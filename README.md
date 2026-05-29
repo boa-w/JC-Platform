@@ -1,0 +1,74 @@
+# 自定义开发平台
+
+基于 Tauri 2 + React + Rust 的仪表设备配置工具，用于管理 UI 资源、CAN 协议参数和多语言翻译，最终导出设备二进制配置包。
+
+## 技术栈
+
+- **前端**：React 18 + TypeScript + Vite
+- **桌面端**：Tauri 2
+- **后端**：Rust (serde, calamine, thiserror)
+
+## 功能模块
+
+1. **项目管理**：创建、打开、保存 `.jcpro` 项目文件。
+2. **UI 资源编辑**：管理仪表 UI 图片、动画帧、坐标和资源导出路径。
+3. **PDO 简化配置**：维护接收表/发送表、CAN 帧和系统内部变量绑定。
+4. **PDO 高级配置**：维护全局变量、条件表、CAN 数据项和底层协议结构。
+5. **SDO 参数配置**：维护 SDO 菜单树、权限、CAN Open 参数、数据类型和预处理。
+6. **多国语言**：自动收集翻译项、编辑翻译表、导入导出 CSV/XLS。
+7. **项目导出**：生成 `jc_export`、图片资源、JSON 描述和设备二进制文件。
+
+## 目录结构
+
+```text
+src/                         React + TypeScript 前端
+  api/                       Tauri command 调用封装
+  components/                通用组件
+  data/                      静态模块定义
+  pages/                     页面级组件
+  stores/                    前端状态边界
+  styles/                    样式
+  types/                     前端类型
+  utils/                     工具函数
+
+src-tauri/                   Rust / Tauri 后端
+  src/commands/              Tauri 命令入口
+  src/domain/                领域模型
+  src/infrastructure/        文件、JSON、表格、二进制适配层
+  capabilities/              Tauri 权限配置
+
+docs/                        项目文档
+```
+
+## 开发命令
+
+安装依赖：
+
+```bash
+npm install
+```
+
+启动前端开发服务器：
+
+```bash
+npm run dev
+```
+
+启动 Tauri 桌面应用：
+
+```bash
+npm run tauri:dev
+```
+
+前端构建：
+
+```bash
+npm run build
+```
+
+Rust 检查：
+
+```bash
+cd src-tauri
+cargo check
+```
