@@ -4,7 +4,7 @@
 
 use crate::commands::{self, LegacyTableKind, UiResourceParseRequest};
 use crate::domain::export::{BinaryCompareRequest, ExportPlanRequest};
-use crate::domain::project::{NewProjectRequest, SaveProjectRequest};
+use crate::domain::project::{NewProjectRequest, SaveProjectAsRequest, SaveProjectRequest};
 use crate::domain::ui_resource::{
     UiResourceOptionAddRequest, UiResourceOptionRemoveRequest, UiResourceUpdateRequest,
 };
@@ -85,6 +85,15 @@ enum ProjectCommand {
     Save {
         #[arg(long)]
         path: String,
+        #[arg(long)]
+        document: String,
+    },
+    /// Save a project document to a new path and copy referenced resources.
+    SaveAs {
+        #[arg(long = "source-path")]
+        source_path: String,
+        #[arg(long = "target-path")]
+        target_path: String,
         #[arg(long)]
         document: String,
     },
@@ -398,6 +407,18 @@ fn run_project(command: ProjectCommand, pretty: bool) -> Result<(), CliError> {
         ProjectCommand::Save { path, document } => print_backend(
             commands::save_project(SaveProjectRequest {
                 path,
+                document: read_json_value(&document)?,
+            }),
+            pretty,
+        ),
+        ProjectCommand::SaveAs {
+            source_path,
+            target_path,
+            document,
+        } => print_backend(
+            commands::save_project_as(SaveProjectAsRequest {
+                source_path,
+                target_path,
                 document: read_json_value(&document)?,
             }),
             pretty,

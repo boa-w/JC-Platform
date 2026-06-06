@@ -20,6 +20,8 @@ import type {
   ProjectParseReport,
   ProjectSummary,
   ProjectValidationReport,
+  SaveProjectAsReport,
+  SaveProjectAsRequest,
   SaveProjectRequest,
   SdoImportReport,
   TableDocument,
@@ -73,6 +75,10 @@ export async function createProject(request: NewProjectRequest): Promise<LoadedP
 
 export async function saveProject(request: SaveProjectRequest): Promise<LoadedProject> {
   return invoke<LoadedProject>('save_project', { request });
+}
+
+export async function saveProjectAs(request: SaveProjectAsRequest): Promise<SaveProjectAsReport> {
+  return invoke<SaveProjectAsReport>('save_project_as', { request });
 }
 
 export async function validateProjectDocument(document: unknown): Promise<ProjectValidationReport> {

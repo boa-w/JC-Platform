@@ -170,6 +170,23 @@ export interface SaveProjectRequest {
   document: unknown;
 }
 
+export interface SaveProjectAsRequest {
+  source_path: string;
+  target_path: string;
+  document: unknown;
+}
+
+export interface ProjectResourceCopyItem {
+  source: string;
+  destination: string;
+}
+
+export interface SaveProjectAsReport {
+  project: LoadedProject;
+  copied_resources: ProjectResourceCopyItem[];
+  warnings: string[];
+}
+
 export interface LegacyTableSpec {
   kind: LegacyTableKind;
   headers: string[];

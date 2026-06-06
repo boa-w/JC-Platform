@@ -18,8 +18,9 @@ use crate::domain::pdo::{
 };
 use crate::domain::project::{
     create_legacy_project_document, migrate_legacy_project_document, parse_legacy_project_document,
-    LoadedProject, MigratedProject, NewProjectRequest, ProjectParseReport, ProjectSummary,
-    ProjectValidationReport, SaveProjectRequest,
+    save_project_as as save_project_as_document, LoadedProject, MigratedProject, NewProjectRequest,
+    ProjectParseReport, ProjectSummary, ProjectValidationReport, SaveProjectAsReport,
+    SaveProjectAsRequest, SaveProjectRequest,
 };
 use crate::domain::sdo::{parse_sdo_table, sdo_document_to_table, SdoImportReport};
 use crate::domain::ui_resource::{
@@ -88,6 +89,12 @@ pub fn create_project(request: NewProjectRequest) -> Result<LoadedProject, Strin
 pub fn save_project(request: SaveProjectRequest) -> Result<LoadedProject, String> {
     json_store::write_json(&request.path, &request.document).map_err(|error| error.to_string())?;
     load_project_from_document(request.path, request.document)
+}
+
+/// 将当前项目另存为新文件，并复制引用的 UI 资源。
+#[tauri::command]
+pub fn save_project_as(request: SaveProjectAsRequest) -> Result<SaveProjectAsReport, String> {
+    save_project_as_document(request)
 }
 
 /// 校验项目 JSON 是否包含所有必要段落。

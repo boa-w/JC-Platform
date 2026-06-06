@@ -27,6 +27,7 @@ import {
   removeUiResourceOptionDocument,
   revealItemInDir,
   saveProject,
+  saveProjectAs,
   sdoDocumentTable,
   updateUiResourceDocument,
 } from '../api/commands';
@@ -182,7 +183,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [isApplyingUi, setIsApplyingUi] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isSavingProject, setIsSavingProject] = useState(false);
+  const [savingProjectAction, setSavingProjectAction] = useState<'save' | 'saveAs' | null>(null);
+  const isSavingProject = savingProjectAction !== null;
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [jsonPopupSize, setJsonPopupSize] = useState({ w: 520, h: 420 });
@@ -1282,7 +1284,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   async function confirmSaveProject() {
     if (!loadedProject?.summary.path) return;
 
-    setIsSavingProject(true);
+    setSavingProjectAction('save');
     setSaveStatus(null);
 
     try {
@@ -1299,7 +1301,51 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     } catch (error) {
       setSaveStatus(error instanceof Error ? error.message : String(error));
     } finally {
-      setIsSavingProject(false);
+      setSavingProjectAction(null);
+    }
+  }
+
+  async function handleSaveProjectAs() {
+    const sourcePath = loadedProject?.summary.path;
+    if (!loadedProject || !sourcePath) return;
+
+    setSaveStatus(null);
+
+    if (!isTauriRuntime()) {
+      setSaveStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+
+    const currentName = sourcePath.split(/[\\/]/).pop() || `${loadedProject.summary.name || 'project'}.jcpro`;
+    const selected = await save({
+      defaultPath: currentName,
+      filters: [{ name: '项目文件', extensions: ['jcpro'] }],
+    });
+    if (!selected) return;
+
+    if (selected === sourcePath) {
+      setSaveStatus('另存为目标不能与当前项目路径相同。');
+      return;
+    }
+
+    setSavingProjectAction('saveAs');
+
+    try {
+      const report = await saveProjectAs({
+        source_path: sourcePath,
+        target_path: selected,
+        document: loadedProject.document,
+      });
+      acceptLoadedProject(report.project, selected);
+      const nextPreview = await parseUiPreview(report.project.document, report.project.summary.path ?? selected);
+      setUiPreview(nextPreview);
+      const copiedText = `已复制 ${report.copied_resources.length} 个资源`;
+      const warningText = report.warnings.length > 0 ? `，${report.warnings.length} 个警告` : '';
+      setSaveStatus(`已另存为：${selected}（${copiedText}${warningText}）`);
+    } catch (error) {
+      setSaveStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingProjectAction(null);
     }
   }
 
@@ -1768,12 +1814,20 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
               </button>
             ) : null}
             <button
+              className="action-bar-btn action-bar-btn--ghost"
+              disabled={!loadedProject?.summary.path || isSavingProject}
+              onClick={() => void handleSaveProjectAs()}
+              type="button"
+            >
+              {savingProjectAction === 'saveAs' ? '另存中...' : '另存为...'}
+            </button>
+            <button
               className="action-bar-btn action-bar-btn--save"
               disabled={!hasUnsavedChanges || !loadedProject.summary.path || isSavingProject}
               onClick={requestSaveProject}
               type="button"
             >
-              {isSavingProject ? '保存中...' : '保存'}
+              {savingProjectAction === 'save' ? '保存中...' : '保存'}
             </button>
           </div>
         </div>
@@ -1797,7 +1851,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
             <div className="modal-actions">
               <button className="modal-btn-cancel" disabled={isSavingProject} onClick={cancelSaveProject} type="button">取消</button>
               <button className="modal-btn-confirm" disabled={isSavingProject} onClick={() => void confirmSaveProject()} type="button">
-                {isSavingProject ? '保存中...' : '确认保存'}
+                {savingProjectAction === 'save' ? '保存中...' : '确认保存'}
               </button>
             </div>
           </div>
