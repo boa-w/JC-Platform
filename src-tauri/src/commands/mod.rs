@@ -42,6 +42,7 @@ use std::path::{Path, PathBuf};
 pub struct BackendHealth {
     pub app_name: String,
     pub version: String,
+    pub commit_hash: String,
     pub core_status: String,
 }
 
@@ -51,6 +52,9 @@ pub fn backend_health() -> BackendHealth {
     BackendHealth {
         app_name: "自定义开发平台".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
+        commit_hash: option_env!("JC_GIT_COMMIT_HASH")
+            .unwrap_or("unknown")
+            .to_string(),
         core_status: "ready".to_string(),
     }
 }

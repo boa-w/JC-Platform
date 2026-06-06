@@ -2598,7 +2598,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         <section className="project-open-card">
           <div>
             <h2>软件设置</h2>
-            <p>查看当前软件版本、核心状态和项目运行信息。</p>
+            <p>查看当前软件版本、提交哈希、核心状态和项目运行信息。</p>
           </div>
           <strong className="section-label--muted">应用信息</strong>
           <div className="project-open-report">
@@ -2613,6 +2613,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
             <article>
               <span>核心版本</span>
               <strong>{health?.version ?? '-'}</strong>
+            </article>
+            <article>
+              <span>提交哈希</span>
+              <strong>{health?.commit_hash ?? 'unknown'}</strong>
             </article>
             <article>
               <span>核心状态</span>

@@ -37,6 +37,7 @@ import type {
 const fallbackHealth: BackendHealth = {
   app_name: '自定义开发平台',
   version: '0.1.0',
+  commit_hash: 'unknown',
   core_status: 'ready',
 };
 

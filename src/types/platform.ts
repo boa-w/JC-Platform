@@ -17,6 +17,7 @@ export interface FeatureModule {
 export interface BackendHealth {
   app_name: string;
   version: string;
+  commit_hash: string;
   core_status: string;
 }
 
