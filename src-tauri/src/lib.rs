@@ -10,6 +10,7 @@
 
 #![allow(dead_code)]
 
+pub mod cli;
 mod commands;
 mod domain;
 mod infrastructure;

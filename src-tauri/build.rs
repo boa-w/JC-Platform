@@ -8,9 +8,14 @@ fn main() {
 
 fn emit_git_commit_hash() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let repo_root = Path::new(&manifest_dir).parent().unwrap_or_else(|| Path::new(&manifest_dir));
+    let repo_root = Path::new(&manifest_dir)
+        .parent()
+        .unwrap_or_else(|| Path::new(&manifest_dir));
 
-    println!("cargo:rerun-if-changed={}", repo_root.join(".git/HEAD").display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        repo_root.join(".git/HEAD").display()
+    );
     emit_git_ref_rerun_hint(repo_root);
 
     let commit_hash = Command::new("git")

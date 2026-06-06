@@ -5,7 +5,7 @@
 /// 顺序写入的二进制缓冲区。
 ///
 /// 使用示例：
-/// ```
+/// ```ignore
 /// let mut writer = BinaryWriter::new();
 /// writer.write_u8(0x01);
 /// writer.write_u16_le(0x1234);

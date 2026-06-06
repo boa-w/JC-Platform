@@ -892,7 +892,11 @@ fn collect_language_entries(document: &Value) -> Vec<String> {
             .map(Vec::len)
             .unwrap_or_default();
         if let Some(items) = language_info.get("list_inner").and_then(Value::as_array) {
-            for item in items.iter().skip(config_prefix_len).filter_map(Value::as_str) {
+            for item in items
+                .iter()
+                .skip(config_prefix_len)
+                .filter_map(Value::as_str)
+            {
                 push_unique(&mut entries, item);
             }
         }

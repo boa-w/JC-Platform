@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "cli": "cargo run --manifest-path src-tauri/Cargo.toml --bin jc-cli --",
+    "cli:build": "cargo build --manifest-path src-tauri/Cargo.toml --bin jc-cli --release"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
