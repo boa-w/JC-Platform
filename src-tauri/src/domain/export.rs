@@ -886,25 +886,16 @@ struct SdoBinaryNode {
 fn collect_language_entries(document: &Value) -> Vec<String> {
     let mut entries = Vec::new();
     if let Some(language_info) = document.get("language_info") {
-        let config_prefix_len = language_info
-            .get("list_code_language")
-            .and_then(Value::as_array)
-            .map(Vec::len)
-            .unwrap_or_default();
         if let Some(items) = language_info.get("list_inner").and_then(Value::as_array) {
-            for item in items
-                .iter()
-                .skip(config_prefix_len)
-                .filter_map(Value::as_str)
-            {
-                push_unique(&mut entries, item);
+            for item in items.iter().filter_map(Value::as_str) {
+                entries.push(item.to_string());
             }
         }
     }
     if let Some(sdo_info) = document.get("sdo_info") {
         collect_sdo_names(sdo_info, &mut entries);
     }
-    push_unique(&mut entries, "");
+    entries.push(String::new());
     entries
 }
 
@@ -1631,4 +1622,89 @@ fn join_path(base: &str, child: &str) -> String {
         base.trim_end_matches(['/', '\\']),
         child.replace('\\', "/")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collect_language_entries_includes_language_name_prefix() {
+        let document = json!({
+            "language_info": {
+                "list_code_language": ["zh", "en"],
+                "list_inner": ["中文", "English", "参数A"]
+            },
+            "sdo_info": {
+                "name": "菜单根",
+                "children": [
+                    { "name": "参数B", "children": [] }
+                ]
+            }
+        });
+
+        assert_eq!(
+            collect_language_entries(&document),
+            vec!["中文", "English", "参数A", "菜单根", "参数B", ""]
+        );
+    }
+
+    #[test]
+    fn collect_language_entries_deduplicates_sdo_names_against_list_inner() {
+        let document = json!({
+            "language_info": {
+                "list_code_language": ["zh", "en"],
+                "list_inner": ["中文", "English", "参数A"]
+            },
+            "sdo_info": {
+                "name": "参数A",
+                "children": [
+                    { "name": "参数B", "children": [] },
+                    { "name": "参数B", "children": [] }
+                ]
+            }
+        });
+
+        assert_eq!(
+            collect_language_entries(&document),
+            vec!["中文", "English", "参数A", "参数B", ""]
+        );
+    }
+
+    #[test]
+    fn collect_language_entries_appends_empty_string_unconditionally() {
+        let document = json!({
+            "language_info": {
+                "list_code_language": ["zh"],
+                "list_inner": ["", "中文"]
+            },
+            "sdo_info": {
+                "name": "菜单根",
+                "children": []
+            }
+        });
+
+        assert_eq!(
+            collect_language_entries(&document),
+            vec!["", "中文", "菜单根", ""]
+        );
+    }
+
+    #[test]
+    fn sdo_name_index_accounts_for_language_prefix() {
+        let document = json!({
+            "language_info": {
+                "list_code_language": ["zh", "en"],
+                "list_inner": ["中文", "English", "参数A"]
+            },
+            "sdo_info": {
+                "name": "菜单根",
+                "children": []
+            }
+        });
+        let entries = collect_language_entries(&document);
+        let bytes = menu_item_bytes(document.get("sdo_info").unwrap(), &entries, 1, 0);
+
+        assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 3);
+    }
 }
