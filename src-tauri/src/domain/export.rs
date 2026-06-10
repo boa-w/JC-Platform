@@ -545,14 +545,7 @@ fn build_config_update_manifest(
     let mut manifest = Map::new();
     manifest.insert(
         "config_version".to_string(),
-        Value::String(
-            request
-                .document
-                .get("config_version")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
-        ),
+        Value::String("jc001".to_string()),
     );
     if let Some(device) = request.document.get("device") {
         manifest.insert("device".to_string(), device.clone());
