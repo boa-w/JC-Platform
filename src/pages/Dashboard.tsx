@@ -192,6 +192,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [isOpening, setIsOpening] = useState(false);
   const [uiApplyError, setUiApplyError] = useState<string | null>(null);
   const [isApplyingUi, setIsApplyingUi] = useState(false);
+  const [showCanvasLabels, setShowCanvasLabels] = useState(true);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savingProjectAction, setSavingProjectAction] = useState<'save' | 'saveAs' | null>(null);
@@ -451,7 +452,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (key !== baselineKey) delete nextTranslate[key];
     nextTranslate[baselineKey] = cloneJson(
       baselineLanguage.list_translate[baselineKey]
-        ?? Object.fromEntries(document.list_code_language.map((code) => [code, ''])),
+      ?? Object.fromEntries(document.list_code_language.map((code) => [code, ''])),
     );
 
     updateLanguageDocument({
@@ -628,27 +629,35 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     try {
       updatePdoSimpleDocument({
         pdo_recv: [
-          { id: 0x181, type: 0, desc: '电机运行状态', data: [
-            { pos: 0, len: 16, show_type: 0, pdo_param_index: 0, pdo_param_name: 'motor_speed' },
-            { pos: 16, len: 8, show_type: 0, pdo_param_index: 1, pdo_param_name: 'motor_temp' },
-            { pos: 24, len: 8, show_type: 0, pdo_param_index: 2, pdo_param_name: 'motor_status' },
-          ]},
-          { id: 0x182, type: 0, desc: '电池信息', data: [
-            { pos: 0, len: 16, show_type: 0, pdo_param_index: 3, pdo_param_name: 'battery_voltage' },
-            { pos: 16, len: 8, show_type: 0, pdo_param_index: 4, pdo_param_name: 'battery_current' },
-            { pos: 24, len: 8, show_type: 0, pdo_param_index: 5, pdo_param_name: 'battery_soc' },
-            { pos: 32, len: 8, show_type: 0, pdo_param_index: 6, pdo_param_name: 'battery_temp' },
-          ]},
+          {
+            id: 0x181, type: 0, desc: '电机运行状态', data: [
+              { pos: 0, len: 16, show_type: 0, pdo_param_index: 0, pdo_param_name: 'motor_speed' },
+              { pos: 16, len: 8, show_type: 0, pdo_param_index: 1, pdo_param_name: 'motor_temp' },
+              { pos: 24, len: 8, show_type: 0, pdo_param_index: 2, pdo_param_name: 'motor_status' },
+            ]
+          },
+          {
+            id: 0x182, type: 0, desc: '电池信息', data: [
+              { pos: 0, len: 16, show_type: 0, pdo_param_index: 3, pdo_param_name: 'battery_voltage' },
+              { pos: 16, len: 8, show_type: 0, pdo_param_index: 4, pdo_param_name: 'battery_current' },
+              { pos: 24, len: 8, show_type: 0, pdo_param_index: 5, pdo_param_name: 'battery_soc' },
+              { pos: 32, len: 8, show_type: 0, pdo_param_index: 6, pdo_param_name: 'battery_temp' },
+            ]
+          },
         ],
         pdo_send: [
-          { id: 0x101, type: 0, desc: '控制指令', data: [
-            { pos: 0, len: 8, show_type: 0, pdo_param_index: 7, pdo_param_name: 'control_cmd' },
-            { pos: 8, len: 16, show_type: 0, pdo_param_index: 8, pdo_param_name: 'target_value' },
-          ]},
-          { id: 0x102, type: 0, desc: '参数配置', data: [
-            { pos: 0, len: 16, show_type: 0, pdo_param_index: 9, pdo_param_name: 'param_value' },
-            { pos: 16, len: 8, show_type: 0, pdo_param_index: 10, pdo_param_name: 'param_index' },
-          ]},
+          {
+            id: 0x101, type: 0, desc: '控制指令', data: [
+              { pos: 0, len: 8, show_type: 0, pdo_param_index: 7, pdo_param_name: 'control_cmd' },
+              { pos: 8, len: 16, show_type: 0, pdo_param_index: 8, pdo_param_name: 'target_value' },
+            ]
+          },
+          {
+            id: 0x102, type: 0, desc: '参数配置', data: [
+              { pos: 0, len: 16, show_type: 0, pdo_param_index: 9, pdo_param_name: 'param_value' },
+              { pos: 16, len: 8, show_type: 0, pdo_param_index: 10, pdo_param_name: 'param_index' },
+            ]
+          },
         ],
       });
     } finally {
@@ -672,20 +681,26 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
           { param_id: '006', process: 0, data: [{ param_id: '003' }, { param_id: '004' }] },
         ],
         pdo_recv: [
-          { id: 0x281, type: 0, desc: '电机状态帧', data: [
-            { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '001' },
-            { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '002' },
-          ]},
-          { id: 0x282, type: 0, desc: '电池状态帧', data: [
-            { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '003' },
-            { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '004' },
-          ]},
+          {
+            id: 0x281, type: 0, desc: '电机状态帧', data: [
+              { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '001' },
+              { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '002' },
+            ]
+          },
+          {
+            id: 0x282, type: 0, desc: '电池状态帧', data: [
+              { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '003' },
+              { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '004' },
+            ]
+          },
         ],
         pdo_send: [
-          { id: 0x201, type: 0, desc: '控制帧', data: [
-            { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '005' },
-            { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '006' },
-          ]},
+          {
+            id: 0x201, type: 0, desc: '控制帧', data: [
+              { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '005' },
+              { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '006' },
+            ]
+          },
         ],
       });
     } finally {
@@ -2241,6 +2256,19 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 ↩ 恢复
               </button>
             ) : null}
+            {activeModule.key === 'ui' ? (
+              <>
+                <button
+                  className={`action-bar-btn ${showCanvasLabels ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'}`}
+                  onClick={() => setShowCanvasLabels((v) => !v)}
+                  title={showCanvasLabels ? '隐藏画布上的资源文字标注' : '显示画布上的资源文字标注'}
+                  type="button"
+                >
+                  {showCanvasLabels ? '隐藏标注' : '显示标注'}
+                </button>
+                <span className="action-bar-sep" />
+              </>
+            ) : null}
             <button
               className="action-bar-btn action-bar-btn--ghost"
               disabled={!loadedProject?.summary.path || isSavingProject}
@@ -2320,165 +2348,919 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       ) : null}
 
       <div className={showJsonEditor && loadedProject ? 'workspace-json-active' : undefined}>
-      {activeModule.key === 'project' ? (
-        <section className="project-page">
-          {/* Open project */}
-          <div className="project-section">
-            <div className="project-open-row">
-              <input
-                className="project-open-input"
-                placeholder="输入或粘贴 .jcpro 文件路径"
-                value={projectPath}
-                onChange={(event) => setProjectPath(event.target.value)}
-                onKeyDown={(event) => { if (event.key === 'Enter') void handleOpenProject(); }}
-              />
-              <button className="project-open-btn" type="button" onClick={() => void handleSelectProjectFile()} disabled={isOpening}>
-                {isOpening ? '打开中...' : '浏览'}
-              </button>
-              <button className="project-open-btn project-open-btn--secondary" type="button" onClick={() => void handleOpenProject()} disabled={isOpening || projectPath.trim() === ''}>
-                打开
-              </button>
-            </div>
-            {openError ? <p className="project-open-error">{openError}</p> : null}
-          </div>
-
-          {/* Recent projects */}
-          {recentProjects.length > 0 ? (
+        {activeModule.key === 'project' ? (
+          <section className="project-page">
+            {/* Open project */}
             <div className="project-section">
-              <div className="project-section-header">
-                <strong>最近项目</strong>
-                <button className="project-link-btn" disabled={recentProjects.length === 0} onClick={clearRecentProjects} type="button">清空</button>
-              </div>
-              <div className="project-recent-list">
-                {recentProjects.map((item) => (
-                  <button className="project-recent-item" key={item.path} disabled={isOpening} onClick={() => void handleOpenProject(item.path)} type="button">
-                    <span className="project-recent-name">{item.name || '未命名'}</span>
-                    <span className="project-recent-path">{item.path}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Create project */}
-          <div className="project-section">
-            <div className="project-section-header">
-              <strong>新建项目</strong>
-            </div>
-            <div className="project-create-form">
-              <input
-                className="project-create-name"
-                placeholder="项目名称"
-                value={newProjectName}
-                onChange={(event) => setNewProjectName(event.target.value)}
-              />
-              <div className="project-create-bottom">
-                <div className="project-create-resolution">
-                  <span className="project-create-label">分辨率</span>
-                  <input
-                    className="project-create-num"
-                    min="1"
-                    type="number"
-                    value={newResolutionW}
-                    onChange={(event) => setNewResolutionW(Number(event.target.value))}
-                  />
-                  <span className="project-create-x">×</span>
-                  <input
-                    className="project-create-num"
-                    min="1"
-                    type="number"
-                    value={newResolutionH}
-                    onChange={(event) => setNewResolutionH(Number(event.target.value))}
-                  />
-                </div>
-                <button
-                  className="project-open-btn"
-                  disabled={isOpening || newProjectName.trim() === ''}
-                  onClick={() => void handleCreateProject()}
-                  type="button"
-                >
-                  创建项目
+              <div className="project-open-row">
+                <input
+                  className="project-open-input"
+                  placeholder="输入或粘贴 .jcpro 文件路径"
+                  value={projectPath}
+                  onChange={(event) => setProjectPath(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === 'Enter') void handleOpenProject(); }}
+                />
+                <button className="project-open-btn" type="button" onClick={() => void handleSelectProjectFile()} disabled={isOpening}>
+                  {isOpening ? '打开中...' : '浏览'}
+                </button>
+                <button className="project-open-btn project-open-btn--secondary" type="button" onClick={() => void handleOpenProject()} disabled={isOpening || projectPath.trim() === ''}>
+                  打开
                 </button>
               </div>
+              {openError ? <p className="project-open-error">{openError}</p> : null}
             </div>
-          </div>
 
-          {/* Loaded project info */}
-          {loadedProject ? (
+            {/* Recent projects */}
+            {recentProjects.length > 0 ? (
+              <div className="project-section">
+                <div className="project-section-header">
+                  <strong>最近项目</strong>
+                  <button className="project-link-btn" disabled={recentProjects.length === 0} onClick={clearRecentProjects} type="button">清空</button>
+                </div>
+                <div className="project-recent-list">
+                  {recentProjects.map((item) => (
+                    <button className="project-recent-item" key={item.path} disabled={isOpening} onClick={() => void handleOpenProject(item.path)} type="button">
+                      <span className="project-recent-name">{item.name || '未命名'}</span>
+                      <span className="project-recent-path">{item.path}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Create project */}
             <div className="project-section">
               <div className="project-section-header">
-                <strong>当前项目</strong>
-                <div className="project-info-actions">
-                  <button className="project-link-btn" disabled={isOpening} onClick={() => void handleParseProject()} type="button">解析</button>
-                  <button className="project-link-btn" disabled={isOpening} onClick={() => void handleMigrateProject()} type="button">补齐结构</button>
+                <strong>新建项目</strong>
+              </div>
+              <div className="project-create-form">
+                <input
+                  className="project-create-name"
+                  placeholder="项目名称"
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                />
+                <div className="project-create-bottom">
+                  <div className="project-create-resolution">
+                    <span className="project-create-label">分辨率</span>
+                    <input
+                      className="project-create-num"
+                      min="1"
+                      type="number"
+                      value={newResolutionW}
+                      onChange={(event) => setNewResolutionW(Number(event.target.value))}
+                    />
+                    <span className="project-create-x">×</span>
+                    <input
+                      className="project-create-num"
+                      min="1"
+                      type="number"
+                      value={newResolutionH}
+                      onChange={(event) => setNewResolutionH(Number(event.target.value))}
+                    />
+                  </div>
+                  <button
+                    className="project-open-btn"
+                    disabled={isOpening || newProjectName.trim() === ''}
+                    onClick={() => void handleCreateProject()}
+                    type="button"
+                  >
+                    创建项目
+                  </button>
                 </div>
               </div>
-              <div className="project-info-grid">
-                <div className="project-info-item">
-                  <span>名称</span>
-                  <strong>{loadedProject.summary.name}</strong>
-                </div>
-                <div className="project-info-item">
-                  <span>分辨率</span>
-                  <strong>{loadedProject.summary.deviceResolution}</strong>
-                </div>
-                <div className="project-info-item">
-                  <span>路径</span>
-                  <strong className="project-info-path">{loadedProject.summary.path}</strong>
-                </div>
-                <div className="project-info-item">
-                  <span>校验</span>
-                  <strong className={loadedProject.validation.valid ? 'text-success' : 'text-danger'}>
-                    {loadedProject.validation.valid ? '通过' : '缺少段落'}
-                  </strong>
-                </div>
-              </div>
-              {loadedProject.validation.missing_sections.length > 0 ? (
-                <p className="project-open-error">缺少：{loadedProject.validation.missing_sections.join('、')}</p>
-              ) : null}
-              {loadedProject.validation.warnings.length > 0 ? (
-                <p className="project-open-warning">警告：{loadedProject.validation.warnings.join('；')}</p>
-              ) : null}
             </div>
-          ) : null}
 
-          {/* Parse report */}
-          {projectParseReport ? (
-            <div className="project-section">
-              <div className="project-section-header">
-                <strong>解析报告</strong>
+            {/* Loaded project info */}
+            {loadedProject ? (
+              <div className="project-section">
+                <div className="project-section-header">
+                  <strong>当前项目</strong>
+                  <div className="project-info-actions">
+                    <button className="project-link-btn" disabled={isOpening} onClick={() => void handleParseProject()} type="button">解析</button>
+                    <button className="project-link-btn" disabled={isOpening} onClick={() => void handleMigrateProject()} type="button">补齐结构</button>
+                  </div>
+                </div>
+                <div className="project-info-grid">
+                  <div className="project-info-item">
+                    <span>名称</span>
+                    <strong>{loadedProject.summary.name}</strong>
+                  </div>
+                  <div className="project-info-item">
+                    <span>分辨率</span>
+                    <strong>{loadedProject.summary.deviceResolution}</strong>
+                  </div>
+                  <div className="project-info-item">
+                    <span>路径</span>
+                    <strong className="project-info-path">{loadedProject.summary.path}</strong>
+                  </div>
+                  <div className="project-info-item">
+                    <span>校验</span>
+                    <strong className={loadedProject.validation.valid ? 'text-success' : 'text-danger'}>
+                      {loadedProject.validation.valid ? '通过' : '缺少段落'}
+                    </strong>
+                  </div>
+                </div>
+                {loadedProject.validation.missing_sections.length > 0 ? (
+                  <p className="project-open-error">缺少：{loadedProject.validation.missing_sections.join('、')}</p>
+                ) : null}
+                {loadedProject.validation.warnings.length > 0 ? (
+                  <p className="project-open-warning">警告：{loadedProject.validation.warnings.join('；')}</p>
+                ) : null}
               </div>
-              <div className="project-info-grid">
-                <div className="project-info-item">
-                  <span>有效</span>
-                  <strong className={projectParseReport.valid ? 'text-success' : 'text-danger'}>{projectParseReport.valid ? '是' : '否'}</strong>
+            ) : null}
+
+            {/* Parse report */}
+            {projectParseReport ? (
+              <div className="project-section">
+                <div className="project-section-header">
+                  <strong>解析报告</strong>
                 </div>
-                <div className="project-info-item">
-                  <span>补齐段落</span>
-                  <strong>{projectParseReport.added_sections.length}</strong>
+                <div className="project-info-grid">
+                  <div className="project-info-item">
+                    <span>有效</span>
+                    <strong className={projectParseReport.valid ? 'text-success' : 'text-danger'}>{projectParseReport.valid ? '是' : '否'}</strong>
+                  </div>
+                  <div className="project-info-item">
+                    <span>补齐段落</span>
+                    <strong>{projectParseReport.added_sections.length}</strong>
+                  </div>
+                  <div className="project-info-item">
+                    <span>错误</span>
+                    <strong className={projectParseReport.errors.length > 0 ? 'text-danger' : undefined}>{projectParseReport.errors.length}</strong>
+                  </div>
                 </div>
-                <div className="project-info-item">
-                  <span>错误</span>
-                  <strong className={projectParseReport.errors.length > 0 ? 'text-danger' : undefined}>{projectParseReport.errors.length}</strong>
-                </div>
+                {projectParseReport.errors.length > 0 ? <p className="project-open-error">{projectParseReport.errors.join('；')}</p> : null}
               </div>
-              {projectParseReport.errors.length > 0 ? <p className="project-open-error">{projectParseReport.errors.join('；')}</p> : null}
+            ) : null}
+          </section>
+        ) : null}
+
+        {(['sdo', 'pdoSimple', 'language'] as TableConfigKind[]).includes(activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind) ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>{tableConfigTitles[activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind]}</h2>
+              <p>导入/导出操作请使用顶部工具栏按钮。支持 CSV、XLS、XLSX、XML 格式。</p>
             </div>
-          ) : null}
-        </section>
-      ) : null}
+            {tableSpecs
+              .filter((spec) => spec.kind === (activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key))
+              .map((spec) => (
+                <div className="table-format-ref" key={spec.kind}>
+                  <strong>表头格式（{spec.headers.length} 列）</strong>
+                  <div className="table-format-chips">
+                    {spec.headers.map((header) => (
+                      <span className="table-format-chip" key={header}>{header}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            {tableImportError ? <p className="project-open-error">{tableImportError}</p> : null}
+            {tableImportReport ? (
+              <div className="table-io-result">
+                <div className="table-io-result-row">
+                  <span>导入校验</span>
+                  <strong className={tableImportReport.valid ? 'text-success' : 'text-danger'}>{tableImportReport.valid ? '通过' : '存在问题'}</strong>
+                </div>
+                <div className="table-io-result-row">
+                  <span>表头列数</span>
+                  <strong>{tableImportReport.table.actual_headers.length}</strong>
+                </div>
+                <div className="table-io-result-row">
+                  <span>写回段落</span>
+                  <strong>{tableConfigSections[activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind]}</strong>
+                </div>
+              </div>
+            ) : null}
+            {tableExportStatus ? <p className="config-helper-text">{tableExportStatus}</p> : null}
+          </section>
+        ) : null}
 
-      {(['sdo', 'pdoSimple', 'language'] as TableConfigKind[]).includes(activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind) ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>{tableConfigTitles[activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind]}</h2>
-            <p>导入/导出操作请使用顶部工具栏按钮。支持 CSV、XLS、XLSX、XML 格式。</p>
-          </div>
-          {tableSpecs
-            .filter((spec) => spec.kind === (activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key))
-            .map((spec) => (
+        {activeModule.key === 'sdo' ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>SDO 参数树</h2>
+              <p>维护 SDO 菜单树、权限、CAN Open 参数、数据范围和预处理字段，修改后直接写回 sdo_info。</p>
+            </div>
+            {currentSdoDocument ? (
+              <>
+                <div className="config-summary-strip">
+                  <article>
+                    <span>根节点</span>
+                    <strong>{currentSdoDocument.name}</strong>
+                  </article>
+                  <article>
+                    <span>直接子节点</span>
+                    <strong>{currentSdoDocument.children?.length ?? 0}</strong>
+                  </article>
+                  <article>
+                    <span>写回段落</span>
+                    <strong>sdo_info</strong>
+                  </article>
+                </div>
+                <p className="config-helper-text">每个节点按基础信息、通信控制、数据范围和预处理字段分组展示；新增/删除会立即同步到内存项目文档。</p>
+                <div className="sdo-tree-editor">{renderSdoNode(currentSdoDocument)}</div>
+              </>
+            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'pdo-simple' ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>PDO 简化配置</h2>
+              <p>维护接收表和发送表中的 CAN 帧、显示变量名、读取方式、位置和长度，修改后直接写回 pdo_simple_send_recv。</p>
+            </div>
+            {currentPdoSimpleDocument ? (
+              <div className="pdo-simple-editor">
+                <div className="config-summary-strip">
+                  <article>
+                    <span>接收帧</span>
+                    <strong>{currentPdoSimpleDocument.pdo_recv.length}</strong>
+                  </article>
+                  <article>
+                    <span>发送帧</span>
+                    <strong>{currentPdoSimpleDocument.pdo_send.length}</strong>
+                  </article>
+                  <article>
+                    <span>写回段落</span>
+                    <strong>pdo_simple_send_recv</strong>
+                  </article>
+                </div>
+                <p className="config-helper-text">帧信息在卡片顶部维护，帧 ID 以 16 进制显示和编辑；位置和长度沿用 bit/byte 数值含义。</p>
+                {pdoJumpTarget !== null ? <p className="config-helper-text">来自 UI 资源跳转的 PDO 参数索引：{pdoJumpTarget}</p> : null}
+                {(['pdo_recv', 'pdo_send'] as const).map((kind) => (
+                  <section className="pdo-frame-section" key={kind}>
+                    <div className="config-table-toolbar">
+                      <strong>{kind === 'pdo_recv' ? '接收表' : '发送表'}（{pdoFrames(kind).length} 帧）</strong>
+                      <button onClick={() => addPdoFrame(kind)} type="button">新增帧</button>
+                    </div>
+                    {pdoFrames(kind).map((frame, frameIndex) => {
+                      const framePath: JsonPath = ['pdo_simple_send_recv', kind, frameIndex];
+                      const frameModified = isModifiedPath(framePath);
+                      return (
+                        <article className={frameModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`${kind}-${frameIndex}`}>
+                          <div className="pdo-frame-grid">
+                            <label>
+                              帧 ID
+                              <input inputMode="text" value={formatFrameId(frame.id)} onChange={(event) => updatePdoFrameId(kind, frameIndex, event.target.value)} />
+                            </label>
+                            <label>
+                              帧类型
+                              <select value={frame.type} onChange={(event) => updatePdoFrame(kind, frameIndex, 'type', Number(event.target.value))}>
+                                <option value={0}>标准帧</option>
+                                <option value={1}>扩展帧</option>
+                              </select>
+                            </label>
+                            <label>
+                              描述
+                              <input value={frame.desc} onChange={(event) => updatePdoFrame(kind, frameIndex, 'desc', event.target.value)} />
+                            </label>
+                          </div>
+                          <div className="pdo-frame-actions">
+                            {frameModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(framePath)} type="button">恢复帧</button> : null}
+                            <button onClick={() => removePdoFrame(kind, frameIndex)} type="button">删除帧</button>
+                          </div>
+                          <div className="config-table-toolbar">
+                            <span>数据项（{frame.data.length}）</span>
+                            <button onClick={() => addPdoSignal(kind, frameIndex)} type="button">新增数据项</button>
+                          </div>
+                          <div className="config-table-frame">
+                            <table className="config-table">
+                              <thead>
+                                <tr>
+                                  <th>变量名</th>
+                                  <th>读取方式</th>
+                                  <th>位置</th>
+                                  <th>长度</th>
+                                  <th>参数索引</th>
+                                  <th>操作</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {frame.data.map((signal, signalIndex) => {
+                                  const signalPath: JsonPath = ['pdo_simple_send_recv', kind, frameIndex, 'data', signalIndex];
+                                  const signalModified = isModifiedPath(signalPath);
+                                  const isJumpTarget = pdoJumpTarget === signal.pdo_param_index;
+                                  return (
+                                    <tr
+                                      className={[isJumpTarget ? 'pdo-row-highlight' : '', signalModified ? 'config-entry-modified' : ''].filter(Boolean).join(' ') || undefined}
+                                      key={`${kind}-${frameIndex}-${signalIndex}`}
+                                      ref={isJumpTarget ? (element) => { pdoJumpRowRef.current = element; } : undefined}
+                                    >
+                                      <td><input value={signal.pdo_param_name ?? ''} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pdo_param_name', event.target.value)} /></td>
+                                      <td>
+                                        <select value={signal.show_type} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'show_type', Number(event.target.value))}>
+                                          <option value={0}>按字节</option>
+                                          <option value={1}>按位</option>
+                                          <option value={2}>按字符串</option>
+                                        </select>
+                                      </td>
+                                      <td><input type="number" value={signal.pos} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pos', Number(event.target.value))} /></td>
+                                      <td><input type="number" value={signal.len} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'len', Number(event.target.value))} /></td>
+                                      <td><input type="number" value={signal.pdo_param_index} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pdo_param_index', Number(event.target.value))} /></td>
+                                      <td>
+                                        {signalModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(signalPath)} type="button">恢复</button> : null}
+                                        <button onClick={() => removePdoSignal(kind, frameIndex, signalIndex)} type="button">删除</button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </section>
+                ))}
+              </div>
+            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'battery-monitor' ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>锂电监控配置</h2>
+              <p>维护锂电监控 CAN 帧、PDO 信号、显示项、单位、精度和超时策略，导出后写入 data.bin 的 battery monitor 段。</p>
+            </div>
+            {currentBatteryMonitorDocument ? (
+              <div className="pdo-simple-editor">
+                <div className="config-summary-strip">
+                  <article><span>状态</span><strong>{currentBatteryMonitorDocument.enabled ? '启用' : '停用'}</strong></article>
+                  <article><span>帧 / 信号</span><strong>{currentBatteryMonitorDocument.frames.length} / {currentBatteryMonitorDocument.signals.length}</strong></article>
+                  <article><span>显示项</span><strong>{currentBatteryMonitorDocument.items.filter((item) => item.enabled).length} / {currentBatteryMonitorDocument.items.length}</strong></article>
+                  <article><span>写回段落</span><strong>battery_monitor_info</strong></article>
+                </div>
+                <div className="pdo-frame-grid">
+                  <label>启用<select value={currentBatteryMonitorDocument.enabled ? 1 : 0} onChange={(event) => updateBatteryMonitorField('enabled', Number(event.target.value) === 1)}><option value={1}>启用</option><option value={0}>停用</option></select></label>
+                  <label>版本<input type="number" value={currentBatteryMonitorDocument.version ?? 1} onChange={(event) => updateBatteryMonitorField('version', Number(event.target.value))} /></label>
+                  <label>每页数量<input type="number" value={currentBatteryMonitorDocument.page_size ?? 4} onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))} /></label>
+                  <label>默认超时 tick<input type="number" value={currentBatteryMonitorDocument.default_timeout_ticks ?? 200} onChange={(event) => updateBatteryMonitorField('default_timeout_ticks', Number(event.target.value))} /></label>
+                </div>
+                <section className="pdo-frame-section">
+                  <div className="config-table-toolbar"><strong>锂电 CAN 帧（{currentBatteryMonitorDocument.frames.length}）</strong><button onClick={addBatteryFrame} type="button">新增帧</button></div>
+                  {currentBatteryMonitorDocument.frames.map((frame, frameIndex) => (
+                    <article className={isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`${frame.frame_key}-${frameIndex}`}>
+                      <div className="pdo-frame-grid">
+                        <label>帧 key<input value={frame.frame_key} onChange={(event) => updateBatteryFrame(frameIndex, 'frame_key', event.target.value)} /></label>
+                        <label>帧 ID<input inputMode="text" value={formatFrameId(frame.can_id)} onChange={(event) => updateBatteryFrameId(frameIndex, event.target.value)} /></label>
+                        <label>帧类型<select value={frame.type} onChange={(event) => updateBatteryFrame(frameIndex, 'type', Number(event.target.value))}><option value={0}>标准帧</option><option value={1}>扩展帧</option></select></label>
+                        <label>超时 tick<input type="number" value={frame.timeout_ticks ?? currentBatteryMonitorDocument.default_timeout_ticks} onChange={(event) => updateBatteryFrame(frameIndex, 'timeout_ticks', Number(event.target.value))} /></label>
+                        <label>描述<input value={frame.desc ?? ''} onChange={(event) => updateBatteryFrame(frameIndex, 'desc', event.target.value)} /></label>
+                      </div>
+                      <div className="pdo-frame-actions">
+                        {isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'frames', frameIndex])} type="button">恢复帧</button> : null}
+                        <button onClick={() => removeBatteryFrame(frameIndex)} type="button">删除帧</button>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+                <section className="pdo-frame-section">
+                  <div className="config-table-toolbar"><strong>锂电信号（{currentBatteryMonitorDocument.signals.length}）</strong><button onClick={addBatterySignal} type="button">新增信号</button></div>
+                  <div className="config-table-frame"><table className="config-table"><thead><tr><th>key</th><th>参数ID</th><th>名称</th><th>内部变量</th><th>类型</th><th>帧</th><th>位置</th><th>长度</th><th>取数</th><th>操作</th></tr></thead><tbody>
+                    {currentBatteryMonitorDocument.signals.map((signal, signalIndex) => (
+                      <tr className={isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? 'config-entry-modified' : undefined} key={`${signal.signal_key}-${signalIndex}`}>
+                        <td><input value={signal.signal_key} onChange={(event) => updateBatterySignal(signalIndex, 'signal_key', event.target.value)} /></td>
+                        <td><input value={signal.param_id} onChange={(event) => updateBatterySignal(signalIndex, 'param_id', event.target.value)} /></td>
+                        <td><input value={signal.name} onChange={(event) => updateBatterySignal(signalIndex, 'name', event.target.value)} /></td>
+                        <td><input type="number" value={signal.inner} onChange={(event) => updateBatterySignal(signalIndex, 'inner', Number(event.target.value))} /></td>
+                        <td><input type="number" value={signal.type} onChange={(event) => updateBatterySignal(signalIndex, 'type', Number(event.target.value))} /></td>
+                        <td><select value={signal.frame_key} onChange={(event) => updateBatterySignal(signalIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
+                        <td><input type="number" value={signal.pos} onChange={(event) => updateBatterySignal(signalIndex, 'pos', Number(event.target.value))} /></td>
+                        <td><input type="number" value={signal.len} onChange={(event) => updateBatterySignal(signalIndex, 'len', Number(event.target.value))} /></td>
+                        <td><input type="number" value={signal.show_type} onChange={(event) => updateBatterySignal(signalIndex, 'show_type', Number(event.target.value))} /></td>
+                        <td>{isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'signals', signalIndex])} type="button">恢复</button> : null}<button onClick={() => removeBatterySignal(signalIndex)} type="button">删除</button></td>
+                      </tr>
+                    ))}
+                  </tbody></table></div>
+                </section>
+                <section className="pdo-frame-section">
+                  <div className="config-table-toolbar"><strong>显示项（{currentBatteryMonitorDocument.items.length}）</strong><button onClick={addBatteryItem} type="button">新增显示项</button></div>
+                  <div className="config-table-frame"><table className="config-table"><thead><tr><th>启用</th><th>顺序</th><th>key</th><th>信号</th><th>名称key</th><th>单位</th><th>格式</th><th>偏移</th><th>缩放</th><th>小数</th><th>有效帧</th><th>操作</th></tr></thead><tbody>
+                    {currentBatteryMonitorDocument.items.map((item, itemIndex) => (
+                      <tr className={isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? 'config-entry-modified' : undefined} key={`${item.item_key}-${itemIndex}`}>
+                        <td><input checked={item.enabled} type="checkbox" onChange={(event) => updateBatteryItem(itemIndex, 'enabled', event.target.checked)} /></td>
+                        <td><input type="number" value={item.order} onChange={(event) => updateBatteryItem(itemIndex, 'order', Number(event.target.value))} /></td>
+                        <td><input value={item.item_key} onChange={(event) => updateBatteryItem(itemIndex, 'item_key', event.target.value)} /></td>
+                        <td><select value={item.signal_key} onChange={(event) => updateBatteryItem(itemIndex, 'signal_key', event.target.value)}>{currentBatteryMonitorDocument.signals.map((signal) => <option key={signal.signal_key} value={signal.signal_key}>{signal.signal_key}</option>)}</select></td>
+                        <td><input value={item.name_key} onChange={(event) => updateBatteryItem(itemIndex, 'name_key', event.target.value)} /></td>
+                        <td><input value={item.unit} onChange={(event) => updateBatteryItem(itemIndex, 'unit', event.target.value)} /></td>
+                        <td><select value={item.formatter?.kind ?? 'linear'} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'kind', event.target.value)}><option value="linear">线性</option><option value="bool_text">布尔文本</option><option value="hex">十六进制</option><option value="packed_time_0p1h">0.1H时间</option></select></td>
+                        <td><input type="number" value={item.formatter?.offset ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'offset', Number(event.target.value))} /></td>
+                        <td><input type="number" value={item.formatter?.scale_num ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_num', Number(event.target.value))} />/<input type="number" value={item.formatter?.scale_den ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_den', Number(event.target.value))} /></td>
+                        <td><input type="number" value={item.formatter?.decimals ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'decimals', Number(event.target.value))} /></td>
+                        <td><select value={item.validity?.frame_key ?? ''} onChange={(event) => updateBatteryItemValidity(itemIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
+                        <td>{isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'items', itemIndex])} type="button">恢复</button> : null}<button onClick={() => removeBatteryItem(itemIndex)} type="button">删除</button></td>
+                      </tr>
+                    ))}
+                  </tbody></table></div>
+                </section>
+              </div>
+            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'can-test-data' ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>CAN 测试数据构建</h2>
+              <p>从当前项目 PDO/锂电配置中提取 CAN 帧，生成测试数据并导出为 TXT 文件。</p>
+            </div>
+            {loadedProject ? (
+              <div className="pdo-simple-editor">
+                <div className="config-summary-strip">
+                  <article><span>已生成帧</span><strong>{canTestFrames.length}</strong></article>
+                  <article><span>默认周期</span><strong>{canTestDefaultCycle} ms</strong></article>
+                </div>
+                <div className="pdo-frame-grid">
+                  <label>默认周期(ms)<input type="number" value={canTestDefaultCycle} onChange={(e) => setCanTestDefaultCycle(Number(e.target.value))} /></label>
+                </div>
+                <div className="config-table-toolbar" style={{ gap: 8 }}>
+                  <button disabled={isGeneratingCanTest} onClick={() => void handleGenerateCanTest()} type="button">
+                    {isGeneratingCanTest ? '生成中...' : '⚡ 生成'}
+                  </button>
+                  <button disabled={canTestFrames.length === 0} onClick={() => void handleExportCanTestTxt()} type="button">📤 导出 TXT</button>
+                  <span className="action-bar-sep" />
+                  <button onClick={() => void handleImportCanTestConfig()} type="button">📥 导入配置</button>
+                  <button disabled={canTestFrames.length === 0} onClick={() => void handleExportCanTestConfig()} type="button">📤 导出配置</button>
+                </div>
+                {canTestFrames.length > 0 ? (
+                  <>
+                    <div className="config-table-toolbar" style={{ gap: 6, marginBottom: 6 }}>
+                      <span style={{ fontSize: '0.85em', opacity: 0.7 }}>信号填充：</span>
+                      <button onClick={() => fillCanTestSignals('min')} type="button" title="所有信号填最小值 0">最小值</button>
+                      <button onClick={() => fillCanTestSignals('max')} type="button" title="所有信号填最大值（对应位宽全 1）">最大值</button>
+                      <button onClick={() => fillCanTestSignals('random')} type="button" title="所有信号填随机值">随机值</button>
+                      <span className="action-bar-sep" />
+                      <button onClick={() => fillCanTestSignals('zero')} type="button" title="所有信号填 0">清零</button>
+                      <button onClick={() => fillCanTestSignals('ff')} type="button" title="所有信号原始值填 FF">全 FF</button>
+                    </div>
+                    {canTestFrames.map((frame, frameIndex) => (
+                      <section className="pdo-frame-section" key={`${frame.id}-${frameIndex}`}>
+                        <div className="pdo-frame-card">
+                          <div className="pdo-frame-grid">
+                            <label>CAN ID<code style={{ fontSize: '1.1em' }}>0x{frame.id.toString(16).toUpperCase().padStart(3, '0')}</code></label>
+                            <label>类型<span>{frame.frameType === 0 ? '标准帧' : '扩展帧'}</span></label>
+                            <label>名称<input value={frame.name} onChange={(e) => updateCanTestFrame(frameIndex, 'name', e.target.value)} /></label>
+                            <label>DLC<span>{frame.dlc}</span></label>
+                            <label>周期(ms)<input type="number" style={{ width: 80 }} value={frame.cycleMs} onChange={(e) => updateCanTestFrame(frameIndex, 'cycleMs', Number(e.target.value))} /></label>
+                            <label>HEX<code style={{ fontSize: '0.85em' }}>{frame.data}</code></label>
+                          </div>
+                        </div>
+                        {frame.signals.length > 0 ? (
+                          <div className="config-table-frame" style={{ marginTop: 6 }}>
+                            <table className="config-table">
+                              <thead>
+                                <tr>
+                                  <th>信号名称</th>
+                                  <th>值</th>
+                                  <th>单位</th>
+                                  <th>位置</th>
+                                  <th>长度</th>
+                                  <th>缩放</th>
+                                  <th>偏移</th>
+                                  <th>原始值</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {frame.signals.map((sig, sigIndex) => (
+                                  <tr key={`${sig.name}-${sigIndex}`}>
+                                    <td>{sig.name}</td>
+                                    <td>
+                                      <input
+                                        type="number"
+                                        step={sig.scaleDen > 1 ? 1 / sig.scaleDen : 'any'}
+                                        style={{ width: 90 }}
+                                        value={sig.displayValue}
+                                        onChange={(e) => updateCanTestSignalDisplayValue(frameIndex, sigIndex, Number(e.target.value))}
+                                      />
+                                    </td>
+                                    <td>{sig.unit}</td>
+                                    <td>{sig.pos}</td>
+                                    <td>{sig.len}</td>
+                                    <td>{sig.scaleNum}/{sig.scaleDen}</td>
+                                    <td>{sig.offset}</td>
+                                    <td><code>0x{sig.rawValue.toString(16).toUpperCase()}</code></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : null}
+                      </section>
+                    ))}
+                  </>
+                ) : canTestStatus && canTestStatus.startsWith('已生成') ? null : (
+                  <div className="empty-state"><div className="empty-state-icon">📂</div><p>点击「⚡ 生成」从项目配置中构建 CAN 测试数据</p></div>
+                )}
+                {canTestStatus ? <p className={canTestStatus.startsWith('已') ? 'text-success' : 'project-open-error'} style={{ marginTop: 8 }}>{canTestStatus}</p> : null}
+              </div>
+            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'language' ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>多语言配置</h2>
+              <p>管理语言代码和翻译内容，修改后写回 language_info。</p>
+            </div>
+            {currentLanguageDocument ? (
+              <>
+                <div className="config-summary-strip">
+                  <article>
+                    <span>语言</span>
+                    <strong>{currentLanguageDocument.list_code_language.length}</strong>
+                  </article>
+                  <article>
+                    <span>翻译键</span>
+                    <strong>{currentLanguageDocument.list_inner.length - currentLanguageDocument.list_code_language.length}</strong>
+                  </article>
+                  <article>
+                    <span>总条目</span>
+                    <strong>{currentLanguageDocument.list_inner.length}</strong>
+                  </article>
+                </div>
+
+                <strong className="lang-section-title">语言列</strong>
+                <div className="lang-code-list">
+                  <div className="lang-code-header">
+                    <span>代码</span>
+                    <span>代码值</span>
+                    <span>显示名</span>
+                    <span />
+                  </div>
+                  {currentLanguageDocument.list_code_language.map((code, index) => {
+                    const codePath: JsonPath = ['language_info', 'list_code_language', index];
+                    const labelPath: JsonPath = ['language_info', 'language_labels', code];
+                    const codeModified = isModifiedPath(codePath);
+                    const labelModified = isModifiedPath(labelPath) || isModifiedPath(['language_info', 'list_inner', index]);
+                    return (
+                      <div className={`lang-code-row ${code === 'zh' ? 'lang-code-row--zh' : ''} ${codeModified || labelModified ? 'config-entry-modified' : ''}`} key={`${code}-${index}`}>
+                        <div className="lang-code-cell lang-code-cell--badge">
+                          <span className={`lang-code-badge ${code === 'zh' ? 'lang-code-badge--zh' : ''}`}>{code}</span>
+                        </div>
+                        <div className="lang-code-cell">
+                          <input
+                            className={`lang-code-input ${editingLanguageCodes[index] !== undefined ? 'config-field-modified' : ''}`}
+                            disabled={code === 'zh'}
+                            onBlur={() => applyLanguageCodeDraft(index)}
+                            onChange={(event) => setLanguageCodeDraft(index, event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') applyLanguageCodeDraft(index);
+                              if (event.key === 'Escape') clearLanguageCodeDraft(index);
+                            }}
+                            value={editingLanguageCodes[index] ?? code}
+                          />
+                        </div>
+                        <div className="lang-code-cell">
+                          <input className="lang-code-input" value={languageConfigLabel(currentLanguageDocument, code)} onChange={(event) => updateLanguageLabel(index, event.target.value)} />
+                        </div>
+                        <div className="lang-code-cell lang-code-cell--actions">
+                          {codeModified ? <button className="lang-btn lang-btn--icon lang-btn--restore" onClick={() => restoreLanguageCode(index)} type="button" title="恢复">↩</button> : null}
+                          <button className="lang-btn lang-btn--icon lang-btn--danger" disabled={code === 'zh' || currentLanguageDocument.list_code_language.length <= 1} onClick={() => removeLanguageCode(index)} type="button" title="删除">×</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="lang-code-row lang-code-row--add">
+                    <div className="lang-code-cell lang-code-cell--badge">
+                      <span className="lang-code-badge lang-code-badge--placeholder">+</span>
+                    </div>
+                    <div className="lang-code-cell">
+                      <input
+                        className="lang-code-input"
+                        onChange={(event) => setNewLanguageCode(event.target.value)}
+                        onKeyDown={(event) => { if (event.key === 'Enter') addLanguageCode(); }}
+                        placeholder="语言代码，如 en"
+                        value={newLanguageCode}
+                      />
+                    </div>
+                    <div className="lang-code-cell">
+                      <input
+                        className="lang-code-input"
+                        onChange={(event) => setNewLanguageLabel(event.target.value)}
+                        onKeyDown={(event) => { if (event.key === 'Enter') addLanguageCode(); }}
+                        placeholder="显示名，如 英文"
+                        value={newLanguageLabel}
+                      />
+                    </div>
+                    <div className="lang-code-cell lang-code-cell--actions">
+                      <button
+                        className="lang-btn lang-btn--primary"
+                        disabled={!loadedProject || newLanguageCode.trim() === '' || newLanguageLabel.trim() === ''}
+                        onClick={addLanguageCode}
+                        type="button"
+                      >
+                        添加
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {languageEditorError ? <p className="project-open-error">{languageEditorError}</p> : null}
+                {orphanLanguageKeys.length > 0 ? <p className="project-open-warning">无主翻译：{orphanLanguageKeys.join('、')}</p> : null}
+
+                <strong className="lang-section-title">翻译内容</strong>
+                <div className="lang-filter-bar">
+                  <input
+                    className="lang-filter-input"
+                    onChange={(event) => setNewLanguageInnerKey(event.target.value)}
+                    onKeyDown={(event) => { if (event.key === 'Enter') addLanguageKey(); }}
+                    placeholder="新增翻译键，如 用户设置"
+                    value={newLanguageInnerKey}
+                  />
+                  <button
+                    className="lang-btn lang-btn--primary"
+                    disabled={!loadedProject || newLanguageInnerKey.trim() === ''}
+                    onClick={addLanguageKey}
+                    type="button"
+                  >
+                    添加键
+                  </button>
+                  <span className="action-bar-sep" />
+                  <button className="lang-btn lang-btn--ghost" disabled={!loadedProject} onClick={syncLanguageConfigKeys} type="button" title="同步开头的语言名称配置段">同步配置键</button>
+                  <button className="lang-btn lang-btn--ghost" disabled={!loadedProject} onClick={checkOrphanLanguageTranslations} type="button" title="检查无主翻译条目">检查无主</button>
+                  <button className="lang-btn lang-btn--ghost" disabled={!loadedProject} onClick={cleanupOrphanLanguageTranslations} type="button" title="清理无主翻译条目">清理无主</button>
+                </div>
+
+                <div className="config-table-frame">
+                  <table className="config-table">
+                    <thead>
+                      <tr>
+                        <th>翻译键</th>
+                        {currentLanguageDocument.list_code_language.map((code) => <th key={code}>{languageConfigLabel(currentLanguageDocument, code)}</th>)}
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentLanguageDocument.list_inner.length === 0 ? (
+                        <tr><td colSpan={currentLanguageDocument.list_code_language.length + 2} className="lang-table-empty">暂无翻译条目，请添加翻译键</td></tr>
+                      ) : null}
+                      {currentLanguageDocument.list_inner.map((key, index) => {
+                        const keyPath: JsonPath = ['language_info', 'list_inner', index];
+                        const rowPath: JsonPath = ['language_info', 'list_translate', key];
+                        const isConfigKey = index < currentLanguageDocument.list_code_language.length;
+                        const keyDraft = editingLanguageInnerKeys[index] ?? key;
+                        const keyDraftModified = keyDraft !== key;
+                        const keyModified = isModifiedPath(keyPath) || keyDraftModified;
+                        const rowModified = keyModified || isModifiedPath(rowPath);
+                        return (
+                          <tr className={rowModified ? 'config-entry-modified' : undefined} key={`${key}-${index}`}>
+                            <td>
+                              <input
+                                className={`lang-table-key-cell ${isConfigKey ? 'lang-table-key-cell--config' : ''} ${keyModified ? 'config-field-modified' : ''}`}
+                                disabled={isConfigKey}
+                                onBlur={() => updateLanguageKey(index, keyDraft)}
+                                onChange={(event) => setLanguageInnerKeyDraft(index, event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') updateLanguageKey(index, keyDraft);
+                                  if (event.key === 'Escape') clearLanguageInnerKeyDraft(index);
+                                }}
+                                value={keyDraft}
+                              />
+                            </td>
+                            {currentLanguageDocument.list_code_language.map((code) => (
+                              <td key={`${key}-${code}`}>
+                                <input
+                                  className={isLanguageValueModified(index, key, code) ? 'config-field-modified' : undefined}
+                                  value={String((currentLanguageDocument.list_translate[key] as Record<string, string> | undefined)?.[code] ?? '')}
+                                  onChange={(event) => updateLanguageValue(key, code, event.target.value)}
+                                />
+                              </td>
+                            ))}
+                            <td>
+                              <div className="lang-table-op">
+                                {rowModified && !isConfigKey ? <button className="lang-btn lang-btn--icon lang-btn--restore" onClick={() => restoreLanguageKey(index, key)} type="button" title="恢复">↩</button> : null}
+                                <button className="lang-btn lang-btn--icon lang-btn--danger" disabled={isConfigKey} onClick={() => removeLanguageKey(index)} type="button" title="删除">×</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'pdo-advanced' ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>PDO 高级配置</h2>
+              <p>维护全局变量、条件表、PDO 接收帧和发送帧，修改后直接写回 pdo_global_param、pdo_condition、pdo_recv 和 pdo_send。</p>
+            </div>
+            {currentPdoAdvancedDocument ? (
+              <div className="pdo-advanced-editor">
+                <div className="config-summary-strip">
+                  <article>
+                    <span>全局变量</span>
+                    <strong>{currentPdoAdvancedDocument.pdo_global_param.length}</strong>
+                  </article>
+                  <article>
+                    <span>条件表</span>
+                    <strong>{currentPdoAdvancedDocument.pdo_condition.length}</strong>
+                  </article>
+                  <article>
+                    <span>接收 / 发送帧</span>
+                    <strong>{currentPdoAdvancedDocument.pdo_recv.length} / {currentPdoAdvancedDocument.pdo_send.length}</strong>
+                  </article>
+                </div>
+                <p className="config-helper-text">参数 ID 保持十六进制字符串，不会转换为数字；帧 ID 以 16 进制显示和编辑。</p>
+                <section className="pdo-frame-section">
+                  <div className="config-table-toolbar">
+                    <strong>全局变量（{currentPdoAdvancedDocument.pdo_global_param.length}）</strong>
+                    <button onClick={addPdoGlobalParam} type="button">新增全局变量</button>
+                  </div>
+                  <div className="config-table-frame">
+                    <table className="config-table">
+                      <thead>
+                        <tr>
+                          <th>参数 ID</th>
+                          <th>名称</th>
+                          <th>默认值</th>
+                          <th>保留</th>
+                          <th>类型</th>
+                          <th>内部变量</th>
+                          <th>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentPdoAdvancedDocument.pdo_global_param.map((item, index) => {
+                          const itemPath: JsonPath = ['pdo_global_param', index];
+                          const itemModified = isModifiedPath(itemPath);
+                          return (
+                            <tr className={itemModified ? 'config-entry-modified' : undefined} key={`global-${index}`}>
+                              <td><input value={item.param_id} onChange={(event) => updatePdoGlobalParam(index, 'param_id', event.target.value)} /></td>
+                              <td><input value={item.name} onChange={(event) => updatePdoGlobalParam(index, 'name', event.target.value)} /></td>
+                              <td><input value={item.def} onChange={(event) => updatePdoGlobalParam(index, 'def', event.target.value)} /></td>
+                              <td><input type="number" value={item.reserved} onChange={(event) => updatePdoGlobalParam(index, 'reserved', Number(event.target.value))} /></td>
+                              <td><input type="number" value={item.type} onChange={(event) => updatePdoGlobalParam(index, 'type', Number(event.target.value))} /></td>
+                              <td><input type="number" value={item.inner} onChange={(event) => updatePdoGlobalParam(index, 'inner', Number(event.target.value))} /></td>
+                              <td>
+                                {itemModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(itemPath)} type="button">恢复</button> : null}
+                                <button onClick={() => removePdoGlobalParam(index)} type="button">删除</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section className="pdo-frame-section">
+                  <div className="config-table-toolbar">
+                    <strong>条件表（{currentPdoAdvancedDocument.pdo_condition.length}）</strong>
+                    <button onClick={addPdoCondition} type="button">新增条件</button>
+                  </div>
+                  {currentPdoAdvancedDocument.pdo_condition.map((condition, conditionIndex) => {
+                    const conditionPath: JsonPath = ['pdo_condition', conditionIndex];
+                    const conditionModified = isModifiedPath(conditionPath);
+                    return (
+                      <article className={conditionModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`condition-${conditionIndex}`}>
+                        <div className="pdo-frame-grid">
+                          <label>参数 ID<input value={condition.param_id} onChange={(event) => updatePdoCondition(conditionIndex, 'param_id', event.target.value)} /></label>
+                          <label>处理方式<input type="number" value={condition.process} onChange={(event) => updatePdoCondition(conditionIndex, 'process', Number(event.target.value))} /></label>
+                        </div>
+                        <div className="pdo-frame-actions">
+                          {conditionModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(conditionPath)} type="button">恢复条件</button> : null}
+                          <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">新增输入</button>
+                          <button onClick={() => removePdoCondition(conditionIndex)} type="button">删除条件</button>
+                        </div>
+                        <div className="structured-list">
+                          {condition.data.map((item, inputIndex) => (
+                            <label key={`condition-${conditionIndex}-${inputIndex}`}>
+                              输入参数 ID
+                              <input value={item.param_id} onChange={(event) => updatePdoConditionInput(conditionIndex, inputIndex, event.target.value)} />
+                              <button onClick={() => removePdoConditionInput(conditionIndex, inputIndex)} type="button">删除输入</button>
+                            </label>
+                          ))}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </section>
+
+                {(['pdo_recv', 'pdo_send'] as const).map((kind) => (
+                  <section className="pdo-frame-section" key={`advanced-${kind}`}>
+                    <div className="config-table-toolbar">
+                      <strong>{kind === 'pdo_recv' ? '高级接收帧' : '高级发送帧'}（{currentPdoAdvancedDocument[kind].length ?? 0}）</strong>
+                      <button onClick={() => addPdoAdvancedFrame(kind)} type="button">新增帧</button>
+                    </div>
+                    {currentPdoAdvancedDocument[kind].map((frame, frameIndex) => {
+                      const framePath: JsonPath = [kind, frameIndex];
+                      const frameModified = isModifiedPath(framePath);
+                      return (
+                        <article className={frameModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`advanced-${kind}-${frameIndex}`}>
+                          <div className="pdo-frame-grid">
+                            <label>帧 ID<input inputMode="text" value={formatFrameId(frame.id)} onChange={(event) => updatePdoAdvancedFrameId(kind, frameIndex, event.target.value)} /></label>
+                            <label>帧类型<input type="number" value={frame.type} onChange={(event) => updatePdoAdvancedFrame(kind, frameIndex, 'type', Number(event.target.value))} /></label>
+                            <label>描述<input value={frame.desc} onChange={(event) => updatePdoAdvancedFrame(kind, frameIndex, 'desc', event.target.value)} /></label>
+                          </div>
+                          <div className="pdo-frame-actions">
+                            {frameModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(framePath)} type="button">恢复帧</button> : null}
+                            <button onClick={() => removePdoAdvancedFrame(kind, frameIndex)} type="button">删除帧</button>
+                          </div>
+                          <div className="config-table-toolbar">
+                            <span>数据项（{frame.data.length}）</span>
+                            <button onClick={() => addPdoAdvancedSignal(kind, frameIndex)} type="button">新增数据项</button>
+                          </div>
+                          <div className="config-table-frame">
+                            <table className="config-table">
+                              <thead>
+                                <tr>
+                                  <th>参数 ID</th>
+                                  <th>位置</th>
+                                  <th>长度</th>
+                                  <th>显示类型</th>
+                                  <th>句柄</th>
+                                  <th>句柄参数</th>
+                                  <th>操作</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {frame.data.map((signal, signalIndex) => {
+                                  const signalPath: JsonPath = [kind, frameIndex, 'data', signalIndex];
+                                  const signalModified = isModifiedPath(signalPath);
+                                  return (
+                                    <tr className={signalModified ? 'config-entry-modified' : undefined} key={`advanced-${kind}-${frameIndex}-${signalIndex}`}>
+                                      <td><input value={signal.param_id} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'param_id', event.target.value)} /></td>
+                                      <td><input type="number" value={signal.pos} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'pos', Number(event.target.value))} /></td>
+                                      <td><input type="number" value={signal.len} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'len', Number(event.target.value))} /></td>
+                                      <td><input type="number" value={signal.show_type} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'show_type', Number(event.target.value))} /></td>
+                                      <td><input type="number" value={signal.handle} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'handle', Number(event.target.value))} /></td>
+                                      <td><input value={signal.handle_param} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'handle_param', event.target.value)} /></td>
+                                      <td>
+                                        {signalModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(signalPath)} type="button">恢复</button> : null}
+                                        <button onClick={() => removePdoAdvancedSignal(kind, frameIndex, signalIndex)} type="button">删除</button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </section>
+                ))}
+              </div>
+            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'pdo-advanced' ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>PDO 高级配置校验</h2>
+              <p>解析当前项目中的全局变量、条件表、PDO 接收帧和发送帧，展示结构统计与引用校验错误。</p>
+            </div>
+            <button
+              className="path-open-button"
+              disabled={!loadedProject || isParsingPdoAdvanced}
+              onClick={() => void handleParsePdoAdvanced()}
+              type="button"
+            >
+              {isParsingPdoAdvanced ? '解析中...' : '解析当前高级 PDO 配置'}
+            </button>
+            {pdoAdvancedReport ? (
+              <div className="project-open-report">
+                <article>
+                  <span>全局变量</span>
+                  <strong>{pdoAdvancedReport.document?.pdo_global_param.length ?? 0}</strong>
+                </article>
+                <article>
+                  <span>条件表</span>
+                  <strong>{pdoAdvancedReport.document?.pdo_condition.length ?? 0}</strong>
+                </article>
+                <article>
+                  <span>接收帧</span>
+                  <strong>{pdoAdvancedReport.document?.pdo_recv.length ?? 0}</strong>
+                </article>
+                <article>
+                  <span>发送帧</span>
+                  <strong>{pdoAdvancedReport.document?.pdo_send.length ?? 0}</strong>
+                </article>
+              </div>
+            ) : null}
+            {pdoAdvancedError ? <p className="project-open-error">{pdoAdvancedError}</p> : null}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'project' || activeModule.key === 'export' ? (
+          <section className="table-spec-card">
+            <div>
+              <h2>表格格式参考</h2>
+              <p>SDO、PDO 简化表和多语言表的表头定义，导入前可快速确认目标格式。</p>
+            </div>
+            {tableSpecs.map((spec) => (
               <div className="table-format-ref" key={spec.kind}>
-                <strong>表头格式（{spec.headers.length} 列）</strong>
+                <strong>{spec.kind === 'sdo' ? 'SDO 参数表' : spec.kind === 'pdoSimple' ? 'PDO 简化表' : '多语言表'}（{spec.headers.length} 列）</strong>
                 <div className="table-format-chips">
                   {spec.headers.map((header) => (
                     <span className="table-format-chip" key={header}>{header}</span>
@@ -2486,966 +3268,213 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 </div>
               </div>
             ))}
-          {tableImportError ? <p className="project-open-error">{tableImportError}</p> : null}
-          {tableImportReport ? (
-            <div className="table-io-result">
-              <div className="table-io-result-row">
-                <span>导入校验</span>
-                <strong className={tableImportReport.valid ? 'text-success' : 'text-danger'}>{tableImportReport.valid ? '通过' : '存在问题'}</strong>
-              </div>
-              <div className="table-io-result-row">
-                <span>表头列数</span>
-                <strong>{tableImportReport.table.actual_headers.length}</strong>
-              </div>
-              <div className="table-io-result-row">
-                <span>写回段落</span>
-                <strong>{tableConfigSections[activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind]}</strong>
-              </div>
+          </section>
+        ) : null}
+
+        {activeModule.key === 'ui' ? (
+          <>
+            <UiCanvasPreview
+              canApply={Boolean(loadedProject)}
+              isApplying={isApplyingUi}
+              showCanvasLabels={showCanvasLabels}
+              onAddOption={handleAddUiOption}
+              onApply={handleApplyUiResource}
+              onJumpToPdo={handleJumpToPdo}
+              onRemoveOption={handleRemoveUiOption}
+              onSelectOptionSources={handleSelectUiOptionSources}
+              report={uiPreview}
+            />
+            {uiApplyError ? <p className="ui-preview-errors">{uiApplyError}</p> : null}
+          </>
+        ) : null}
+        {activeModule.key === 'settings' ? (
+          <section className="project-open-card">
+            <div>
+              <h2>软件设置</h2>
+              <p>查看当前软件版本、提交哈希、核心状态和项目运行信息。</p>
             </div>
-          ) : null}
-          {tableExportStatus ? <p className="config-helper-text">{tableExportStatus}</p> : null}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'sdo' ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>SDO 参数树</h2>
-            <p>维护 SDO 菜单树、权限、CAN Open 参数、数据范围和预处理字段，修改后直接写回 sdo_info。</p>
-          </div>
-          {currentSdoDocument ? (
-            <>
-              <div className="config-summary-strip">
-                <article>
-                  <span>根节点</span>
-                  <strong>{currentSdoDocument.name}</strong>
-                </article>
-                <article>
-                  <span>直接子节点</span>
-                  <strong>{currentSdoDocument.children?.length ?? 0}</strong>
-                </article>
-                <article>
-                  <span>写回段落</span>
-                  <strong>sdo_info</strong>
-                </article>
-              </div>
-              <p className="config-helper-text">每个节点按基础信息、通信控制、数据范围和预处理字段分组展示；新增/删除会立即同步到内存项目文档。</p>
-              <div className="sdo-tree-editor">{renderSdoNode(currentSdoDocument)}</div>
-            </>
-          ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'pdo-simple' ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>PDO 简化配置</h2>
-            <p>维护接收表和发送表中的 CAN 帧、显示变量名、读取方式、位置和长度，修改后直接写回 pdo_simple_send_recv。</p>
-          </div>
-          {currentPdoSimpleDocument ? (
-            <div className="pdo-simple-editor">
-              <div className="config-summary-strip">
-                <article>
-                  <span>接收帧</span>
-                  <strong>{currentPdoSimpleDocument.pdo_recv.length}</strong>
-                </article>
-                <article>
-                  <span>发送帧</span>
-                  <strong>{currentPdoSimpleDocument.pdo_send.length}</strong>
-                </article>
-                <article>
-                  <span>写回段落</span>
-                  <strong>pdo_simple_send_recv</strong>
-                </article>
-              </div>
-              <p className="config-helper-text">帧信息在卡片顶部维护，帧 ID 以 16 进制显示和编辑；位置和长度沿用 bit/byte 数值含义。</p>
-              {pdoJumpTarget !== null ? <p className="config-helper-text">来自 UI 资源跳转的 PDO 参数索引：{pdoJumpTarget}</p> : null}
-              {(['pdo_recv', 'pdo_send'] as const).map((kind) => (
-                <section className="pdo-frame-section" key={kind}>
-                  <div className="config-table-toolbar">
-                    <strong>{kind === 'pdo_recv' ? '接收表' : '发送表'}（{pdoFrames(kind).length} 帧）</strong>
-                    <button onClick={() => addPdoFrame(kind)} type="button">新增帧</button>
-                  </div>
-                  {pdoFrames(kind).map((frame, frameIndex) => {
-                    const framePath: JsonPath = ['pdo_simple_send_recv', kind, frameIndex];
-                    const frameModified = isModifiedPath(framePath);
-                    return (
-                    <article className={frameModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`${kind}-${frameIndex}`}>
-                      <div className="pdo-frame-grid">
-                        <label>
-                          帧 ID
-                          <input inputMode="text" value={formatFrameId(frame.id)} onChange={(event) => updatePdoFrameId(kind, frameIndex, event.target.value)} />
-                        </label>
-                        <label>
-                          帧类型
-                          <select value={frame.type} onChange={(event) => updatePdoFrame(kind, frameIndex, 'type', Number(event.target.value))}>
-                            <option value={0}>标准帧</option>
-                            <option value={1}>扩展帧</option>
-                          </select>
-                        </label>
-                        <label>
-                          描述
-                          <input value={frame.desc} onChange={(event) => updatePdoFrame(kind, frameIndex, 'desc', event.target.value)} />
-                        </label>
-                      </div>
-                      <div className="pdo-frame-actions">
-                        {frameModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(framePath)} type="button">恢复帧</button> : null}
-                        <button onClick={() => removePdoFrame(kind, frameIndex)} type="button">删除帧</button>
-                      </div>
-                      <div className="config-table-toolbar">
-                        <span>数据项（{frame.data.length}）</span>
-                        <button onClick={() => addPdoSignal(kind, frameIndex)} type="button">新增数据项</button>
-                      </div>
-                      <div className="config-table-frame">
-                        <table className="config-table">
-                          <thead>
-                            <tr>
-                              <th>变量名</th>
-                              <th>读取方式</th>
-                              <th>位置</th>
-                              <th>长度</th>
-                              <th>参数索引</th>
-                              <th>操作</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {frame.data.map((signal, signalIndex) => {
-                              const signalPath: JsonPath = ['pdo_simple_send_recv', kind, frameIndex, 'data', signalIndex];
-                              const signalModified = isModifiedPath(signalPath);
-                              const isJumpTarget = pdoJumpTarget === signal.pdo_param_index;
-                              return (
-                              <tr
-                                className={[isJumpTarget ? 'pdo-row-highlight' : '', signalModified ? 'config-entry-modified' : ''].filter(Boolean).join(' ') || undefined}
-                                key={`${kind}-${frameIndex}-${signalIndex}`}
-                                ref={isJumpTarget ? (element) => { pdoJumpRowRef.current = element; } : undefined}
-                              >
-                                <td><input value={signal.pdo_param_name ?? ''} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pdo_param_name', event.target.value)} /></td>
-                                <td>
-                                  <select value={signal.show_type} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'show_type', Number(event.target.value))}>
-                                    <option value={0}>按字节</option>
-                                    <option value={1}>按位</option>
-                                    <option value={2}>按字符串</option>
-                                  </select>
-                                </td>
-                                <td><input type="number" value={signal.pos} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pos', Number(event.target.value))} /></td>
-                                <td><input type="number" value={signal.len} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'len', Number(event.target.value))} /></td>
-                                <td><input type="number" value={signal.pdo_param_index} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pdo_param_index', Number(event.target.value))} /></td>
-                                <td>
-                                  {signalModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(signalPath)} type="button">恢复</button> : null}
-                                  <button onClick={() => removePdoSignal(kind, frameIndex, signalIndex)} type="button">删除</button>
-                                </td>
-                              </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </article>
-                    );
-                  })}
-                </section>
-              ))}
-            </div>
-          ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'battery-monitor' ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>锂电监控配置</h2>
-            <p>维护锂电监控 CAN 帧、PDO 信号、显示项、单位、精度和超时策略，导出后写入 data.bin 的 battery monitor 段。</p>
-          </div>
-          {currentBatteryMonitorDocument ? (
-            <div className="pdo-simple-editor">
-              <div className="config-summary-strip">
-                <article><span>状态</span><strong>{currentBatteryMonitorDocument.enabled ? '启用' : '停用'}</strong></article>
-                <article><span>帧 / 信号</span><strong>{currentBatteryMonitorDocument.frames.length} / {currentBatteryMonitorDocument.signals.length}</strong></article>
-                <article><span>显示项</span><strong>{currentBatteryMonitorDocument.items.filter((item) => item.enabled).length} / {currentBatteryMonitorDocument.items.length}</strong></article>
-                <article><span>写回段落</span><strong>battery_monitor_info</strong></article>
-              </div>
-              <div className="pdo-frame-grid">
-                <label>启用<select value={currentBatteryMonitorDocument.enabled ? 1 : 0} onChange={(event) => updateBatteryMonitorField('enabled', Number(event.target.value) === 1)}><option value={1}>启用</option><option value={0}>停用</option></select></label>
-                <label>版本<input type="number" value={currentBatteryMonitorDocument.version ?? 1} onChange={(event) => updateBatteryMonitorField('version', Number(event.target.value))} /></label>
-                <label>每页数量<input type="number" value={currentBatteryMonitorDocument.page_size ?? 4} onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))} /></label>
-                <label>默认超时 tick<input type="number" value={currentBatteryMonitorDocument.default_timeout_ticks ?? 200} onChange={(event) => updateBatteryMonitorField('default_timeout_ticks', Number(event.target.value))} /></label>
-              </div>
-              <section className="pdo-frame-section">
-                <div className="config-table-toolbar"><strong>锂电 CAN 帧（{currentBatteryMonitorDocument.frames.length}）</strong><button onClick={addBatteryFrame} type="button">新增帧</button></div>
-                {currentBatteryMonitorDocument.frames.map((frame, frameIndex) => (
-                  <article className={isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`${frame.frame_key}-${frameIndex}`}>
-                    <div className="pdo-frame-grid">
-                      <label>帧 key<input value={frame.frame_key} onChange={(event) => updateBatteryFrame(frameIndex, 'frame_key', event.target.value)} /></label>
-                      <label>帧 ID<input inputMode="text" value={formatFrameId(frame.can_id)} onChange={(event) => updateBatteryFrameId(frameIndex, event.target.value)} /></label>
-                      <label>帧类型<select value={frame.type} onChange={(event) => updateBatteryFrame(frameIndex, 'type', Number(event.target.value))}><option value={0}>标准帧</option><option value={1}>扩展帧</option></select></label>
-                      <label>超时 tick<input type="number" value={frame.timeout_ticks ?? currentBatteryMonitorDocument.default_timeout_ticks} onChange={(event) => updateBatteryFrame(frameIndex, 'timeout_ticks', Number(event.target.value))} /></label>
-                      <label>描述<input value={frame.desc ?? ''} onChange={(event) => updateBatteryFrame(frameIndex, 'desc', event.target.value)} /></label>
-                    </div>
-                    <div className="pdo-frame-actions">
-                      {isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'frames', frameIndex])} type="button">恢复帧</button> : null}
-                      <button onClick={() => removeBatteryFrame(frameIndex)} type="button">删除帧</button>
-                    </div>
-                  </article>
-                ))}
-              </section>
-              <section className="pdo-frame-section">
-                <div className="config-table-toolbar"><strong>锂电信号（{currentBatteryMonitorDocument.signals.length}）</strong><button onClick={addBatterySignal} type="button">新增信号</button></div>
-                <div className="config-table-frame"><table className="config-table"><thead><tr><th>key</th><th>参数ID</th><th>名称</th><th>内部变量</th><th>类型</th><th>帧</th><th>位置</th><th>长度</th><th>取数</th><th>操作</th></tr></thead><tbody>
-                  {currentBatteryMonitorDocument.signals.map((signal, signalIndex) => (
-                    <tr className={isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? 'config-entry-modified' : undefined} key={`${signal.signal_key}-${signalIndex}`}>
-                      <td><input value={signal.signal_key} onChange={(event) => updateBatterySignal(signalIndex, 'signal_key', event.target.value)} /></td>
-                      <td><input value={signal.param_id} onChange={(event) => updateBatterySignal(signalIndex, 'param_id', event.target.value)} /></td>
-                      <td><input value={signal.name} onChange={(event) => updateBatterySignal(signalIndex, 'name', event.target.value)} /></td>
-                      <td><input type="number" value={signal.inner} onChange={(event) => updateBatterySignal(signalIndex, 'inner', Number(event.target.value))} /></td>
-                      <td><input type="number" value={signal.type} onChange={(event) => updateBatterySignal(signalIndex, 'type', Number(event.target.value))} /></td>
-                      <td><select value={signal.frame_key} onChange={(event) => updateBatterySignal(signalIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
-                      <td><input type="number" value={signal.pos} onChange={(event) => updateBatterySignal(signalIndex, 'pos', Number(event.target.value))} /></td>
-                      <td><input type="number" value={signal.len} onChange={(event) => updateBatterySignal(signalIndex, 'len', Number(event.target.value))} /></td>
-                      <td><input type="number" value={signal.show_type} onChange={(event) => updateBatterySignal(signalIndex, 'show_type', Number(event.target.value))} /></td>
-                      <td>{isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'signals', signalIndex])} type="button">恢复</button> : null}<button onClick={() => removeBatterySignal(signalIndex)} type="button">删除</button></td>
-                    </tr>
-                  ))}
-                </tbody></table></div>
-              </section>
-              <section className="pdo-frame-section">
-                <div className="config-table-toolbar"><strong>显示项（{currentBatteryMonitorDocument.items.length}）</strong><button onClick={addBatteryItem} type="button">新增显示项</button></div>
-                <div className="config-table-frame"><table className="config-table"><thead><tr><th>启用</th><th>顺序</th><th>key</th><th>信号</th><th>名称key</th><th>单位</th><th>格式</th><th>偏移</th><th>缩放</th><th>小数</th><th>有效帧</th><th>操作</th></tr></thead><tbody>
-                  {currentBatteryMonitorDocument.items.map((item, itemIndex) => (
-                    <tr className={isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? 'config-entry-modified' : undefined} key={`${item.item_key}-${itemIndex}`}>
-                      <td><input checked={item.enabled} type="checkbox" onChange={(event) => updateBatteryItem(itemIndex, 'enabled', event.target.checked)} /></td>
-                      <td><input type="number" value={item.order} onChange={(event) => updateBatteryItem(itemIndex, 'order', Number(event.target.value))} /></td>
-                      <td><input value={item.item_key} onChange={(event) => updateBatteryItem(itemIndex, 'item_key', event.target.value)} /></td>
-                      <td><select value={item.signal_key} onChange={(event) => updateBatteryItem(itemIndex, 'signal_key', event.target.value)}>{currentBatteryMonitorDocument.signals.map((signal) => <option key={signal.signal_key} value={signal.signal_key}>{signal.signal_key}</option>)}</select></td>
-                      <td><input value={item.name_key} onChange={(event) => updateBatteryItem(itemIndex, 'name_key', event.target.value)} /></td>
-                      <td><input value={item.unit} onChange={(event) => updateBatteryItem(itemIndex, 'unit', event.target.value)} /></td>
-                      <td><select value={item.formatter?.kind ?? 'linear'} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'kind', event.target.value)}><option value="linear">线性</option><option value="bool_text">布尔文本</option><option value="hex">十六进制</option><option value="packed_time_0p1h">0.1H时间</option></select></td>
-                      <td><input type="number" value={item.formatter?.offset ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'offset', Number(event.target.value))} /></td>
-                      <td><input type="number" value={item.formatter?.scale_num ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_num', Number(event.target.value))} />/<input type="number" value={item.formatter?.scale_den ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_den', Number(event.target.value))} /></td>
-                      <td><input type="number" value={item.formatter?.decimals ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'decimals', Number(event.target.value))} /></td>
-                      <td><select value={item.validity?.frame_key ?? ''} onChange={(event) => updateBatteryItemValidity(itemIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
-                      <td>{isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'items', itemIndex])} type="button">恢复</button> : null}<button onClick={() => removeBatteryItem(itemIndex)} type="button">删除</button></td>
-                    </tr>
-                  ))}
-                </tbody></table></div>
-              </section>
-            </div>
-          ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'can-test-data' ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>CAN 测试数据构建</h2>
-            <p>从当前项目 PDO/锂电配置中提取 CAN 帧，生成测试数据并导出为 TXT 文件。</p>
-          </div>
-          {loadedProject ? (
-            <div className="pdo-simple-editor">
-              <div className="config-summary-strip">
-                <article><span>已生成帧</span><strong>{canTestFrames.length}</strong></article>
-                <article><span>默认周期</span><strong>{canTestDefaultCycle} ms</strong></article>
-              </div>
-              <div className="pdo-frame-grid">
-                <label>默认周期(ms)<input type="number" value={canTestDefaultCycle} onChange={(e) => setCanTestDefaultCycle(Number(e.target.value))} /></label>
-              </div>
-              <div className="config-table-toolbar" style={{ gap: 8 }}>
-                <button disabled={isGeneratingCanTest} onClick={() => void handleGenerateCanTest()} type="button">
-                  {isGeneratingCanTest ? '生成中...' : '⚡ 生成'}
-                </button>
-                <button disabled={canTestFrames.length === 0} onClick={() => void handleExportCanTestTxt()} type="button">📤 导出 TXT</button>
-                <span className="action-bar-sep" />
-                <button onClick={() => void handleImportCanTestConfig()} type="button">📥 导入配置</button>
-                <button disabled={canTestFrames.length === 0} onClick={() => void handleExportCanTestConfig()} type="button">📤 导出配置</button>
-              </div>
-              {canTestFrames.length > 0 ? (
-                <>
-                  <div className="config-table-toolbar" style={{ gap: 6, marginBottom: 6 }}>
-                    <span style={{ fontSize: '0.85em', opacity: 0.7 }}>信号填充：</span>
-                    <button onClick={() => fillCanTestSignals('min')} type="button" title="所有信号填最小值 0">最小值</button>
-                    <button onClick={() => fillCanTestSignals('max')} type="button" title="所有信号填最大值（对应位宽全 1）">最大值</button>
-                    <button onClick={() => fillCanTestSignals('random')} type="button" title="所有信号填随机值">随机值</button>
-                    <span className="action-bar-sep" />
-                    <button onClick={() => fillCanTestSignals('zero')} type="button" title="所有信号填 0">清零</button>
-                    <button onClick={() => fillCanTestSignals('ff')} type="button" title="所有信号原始值填 FF">全 FF</button>
-                  </div>
-                  {canTestFrames.map((frame, frameIndex) => (
-                    <section className="pdo-frame-section" key={`${frame.id}-${frameIndex}`}>
-                      <div className="pdo-frame-card">
-                        <div className="pdo-frame-grid">
-                          <label>CAN ID<code style={{ fontSize: '1.1em' }}>0x{frame.id.toString(16).toUpperCase().padStart(3, '0')}</code></label>
-                          <label>类型<span>{frame.frameType === 0 ? '标准帧' : '扩展帧'}</span></label>
-                          <label>名称<input value={frame.name} onChange={(e) => updateCanTestFrame(frameIndex, 'name', e.target.value)} /></label>
-                          <label>DLC<span>{frame.dlc}</span></label>
-                          <label>周期(ms)<input type="number" style={{ width: 80 }} value={frame.cycleMs} onChange={(e) => updateCanTestFrame(frameIndex, 'cycleMs', Number(e.target.value))} /></label>
-                          <label>HEX<code style={{ fontSize: '0.85em' }}>{frame.data}</code></label>
-                        </div>
-                      </div>
-                      {frame.signals.length > 0 ? (
-                        <div className="config-table-frame" style={{ marginTop: 6 }}>
-                          <table className="config-table">
-                            <thead>
-                              <tr>
-                                <th>信号名称</th>
-                                <th>值</th>
-                                <th>单位</th>
-                                <th>位置</th>
-                                <th>长度</th>
-                                <th>缩放</th>
-                                <th>偏移</th>
-                                <th>原始值</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {frame.signals.map((sig, sigIndex) => (
-                                <tr key={`${sig.name}-${sigIndex}`}>
-                                  <td>{sig.name}</td>
-                                  <td>
-                                    <input
-                                      type="number"
-                                      step={sig.scaleDen > 1 ? 1 / sig.scaleDen : 'any'}
-                                      style={{ width: 90 }}
-                                      value={sig.displayValue}
-                                      onChange={(e) => updateCanTestSignalDisplayValue(frameIndex, sigIndex, Number(e.target.value))}
-                                    />
-                                  </td>
-                                  <td>{sig.unit}</td>
-                                  <td>{sig.pos}</td>
-                                  <td>{sig.len}</td>
-                                  <td>{sig.scaleNum}/{sig.scaleDen}</td>
-                                  <td>{sig.offset}</td>
-                                  <td><code>0x{sig.rawValue.toString(16).toUpperCase()}</code></td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : null}
-                    </section>
-                  ))}
-                </>
-              ) : canTestStatus && canTestStatus.startsWith('已生成') ? null : (
-                <div className="empty-state"><div className="empty-state-icon">📂</div><p>点击「⚡ 生成」从项目配置中构建 CAN 测试数据</p></div>
-              )}
-              {canTestStatus ? <p className={canTestStatus.startsWith('已') ? 'text-success' : 'project-open-error'} style={{ marginTop: 8 }}>{canTestStatus}</p> : null}
-            </div>
-          ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'language' ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>多语言配置</h2>
-            <p>管理语言代码和翻译内容，修改后写回 language_info。</p>
-          </div>
-          {currentLanguageDocument ? (
-            <>
-              <div className="config-summary-strip">
-                <article>
-                  <span>语言</span>
-                  <strong>{currentLanguageDocument.list_code_language.length}</strong>
-                </article>
-                <article>
-                  <span>翻译键</span>
-                  <strong>{currentLanguageDocument.list_inner.length - currentLanguageDocument.list_code_language.length}</strong>
-                </article>
-                <article>
-                  <span>总条目</span>
-                  <strong>{currentLanguageDocument.list_inner.length}</strong>
-                </article>
-              </div>
-
-              <strong className="lang-section-title">语言列</strong>
-              <div className="lang-code-list">
-                <div className="lang-code-header">
-                  <span>代码</span>
-                  <span>代码值</span>
-                  <span>显示名</span>
-                  <span />
-                </div>
-                {currentLanguageDocument.list_code_language.map((code, index) => {
-                  const codePath: JsonPath = ['language_info', 'list_code_language', index];
-                  const labelPath: JsonPath = ['language_info', 'language_labels', code];
-                  const codeModified = isModifiedPath(codePath);
-                  const labelModified = isModifiedPath(labelPath) || isModifiedPath(['language_info', 'list_inner', index]);
-                  return (
-                  <div className={`lang-code-row ${code === 'zh' ? 'lang-code-row--zh' : ''} ${codeModified || labelModified ? 'config-entry-modified' : ''}`} key={`${code}-${index}`}>
-                    <div className="lang-code-cell lang-code-cell--badge">
-                      <span className={`lang-code-badge ${code === 'zh' ? 'lang-code-badge--zh' : ''}`}>{code}</span>
-                    </div>
-                    <div className="lang-code-cell">
-                      <input
-                        className={`lang-code-input ${editingLanguageCodes[index] !== undefined ? 'config-field-modified' : ''}`}
-                        disabled={code === 'zh'}
-                        onBlur={() => applyLanguageCodeDraft(index)}
-                        onChange={(event) => setLanguageCodeDraft(index, event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') applyLanguageCodeDraft(index);
-                          if (event.key === 'Escape') clearLanguageCodeDraft(index);
-                        }}
-                        value={editingLanguageCodes[index] ?? code}
-                      />
-                    </div>
-                    <div className="lang-code-cell">
-                      <input className="lang-code-input" value={languageConfigLabel(currentLanguageDocument, code)} onChange={(event) => updateLanguageLabel(index, event.target.value)} />
-                    </div>
-                    <div className="lang-code-cell lang-code-cell--actions">
-                      {codeModified ? <button className="lang-btn lang-btn--icon lang-btn--restore" onClick={() => restoreLanguageCode(index)} type="button" title="恢复">↩</button> : null}
-                      <button className="lang-btn lang-btn--icon lang-btn--danger" disabled={code === 'zh' || currentLanguageDocument.list_code_language.length <= 1} onClick={() => removeLanguageCode(index)} type="button" title="删除">×</button>
-                    </div>
-                  </div>
-                  );
-                })}
-                <div className="lang-code-row lang-code-row--add">
-                  <div className="lang-code-cell lang-code-cell--badge">
-                    <span className="lang-code-badge lang-code-badge--placeholder">+</span>
-                  </div>
-                  <div className="lang-code-cell">
-                    <input
-                      className="lang-code-input"
-                      onChange={(event) => setNewLanguageCode(event.target.value)}
-                      onKeyDown={(event) => { if (event.key === 'Enter') addLanguageCode(); }}
-                      placeholder="语言代码，如 en"
-                      value={newLanguageCode}
-                    />
-                  </div>
-                  <div className="lang-code-cell">
-                    <input
-                      className="lang-code-input"
-                      onChange={(event) => setNewLanguageLabel(event.target.value)}
-                      onKeyDown={(event) => { if (event.key === 'Enter') addLanguageCode(); }}
-                      placeholder="显示名，如 英文"
-                      value={newLanguageLabel}
-                    />
-                  </div>
-                  <div className="lang-code-cell lang-code-cell--actions">
-                    <button
-                      className="lang-btn lang-btn--primary"
-                      disabled={!loadedProject || newLanguageCode.trim() === '' || newLanguageLabel.trim() === ''}
-                      onClick={addLanguageCode}
-                      type="button"
-                    >
-                      添加
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {languageEditorError ? <p className="project-open-error">{languageEditorError}</p> : null}
-              {orphanLanguageKeys.length > 0 ? <p className="project-open-warning">无主翻译：{orphanLanguageKeys.join('、')}</p> : null}
-
-              <strong className="lang-section-title">翻译内容</strong>
-              <div className="lang-filter-bar">
-                <input
-                  className="lang-filter-input"
-                  onChange={(event) => setNewLanguageInnerKey(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === 'Enter') addLanguageKey(); }}
-                  placeholder="新增翻译键，如 用户设置"
-                  value={newLanguageInnerKey}
-                />
-                <button
-                  className="lang-btn lang-btn--primary"
-                  disabled={!loadedProject || newLanguageInnerKey.trim() === ''}
-                  onClick={addLanguageKey}
-                  type="button"
-                >
-                  添加键
-                </button>
-                <span className="action-bar-sep" />
-                <button className="lang-btn lang-btn--ghost" disabled={!loadedProject} onClick={syncLanguageConfigKeys} type="button" title="同步开头的语言名称配置段">同步配置键</button>
-                <button className="lang-btn lang-btn--ghost" disabled={!loadedProject} onClick={checkOrphanLanguageTranslations} type="button" title="检查无主翻译条目">检查无主</button>
-                <button className="lang-btn lang-btn--ghost" disabled={!loadedProject} onClick={cleanupOrphanLanguageTranslations} type="button" title="清理无主翻译条目">清理无主</button>
-              </div>
-
-              <div className="config-table-frame">
-                <table className="config-table">
-                  <thead>
-                    <tr>
-                      <th>翻译键</th>
-                      {currentLanguageDocument.list_code_language.map((code) => <th key={code}>{languageConfigLabel(currentLanguageDocument, code)}</th>)}
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentLanguageDocument.list_inner.length === 0 ? (
-                      <tr><td colSpan={currentLanguageDocument.list_code_language.length + 2} className="lang-table-empty">暂无翻译条目，请添加翻译键</td></tr>
-                    ) : null}
-                    {currentLanguageDocument.list_inner.map((key, index) => {
-                      const keyPath: JsonPath = ['language_info', 'list_inner', index];
-                      const rowPath: JsonPath = ['language_info', 'list_translate', key];
-                      const isConfigKey = index < currentLanguageDocument.list_code_language.length;
-                      const keyDraft = editingLanguageInnerKeys[index] ?? key;
-                      const keyDraftModified = keyDraft !== key;
-                      const keyModified = isModifiedPath(keyPath) || keyDraftModified;
-                      const rowModified = keyModified || isModifiedPath(rowPath);
-                      return (
-                      <tr className={rowModified ? 'config-entry-modified' : undefined} key={`${key}-${index}`}>
-                        <td>
-                          <input
-                            className={`lang-table-key-cell ${isConfigKey ? 'lang-table-key-cell--config' : ''} ${keyModified ? 'config-field-modified' : ''}`}
-                            disabled={isConfigKey}
-                            onBlur={() => updateLanguageKey(index, keyDraft)}
-                            onChange={(event) => setLanguageInnerKeyDraft(index, event.target.value)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') updateLanguageKey(index, keyDraft);
-                              if (event.key === 'Escape') clearLanguageInnerKeyDraft(index);
-                            }}
-                            value={keyDraft}
-                          />
-                        </td>
-                        {currentLanguageDocument.list_code_language.map((code) => (
-                          <td key={`${key}-${code}`}>
-                            <input
-                              className={isLanguageValueModified(index, key, code) ? 'config-field-modified' : undefined}
-                              value={String((currentLanguageDocument.list_translate[key] as Record<string, string> | undefined)?.[code] ?? '')}
-                              onChange={(event) => updateLanguageValue(key, code, event.target.value)}
-                            />
-                          </td>
-                        ))}
-                        <td>
-                          <div className="lang-table-op">
-                            {rowModified && !isConfigKey ? <button className="lang-btn lang-btn--icon lang-btn--restore" onClick={() => restoreLanguageKey(index, key)} type="button" title="恢复">↩</button> : null}
-                            <button className="lang-btn lang-btn--icon lang-btn--danger" disabled={isConfigKey} onClick={() => removeLanguageKey(index)} type="button" title="删除">×</button>
-                          </div>
-                        </td>
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'pdo-advanced' ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>PDO 高级配置</h2>
-            <p>维护全局变量、条件表、PDO 接收帧和发送帧，修改后直接写回 pdo_global_param、pdo_condition、pdo_recv 和 pdo_send。</p>
-          </div>
-          {currentPdoAdvancedDocument ? (
-            <div className="pdo-advanced-editor">
-              <div className="config-summary-strip">
-                <article>
-                  <span>全局变量</span>
-                  <strong>{currentPdoAdvancedDocument.pdo_global_param.length}</strong>
-                </article>
-                <article>
-                  <span>条件表</span>
-                  <strong>{currentPdoAdvancedDocument.pdo_condition.length}</strong>
-                </article>
-                <article>
-                  <span>接收 / 发送帧</span>
-                  <strong>{currentPdoAdvancedDocument.pdo_recv.length} / {currentPdoAdvancedDocument.pdo_send.length}</strong>
-                </article>
-              </div>
-              <p className="config-helper-text">参数 ID 保持十六进制字符串，不会转换为数字；帧 ID 以 16 进制显示和编辑。</p>
-              <section className="pdo-frame-section">
-                <div className="config-table-toolbar">
-                  <strong>全局变量（{currentPdoAdvancedDocument.pdo_global_param.length}）</strong>
-                  <button onClick={addPdoGlobalParam} type="button">新增全局变量</button>
-                </div>
-                <div className="config-table-frame">
-                  <table className="config-table">
-                    <thead>
-                      <tr>
-                        <th>参数 ID</th>
-                        <th>名称</th>
-                        <th>默认值</th>
-                        <th>保留</th>
-                        <th>类型</th>
-                        <th>内部变量</th>
-                        <th>操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {currentPdoAdvancedDocument.pdo_global_param.map((item, index) => {
-                        const itemPath: JsonPath = ['pdo_global_param', index];
-                        const itemModified = isModifiedPath(itemPath);
-                        return (
-                        <tr className={itemModified ? 'config-entry-modified' : undefined} key={`global-${index}`}>
-                          <td><input value={item.param_id} onChange={(event) => updatePdoGlobalParam(index, 'param_id', event.target.value)} /></td>
-                          <td><input value={item.name} onChange={(event) => updatePdoGlobalParam(index, 'name', event.target.value)} /></td>
-                          <td><input value={item.def} onChange={(event) => updatePdoGlobalParam(index, 'def', event.target.value)} /></td>
-                          <td><input type="number" value={item.reserved} onChange={(event) => updatePdoGlobalParam(index, 'reserved', Number(event.target.value))} /></td>
-                          <td><input type="number" value={item.type} onChange={(event) => updatePdoGlobalParam(index, 'type', Number(event.target.value))} /></td>
-                          <td><input type="number" value={item.inner} onChange={(event) => updatePdoGlobalParam(index, 'inner', Number(event.target.value))} /></td>
-                          <td>
-                            {itemModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(itemPath)} type="button">恢复</button> : null}
-                            <button onClick={() => removePdoGlobalParam(index)} type="button">删除</button>
-                          </td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              <section className="pdo-frame-section">
-                <div className="config-table-toolbar">
-                  <strong>条件表（{currentPdoAdvancedDocument.pdo_condition.length}）</strong>
-                  <button onClick={addPdoCondition} type="button">新增条件</button>
-                </div>
-                {currentPdoAdvancedDocument.pdo_condition.map((condition, conditionIndex) => {
-                  const conditionPath: JsonPath = ['pdo_condition', conditionIndex];
-                  const conditionModified = isModifiedPath(conditionPath);
-                  return (
-                  <article className={conditionModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`condition-${conditionIndex}`}>
-                    <div className="pdo-frame-grid">
-                      <label>参数 ID<input value={condition.param_id} onChange={(event) => updatePdoCondition(conditionIndex, 'param_id', event.target.value)} /></label>
-                      <label>处理方式<input type="number" value={condition.process} onChange={(event) => updatePdoCondition(conditionIndex, 'process', Number(event.target.value))} /></label>
-                    </div>
-                    <div className="pdo-frame-actions">
-                      {conditionModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(conditionPath)} type="button">恢复条件</button> : null}
-                      <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">新增输入</button>
-                      <button onClick={() => removePdoCondition(conditionIndex)} type="button">删除条件</button>
-                    </div>
-                    <div className="structured-list">
-                      {condition.data.map((item, inputIndex) => (
-                        <label key={`condition-${conditionIndex}-${inputIndex}`}>
-                          输入参数 ID
-                          <input value={item.param_id} onChange={(event) => updatePdoConditionInput(conditionIndex, inputIndex, event.target.value)} />
-                          <button onClick={() => removePdoConditionInput(conditionIndex, inputIndex)} type="button">删除输入</button>
-                        </label>
-                      ))}
-                    </div>
-                  </article>
-                  );
-                })}
-              </section>
-
-              {(['pdo_recv', 'pdo_send'] as const).map((kind) => (
-                <section className="pdo-frame-section" key={`advanced-${kind}`}>
-                  <div className="config-table-toolbar">
-                    <strong>{kind === 'pdo_recv' ? '高级接收帧' : '高级发送帧'}（{currentPdoAdvancedDocument[kind].length ?? 0}）</strong>
-                    <button onClick={() => addPdoAdvancedFrame(kind)} type="button">新增帧</button>
-                  </div>
-                  {currentPdoAdvancedDocument[kind].map((frame, frameIndex) => {
-                    const framePath: JsonPath = [kind, frameIndex];
-                    const frameModified = isModifiedPath(framePath);
-                    return (
-                    <article className={frameModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`advanced-${kind}-${frameIndex}`}>
-                      <div className="pdo-frame-grid">
-                        <label>帧 ID<input inputMode="text" value={formatFrameId(frame.id)} onChange={(event) => updatePdoAdvancedFrameId(kind, frameIndex, event.target.value)} /></label>
-                        <label>帧类型<input type="number" value={frame.type} onChange={(event) => updatePdoAdvancedFrame(kind, frameIndex, 'type', Number(event.target.value))} /></label>
-                        <label>描述<input value={frame.desc} onChange={(event) => updatePdoAdvancedFrame(kind, frameIndex, 'desc', event.target.value)} /></label>
-                      </div>
-                      <div className="pdo-frame-actions">
-                        {frameModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(framePath)} type="button">恢复帧</button> : null}
-                        <button onClick={() => removePdoAdvancedFrame(kind, frameIndex)} type="button">删除帧</button>
-                      </div>
-                      <div className="config-table-toolbar">
-                        <span>数据项（{frame.data.length}）</span>
-                        <button onClick={() => addPdoAdvancedSignal(kind, frameIndex)} type="button">新增数据项</button>
-                      </div>
-                      <div className="config-table-frame">
-                        <table className="config-table">
-                          <thead>
-                            <tr>
-                              <th>参数 ID</th>
-                              <th>位置</th>
-                              <th>长度</th>
-                              <th>显示类型</th>
-                              <th>句柄</th>
-                              <th>句柄参数</th>
-                              <th>操作</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {frame.data.map((signal, signalIndex) => {
-                              const signalPath: JsonPath = [kind, frameIndex, 'data', signalIndex];
-                              const signalModified = isModifiedPath(signalPath);
-                              return (
-                              <tr className={signalModified ? 'config-entry-modified' : undefined} key={`advanced-${kind}-${frameIndex}-${signalIndex}`}>
-                                <td><input value={signal.param_id} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'param_id', event.target.value)} /></td>
-                                <td><input type="number" value={signal.pos} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'pos', Number(event.target.value))} /></td>
-                                <td><input type="number" value={signal.len} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'len', Number(event.target.value))} /></td>
-                                <td><input type="number" value={signal.show_type} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'show_type', Number(event.target.value))} /></td>
-                                <td><input type="number" value={signal.handle} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'handle', Number(event.target.value))} /></td>
-                                <td><input value={signal.handle_param} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'handle_param', event.target.value)} /></td>
-                                <td>
-                                  {signalModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(signalPath)} type="button">恢复</button> : null}
-                                  <button onClick={() => removePdoAdvancedSignal(kind, frameIndex, signalIndex)} type="button">删除</button>
-                                </td>
-                              </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </article>
-                    );
-                  })}
-                </section>
-              ))}
-            </div>
-          ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'pdo-advanced' ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>PDO 高级配置校验</h2>
-            <p>解析当前项目中的全局变量、条件表、PDO 接收帧和发送帧，展示结构统计与引用校验错误。</p>
-          </div>
-          <button
-            className="path-open-button"
-            disabled={!loadedProject || isParsingPdoAdvanced}
-            onClick={() => void handleParsePdoAdvanced()}
-            type="button"
-          >
-            {isParsingPdoAdvanced ? '解析中...' : '解析当前高级 PDO 配置'}
-          </button>
-          {pdoAdvancedReport ? (
+            <strong className="section-label--muted">应用信息</strong>
             <div className="project-open-report">
               <article>
-                <span>全局变量</span>
-                <strong>{pdoAdvancedReport.document?.pdo_global_param.length ?? 0}</strong>
+                <span>软件名称</span>
+                <strong>{health?.app_name ?? '自定义开发平台'}</strong>
               </article>
               <article>
-                <span>条件表</span>
-                <strong>{pdoAdvancedReport.document?.pdo_condition.length ?? 0}</strong>
+                <span>前端版本</span>
+                <strong>{appVersion}</strong>
               </article>
               <article>
-                <span>接收帧</span>
-                <strong>{pdoAdvancedReport.document?.pdo_recv.length ?? 0}</strong>
+                <span>核心版本</span>
+                <strong>{health?.version ?? '-'}</strong>
               </article>
               <article>
-                <span>发送帧</span>
-                <strong>{pdoAdvancedReport.document?.pdo_send.length ?? 0}</strong>
+                <span>提交哈希</span>
+                <strong>{health?.commit_hash ?? 'unknown'}</strong>
+              </article>
+              <article>
+                <span>核心状态</span>
+                <strong>{health?.core_status ?? 'loading'}</strong>
               </article>
             </div>
-          ) : null}
-          {pdoAdvancedError ? <p className="project-open-error">{pdoAdvancedError}</p> : null}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'project' || activeModule.key === 'ui' || activeModule.key === 'export' ? (
-        <section className="table-spec-card">
-          <div>
-            <h2>表格格式参考</h2>
-            <p>SDO、PDO 简化表和多语言表的表头定义，导入前可快速确认目标格式。</p>
-          </div>
-          {tableSpecs.map((spec) => (
-            <div className="table-format-ref" key={spec.kind}>
-              <strong>{spec.kind === 'sdo' ? 'SDO 参数表' : spec.kind === 'pdoSimple' ? 'PDO 简化表' : '多语言表'}（{spec.headers.length} 列）</strong>
-              <div className="table-format-chips">
-                {spec.headers.map((header) => (
-                  <span className="table-format-chip" key={header}>{header}</span>
-                ))}
+            <strong className="section-label--muted">项目信息</strong>
+            <div className="project-open-report">
+              <article>
+                <span>当前项目</span>
+                <strong>{project?.name ?? '未打开项目'}</strong>
+              </article>
+              <article>
+                <span>项目路径</span>
+                <strong>{loadedProject?.summary.path ?? (projectPath || '—')}</strong>
+              </article>
+            </div>
+            <strong className="section-label--muted">外观</strong>
+            <div className="theme-toggle-row">
+              <div className="theme-toggle-info">
+                <span>主题模式</span>
+                <small>{theme === 'dark' ? '深色模式' : '浅色模式'}</small>
               </div>
-            </div>
-          ))}
-        </section>
-      ) : null}
-
-      {activeModule.key === 'ui' ? (
-        <>
-          <UiCanvasPreview
-            canApply={Boolean(loadedProject)}
-            isApplying={isApplyingUi}
-            onAddOption={handleAddUiOption}
-            onApply={handleApplyUiResource}
-            onJumpToPdo={handleJumpToPdo}
-            onRemoveOption={handleRemoveUiOption}
-            onSelectOptionSources={handleSelectUiOptionSources}
-            report={uiPreview}
-          />
-          {uiApplyError ? <p className="ui-preview-errors">{uiApplyError}</p> : null}
-        </>
-      ) : null}
-      {activeModule.key === 'settings' ? (
-        <section className="project-open-card">
-          <div>
-            <h2>软件设置</h2>
-            <p>查看当前软件版本、提交哈希、核心状态和项目运行信息。</p>
-          </div>
-          <strong className="section-label--muted">应用信息</strong>
-          <div className="project-open-report">
-            <article>
-              <span>软件名称</span>
-              <strong>{health?.app_name ?? '自定义开发平台'}</strong>
-            </article>
-            <article>
-              <span>前端版本</span>
-              <strong>{appVersion}</strong>
-            </article>
-            <article>
-              <span>核心版本</span>
-              <strong>{health?.version ?? '-'}</strong>
-            </article>
-            <article>
-              <span>提交哈希</span>
-              <strong>{health?.commit_hash ?? 'unknown'}</strong>
-            </article>
-            <article>
-              <span>核心状态</span>
-              <strong>{health?.core_status ?? 'loading'}</strong>
-            </article>
-          </div>
-          <strong className="section-label--muted">项目信息</strong>
-          <div className="project-open-report">
-            <article>
-              <span>当前项目</span>
-              <strong>{project?.name ?? '未打开项目'}</strong>
-            </article>
-            <article>
-              <span>项目路径</span>
-              <strong>{loadedProject?.summary.path ?? (projectPath || '—')}</strong>
-            </article>
-          </div>
-          <strong className="section-label--muted">外观</strong>
-          <div className="theme-toggle-row">
-            <div className="theme-toggle-info">
-              <span>主题模式</span>
-              <small>{theme === 'dark' ? '深色模式' : '浅色模式'}</small>
-            </div>
-            <button className="theme-toggle-btn" onClick={onToggleTheme} type="button">
-              <span className={`theme-toggle-track ${theme === 'dark' ? 'theme-toggle-track--dark' : ''}`}>
-                <span className="theme-toggle-thumb" />
-              </span>
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {activeModule.key === 'export' ? (
-        <section className="export-card">
-          <div>
-            <h2>项目导出</h2>
-            <p>生成 jc_export、ConfigUpdate.json、UI 图片资源和 pdo_sdo_data.bin，用于设备配置发布。</p>
-          </div>
-          <div className="export-form">
-            <label>
-              导出目录
-              <input value={exportOutputDir} onChange={(event) => setExportOutputDir(event.target.value)} />
-            </label>
-            <button type="button" onClick={() => void handleSelectExportDir()} disabled={isExporting}>
-              选择目录
-            </button>
-            <button type="button" onClick={handleExportPackage} disabled={isExporting || exportOutputDir.trim() === ''}>
-              {isExporting ? '导出中...' : '执行项目导出'}
-            </button>
-            {exportReport ? (
-              <button type="button" onClick={() => void handleOpenExportDir(exportReport.export_root)}>
-                打开导出目录
+              <button className="theme-toggle-btn" onClick={onToggleTheme} type="button">
+                <span className={`theme-toggle-track ${theme === 'dark' ? 'theme-toggle-track--dark' : ''}`}>
+                  <span className="theme-toggle-thumb" />
+                </span>
               </button>
+            </div>
+          </section>
+        ) : null}
+
+        {activeModule.key === 'export' ? (
+          <section className="export-card">
+            <div>
+              <h2>项目导出</h2>
+              <p>生成 jc_export、ConfigUpdate.json、UI 图片资源和 pdo_sdo_data.bin，用于设备配置发布。</p>
+            </div>
+            <div className="export-form">
+              <label>
+                导出目录
+                <input value={exportOutputDir} onChange={(event) => setExportOutputDir(event.target.value)} />
+              </label>
+              <button type="button" onClick={() => void handleSelectExportDir()} disabled={isExporting}>
+                选择目录
+              </button>
+              <button type="button" onClick={handleExportPackage} disabled={isExporting || exportOutputDir.trim() === ''}>
+                {isExporting ? '导出中...' : '执行项目导出'}
+              </button>
+              {exportReport ? (
+                <button type="button" onClick={() => void handleOpenExportDir(exportReport.export_root)}>
+                  打开导出目录
+                </button>
+              ) : null}
+            </div>
+            <div className="section-divider" />
+            <strong className="section-label--muted">辅助工具</strong>
+            <div className="sample-actions">
+              <button type="button" onClick={() => void handleCopyUiImages()}>
+                仅复制 UI 图片
+              </button>
+              <button type="button" onClick={() => void handleBuildBinaryReport()}>
+                生成二进制报告
+              </button>
+              <button type="button" onClick={() => void handleCompareBinary()}>
+                选择参考 bin 对比
+              </button>
+            </div>
+            {exportError ? <p className="export-error">{exportError}</p> : null}
+            {imageCopyReport ? (
+              <div className="export-report">
+                <article>
+                  <span>图片复制有效</span>
+                  <strong>{imageCopyReport.valid ? '是' : '否'}</strong>
+                </article>
+                <article>
+                  <span>导出根目录</span>
+                  <strong>{imageCopyReport.export_root}</strong>
+                </article>
+                <article>
+                  <span>复制数量</span>
+                  <strong>{imageCopyReport.copied_files.length}</strong>
+                </article>
+                {imageCopyReport.warnings.length > 0 ? <p className="export-warning">{imageCopyReport.warnings.join('；')}</p> : null}
+                <button type="button" onClick={() => void handleOpenExportDir(imageCopyReport.export_root)}>
+                  打开导出目录
+                </button>
+              </div>
             ) : null}
-          </div>
-          <div className="section-divider" />
-          <strong className="section-label--muted">辅助工具</strong>
-          <div className="sample-actions">
-            <button type="button" onClick={() => void handleCopyUiImages()}>
-              仅复制 UI 图片
-            </button>
-            <button type="button" onClick={() => void handleBuildBinaryReport()}>
-              生成二进制报告
-            </button>
-            <button type="button" onClick={() => void handleCompareBinary()}>
-              选择参考 bin 对比
-            </button>
-          </div>
-          {exportError ? <p className="export-error">{exportError}</p> : null}
-          {imageCopyReport ? (
-            <div className="export-report">
-              <article>
-                <span>图片复制有效</span>
-                <strong>{imageCopyReport.valid ? '是' : '否'}</strong>
-              </article>
-              <article>
-                <span>导出根目录</span>
-                <strong>{imageCopyReport.export_root}</strong>
-              </article>
-              <article>
-                <span>复制数量</span>
-                <strong>{imageCopyReport.copied_files.length}</strong>
-              </article>
-              {imageCopyReport.warnings.length > 0 ? <p className="export-warning">{imageCopyReport.warnings.join('；')}</p> : null}
-              <button type="button" onClick={() => void handleOpenExportDir(imageCopyReport.export_root)}>
-                打开导出目录
-              </button>
-            </div>
-          ) : null}
-          {binaryReport ? (
-            <div className="export-report">
-              <article>
-                <span>二进制有效</span>
-                <strong>{binaryReport.valid ? '是' : '否'}</strong>
-              </article>
-              <article>
-                <span>大小</span>
-                <strong>{binaryReport.file_size} bytes</strong>
-              </article>
-              <article>
-                <span>CRC</span>
-                <strong>{binaryReport.crc}</strong>
-              </article>
-              <article>
-                <span>语言数量</span>
-                <strong>{binaryReport.data_description.language_code.length}</strong>
-              </article>
-              {binaryReport.warnings.length > 0 ? <p className="export-warning">{binaryReport.warnings.join('；')}</p> : null}
-            </div>
-          ) : null}
-          {binaryCompareReport ? (
-            <div className="export-report">
-              <article>
-                <span>是否一致</span>
-                <strong>{binaryCompareReport.same ? '一致' : '不一致'}</strong>
-              </article>
-              <article>
-                <span>生成/参考大小</span>
-                <strong>{binaryCompareReport.generated_size} / {binaryCompareReport.legacy_size}</strong>
-              </article>
-              <article>
-                <span>首个差异偏移</span>
-                <strong>{binaryCompareReport.first_diff_offset ?? '-'}</strong>
-              </article>
-              <article>
-                <span>生成/参考字节</span>
-                <strong>{binaryCompareReport.generated_byte ?? '-'} / {binaryCompareReport.legacy_byte ?? '-'}</strong>
-              </article>
-            </div>
-          ) : null}
-          {exportReport ? (
-            <div className="export-report">
-              <article>
-                <span>结果</span>
-                <strong>{exportReport.valid ? '有效' : '存在问题'}</strong>
-              </article>
-              <article>
-                <span>导出根目录</span>
-                <strong>{exportReport.export_root}</strong>
-              </article>
-              <article>
-                <span>ConfigUpdate.json</span>
-                <strong>{exportReport.manifest_path}</strong>
-              </article>
-              <article>
-                <span>pdo_sdo_data.bin</span>
-                <strong>{exportReport.binary_path}</strong>
-              </article>
-              <article>
-                <span>二进制大小 / CRC</span>
-                <strong>{exportReport.binary.file_size} bytes / {exportReport.binary.crc}</strong>
-              </article>
-              <article>
-                <span>图片复制</span>
-                <strong>{exportReport.copied_images.length} 个文件</strong>
-              </article>
-              {exportReport.errors.length > 0 ? <p className="export-error">{exportReport.errors.join('；')}</p> : null}
-              {exportReport.warnings.length > 0 ? <p className="export-warning">{exportReport.warnings.join('；')}</p> : null}
-              <button type="button" onClick={() => void handleOpenExportDir(exportReport.export_root)}>
-                打开导出目录
-              </button>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+            {binaryReport ? (
+              <div className="export-report">
+                <article>
+                  <span>二进制有效</span>
+                  <strong>{binaryReport.valid ? '是' : '否'}</strong>
+                </article>
+                <article>
+                  <span>大小</span>
+                  <strong>{binaryReport.file_size} bytes</strong>
+                </article>
+                <article>
+                  <span>CRC</span>
+                  <strong>{binaryReport.crc}</strong>
+                </article>
+                <article>
+                  <span>语言数量</span>
+                  <strong>{binaryReport.data_description.language_code.length}</strong>
+                </article>
+                {binaryReport.warnings.length > 0 ? <p className="export-warning">{binaryReport.warnings.join('；')}</p> : null}
+              </div>
+            ) : null}
+            {binaryCompareReport ? (
+              <div className="export-report">
+                <article>
+                  <span>是否一致</span>
+                  <strong>{binaryCompareReport.same ? '一致' : '不一致'}</strong>
+                </article>
+                <article>
+                  <span>生成/参考大小</span>
+                  <strong>{binaryCompareReport.generated_size} / {binaryCompareReport.legacy_size}</strong>
+                </article>
+                <article>
+                  <span>首个差异偏移</span>
+                  <strong>{binaryCompareReport.first_diff_offset ?? '-'}</strong>
+                </article>
+                <article>
+                  <span>生成/参考字节</span>
+                  <strong>{binaryCompareReport.generated_byte ?? '-'} / {binaryCompareReport.legacy_byte ?? '-'}</strong>
+                </article>
+              </div>
+            ) : null}
+            {exportReport ? (
+              <div className="export-report">
+                <article>
+                  <span>结果</span>
+                  <strong>{exportReport.valid ? '有效' : '存在问题'}</strong>
+                </article>
+                <article>
+                  <span>导出根目录</span>
+                  <strong>{exportReport.export_root}</strong>
+                </article>
+                <article>
+                  <span>ConfigUpdate.json</span>
+                  <strong>{exportReport.manifest_path}</strong>
+                </article>
+                <article>
+                  <span>pdo_sdo_data.bin</span>
+                  <strong>{exportReport.binary_path}</strong>
+                </article>
+                <article>
+                  <span>二进制大小 / CRC</span>
+                  <strong>{exportReport.binary.file_size} bytes / {exportReport.binary.crc}</strong>
+                </article>
+                <article>
+                  <span>图片复制</span>
+                  <strong>{exportReport.copied_images.length} 个文件</strong>
+                </article>
+                {exportReport.errors.length > 0 ? <p className="export-error">{exportReport.errors.join('；')}</p> : null}
+                {exportReport.warnings.length > 0 ? <p className="export-warning">{exportReport.warnings.join('；')}</p> : null}
+                <button type="button" onClick={() => void handleOpenExportDir(exportReport.export_root)}>
+                  打开导出目录
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     </main>
   );
