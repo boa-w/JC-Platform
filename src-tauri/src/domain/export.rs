@@ -1473,7 +1473,7 @@ fn write_language_bytes(
                 .and_then(|items| items.get(entry))
                 .and_then(|item| item.get(&code))
                 .and_then(Value::as_str)
-                .unwrap_or_default();
+                .unwrap_or(entry);
             text_bytes.extend(text.as_bytes());
             text_bytes.push(0);
         }
