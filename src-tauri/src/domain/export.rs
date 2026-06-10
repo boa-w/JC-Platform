@@ -1912,6 +1912,27 @@ fn join_path(base: &str, child: &str) -> String {
 mod tests {
     use super::*;
 
+    fn language_info_without_selected_languages() -> Value {
+        json!({
+            "list_code_language": [],
+            "list_inner": [],
+            "list_translate": {}
+        })
+    }
+
+    fn disabled_battery_monitor() -> Value {
+        json!({ "enabled": false })
+    }
+
+    fn empty_pdo_advanced_sections() -> Value {
+        json!({
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": []
+        })
+    }
+
     #[test]
     fn collect_language_entries_includes_language_name_prefix() {
         let document = json!({
@@ -1990,5 +2011,215 @@ mod tests {
         let bytes = menu_item_bytes(document.get("sdo_info").unwrap(), &entries, 1, 0);
 
         assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 3);
+    }
+
+    #[test]
+    fn build_project_binary_prefers_advanced_pdo_over_simple_pdo() {
+        let document = json!({
+            "language_info": language_info_without_selected_languages(),
+            "battery_monitor_info": disabled_battery_monitor(),
+            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
+            "pdo_simple_send_recv": {
+                "pdo_recv": [{
+                    "id": 0x222,
+                    "type": 0,
+                    "desc": "simple fallback must not be used",
+                    "data": [{ "pos": 0, "len": 8, "show_type": 0, "pdo_param_index": 0, "pdo_param_name": "simple" }]
+                }],
+                "pdo_send": []
+            },
+            "pdo_global_param": [{
+                "param_id": "ADV_SIGNAL",
+                "name": "Advanced Signal",
+                "def": "7",
+                "reserved": 0,
+                "type": 0,
+                "inner": -1
+            }],
+            "pdo_condition": [],
+            "pdo_recv": [{
+                "id": 0x111,
+                "type": 0,
+                "desc": "advanced recv",
+                "data": [{
+                    "pos": 0,
+                    "len": 8,
+                    "show_type": 0,
+                    "handle": 0,
+                    "handle_param": "",
+                    "param_id": "ADV_SIGNAL"
+                }]
+            }],
+            "pdo_send": []
+        });
+
+        let report = build_project_binary(&document);
+
+        assert!(report.valid, "unexpected export errors: {:?}", report.errors);
+        assert_eq!(report.data_description.global_param_total, 1);
+        assert_eq!(report.data_description.pdo_recv_total, 1);
+        assert_eq!(report.data_description.pdo_send_total, 0);
+        let recv_base = report.data_description.pdo_recv_base_addr as usize;
+        assert_eq!(u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()), 0x111);
+    }
+
+    #[test]
+    fn build_project_binary_uses_simple_pdo_when_advanced_sections_are_empty() {
+        let mut document = empty_pdo_advanced_sections();
+        let object = document.as_object_mut().unwrap();
+        object.insert("language_info".to_string(), language_info_without_selected_languages());
+        object.insert("battery_monitor_info".to_string(), disabled_battery_monitor());
+        object.insert(
+            "sdo_info".to_string(),
+            json!({ "type": 0, "user_auth": 0, "name": "菜单", "children": [] }),
+        );
+        object.insert(
+            "pdo_simple_send_recv".to_string(),
+            json!({
+                "pdo_recv": [{
+                    "id": 0x321,
+                    "type": 0,
+                    "desc": "simple recv",
+                    "data": [{ "pos": 8, "len": 8, "show_type": 0, "pdo_param_index": 3, "pdo_param_name": "simple_signal" }]
+                }],
+                "pdo_send": []
+            }),
+        );
+
+        let report = build_project_binary(&document);
+
+        assert!(report.valid, "unexpected export errors: {:?}", report.errors);
+        assert_eq!(report.data_description.global_param_total, 1);
+        assert_eq!(report.data_description.global_param_index_total, 1);
+        assert_eq!(report.data_description.pdo_recv_total, 1);
+        let recv_base = report.data_description.pdo_recv_base_addr as usize;
+        assert_eq!(u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()), 0x321);
+        let data_base = u32::from_le_bytes(report.bytes[recv_base + 4..recv_base + 8].try_into().unwrap()) as usize;
+        assert_eq!(report.bytes[data_base], 8);
+        assert_eq!(report.bytes[data_base + 1], 8);
+    }
+
+    #[test]
+    fn build_project_binary_merges_enabled_battery_monitor_into_pdo_and_battery_segment() {
+        let document = json!({
+            "language_info": language_info_without_selected_languages(),
+            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
+            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "battery_monitor_info": {
+                "enabled": true,
+                "version": 2,
+                "page_size": 4,
+                "default_timeout_ticks": 200,
+                "frames": [{ "frame_key": "bat_2f0", "can_id": 0x2f0, "type": 0, "desc": "battery", "timeout_ticks": 200 }],
+                "signals": [{
+                    "signal_key": "battery_voltage",
+                    "param_id": "BATTERY_MONITOR_VOLTAGE",
+                    "name": "电池总电压",
+                    "inner": 17,
+                    "type": 10,
+                    "def": "0",
+                    "frame_key": "bat_2f0",
+                    "pos": 0,
+                    "len": 16,
+                    "show_type": 0,
+                    "handle": 0,
+                    "handle_param": ""
+                }],
+                "items": [{
+                    "item_key": "battery_voltage",
+                    "enabled": true,
+                    "order": 0,
+                    "signal_key": "battery_voltage",
+                    "name_key": "电池总电压",
+                    "unit": "V",
+                    "formatter": { "kind": "linear", "offset": 0, "scale_num": 1, "scale_den": 10, "decimals": 1, "display_base": 10 },
+                    "validity": { "mode": "frame_timeout", "frame_key": "bat_2f0", "empty_text": " " }
+                }]
+            }
+        });
+
+        let report = build_project_binary(&document);
+
+        assert!(report.valid, "unexpected export errors: {:?}", report.errors);
+        assert_eq!(report.data_description.global_param_total, 1);
+        assert_eq!(report.data_description.global_param_index_total, 1);
+        assert_eq!(report.data_description.pdo_recv_total, 1);
+        assert_eq!(report.data_description.battery_monitor_item_total, 1);
+        assert_eq!(report.data_description.battery_monitor_frame_total, 1);
+        assert_eq!(report.data_description.battery_monitor_version, 2);
+        let recv_base = report.data_description.pdo_recv_base_addr as usize;
+        assert_eq!(u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()), 0x2f0);
+        assert!(report.data_description.battery_monitor_base_addr > report.data_description.pdo_recv_base_addr);
+        assert!(report.data_description.sdo_base_addr > report.data_description.battery_monitor_base_addr);
+    }
+
+    #[test]
+    fn build_project_binary_packs_sdo_parameter_and_reports_stable_crc() {
+        let document = json!({
+            "language_info": language_info_without_selected_languages(),
+            "battery_monitor_info": disabled_battery_monitor(),
+            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+            "pdo_global_param": [{
+                "param_id": "PARAM_A",
+                "name": "参数A",
+                "def": "1",
+                "reserved": 0,
+                "type": 0,
+                "inner": -1
+            }],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": {
+                "type": 0,
+                "user_auth": 0,
+                "name": "菜单",
+                "children": [{
+                    "type": 1,
+                    "user_auth": 2,
+                    "name": "参数A",
+                    "control_protocol": 0,
+                    "control_rw": 1,
+                    "control_use_default": 1,
+                    "control_use_min_max": 1,
+                    "handle": 0,
+                    "handle_name": "u8",
+                    "handle_param": "0->0->0",
+                    "fid": 1,
+                    "mid": 0x2000,
+                    "sid": 1,
+                    "data_default": "3",
+                    "data_min": "1",
+                    "data_max": "10",
+                    "pre_handle": 0,
+                    "pre_handle_scale": "1",
+                    "pre_handle_offset": "0",
+                    "pre_handle_decimal": 0
+                }]
+            }
+        });
+
+        let report = build_project_binary(&document);
+
+        assert!(report.valid, "unexpected export errors: {:?}", report.errors);
+        assert_eq!(report.data_description.sdo_base_addr, 5);
+        assert_eq!(report.data_description.file_size, 85);
+        assert_eq!(report.bytes.len(), 85);
+        assert_eq!(report.crc, crc16_ccitt_false(&report.bytes));
+        let sdo_param_base = report.data_description.sdo_base_addr as usize + 40;
+        assert_eq!(report.bytes[sdo_param_base], menu_control(1, 2, 1) as u8);
+        assert_eq!(report.bytes[sdo_param_base + 12], 1);
+        assert_eq!(
+            u16::from_le_bytes([
+                report.bytes[sdo_param_base + 13],
+                report.bytes[sdo_param_base + 14],
+            ]),
+            0x2000
+        );
+        assert_eq!(report.bytes[sdo_param_base + 15], 1);
     }
 }
