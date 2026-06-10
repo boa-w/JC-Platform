@@ -19,14 +19,15 @@ use commands::{
     add_ui_resource_option_document, backend_health, build_project_binary_report,
     build_project_export_plan, compare_project_binary_report, copy_ui_resource_images,
     create_project, export_project_package_command, export_table_csv, export_table_workbook,
-    import_language_csv, import_language_table, import_language_workbook, import_pdo_simple_csv,
-    import_pdo_simple_table, import_pdo_simple_workbook, import_sdo_csv, import_sdo_table,
-    import_sdo_workbook, language_document_table, legacy_table_spec, load_project,
-    migrate_project_document, migrate_project_file, parse_pdo_advanced_file,
-    parse_pdo_advanced_project, parse_project_document, parse_project_file, parse_ui_resource_file,
-    parse_ui_resources, parse_ui_resources_with_project_path, pdo_simple_document_table,
-    project_summary, remove_ui_resource_option_document, save_project, save_project_as,
-    sdo_document_table, update_ui_resource_document, validate_project_document,
+    generate_can_test_data, import_language_csv, import_language_table, import_language_workbook,
+    import_pdo_simple_csv, import_pdo_simple_table, import_pdo_simple_workbook, import_sdo_csv,
+    import_sdo_table, import_sdo_workbook, language_document_table, legacy_table_spec,
+    load_json_file, load_project, migrate_project_document, migrate_project_file,
+    parse_pdo_advanced_file, parse_pdo_advanced_project, parse_project_document,
+    parse_project_file, parse_ui_resource_file, parse_ui_resources,
+    parse_ui_resources_with_project_path, pdo_simple_document_table, project_summary,
+    remove_ui_resource_option_document, save_json_file, save_project, save_project_as,
+    save_text_file, sdo_document_table, update_ui_resource_document, validate_project_document,
     validate_table_headers,
 };
 
@@ -81,7 +82,11 @@ pub fn run() {
             export_project_package_command,
             copy_ui_resource_images,
             compare_project_binary_report,
-            build_project_binary_report
+            build_project_binary_report,
+            generate_can_test_data,
+            save_text_file,
+            save_json_file,
+            load_json_file
         ])
         .run(tauri::generate_context!())
         .expect("failed to run jc custom platform tauri app");

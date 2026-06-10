@@ -5,6 +5,7 @@ import type {
   BinaryBuildReport,
   BinaryCompareReport,
   BinaryCompareRequest,
+  CanTestGenerateResponse,
   ExportPlanReport,
   ExportPlanRequest,
   ExportTableRequest,
@@ -230,4 +231,20 @@ export async function buildProjectBinaryReport(document: unknown): Promise<Binar
 
 export async function revealItemInDir(path: string): Promise<void> {
   return openPath(path);
+}
+
+export async function generateCanTestData(document: unknown): Promise<CanTestGenerateResponse> {
+  return invoke<CanTestGenerateResponse>('generate_can_test_data', { document });
+}
+
+export async function saveTextFile(path: string, content: string): Promise<void> {
+  return invoke<void>('save_text_file', { path, content });
+}
+
+export async function saveJsonFile(path: string, content: unknown): Promise<void> {
+  return invoke<void>('save_json_file', { path, content });
+}
+
+export async function loadJsonFile(path: string): Promise<unknown> {
+  return invoke<unknown>('load_json_file', { path });
 }

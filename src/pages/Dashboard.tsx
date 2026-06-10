@@ -9,6 +9,7 @@ import {
   exportProjectPackage,
   exportTableCsv,
   exportTableWorkbook,
+  generateCanTestData,
   getLegacyTableSpec,
   importLanguageCsv,
   importLanguageWorkbook,
@@ -17,6 +18,7 @@ import {
   importSdoCsv,
   importSdoWorkbook,
   languageDocumentTable,
+  loadJsonFile,
   loadProject,
   migrateProjectDocument,
   parsePdoAdvancedProject,
@@ -26,8 +28,10 @@ import {
   pdoSimpleDocumentTable,
   removeUiResourceOptionDocument,
   revealItemInDir,
+  saveJsonFile,
   saveProject,
   saveProjectAs,
+  saveTextFile,
   sdoDocumentTable,
   updateUiResourceDocument,
 } from '../api/commands';
@@ -39,6 +43,8 @@ import type {
   BatteryMonitorSignal,
   BinaryBuildReport,
   BinaryCompareReport,
+  CanTestFrame,
+  CanTestSignalValue,
   FeatureModule,
   LanguageDocument,
   LanguageImportReport,
@@ -214,6 +220,11 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [pdoJumpTarget, setPdoJumpTarget] = useState<number | null>(null);
+  const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
+  const [canTestFrames, setCanTestFrames] = useState<CanTestFrame[]>([]);
+  const [canTestDefaultCycle, setCanTestDefaultCycle] = useState(100);
+  const [canTestStatus, setCanTestStatus] = useState<string | null>(null);
+  const [isGeneratingCanTest, setIsGeneratingCanTest] = useState(false);
   const [newLanguageCode, setNewLanguageCode] = useState('');
   const [newLanguageLabel, setNewLanguageLabel] = useState('');
   const [newLanguageInnerKey, setNewLanguageInnerKey] = useState('');
@@ -610,6 +621,281 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     const document = batteryMonitorDocument();
     if (!document) return;
     updateBatteryMonitorDocument({ ...document, items: document.items.filter((_, currentIndex) => currentIndex !== index) });
+  }
+
+  function generateSimplePdoTestData() {
+    setGeneratingTestKey('pdo-simple');
+    try {
+      updatePdoSimpleDocument({
+        pdo_recv: [
+          { id: 0x181, type: 0, desc: '电机运行状态', data: [
+            { pos: 0, len: 16, show_type: 0, pdo_param_index: 0, pdo_param_name: 'motor_speed' },
+            { pos: 16, len: 8, show_type: 0, pdo_param_index: 1, pdo_param_name: 'motor_temp' },
+            { pos: 24, len: 8, show_type: 0, pdo_param_index: 2, pdo_param_name: 'motor_status' },
+          ]},
+          { id: 0x182, type: 0, desc: '电池信息', data: [
+            { pos: 0, len: 16, show_type: 0, pdo_param_index: 3, pdo_param_name: 'battery_voltage' },
+            { pos: 16, len: 8, show_type: 0, pdo_param_index: 4, pdo_param_name: 'battery_current' },
+            { pos: 24, len: 8, show_type: 0, pdo_param_index: 5, pdo_param_name: 'battery_soc' },
+            { pos: 32, len: 8, show_type: 0, pdo_param_index: 6, pdo_param_name: 'battery_temp' },
+          ]},
+        ],
+        pdo_send: [
+          { id: 0x101, type: 0, desc: '控制指令', data: [
+            { pos: 0, len: 8, show_type: 0, pdo_param_index: 7, pdo_param_name: 'control_cmd' },
+            { pos: 8, len: 16, show_type: 0, pdo_param_index: 8, pdo_param_name: 'target_value' },
+          ]},
+          { id: 0x102, type: 0, desc: '参数配置', data: [
+            { pos: 0, len: 16, show_type: 0, pdo_param_index: 9, pdo_param_name: 'param_value' },
+            { pos: 16, len: 8, show_type: 0, pdo_param_index: 10, pdo_param_name: 'param_index' },
+          ]},
+        ],
+      });
+    } finally {
+      setGeneratingTestKey(null);
+    }
+  }
+
+  function generateAdvancedPdoTestData() {
+    setGeneratingTestKey('pdo-advanced');
+    try {
+      updatePdoAdvancedDocument({
+        pdo_global_param: [
+          { param_id: '001', name: '电机转速', def: '0', reserved: 0, type: 0, inner: -1 },
+          { param_id: '002', name: '电机温度', def: '25', reserved: 0, type: 0, inner: -1 },
+          { param_id: '003', name: '电池电压', def: '480', reserved: 0, type: 0, inner: -1 },
+          { param_id: '004', name: '电池SOC', def: '50', reserved: 0, type: 0, inner: -1 },
+          { param_id: '005', name: '车速', def: '0', reserved: 0, type: 0, inner: -1 },
+          { param_id: '006', name: '故障码', def: '0', reserved: 0, type: 0, inner: -1 },
+        ],
+        pdo_condition: [
+          { param_id: '006', process: 0, data: [{ param_id: '003' }, { param_id: '004' }] },
+        ],
+        pdo_recv: [
+          { id: 0x281, type: 0, desc: '电机状态帧', data: [
+            { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '001' },
+            { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '002' },
+          ]},
+          { id: 0x282, type: 0, desc: '电池状态帧', data: [
+            { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '003' },
+            { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '004' },
+          ]},
+        ],
+        pdo_send: [
+          { id: 0x201, type: 0, desc: '控制帧', data: [
+            { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '005' },
+            { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '006' },
+          ]},
+        ],
+      });
+    } finally {
+      setGeneratingTestKey(null);
+    }
+  }
+
+  function generateBatteryMonitorTestData() {
+    setGeneratingTestKey('battery-monitor');
+    try {
+      updateBatteryMonitorDocument({
+        enabled: true,
+        version: 1,
+        page_size: 4,
+        default_timeout_ticks: 200,
+        frames: [
+          { frame_key: 'bat_2f0', can_id: 0x2F0, type: 0, desc: '锂电基础信息', timeout_ticks: 200 },
+          { frame_key: 'bat_2f1', can_id: 0x2F1, type: 0, desc: '锂电温度信息', timeout_ticks: 200 },
+          { frame_key: 'bat_2f2', can_id: 0x2F2, type: 0, desc: '锂电状态信息', timeout_ticks: 200 },
+          { frame_key: 'bat_2f3', can_id: 0x2F3, type: 0, desc: '锂电故障信息', timeout_ticks: 200 },
+        ],
+        signals: [
+          { signal_key: 'bat_total_voltage', param_id: 'BATTERY_MONITOR_TOTAL_VOLTAGE', name: '总电压', inner: -1, type: 0, def: '0', frame_key: 'bat_2f0', pos: 0, len: 16, show_type: 0 },
+          { signal_key: 'bat_total_current', param_id: 'BATTERY_MONITOR_TOTAL_CURRENT', name: '总电流', inner: -1, type: 0, def: '0', frame_key: 'bat_2f0', pos: 16, len: 16, show_type: 0 },
+          { signal_key: 'bat_soc', param_id: 'BATTERY_MONITOR_SOC', name: 'SOC', inner: -1, type: 0, def: '0', frame_key: 'bat_2f0', pos: 32, len: 8, show_type: 0 },
+          { signal_key: 'bat_soh', param_id: 'BATTERY_MONITOR_SOH', name: 'SOH', inner: -1, type: 0, def: '0', frame_key: 'bat_2f0', pos: 40, len: 8, show_type: 0 },
+          { signal_key: 'bat_remain_cap', param_id: 'BATTERY_MONITOR_REMAIN_CAP', name: '剩余容量', inner: -1, type: 0, def: '0', frame_key: 'bat_2f0', pos: 48, len: 16, show_type: 0 },
+          { signal_key: 'bat_max_temp', param_id: 'BATTERY_MONITOR_MAX_TEMP', name: '最高温度', inner: -1, type: 0, def: '0', frame_key: 'bat_2f1', pos: 0, len: 8, show_type: 0 },
+          { signal_key: 'bat_min_temp', param_id: 'BATTERY_MONITOR_MIN_TEMP', name: '最低温度', inner: -1, type: 0, def: '0', frame_key: 'bat_2f1', pos: 8, len: 8, show_type: 0 },
+          { signal_key: 'bat_cell_avg_temp', param_id: 'BATTERY_MONITOR_AVG_TEMP', name: '平均温度', inner: -1, type: 0, def: '0', frame_key: 'bat_2f1', pos: 16, len: 8, show_type: 0 },
+          { signal_key: 'bat_heat_status', param_id: 'BATTERY_MONITOR_HEAT', name: '加热状态', inner: -1, type: 0, def: '0', frame_key: 'bat_2f1', pos: 24, len: 8, show_type: 0 },
+          { signal_key: 'bat_charge_status', param_id: 'BATTERY_MONITOR_CHARGE', name: '充电状态', inner: -1, type: 0, def: '0', frame_key: 'bat_2f2', pos: 0, len: 8, show_type: 0 },
+          { signal_key: 'bat_discharge_status', param_id: 'BATTERY_MONITOR_DISCHARGE', name: '放电状态', inner: -1, type: 0, def: '0', frame_key: 'bat_2f2', pos: 8, len: 8, show_type: 0 },
+          { signal_key: 'bat_usage_time', param_id: 'BATTERY_MONITOR_USAGE_TIME', name: '累计使用时间', inner: -1, type: 0, def: '0', frame_key: 'bat_2f2', pos: 16, len: 32, show_type: 0 },
+          { signal_key: 'bat_error_code', param_id: 'BATTERY_MONITOR_ERROR', name: '故障码', inner: -1, type: 0, def: '0', frame_key: 'bat_2f3', pos: 0, len: 8, show_type: 0 },
+          { signal_key: 'bat_error_detail', param_id: 'BATTERY_MONITOR_ERROR_DETAIL', name: '故障详情', inner: -1, type: 0, def: '0', frame_key: 'bat_2f3', pos: 8, len: 24, show_type: 0 },
+        ],
+        items: [
+          { item_key: 'bat_voltage_item', enabled: true, order: 0, signal_key: 'bat_total_voltage', name_key: '锂电总电压', unit: 'V', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 10, decimals: 1 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
+          { item_key: 'bat_current_item', enabled: true, order: 1, signal_key: 'bat_total_current', name_key: '锂电总电流', unit: 'A', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 10, decimals: 1 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
+          { item_key: 'bat_soc_item', enabled: true, order: 2, signal_key: 'bat_soc', name_key: '锂电 SOC', unit: '%', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 1, decimals: 0 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
+          { item_key: 'bat_soh_item', enabled: true, order: 3, signal_key: 'bat_soh', name_key: '锂电 SOH', unit: '%', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 1, decimals: 0 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
+          { item_key: 'bat_remain_cap_item', enabled: true, order: 4, signal_key: 'bat_remain_cap', name_key: '剩余容量', unit: 'AH', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 100, decimals: 2 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
+          { item_key: 'bat_max_temp_item', enabled: true, order: 5, signal_key: 'bat_max_temp', name_key: '最高温度', unit: '℃', formatter: { kind: 'linear', offset: -40, scale_num: 1, scale_den: 1, decimals: 0 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f1', empty_text: ' ' } },
+          { item_key: 'bat_min_temp_item', enabled: true, order: 6, signal_key: 'bat_min_temp', name_key: '最低温度', unit: '℃', formatter: { kind: 'linear', offset: -40, scale_num: 1, scale_den: 1, decimals: 0 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f1', empty_text: ' ' } },
+          { item_key: 'bat_avg_temp_item', enabled: true, order: 7, signal_key: 'bat_cell_avg_temp', name_key: '平均温度', unit: '℃', formatter: { kind: 'linear', offset: -40, scale_num: 1, scale_den: 1, decimals: 0 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f1', empty_text: ' ' } },
+          { item_key: 'bat_heat_item', enabled: true, order: 8, signal_key: 'bat_heat_status', name_key: '加热状态', unit: '', formatter: { kind: 'bool_text', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, true_text: '加热中', false_text: '关闭' }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f1', empty_text: ' ' } },
+          { item_key: 'bat_charge_item', enabled: true, order: 9, signal_key: 'bat_charge_status', name_key: '充电状态', unit: '', formatter: { kind: 'bool_text', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, true_text: '充电中', false_text: '未充电' }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f2', empty_text: ' ' } },
+          { item_key: 'bat_discharge_item', enabled: true, order: 10, signal_key: 'bat_discharge_status', name_key: '放电状态', unit: '', formatter: { kind: 'bool_text', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, true_text: '放电中', false_text: '停止' }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f2', empty_text: ' ' } },
+          { item_key: 'bat_usage_time_item', enabled: true, order: 11, signal_key: 'bat_usage_time', name_key: '累计使用时间', unit: 'H', formatter: { kind: 'packed_time_0p1h', offset: 0, scale_num: 1, scale_den: 1, decimals: 1 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f2', empty_text: ' ' } },
+          { item_key: 'bat_error_item', enabled: true, order: 12, signal_key: 'bat_error_code', name_key: '故障码', unit: '', formatter: { kind: 'hex', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, display_base: 16 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f3', empty_text: ' ' } },
+        ],
+      });
+    } finally {
+      setGeneratingTestKey(null);
+    }
+  }
+
+  async function handleGenerateCanTest() {
+    if (!loadedProject) {
+      setCanTestStatus('请先打开 .jcpro 项目。');
+      return;
+    }
+    setIsGeneratingCanTest(true);
+    setCanTestStatus(null);
+    try {
+      const result = await generateCanTestData(loadedProject.document);
+      const frames = result.frames.map((f) => ({ ...f, cycleMs: canTestDefaultCycle }));
+      setCanTestFrames(frames);
+      setCanTestStatus(`已生成 ${result.frameCount} 个 CAN 帧`);
+    } catch (error) {
+      setCanTestStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsGeneratingCanTest(false);
+    }
+  }
+
+  function updateCanTestFrame(index: number, field: keyof CanTestFrame, value: number | string) {
+    setCanTestFrames((prev) => prev.map((f, i) => (i === index ? { ...f, [field]: value } : f)));
+  }
+
+  function computeHexFromSignals(signals: CanTestSignalValue[], dlc: number): string {
+    const bytes = new Uint8Array(dlc);
+    for (const sig of signals) {
+      let value = sig.rawValue >>> 0;
+      let bitPos = sig.pos;
+      let bitsRem = sig.len;
+      while (bitsRem > 0) {
+        const byteIdx = Math.floor(bitPos / 8);
+        if (byteIdx >= dlc) break;
+        const bitOff = bitPos % 8;
+        const bitsThis = Math.min(8 - bitOff, bitsRem);
+        bytes[byteIdx] |= (value & ((1 << bitsThis) - 1)) << bitOff;
+        value >>>= bitsThis;
+        bitPos += bitsThis;
+        bitsRem -= bitsThis;
+      }
+    }
+    return Array.from(bytes).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+  }
+
+  function updateCanTestSignalDisplayValue(frameIndex: number, signalIndex: number, displayValue: number) {
+    setCanTestFrames((prev) => prev.map((frame, fi) => {
+      if (fi !== frameIndex) return frame;
+      const newSignals = frame.signals.map((sig, si) => {
+        if (si !== signalIndex) return sig;
+        const rawValue = Math.round((displayValue - sig.offset) * sig.scaleDen / sig.scaleNum);
+        return { ...sig, displayValue, rawValue: Math.max(0, rawValue) };
+      });
+      const newData = computeHexFromSignals(newSignals, frame.dlc);
+      return { ...frame, signals: newSignals, data: newData };
+    }));
+  }
+
+  function fillCanTestSignals(mode: 'min' | 'max' | 'random' | 'zero' | 'ff') {
+    setCanTestFrames((prev) => prev.map((frame) => {
+      const newSignals = frame.signals.map((sig) => {
+        let rawValue: number;
+        if (mode === 'zero' || mode === 'min') {
+          rawValue = 0;
+        } else if (mode === 'ff' || mode === 'max') {
+          rawValue = 0xFFFFFFFF >>> (32 - sig.len);
+        } else {
+          const maxRaw = 0xFFFFFFFF >>> (32 - sig.len);
+          rawValue = Math.floor(Math.random() * (maxRaw + 1));
+        }
+        const displayValue = rawValue * sig.scaleNum / sig.scaleDen + sig.offset;
+        return { ...sig, rawValue, displayValue };
+      });
+      const newData = computeHexFromSignals(newSignals, frame.dlc);
+      return { ...frame, signals: newSignals, data: newData };
+    }));
+    const labels: Record<string, string> = { zero: '全部清零', min: '填充最小值', max: '填充最大值', random: '填充随机值', ff: '全填 FF' };
+    setCanTestStatus(`已${labels[mode]}`);
+  }
+
+  async function handleExportCanTestTxt() {
+    if (!loadedProject || canTestFrames.length === 0) {
+      setCanTestStatus('请先生成测试数据。');
+      return;
+    }
+    const selected = await open({
+      filters: [{ name: '文本文件', extensions: ['txt'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    const lines: string[] = [
+      '# CAN Test Data',
+      `# Generated: ${new Date().toISOString()}`,
+      `# Source: ${loadedProject.summary.name || 'unknown'}`,
+      '# ---',
+      '# CAN_ID, TYPE, NAME, DLC, CYCLE_MS, DATA_HEX',
+    ];
+    for (const frame of canTestFrames) {
+      const idStr = `0x${frame.id.toString(16).toUpperCase()}`;
+      lines.push(`${idStr}, ${frame.frameType}, ${frame.name}, ${frame.dlc}, ${frame.cycleMs}, ${frame.data}`);
+      for (const sig of frame.signals) {
+        lines.push(`#   ${sig.name} = ${sig.displayValue} ${sig.unit} (raw=${sig.rawValue}, pos=${sig.pos}, len=${sig.len})`);
+      }
+    }
+
+    try {
+      await saveTextFile(selected, lines.join('\n'));
+      setCanTestStatus(`已导出：${selected}`);
+    } catch (error) {
+      setCanTestStatus(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleExportCanTestConfig() {
+    if (canTestFrames.length === 0) {
+      setCanTestStatus('请先生成测试数据。');
+      return;
+    }
+    const selected = await open({
+      filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    try {
+      await saveJsonFile(selected, {
+        version: 1,
+        defaultCycleMs: canTestDefaultCycle,
+        frames: canTestFrames,
+      });
+      setCanTestStatus(`已导出配置：${selected}`);
+    } catch (error) {
+      setCanTestStatus(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleImportCanTestConfig() {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    try {
+      const config = await loadJsonFile(selected) as { version?: number; defaultCycleMs?: number; frames?: CanTestFrame[] };
+      if (!config.frames || !Array.isArray(config.frames)) {
+        setCanTestStatus('配置文件中没有有效的帧数据。');
+        return;
+      }
+      setCanTestFrames(config.frames);
+      if (config.defaultCycleMs) setCanTestDefaultCycle(config.defaultCycleMs);
+      setCanTestStatus(`已导入 ${config.frames.length} 个 CAN 帧`);
+    } catch (error) {
+      setCanTestStatus(error instanceof Error ? error.message : String(error));
+    }
   }
 
   function updateLanguageDocument(next: LanguageDocument) {
@@ -1914,6 +2200,22 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <span className="action-bar-sep" />
               </>
             ) : null}
+            {(['pdo-simple', 'pdo-advanced', 'battery-monitor'] as string[]).includes(activeModule.key) ? (
+              <button
+                className="action-bar-btn action-bar-btn--secondary"
+                disabled={!loadedProject || generatingTestKey !== null}
+                onClick={() => {
+                  if (activeModule.key === 'pdo-simple') generateSimplePdoTestData();
+                  else if (activeModule.key === 'pdo-advanced') generateAdvancedPdoTestData();
+                  else if (activeModule.key === 'battery-monitor') generateBatteryMonitorTestData();
+                }}
+                type="button"
+                title="自动构建当前页面的 CAN 测试数据"
+              >
+                <span className="action-bar-icon">⚡</span>
+                {generatingTestKey === activeModule.key ? '生成中...' : '生成测试数据'}
+              </button>
+            ) : null}
             {(['sdo', 'pdo-simple', 'pdo-advanced', 'battery-monitor', 'language'] as string[]).includes(activeModule.key) ? (
               <>
                 <button
@@ -2426,6 +2728,105 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   ))}
                 </tbody></table></div>
               </section>
+            </div>
+          ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+        </section>
+      ) : null}
+
+      {activeModule.key === 'can-test-data' ? (
+        <section className="table-spec-card">
+          <div>
+            <h2>CAN 测试数据构建</h2>
+            <p>从当前项目 PDO/锂电配置中提取 CAN 帧，生成测试数据并导出为 TXT 文件。</p>
+          </div>
+          {loadedProject ? (
+            <div className="pdo-simple-editor">
+              <div className="config-summary-strip">
+                <article><span>已生成帧</span><strong>{canTestFrames.length}</strong></article>
+                <article><span>默认周期</span><strong>{canTestDefaultCycle} ms</strong></article>
+              </div>
+              <div className="pdo-frame-grid">
+                <label>默认周期(ms)<input type="number" value={canTestDefaultCycle} onChange={(e) => setCanTestDefaultCycle(Number(e.target.value))} /></label>
+              </div>
+              <div className="config-table-toolbar" style={{ gap: 8 }}>
+                <button disabled={isGeneratingCanTest} onClick={() => void handleGenerateCanTest()} type="button">
+                  {isGeneratingCanTest ? '生成中...' : '⚡ 生成'}
+                </button>
+                <button disabled={canTestFrames.length === 0} onClick={() => void handleExportCanTestTxt()} type="button">📤 导出 TXT</button>
+                <span className="action-bar-sep" />
+                <button onClick={() => void handleImportCanTestConfig()} type="button">📥 导入配置</button>
+                <button disabled={canTestFrames.length === 0} onClick={() => void handleExportCanTestConfig()} type="button">📤 导出配置</button>
+              </div>
+              {canTestFrames.length > 0 ? (
+                <>
+                  <div className="config-table-toolbar" style={{ gap: 6, marginBottom: 6 }}>
+                    <span style={{ fontSize: '0.85em', opacity: 0.7 }}>信号填充：</span>
+                    <button onClick={() => fillCanTestSignals('min')} type="button" title="所有信号填最小值 0">最小值</button>
+                    <button onClick={() => fillCanTestSignals('max')} type="button" title="所有信号填最大值（对应位宽全 1）">最大值</button>
+                    <button onClick={() => fillCanTestSignals('random')} type="button" title="所有信号填随机值">随机值</button>
+                    <span className="action-bar-sep" />
+                    <button onClick={() => fillCanTestSignals('zero')} type="button" title="所有信号填 0">清零</button>
+                    <button onClick={() => fillCanTestSignals('ff')} type="button" title="所有信号原始值填 FF">全 FF</button>
+                  </div>
+                  {canTestFrames.map((frame, frameIndex) => (
+                    <section className="pdo-frame-section" key={`${frame.id}-${frameIndex}`}>
+                      <div className="pdo-frame-card">
+                        <div className="pdo-frame-grid">
+                          <label>CAN ID<code style={{ fontSize: '1.1em' }}>0x{frame.id.toString(16).toUpperCase().padStart(3, '0')}</code></label>
+                          <label>类型<span>{frame.frameType === 0 ? '标准帧' : '扩展帧'}</span></label>
+                          <label>名称<input value={frame.name} onChange={(e) => updateCanTestFrame(frameIndex, 'name', e.target.value)} /></label>
+                          <label>DLC<span>{frame.dlc}</span></label>
+                          <label>周期(ms)<input type="number" style={{ width: 80 }} value={frame.cycleMs} onChange={(e) => updateCanTestFrame(frameIndex, 'cycleMs', Number(e.target.value))} /></label>
+                          <label>HEX<code style={{ fontSize: '0.85em' }}>{frame.data}</code></label>
+                        </div>
+                      </div>
+                      {frame.signals.length > 0 ? (
+                        <div className="config-table-frame" style={{ marginTop: 6 }}>
+                          <table className="config-table">
+                            <thead>
+                              <tr>
+                                <th>信号名称</th>
+                                <th>值</th>
+                                <th>单位</th>
+                                <th>位置</th>
+                                <th>长度</th>
+                                <th>缩放</th>
+                                <th>偏移</th>
+                                <th>原始值</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {frame.signals.map((sig, sigIndex) => (
+                                <tr key={`${sig.name}-${sigIndex}`}>
+                                  <td>{sig.name}</td>
+                                  <td>
+                                    <input
+                                      type="number"
+                                      step={sig.scaleDen > 1 ? 1 / sig.scaleDen : 'any'}
+                                      style={{ width: 90 }}
+                                      value={sig.displayValue}
+                                      onChange={(e) => updateCanTestSignalDisplayValue(frameIndex, sigIndex, Number(e.target.value))}
+                                    />
+                                  </td>
+                                  <td>{sig.unit}</td>
+                                  <td>{sig.pos}</td>
+                                  <td>{sig.len}</td>
+                                  <td>{sig.scaleNum}/{sig.scaleDen}</td>
+                                  <td>{sig.offset}</td>
+                                  <td><code>0x{sig.rawValue.toString(16).toUpperCase()}</code></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : null}
+                    </section>
+                  ))}
+                </>
+              ) : canTestStatus && canTestStatus.startsWith('已生成') ? null : (
+                <div className="empty-state"><div className="empty-state-icon">📂</div><p>点击「⚡ 生成」从项目配置中构建 CAN 测试数据</p></div>
+              )}
+              {canTestStatus ? <p className={canTestStatus.startsWith('已') ? 'text-success' : 'project-open-error'} style={{ marginTop: 8 }}>{canTestStatus}</p> : null}
             </div>
           ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
         </section>

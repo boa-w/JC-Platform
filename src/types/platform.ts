@@ -1,4 +1,4 @@
-export type NavigationKey = 'project' | 'ui' | 'pdo-simple' | 'pdo-advanced' | 'sdo' | 'battery-monitor' | 'language' | 'export' | 'settings';
+export type NavigationKey = 'project' | 'ui' | 'pdo-simple' | 'pdo-advanced' | 'sdo' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
 
 export interface ProjectSummary {
   name: string;
@@ -528,4 +528,31 @@ export interface ParsedResourceOption {
   sources: string[];
   frame_count: number;
   format?: string;
+}
+
+export interface CanTestSignalValue {
+  name: string;
+  unit: string;
+  pos: number;
+  len: number;
+  scaleNum: number;
+  scaleDen: number;
+  offset: number;
+  rawValue: number;
+  displayValue: number;
+}
+
+export interface CanTestFrame {
+  id: number;
+  frameType: number;
+  name: string;
+  dlc: number;
+  cycleMs: number;
+  data: string;
+  signals: CanTestSignalValue[];
+}
+
+export interface CanTestGenerateResponse {
+  frames: CanTestFrame[];
+  frameCount: number;
 }

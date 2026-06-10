@@ -37,6 +37,11 @@ export const featureModules: FeatureModule[] = [
     description: '负责自动收集翻译项、编辑多语言表、CSV/XLS 导入导出和导出语言资源。',
   },
   {
+    key: 'can-test-data',
+    title: 'CAN 测试数据构建',
+    description: '自动提取项目 PDO/锂电 CAN 帧，生成测试数据并导出为 TXT 文件。',
+  },
+  {
     key: 'export',
     title: '项目导出',
     description: '负责生成 jc_export、复制图片资源、生成 JSON 描述和设备二进制 bin。',
