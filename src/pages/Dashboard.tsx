@@ -33,6 +33,10 @@ import {
 } from '../api/commands';
 import type {
   BackendHealth,
+  BatteryMonitorFrame,
+  BatteryMonitorInfo,
+  BatteryMonitorItem,
+  BatteryMonitorSignal,
   BinaryBuildReport,
   BinaryCompareReport,
   FeatureModule,
@@ -114,6 +118,7 @@ const modifiedSectionLabels: Record<string, string> = {
   pdo_recv: 'PDO 接收帧',
   pdo_send: 'PDO 发送帧',
   language_info: '多国语言',
+  battery_monitor_info: '锂电监控配置',
 };
 
 const trackedDocumentSections = Object.keys(modifiedSectionLabels);
@@ -284,6 +289,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (activeModule.key === 'sdo') return document.sdo_info;
     if (activeModule.key === 'pdo-simple') return document.pdo_simple_send_recv;
     if (activeModule.key === 'language') return document.language_info;
+    if (activeModule.key === 'battery-monitor') return document.battery_monitor_info;
     if (activeModule.key === 'pdo-advanced') {
       return Object.fromEntries(advancedConfigSections.map((section) => [section, document[section]]));
     }
@@ -358,6 +364,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (activeModule.key === 'sdo') document = restorePath(document, baselineDocument, ['sdo_info']);
     if (activeModule.key === 'pdo-simple') document = restorePath(document, baselineDocument, ['pdo_simple_send_recv']);
     if (activeModule.key === 'language') document = restorePath(document, baselineDocument, ['language_info']);
+    if (activeModule.key === 'battery-monitor') document = restorePath(document, baselineDocument, ['battery_monitor_info']);
     if (activeModule.key === 'pdo-advanced') {
       for (const section of advancedConfigSections) {
         document = restorePath(document, baselineDocument, [section]);
@@ -470,6 +477,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       if (activeModule.key === 'sdo') document.sdo_info = parsed;
       if (activeModule.key === 'pdo-simple') document.pdo_simple_send_recv = parsed;
       if (activeModule.key === 'language') document.language_info = parsed;
+      if (activeModule.key === 'battery-monitor') document.battery_monitor_info = parsed;
       if (activeModule.key === 'pdo-advanced') {
         for (const section of advancedConfigSections) {
           document[section] = parsed?.[section];
@@ -485,6 +493,123 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   function languageDocument(): LanguageDocument | null {
     if (!loadedProject) return null;
     return (loadedProject.document as Record<string, unknown>).language_info as LanguageDocument;
+  }
+
+  function batteryMonitorDocument(): BatteryMonitorInfo | null {
+    if (!loadedProject) return null;
+    return (loadedProject.document as Record<string, unknown>).battery_monitor_info as BatteryMonitorInfo;
+  }
+
+  function updateBatteryMonitorDocument(next: BatteryMonitorInfo) {
+    updateProjectDocument('battery_monitor_info', next);
+  }
+
+  function updateBatteryMonitorField(field: keyof BatteryMonitorInfo, value: unknown) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({ ...document, [field]: value });
+  }
+
+  function updateBatteryFrame(index: number, field: keyof BatteryMonitorFrame, value: string | number) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({
+      ...document,
+      frames: document.frames.map((frame, currentIndex) => (currentIndex === index ? { ...frame, [field]: value } : frame)),
+    });
+  }
+
+  function updateBatteryFrameId(index: number, value: string) {
+    const nextId = parseFrameId(value);
+    if (nextId !== null) updateBatteryFrame(index, 'can_id', nextId);
+  }
+
+  function addBatteryFrame() {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    const index = document.frames.length;
+    updateBatteryMonitorDocument({
+      ...document,
+      frames: [...document.frames, { frame_key: `bat_custom_${index + 1}`, can_id: 0, type: 0, desc: '新锂电帧', timeout_ticks: document.default_timeout_ticks ?? 200 }],
+    });
+  }
+
+  function removeBatteryFrame(index: number) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({ ...document, frames: document.frames.filter((_, currentIndex) => currentIndex !== index) });
+  }
+
+  function updateBatterySignal(index: number, field: keyof BatteryMonitorSignal, value: string | number) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({
+      ...document,
+      signals: document.signals.map((signal, currentIndex) => (currentIndex === index ? { ...signal, [field]: value } : signal)),
+    });
+  }
+
+  function addBatterySignal() {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    const index = document.signals.length;
+    updateBatteryMonitorDocument({
+      ...document,
+      signals: [...document.signals, { signal_key: `battery_signal_${index + 1}`, param_id: `BATTERY_MONITOR_CUSTOM_${index + 1}`, name: '新锂电信号', inner: -1, type: 0, def: '0', frame_key: document.frames[0]?.frame_key ?? '', pos: 0, len: 8, show_type: 0, handle: 0, handle_param: '' }],
+    });
+  }
+
+  function removeBatterySignal(index: number) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({ ...document, signals: document.signals.filter((_, currentIndex) => currentIndex !== index) });
+  }
+
+  function updateBatteryItem(index: number, field: keyof BatteryMonitorItem, value: string | number | boolean) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({
+      ...document,
+      items: document.items.map((item, currentIndex) => (currentIndex === index ? { ...item, [field]: value } : item)),
+    });
+  }
+
+  function updateBatteryItemFormatter(index: number, field: string, value: string | number) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({
+      ...document,
+      items: document.items.map((item, currentIndex) => (
+        currentIndex === index ? { ...item, formatter: { ...item.formatter, [field]: value } } : item
+      )),
+    });
+  }
+
+  function updateBatteryItemValidity(index: number, field: string, value: string | number) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({
+      ...document,
+      items: document.items.map((item, currentIndex) => (
+        currentIndex === index ? { ...item, validity: { ...item.validity, [field]: value } } : item
+      )),
+    });
+  }
+
+  function addBatteryItem() {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    const index = document.items.length;
+    updateBatteryMonitorDocument({
+      ...document,
+      items: [...document.items, { item_key: `battery_item_${index + 1}`, enabled: true, order: index, signal_key: document.signals[0]?.signal_key ?? '', name_key: '新锂电项', unit: '', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: document.frames[0]?.frame_key ?? '', empty_text: ' ' } }],
+    });
+  }
+
+  function removeBatteryItem(index: number) {
+    const document = batteryMonitorDocument();
+    if (!document) return;
+    updateBatteryMonitorDocument({ ...document, items: document.items.filter((_, currentIndex) => currentIndex !== index) });
   }
 
   function updateLanguageDocument(next: LanguageDocument) {
@@ -1736,6 +1861,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const currentPdoSimpleDocument = pdoSimpleDocument();
   const currentPdoAdvancedDocument = pdoAdvancedDocument();
   const currentLanguageDocument = languageDocument();
+  const currentBatteryMonitorDocument = batteryMonitorDocument();
 
   return (
     <main className="workspace">
@@ -1788,7 +1914,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <span className="action-bar-sep" />
               </>
             ) : null}
-            {(['sdo', 'pdo-simple', 'pdo-advanced', 'language'] as string[]).includes(activeModule.key) ? (
+            {(['sdo', 'pdo-simple', 'pdo-advanced', 'battery-monitor', 'language'] as string[]).includes(activeModule.key) ? (
               <>
                 <button
                   className={`action-bar-btn ${showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'}`}
@@ -2217,6 +2343,89 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   })}
                 </section>
               ))}
+            </div>
+          ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+        </section>
+      ) : null}
+
+      {activeModule.key === 'battery-monitor' ? (
+        <section className="table-spec-card">
+          <div>
+            <h2>锂电监控配置</h2>
+            <p>维护锂电监控 CAN 帧、PDO 信号、显示项、单位、精度和超时策略，导出后写入 data.bin 的 battery monitor 段。</p>
+          </div>
+          {currentBatteryMonitorDocument ? (
+            <div className="pdo-simple-editor">
+              <div className="config-summary-strip">
+                <article><span>状态</span><strong>{currentBatteryMonitorDocument.enabled ? '启用' : '停用'}</strong></article>
+                <article><span>帧 / 信号</span><strong>{currentBatteryMonitorDocument.frames.length} / {currentBatteryMonitorDocument.signals.length}</strong></article>
+                <article><span>显示项</span><strong>{currentBatteryMonitorDocument.items.filter((item) => item.enabled).length} / {currentBatteryMonitorDocument.items.length}</strong></article>
+                <article><span>写回段落</span><strong>battery_monitor_info</strong></article>
+              </div>
+              <div className="pdo-frame-grid">
+                <label>启用<select value={currentBatteryMonitorDocument.enabled ? 1 : 0} onChange={(event) => updateBatteryMonitorField('enabled', Number(event.target.value) === 1)}><option value={1}>启用</option><option value={0}>停用</option></select></label>
+                <label>版本<input type="number" value={currentBatteryMonitorDocument.version ?? 1} onChange={(event) => updateBatteryMonitorField('version', Number(event.target.value))} /></label>
+                <label>每页数量<input type="number" value={currentBatteryMonitorDocument.page_size ?? 4} onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))} /></label>
+                <label>默认超时 tick<input type="number" value={currentBatteryMonitorDocument.default_timeout_ticks ?? 200} onChange={(event) => updateBatteryMonitorField('default_timeout_ticks', Number(event.target.value))} /></label>
+              </div>
+              <section className="pdo-frame-section">
+                <div className="config-table-toolbar"><strong>锂电 CAN 帧（{currentBatteryMonitorDocument.frames.length}）</strong><button onClick={addBatteryFrame} type="button">新增帧</button></div>
+                {currentBatteryMonitorDocument.frames.map((frame, frameIndex) => (
+                  <article className={isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`${frame.frame_key}-${frameIndex}`}>
+                    <div className="pdo-frame-grid">
+                      <label>帧 key<input value={frame.frame_key} onChange={(event) => updateBatteryFrame(frameIndex, 'frame_key', event.target.value)} /></label>
+                      <label>帧 ID<input inputMode="text" value={formatFrameId(frame.can_id)} onChange={(event) => updateBatteryFrameId(frameIndex, event.target.value)} /></label>
+                      <label>帧类型<select value={frame.type} onChange={(event) => updateBatteryFrame(frameIndex, 'type', Number(event.target.value))}><option value={0}>标准帧</option><option value={1}>扩展帧</option></select></label>
+                      <label>超时 tick<input type="number" value={frame.timeout_ticks ?? currentBatteryMonitorDocument.default_timeout_ticks} onChange={(event) => updateBatteryFrame(frameIndex, 'timeout_ticks', Number(event.target.value))} /></label>
+                      <label>描述<input value={frame.desc ?? ''} onChange={(event) => updateBatteryFrame(frameIndex, 'desc', event.target.value)} /></label>
+                    </div>
+                    <div className="pdo-frame-actions">
+                      {isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'frames', frameIndex])} type="button">恢复帧</button> : null}
+                      <button onClick={() => removeBatteryFrame(frameIndex)} type="button">删除帧</button>
+                    </div>
+                  </article>
+                ))}
+              </section>
+              <section className="pdo-frame-section">
+                <div className="config-table-toolbar"><strong>锂电信号（{currentBatteryMonitorDocument.signals.length}）</strong><button onClick={addBatterySignal} type="button">新增信号</button></div>
+                <div className="config-table-frame"><table className="config-table"><thead><tr><th>key</th><th>参数ID</th><th>名称</th><th>内部变量</th><th>类型</th><th>帧</th><th>位置</th><th>长度</th><th>取数</th><th>操作</th></tr></thead><tbody>
+                  {currentBatteryMonitorDocument.signals.map((signal, signalIndex) => (
+                    <tr className={isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? 'config-entry-modified' : undefined} key={`${signal.signal_key}-${signalIndex}`}>
+                      <td><input value={signal.signal_key} onChange={(event) => updateBatterySignal(signalIndex, 'signal_key', event.target.value)} /></td>
+                      <td><input value={signal.param_id} onChange={(event) => updateBatterySignal(signalIndex, 'param_id', event.target.value)} /></td>
+                      <td><input value={signal.name} onChange={(event) => updateBatterySignal(signalIndex, 'name', event.target.value)} /></td>
+                      <td><input type="number" value={signal.inner} onChange={(event) => updateBatterySignal(signalIndex, 'inner', Number(event.target.value))} /></td>
+                      <td><input type="number" value={signal.type} onChange={(event) => updateBatterySignal(signalIndex, 'type', Number(event.target.value))} /></td>
+                      <td><select value={signal.frame_key} onChange={(event) => updateBatterySignal(signalIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
+                      <td><input type="number" value={signal.pos} onChange={(event) => updateBatterySignal(signalIndex, 'pos', Number(event.target.value))} /></td>
+                      <td><input type="number" value={signal.len} onChange={(event) => updateBatterySignal(signalIndex, 'len', Number(event.target.value))} /></td>
+                      <td><input type="number" value={signal.show_type} onChange={(event) => updateBatterySignal(signalIndex, 'show_type', Number(event.target.value))} /></td>
+                      <td>{isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'signals', signalIndex])} type="button">恢复</button> : null}<button onClick={() => removeBatterySignal(signalIndex)} type="button">删除</button></td>
+                    </tr>
+                  ))}
+                </tbody></table></div>
+              </section>
+              <section className="pdo-frame-section">
+                <div className="config-table-toolbar"><strong>显示项（{currentBatteryMonitorDocument.items.length}）</strong><button onClick={addBatteryItem} type="button">新增显示项</button></div>
+                <div className="config-table-frame"><table className="config-table"><thead><tr><th>启用</th><th>顺序</th><th>key</th><th>信号</th><th>名称key</th><th>单位</th><th>格式</th><th>偏移</th><th>缩放</th><th>小数</th><th>有效帧</th><th>操作</th></tr></thead><tbody>
+                  {currentBatteryMonitorDocument.items.map((item, itemIndex) => (
+                    <tr className={isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? 'config-entry-modified' : undefined} key={`${item.item_key}-${itemIndex}`}>
+                      <td><input checked={item.enabled} type="checkbox" onChange={(event) => updateBatteryItem(itemIndex, 'enabled', event.target.checked)} /></td>
+                      <td><input type="number" value={item.order} onChange={(event) => updateBatteryItem(itemIndex, 'order', Number(event.target.value))} /></td>
+                      <td><input value={item.item_key} onChange={(event) => updateBatteryItem(itemIndex, 'item_key', event.target.value)} /></td>
+                      <td><select value={item.signal_key} onChange={(event) => updateBatteryItem(itemIndex, 'signal_key', event.target.value)}>{currentBatteryMonitorDocument.signals.map((signal) => <option key={signal.signal_key} value={signal.signal_key}>{signal.signal_key}</option>)}</select></td>
+                      <td><input value={item.name_key} onChange={(event) => updateBatteryItem(itemIndex, 'name_key', event.target.value)} /></td>
+                      <td><input value={item.unit} onChange={(event) => updateBatteryItem(itemIndex, 'unit', event.target.value)} /></td>
+                      <td><select value={item.formatter?.kind ?? 'linear'} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'kind', event.target.value)}><option value="linear">线性</option><option value="bool_text">布尔文本</option><option value="hex">十六进制</option><option value="packed_time_0p1h">0.1H时间</option></select></td>
+                      <td><input type="number" value={item.formatter?.offset ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'offset', Number(event.target.value))} /></td>
+                      <td><input type="number" value={item.formatter?.scale_num ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_num', Number(event.target.value))} />/<input type="number" value={item.formatter?.scale_den ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_den', Number(event.target.value))} /></td>
+                      <td><input type="number" value={item.formatter?.decimals ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'decimals', Number(event.target.value))} /></td>
+                      <td><select value={item.validity?.frame_key ?? ''} onChange={(event) => updateBatteryItemValidity(itemIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
+                      <td>{isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'items', itemIndex])} type="button">恢复</button> : null}<button onClick={() => removeBatteryItem(itemIndex)} type="button">删除</button></td>
+                    </tr>
+                  ))}
+                </tbody></table></div>
+              </section>
             </div>
           ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
         </section>

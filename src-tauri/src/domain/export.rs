@@ -172,6 +172,10 @@ pub struct DataDescriptionPlan {
     pub pdo_recv_total: usize,
     pub pdo_send_base_addr: isize,
     pub pdo_send_total: usize,
+    pub battery_monitor_base_addr: isize,
+    pub battery_monitor_item_total: usize,
+    pub battery_monitor_frame_total: usize,
+    pub battery_monitor_version: usize,
     pub sdo_base_addr: isize,
     pub language_addr: Vec<isize>,
     pub language_code: Vec<String>,
@@ -196,6 +200,10 @@ impl DataDescriptionPlan {
             pdo_recv_total: 0,
             pdo_send_base_addr: -1,
             pdo_send_total: 0,
+            battery_monitor_base_addr: -1,
+            battery_monitor_item_total: 0,
+            battery_monitor_frame_total: 0,
+            battery_monitor_version: 0,
             sdo_base_addr: -1,
             language_addr: Vec::new(),
             language_code,
@@ -474,8 +482,7 @@ pub fn compare_project_binary(request: BinaryCompareRequest) -> BinaryCompareRep
 
 /// 从项目 JSON 构建二进制数据。
 ///
-/// 优先尝试简单模式（`pdo_simple_send_recv`），失败则使用高级模式。
-/// 简单模式会先转换为高级模式的中间表示再打包。
+/// 优先使用高级 PDO 与锂电监控配置，避免简化 PDO 覆盖配置化锂电帧。
 pub fn build_project_binary(document: &Value) -> BinaryBuildReport {
     let language_code = document
         .get("language_info")
@@ -490,29 +497,42 @@ pub fn build_project_binary(document: &Value) -> BinaryBuildReport {
         })
         .unwrap_or_default();
 
-    if let Some(pdo_document) = build_pdo_document_from_simple(document) {
-        return build_binary_from_pdo(document, &pdo_document, language_code);
+    let mut errors = Vec::new();
+    let battery_enabled = battery_monitor_enabled(document);
+    let pdo_report = parse_pdo_advanced_document(document);
+    if !battery_enabled {
+        errors.extend(pdo_report.errors.clone());
     }
 
-    let mut errors = Vec::new();
-    let pdo_report = parse_pdo_advanced_document(document);
-    errors.extend(pdo_report.errors);
-
     if let Some(pdo_document) = pdo_report.document.as_ref() {
-        let mut report = build_binary_from_pdo(document, pdo_document, language_code);
+        if battery_enabled || pdo_document_has_content(pdo_document) {
+            let mut pdo_document = pdo_document.clone();
+            merge_battery_monitor_pdo(document, &mut pdo_document, &mut errors);
+            let mut report = build_binary_from_pdo(document, &pdo_document, language_code);
+            report.errors.extend(errors);
+            report.valid = report.errors.is_empty();
+            return report;
+        }
+    }
+
+    if let Some(mut pdo_document) = build_pdo_document_from_simple(document) {
+        if battery_enabled {
+            merge_battery_monitor_pdo(document, &mut pdo_document, &mut errors);
+        }
+        let mut report = build_binary_from_pdo(document, &pdo_document, language_code);
         report.errors.extend(errors);
         report.valid = report.errors.is_empty();
-        report
-    } else {
-        BinaryBuildReport {
-            valid: false,
-            file_size: 0,
-            crc: 0,
-            data_description: DataDescriptionPlan::empty(language_code),
-            bytes: Vec::new(),
-            warnings: Vec::new(),
-            errors,
-        }
+        return report;
+    }
+
+    BinaryBuildReport {
+        valid: false,
+        file_size: 0,
+        crc: 0,
+        data_description: DataDescriptionPlan::empty(language_code),
+        bytes: Vec::new(),
+        warnings: Vec::new(),
+        errors,
     }
 }
 
@@ -617,6 +637,21 @@ fn prepare_clean_directory(path: &str, label: &str) -> Result<(), String> {
     ensure_dir(path_ref).map_err(|error| format!("创建导出 {} 目录失败 {}：{}", label, path, error))
 }
 
+fn pdo_document_has_content(document: &PdoAdvancedDocument) -> bool {
+    !document.pdo_global_param.is_empty()
+        || !document.pdo_condition.is_empty()
+        || !document.pdo_recv.is_empty()
+        || !document.pdo_send.is_empty()
+}
+
+fn battery_monitor_enabled(document: &Value) -> bool {
+    document
+        .get("battery_monitor_info")
+        .and_then(|value| value.get("enabled"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
 fn build_pdo_document_from_simple(document: &Value) -> Option<PdoAdvancedDocument> {
     let simple = document.get("pdo_simple_send_recv")?;
     let mut param_indexes = Vec::new();
@@ -711,6 +746,117 @@ fn generated_simple_param_id(inner: i64, index: usize) -> String {
     format!("SIMPLE{:04X}{:04X}", inner.max(0), index)
 }
 
+fn merge_battery_monitor_pdo(
+    source_document: &Value,
+    pdo_document: &mut PdoAdvancedDocument,
+    errors: &mut Vec<String>,
+) {
+    let Some(root) = source_document.get("battery_monitor_info") else {
+        return;
+    };
+    if !root.get("enabled").and_then(Value::as_bool).unwrap_or(false) {
+        return;
+    }
+
+    let frames = root
+        .get("frames")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let signals = root
+        .get("signals")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    let mut frame_map = HashMap::new();
+    for frame in &frames {
+        let key = object_string(frame, "frame_key");
+        if key.is_empty() {
+            errors.push("锂电监控存在空 frame_key".to_string());
+            continue;
+        }
+        frame_map.insert(key, frame.clone());
+    }
+
+    let mut existing_params = pdo_document
+        .pdo_global_param
+        .iter()
+        .map(|param| param.param_id.clone())
+        .collect::<HashSet<_>>();
+    for signal in &signals {
+        let param_id = object_string(signal, "param_id");
+        if param_id.is_empty() {
+            errors.push(format!("锂电信号 {} 缺少 param_id", object_string(signal, "signal_key")));
+            continue;
+        }
+        if existing_params.insert(param_id.clone()) {
+            pdo_document.pdo_global_param.push(PdoGlobalParam {
+                param_id,
+                name: object_string(signal, "name"),
+                def: object_string(signal, "def"),
+                reserved: object_i64(signal, "reserved", 0),
+                data_type: object_i64(signal, "type", 0),
+                inner: object_i64(signal, "inner", -1),
+            });
+        }
+    }
+
+    let mut recv_by_key = pdo_document
+        .pdo_recv
+        .iter()
+        .enumerate()
+        .map(|(index, frame)| ((frame.id, frame.frame_type), index))
+        .collect::<HashMap<_, _>>();
+
+    for frame in &frames {
+        let id = object_i64(frame, "can_id", 0) as u32;
+        let frame_type = object_i64(frame, "type", 0) as u8;
+        let key = (id, frame_type);
+        recv_by_key.entry(key).or_insert_with(|| {
+            let index = pdo_document.pdo_recv.len();
+            pdo_document.pdo_recv.push(PdoAdvancedFrame {
+                id,
+                frame_type,
+                desc: object_string(frame, "desc"),
+                data: Vec::new(),
+            });
+            index
+        });
+    }
+
+    for signal in &signals {
+        let frame_key = object_string(signal, "frame_key");
+        let Some(frame) = frame_map.get(&frame_key) else {
+            errors.push(format!("锂电信号 {} 引用了不存在的帧 {}", object_string(signal, "signal_key"), frame_key));
+            continue;
+        };
+        let key = (object_i64(frame, "can_id", 0) as u32, object_i64(frame, "type", 0) as u8);
+        let Some(frame_index) = recv_by_key.get(&key).copied() else {
+            continue;
+        };
+        let param_id = object_string(signal, "param_id");
+        if param_id.is_empty() {
+            continue;
+        }
+        if pdo_document.pdo_recv[frame_index]
+            .data
+            .iter()
+            .any(|item| item.param_id == param_id)
+        {
+            continue;
+        }
+        pdo_document.pdo_recv[frame_index].data.push(PdoAdvancedSignal {
+            pos: object_i64(signal, "pos", 0) as u32,
+            len: object_i64(signal, "len", 0) as u32,
+            show_type: object_i64(signal, "show_type", 0) as u8,
+            handle: object_i64(signal, "handle", 0) as u8,
+            handle_param: object_string(signal, "handle_param"),
+            param_id,
+        });
+    }
+}
+
 fn system_inner_param_name(index: i64) -> &'static str {
     match index {
         -1 => "无效",
@@ -798,6 +944,7 @@ fn build_binary_from_pdo(
         .iter()
         .flat_map(|condition| condition.data.iter().map(|input| input.param_id.clone()))
         .collect::<HashSet<_>>();
+    let language_entries = collect_language_entries(source_document);
 
     if !document.pdo_condition.is_empty() {
         description.global_condition_base_addr = bytes.len() as isize;
@@ -842,8 +989,22 @@ fn build_binary_from_pdo(
         description.pdo_send_total = document.pdo_send.len();
     }
 
+    let battery_bytes = build_battery_monitor_bytes(
+        source_document,
+        bytes.len(),
+        &param_indexes,
+        &language_entries,
+        &mut warnings,
+    );
+    if let Some((battery_bytes, item_total, frame_total, version)) = battery_bytes {
+        description.battery_monitor_base_addr = bytes.len() as isize;
+        description.battery_monitor_item_total = item_total;
+        description.battery_monitor_frame_total = frame_total;
+        description.battery_monitor_version = version;
+        bytes.extend(battery_bytes);
+    }
+
     description.sdo_base_addr = bytes.len() as isize;
-    let language_entries = collect_language_entries(source_document);
     let sdo_bytes = build_sdo_bytes(
         source_document.get("sdo_info"),
         bytes.len(),
@@ -895,6 +1056,7 @@ fn collect_language_entries(document: &Value) -> Vec<String> {
     if let Some(sdo_info) = document.get("sdo_info") {
         collect_sdo_names(sdo_info, &mut entries);
     }
+    collect_battery_monitor_language_entries(document, &mut entries);
     entries.push(String::new());
     entries
 }
@@ -910,10 +1072,139 @@ fn collect_sdo_names(value: &Value, entries: &mut Vec<String>) {
     }
 }
 
+fn collect_battery_monitor_language_entries(document: &Value, entries: &mut Vec<String>) {
+    let Some(root) = document.get("battery_monitor_info") else {
+        return;
+    };
+    let Some(items) = root.get("items").and_then(Value::as_array) else {
+        return;
+    };
+    for item in items {
+        push_unique(entries, &object_string(item, "name_key"));
+        push_unique(entries, &object_string(item, "unit"));
+        if let Some(formatter) = item.get("formatter") {
+            push_unique(entries, &object_string(formatter, "true_text"));
+            push_unique(entries, &object_string(formatter, "false_text"));
+        }
+        if let Some(validity) = item.get("validity") {
+            push_unique(entries, &object_string(validity, "empty_text"));
+        }
+    }
+}
+
 fn push_unique(entries: &mut Vec<String>, value: &str) {
     if !entries.iter().any(|item| item == value) {
         entries.push(value.to_string());
     }
+}
+
+fn build_battery_monitor_bytes(
+    document: &Value,
+    base_addr: usize,
+    param_indexes: &HashMap<String, u16>,
+    language_entries: &[String],
+    warnings: &mut Vec<String>,
+) -> Option<(Vec<u8>, usize, usize, usize)> {
+    let root = document.get("battery_monitor_info")?;
+    if !root.get("enabled").and_then(Value::as_bool).unwrap_or(false) {
+        return None;
+    }
+    let frames = root.get("frames").and_then(Value::as_array).cloned().unwrap_or_default();
+    let mut items = root.get("items").and_then(Value::as_array).cloned().unwrap_or_default();
+    if frames.is_empty() || items.is_empty() {
+        warnings.push("锂电监控已启用但帧或显示项为空，跳过 battery monitor 段".to_string());
+        return None;
+    }
+    items.sort_by_key(|item| object_i64(item, "order", 0));
+    items.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
+    if items.is_empty() {
+        warnings.push("锂电监控没有启用的显示项，跳过 battery monitor 段".to_string());
+        return None;
+    }
+
+    let signals = root.get("signals").and_then(Value::as_array).cloned().unwrap_or_default();
+    let signal_map = signals
+        .iter()
+        .map(|signal| (object_string(signal, "signal_key"), signal.clone()))
+        .collect::<HashMap<_, _>>();
+    let frame_map = frames
+        .iter()
+        .enumerate()
+        .map(|(index, frame)| (object_string(frame, "frame_key"), index as u16))
+        .collect::<HashMap<_, _>>();
+
+    let version = object_i64(root, "version", 1).max(0) as usize;
+    let page_size = object_i64(root, "page_size", 4).max(1) as u16;
+    let default_timeout = object_i64(root, "default_timeout_ticks", 200).max(0) as u16;
+    let header_len = 20usize;
+    let frame_table_addr = base_addr + header_len;
+    let item_table_addr = frame_table_addr + frames.len() * 8;
+    let mut bytes = Vec::new();
+
+    write_u16(&mut bytes, version as u16);
+    write_u16(&mut bytes, 0);
+    write_u16(&mut bytes, page_size);
+    write_u16(&mut bytes, items.len() as u16);
+    write_u16(&mut bytes, frames.len() as u16);
+    write_u16(&mut bytes, default_timeout);
+    write_u32(&mut bytes, frame_table_addr as u32);
+    write_u32(&mut bytes, item_table_addr as u32);
+
+    for frame in &frames {
+        write_u32(&mut bytes, object_i64(frame, "can_id", 0).max(0) as u32);
+        write_u8(&mut bytes, object_i64(frame, "type", 0).max(0) as u8);
+        write_u8(&mut bytes, 0);
+        write_u16(&mut bytes, object_i64(frame, "timeout_ticks", default_timeout as i64).max(0) as u16);
+    }
+
+    for item in &items {
+        let signal_key = object_string(item, "signal_key");
+        let signal = signal_map.get(&signal_key);
+        if signal.is_none() {
+            warnings.push(format!("锂电显示项 {} 引用了不存在的信号 {}", object_string(item, "item_key"), signal_key));
+        }
+        let signal = signal.cloned().unwrap_or(Value::Null);
+        let param_id = object_string(&signal, "param_id");
+        let formatter = item.get("formatter").unwrap_or(&Value::Null);
+        let validity = item.get("validity").unwrap_or(&Value::Null);
+        let frame_key = object_string(validity, "frame_key");
+        let scale_den = object_i64(formatter, "scale_den", 1);
+
+        write_u16(&mut bytes, param_indexes.get(&param_id).copied().unwrap_or(0));
+        write_u16(&mut bytes, object_i64(&signal, "inner", -1).max(0) as u16);
+        write_u16(&mut bytes, language_text_index(&object_string(item, "name_key"), language_entries));
+        write_u16(&mut bytes, frame_map.get(&frame_key).copied().unwrap_or(0xffff));
+        write_u8(&mut bytes, 1);
+        write_u8(&mut bytes, object_i64(item, "order", 0).max(0) as u8);
+        write_u8(&mut bytes, object_i64(&signal, "type", 0).max(0) as u8);
+        write_u8(&mut bytes, battery_formatter_kind(&object_string(formatter, "kind")));
+        write_i32(&mut bytes, object_i64(formatter, "offset", 0) as i32);
+        write_i32(&mut bytes, object_i64(formatter, "scale_num", 1) as i32);
+        write_i32(&mut bytes, if scale_den == 0 { 1 } else { scale_den } as i32);
+        write_u8(&mut bytes, object_i64(formatter, "decimals", 0).max(0) as u8);
+        write_u8(&mut bytes, object_i64(formatter, "display_base", 10).max(0) as u8);
+        write_u16(&mut bytes, language_text_index(&object_string(item, "unit"), language_entries));
+        write_u16(&mut bytes, language_text_index(&object_string(formatter, "true_text"), language_entries));
+        write_u16(&mut bytes, language_text_index(&object_string(formatter, "false_text"), language_entries));
+        write_u16(&mut bytes, language_text_index(&object_string(validity, "empty_text"), language_entries));
+        write_u32(&mut bytes, 0);
+        write_u16(&mut bytes, 0);
+    }
+
+    Some((bytes, items.len(), frames.len(), version))
+}
+
+fn battery_formatter_kind(kind: &str) -> u8 {
+    match kind {
+        "bool_text" => 1,
+        "hex" => 2,
+        "packed_time_0p1h" => 3,
+        _ => 0,
+    }
+}
+
+fn language_text_index(value: &str, entries: &[String]) -> u16 {
+    entries.iter().position(|item| item == value).unwrap_or(0) as u16
 }
 
 fn build_sdo_bytes(

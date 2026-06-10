@@ -8,7 +8,7 @@ interface SidebarProps {
 
 const navGroups: { label: string; keys: NavigationKey[] }[] = [
   { label: '项目', keys: ['project'] },
-  { label: '配置', keys: ['ui', 'pdo-simple', 'pdo-advanced', 'sdo', 'language'] },
+  { label: '配置', keys: ['ui', 'pdo-simple', 'pdo-advanced', 'sdo', 'battery-monitor', 'language'] },
   { label: '输出', keys: ['export', 'settings'] },
 ];
 

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "自定义开发平台"
 authors = ["JC"]
 edition = "2021"
+default-run = "jc_custom_platform_tauri"
 
 [lib]
 name = "jc_custom_platform_tauri_lib"

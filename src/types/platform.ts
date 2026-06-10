@@ -1,4 +1,4 @@
-export type NavigationKey = 'project' | 'ui' | 'pdo-simple' | 'pdo-advanced' | 'sdo' | 'language' | 'export' | 'settings';
+export type NavigationKey = 'project' | 'ui' | 'pdo-simple' | 'pdo-advanced' | 'sdo' | 'battery-monitor' | 'language' | 'export' | 'settings';
 
 export interface ProjectSummary {
   name: string;
@@ -64,6 +64,75 @@ export interface ProjectDocument {
   pdo_send: unknown[];
   sdo_info: SdoNodeDocument;
   language_info: LanguageDocument;
+  battery_monitor_info: BatteryMonitorInfo;
+}
+
+export interface BatteryMonitorInfo {
+  enabled: boolean;
+  version: number;
+  page_size: number;
+  default_timeout_ticks: number;
+  frames: BatteryMonitorFrame[];
+  signals: BatteryMonitorSignal[];
+  items: BatteryMonitorItem[];
+  [key: string]: unknown;
+}
+
+export interface BatteryMonitorFrame {
+  frame_key: string;
+  can_id: number;
+  type: number;
+  desc: string;
+  timeout_ticks: number;
+  [key: string]: unknown;
+}
+
+export interface BatteryMonitorSignal {
+  signal_key: string;
+  param_id: string;
+  name: string;
+  inner: number;
+  type: number;
+  def: string;
+  frame_key: string;
+  pos: number;
+  len: number;
+  show_type: number;
+  handle?: number;
+  handle_param?: string;
+  [key: string]: unknown;
+}
+
+export interface BatteryMonitorFormatter {
+  kind: string;
+  offset: number;
+  scale_num: number;
+  scale_den: number;
+  decimals: number;
+  display_base?: number;
+  true_text?: string;
+  false_text?: string;
+  [key: string]: unknown;
+}
+
+export interface BatteryMonitorValidity {
+  mode: string;
+  frame_key?: string;
+  empty_text?: string;
+  timeout_ticks?: number;
+  [key: string]: unknown;
+}
+
+export interface BatteryMonitorItem {
+  item_key: string;
+  enabled: boolean;
+  order: number;
+  signal_key: string;
+  name_key: string;
+  unit: string;
+  formatter: BatteryMonitorFormatter;
+  validity: BatteryMonitorValidity;
+  [key: string]: unknown;
 }
 
 export interface ProjectMetadata {
@@ -323,6 +392,10 @@ export interface DataDescriptionPlan {
   pdo_recv_total: number;
   pdo_send_base_addr: number;
   pdo_send_total: number;
+  battery_monitor_base_addr: number;
+  battery_monitor_item_total: number;
+  battery_monitor_frame_total: number;
+  battery_monitor_version: number;
   sdo_base_addr: number;
   language_addr: number[];
   language_code: string[];

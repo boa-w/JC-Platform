@@ -27,6 +27,11 @@ export const featureModules: FeatureModule[] = [
     description: '负责 SDO 菜单树、CAN Open 参数、权限、读写属性、缩放偏移和小数位。',
   },
   {
+    key: 'battery-monitor',
+    title: '锂电监控配置',
+    description: '负责锂电监控 CAN 帧、信号、显示项、单位、精度和超时策略。',
+  },
+  {
     key: 'language',
     title: '多国语言',
     description: '负责自动收集翻译项、编辑多语言表、CSV/XLS 导入导出和导出语言资源。',
