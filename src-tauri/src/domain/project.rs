@@ -220,6 +220,9 @@ pub fn migrate_legacy_project_document(path: Option<String>, value: Value) -> Mi
         }
     }
 
+    normalize_language_info(&mut document);
+    migrate_battery_monitor_formatters(&mut document);
+
     document.insert(
         "config_version".to_string(),
         Value::String("0.1.0-tauri-refactor".to_string()),
@@ -234,6 +237,63 @@ pub fn migrate_legacy_project_document(path: Option<String>, value: Value) -> Mi
         document,
         added_sections,
         migrated_version: "0.1.0-tauri-refactor".to_string(),
+    }
+}
+
+const BATTERY_MONITOR_FIXED_LANGUAGE_ENTRIES: [&str; 10] = [" ", "%", "A", "AH", "H", "V", "℃", "关", "加热中", "开"];
+
+fn normalize_language_info(document: &mut Map<String, Value>) {
+    let Some(language_info) = document.get_mut("language_info").and_then(Value::as_object_mut) else {
+        return;
+    };
+    let list_inner = language_info
+        .entry("list_inner".to_string())
+        .or_insert_with(|| Value::Array(Vec::new()));
+    let Some(items) = list_inner.as_array_mut() else {
+        return;
+    };
+    for entry in BATTERY_MONITOR_FIXED_LANGUAGE_ENTRIES {
+        if !items.iter().any(|item| item.as_str() == Some(entry)) {
+            items.push(Value::String(entry.to_string()));
+        }
+    }
+}
+
+fn migrate_battery_monitor_formatters(document: &mut Map<String, Value>) {
+    let Some(items) = document
+        .get_mut("battery_monitor_info")
+        .and_then(|value| value.get_mut("items"))
+        .and_then(Value::as_array_mut)
+    else {
+        return;
+    };
+
+    for item in items {
+        let item_key = item.get("item_key").and_then(Value::as_str).unwrap_or_default().to_string();
+        let signal_key = item.get("signal_key").and_then(Value::as_str).unwrap_or_default().to_string();
+        let Some(formatter) = item.get_mut("formatter").and_then(Value::as_object_mut) else {
+            continue;
+        };
+        let kind = formatter.get("kind").and_then(Value::as_str).unwrap_or_default();
+        let scale_num = formatter.get("scale_num").and_then(Value::as_i64).unwrap_or(1);
+        let scale_den = formatter.get("scale_den").and_then(Value::as_i64).unwrap_or(1);
+
+        if item_key == "battery_capacity"
+            && signal_key == "battery_capacity"
+            && kind == "linear"
+            && scale_num == 5
+            && scale_den == 1
+        {
+            formatter.insert("kind".to_string(), Value::String("linear_u8_wrap".to_string()));
+        } else if item_key == "battery_discharge_time"
+            && signal_key == "battery_discharge_time"
+            && kind == "packed_time_0p1h"
+        {
+            formatter.insert(
+                "kind".to_string(),
+                Value::String("packed_time_legacy_discharge_0p1h".to_string()),
+            );
+        }
     }
 }
 
@@ -746,7 +806,7 @@ pub fn default_battery_monitor_info() -> Value {
             { "item_key": "battery_voltage", "enabled": true, "order": 0, "signal_key": "battery_voltage", "name_key": "电池总电压", "unit": "V", "formatter": { "kind": "linear", "offset": 0, "scale_num": 1, "scale_den": 10, "decimals": 1, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f0", "empty_text": " " } },
             { "item_key": "battery_soc", "enabled": true, "order": 1, "signal_key": "battery_soc", "name_key": "SOC", "unit": "%", "formatter": { "kind": "linear", "offset": 0, "scale_num": 4, "scale_den": 10, "decimals": 0, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f0", "empty_text": " " } },
             { "item_key": "cell_max_voltage", "enabled": true, "order": 2, "signal_key": "cell_max_voltage", "name_key": "单体最高电压", "unit": "V", "formatter": { "kind": "linear", "offset": 0, "scale_num": 1, "scale_den": 1000, "decimals": 1, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f2", "empty_text": " " } },
-            { "item_key": "battery_capacity", "enabled": true, "order": 3, "signal_key": "battery_capacity", "name_key": "电池容量", "unit": "AH", "formatter": { "kind": "linear", "offset": 0, "scale_num": 5, "scale_den": 1, "decimals": 0, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f0", "empty_text": " " } },
+            { "item_key": "battery_capacity", "enabled": true, "order": 3, "signal_key": "battery_capacity", "name_key": "电池容量", "unit": "AH", "formatter": { "kind": "linear_u8_wrap", "offset": 0, "scale_num": 5, "scale_den": 1, "decimals": 0, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f0", "empty_text": " " } },
             { "item_key": "cell_min_voltage", "enabled": true, "order": 4, "signal_key": "cell_min_voltage", "name_key": "单体最低电压", "unit": "V", "formatter": { "kind": "linear", "offset": 0, "scale_num": 1, "scale_den": 1000, "decimals": 1, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f2", "empty_text": " " } },
             { "item_key": "battery_heat_status", "enabled": true, "order": 5, "signal_key": "battery_heat_status", "name_key": "电加热状态", "unit": "", "formatter": { "kind": "bool_text", "offset": 0, "scale_num": 1, "scale_den": 1, "decimals": 0, "display_base": 10, "true_text": "开", "false_text": "关" }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f1", "empty_text": " " } },
             { "item_key": "cell_max_temp", "enabled": true, "order": 6, "signal_key": "cell_max_temp", "name_key": "单体最高温度", "unit": "℃", "formatter": { "kind": "linear", "offset": -40, "scale_num": 1, "scale_den": 1, "decimals": 0, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f2", "empty_text": " " } },
@@ -754,7 +814,7 @@ pub fn default_battery_monitor_info() -> Value {
             { "item_key": "cell_min_temp", "enabled": true, "order": 8, "signal_key": "cell_min_temp", "name_key": "单体最低温度", "unit": "℃", "formatter": { "kind": "linear", "offset": -40, "scale_num": 1, "scale_den": 1, "decimals": 0, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f2", "empty_text": " " } },
             { "item_key": "battery_usage_time", "enabled": true, "order": 9, "signal_key": "battery_usage_time", "name_key": "电池使用时间", "unit": "H", "formatter": { "kind": "packed_time_0p1h", "offset": 0, "scale_num": 1, "scale_den": 1, "decimals": 1, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f3", "empty_text": " " } },
             { "item_key": "battery_current", "enabled": true, "order": 10, "signal_key": "battery_current", "name_key": "电池总电流", "unit": "A", "formatter": { "kind": "linear", "offset": -32000, "scale_num": 1, "scale_den": 10, "decimals": 1, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f0", "empty_text": " " } },
-            { "item_key": "battery_discharge_time", "enabled": true, "order": 11, "signal_key": "battery_discharge_time", "name_key": "电池放电时间", "unit": "H", "formatter": { "kind": "packed_time_0p1h", "offset": 0, "scale_num": 1, "scale_den": 1, "decimals": 1, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f3", "empty_text": " " } }
+            { "item_key": "battery_discharge_time", "enabled": true, "order": 11, "signal_key": "battery_discharge_time", "name_key": "电池放电时间", "unit": "H", "formatter": { "kind": "packed_time_legacy_discharge_0p1h", "offset": 0, "scale_num": 1, "scale_den": 1, "decimals": 1, "display_base": 10 }, "validity": { "mode": "frame_timeout", "frame_key": "bat_2f3", "empty_text": " " } }
         ]
     })
 }
