@@ -2680,19 +2680,16 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
 
         {activeModule.key === 'battery-monitor' ? (
           <section className="table-spec-card">
-            <div>
-              <h2>锂电监控配置</h2>
-              <p>维护锂电监控 CAN 帧、PDO 信号、显示项、单位、精度和超时策略，导出后写入 data.bin 的 battery monitor 段。</p>
-            </div>
+            <h2>锂电监控配置</h2>
             {currentBatteryMonitorDocument ? (
-              <div className="pdo-simple-editor">
+              <div className="pdo-simple-editor battery-monitor-editor">
                 <div className="config-summary-strip">
                   <article><span>状态</span><strong>{currentBatteryMonitorDocument.enabled ? '启用' : '停用'}</strong></article>
                   <article><span>帧 / 信号</span><strong>{currentBatteryMonitorDocument.frames.length} / {currentBatteryMonitorDocument.signals.length}</strong></article>
                   <article><span>显示项</span><strong>{currentBatteryMonitorDocument.items.filter((item) => item.enabled).length} / {currentBatteryMonitorDocument.items.length}</strong></article>
                   <article><span>写回段落</span><strong>battery_monitor_info</strong></article>
                 </div>
-                <div className="pdo-frame-grid">
+                <div className="battery-config-row">
                   <label>启用<select value={currentBatteryMonitorDocument.enabled ? 1 : 0} onChange={(event) => updateBatteryMonitorField('enabled', Number(event.target.value) === 1)}><option value={1}>启用</option><option value={0}>停用</option></select></label>
                   <label>版本<input type="number" value={currentBatteryMonitorDocument.version ?? 1} onChange={(event) => updateBatteryMonitorField('version', Number(event.target.value))} /></label>
                   <label>每页数量<input type="number" value={currentBatteryMonitorDocument.page_size ?? 4} onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))} /></label>
@@ -2701,15 +2698,15 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <section className="pdo-frame-section">
                   <div className="config-table-toolbar"><strong>锂电 CAN 帧（{currentBatteryMonitorDocument.frames.length}）</strong><button onClick={addBatteryFrame} type="button">新增帧</button></div>
                   {currentBatteryMonitorDocument.frames.map((frame, frameIndex) => (
-                    <article className={isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`${frame.frame_key}-${frameIndex}`}>
-                      <div className="pdo-frame-grid">
+                    <article className={isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? 'pdo-frame-card battery-frame-card config-entry-modified' : 'pdo-frame-card battery-frame-card'} key={`${frame.frame_key}-${frameIndex}`}>
+                      <div className="battery-frame-grid">
                         <label>帧 key<input value={frame.frame_key} onChange={(event) => updateBatteryFrame(frameIndex, 'frame_key', event.target.value)} /></label>
                         <label>帧 ID<input inputMode="text" value={formatFrameId(frame.can_id)} onChange={(event) => updateBatteryFrameId(frameIndex, event.target.value)} /></label>
                         <label>帧类型<select value={frame.type} onChange={(event) => updateBatteryFrame(frameIndex, 'type', Number(event.target.value))}><option value={0}>标准帧</option><option value={1}>扩展帧</option></select></label>
                         <label>超时 tick<input type="number" value={frame.timeout_ticks ?? currentBatteryMonitorDocument.default_timeout_ticks} onChange={(event) => updateBatteryFrame(frameIndex, 'timeout_ticks', Number(event.target.value))} /></label>
                         <label>描述<input value={frame.desc ?? ''} onChange={(event) => updateBatteryFrame(frameIndex, 'desc', event.target.value)} /></label>
                       </div>
-                      <div className="pdo-frame-actions">
+                      <div className="battery-frame-actions">
                         {isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'frames', frameIndex])} type="button">恢复帧</button> : null}
                         <button onClick={() => removeBatteryFrame(frameIndex)} type="button">删除帧</button>
                       </div>

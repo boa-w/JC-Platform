@@ -2435,6 +2435,116 @@ button {
   background: #b91c1c;
 }
 
+/* ── Battery Monitor Compact Layout ── */
+
+.battery-monitor-editor {
+  gap: 10px;
+}
+
+.battery-monitor-editor>.pdo-frame-section {
+  gap: 8px;
+}
+
+.battery-monitor-editor .config-table-toolbar {
+  gap: 8px;
+}
+
+.battery-config-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.battery-config-row label {
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.battery-config-row input,
+.battery-config-row select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  background: white;
+  color: var(--color-text);
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+
+.battery-config-row input:focus,
+.battery-config-row select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.battery-frame-card {
+  padding: 8px 10px;
+  gap: 6px;
+}
+
+.battery-frame-grid {
+  display: grid;
+  grid-template-columns: 1fr 100px 90px 100px 1fr;
+  gap: 6px;
+  align-items: end;
+}
+
+.battery-frame-grid label {
+  display: grid;
+  gap: 3px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.battery-frame-grid input,
+.battery-frame-grid select {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 7px;
+  background: white;
+  color: var(--color-text);
+  font-size: 12px;
+  transition: border-color 0.15s;
+}
+
+.battery-frame-grid input:focus,
+.battery-frame-grid select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.battery-frame-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+[data-theme="dark"] .battery-config-row input,
+[data-theme="dark"] .battery-config-row select,
+[data-theme="dark"] .battery-frame-grid input,
+[data-theme="dark"] .battery-frame-grid select {
+  background: #3c3c3c;
+  border-color: #3e3e3e;
+  color: #d4d4d4;
+}
+
+[data-theme="dark"] .battery-config-row input:focus,
+[data-theme="dark"] .battery-config-row select:focus,
+[data-theme="dark"] .battery-frame-grid input:focus,
+[data-theme="dark"] .battery-frame-grid select:focus {
+  border-color: var(--color-primary);
+  background: #3c3c3c;
+}
+
 /* ── Table Format Reference ── */
 
 .table-format-ref {
