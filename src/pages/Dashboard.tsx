@@ -3766,8 +3766,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
 
         {activeModule.key === 'private-protocol' ? (
           <section className="project-open-card">
-            <div className="config-table-toolbar">
-              <div>
+            <div className="private-protocol-header">
+              <div className="private-protocol-header-text">
                 <h2>私有协议</h2>
                 <p>集中查看私有协议帧、校验方式、字节序和 Signal 载荷布局；当前会从锂电监控帧自动派生初始私有协议模型。</p>
               </div>
@@ -3796,7 +3796,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
             {unifiedProtocolError ? <p className="project-open-error">{unifiedProtocolError}</p> : null}
             {unifiedProtocol ? (
               <>
-                <div className="project-open-report">
+                <div className="config-summary-strip">
                   <article>
                     <span>启用状态</span>
                     <strong>{currentPrivateProtocol.enabled ? '启用' : '未启用'}</strong>
@@ -3816,39 +3816,31 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 </div>
                 {currentPrivateProtocol.frames.map((frame, frameIndex) => (
                   <article className={isModifiedPath(['private_protocol', 'frames', frameIndex]) ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`private-protocol-${frame.frame_key}-${frameIndex}`}>
-                    <div className="pdo-frame-grid">
-                      <label>帧 Key<input value={frame.frame_key || ''} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_key: event.target.value }))} /></label>
-                      <label>帧 ID<input inputMode="text" value={formatFrameId(frame.frame_id)} onChange={(event) => {
-                        const nextId = parseFrameId(event.target.value);
-                        if (nextId !== null) updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_id: nextId }));
-                      }} /></label>
-                      <label>名称<input value={frame.name || ''} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, name: event.target.value }))} /></label>
+                    <div className="pdo-frame-header">
+                      <div className="pdo-frame-grid">
+                        <label>帧 Key<input value={frame.frame_key || ''} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_key: event.target.value }))} /></label>
+                        <label>帧 ID<input inputMode="text" value={formatFrameId(frame.frame_id)} onChange={(event) => {
+                          const nextId = parseFrameId(event.target.value);
+                          if (nextId !== null) updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_id: nextId }));
+                        }} /></label>
+                        <label>名称<input value={frame.name || ''} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, name: event.target.value }))} /></label>
+                      </div>
+                      <div className="pdo-frame-actions">
+                        <button className="danger" onClick={() => removePrivateFrame(frameIndex)} type="button">删除帧</button>
+                      </div>
                     </div>
-                    <div className="project-open-report">
-                      <article>
-                        <span>帧类型</span>
-                        <input value={frame.frame_type} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_type: event.target.value }))} />
-                      </article>
-                      <article>
-                        <span>周期/超时</span>
-                        <input type="number" value={frame.cycle_ms} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, cycle_ms: Number(event.target.value) }))} />
-                      </article>
-                      <article>
-                        <span>校验</span>
-                        <input value={frame.checksum} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, checksum: event.target.value }))} />
-                      </article>
-                      <article>
-                        <span>字节序</span>
-                        <select value={frame.byte_order} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, byte_order: event.target.value }))}>
-                          <option value="little">little</option>
-                          <option value="big">big</option>
-                        </select>
-                      </article>
+                    <div className="private-frame-props">
+                      <label>帧类型<input value={frame.frame_type} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_type: event.target.value }))} /></label>
+                      <label>周期/超时<input type="number" value={frame.cycle_ms} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, cycle_ms: Number(event.target.value) }))} /></label>
+                      <label>校验<input value={frame.checksum} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, checksum: event.target.value }))} /></label>
+                      <label>字节序<select value={frame.byte_order} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, byte_order: event.target.value }))}>
+                        <option value="little">little</option>
+                        <option value="big">big</option>
+                      </select></label>
                     </div>
                     <div className="config-table-toolbar">
                       <span>载荷 Signal（{frame.payload.length}）</span>
                       <button onClick={() => addPrivatePayload(frameIndex)} type="button">新增载荷</button>
-                      <button className="danger" onClick={() => removePrivateFrame(frameIndex)} type="button">删除帧</button>
                     </div>
                     <div className="config-table-frame">
                       <table className="config-table">
