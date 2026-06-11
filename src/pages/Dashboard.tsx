@@ -36,6 +36,7 @@ import {
   saveTextFile,
   sdoDocumentTable,
   updateUiResourceDocument,
+  validateProjectDocument,
 } from '../api/commands';
 import type {
   BackendHealth,
@@ -528,6 +529,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     : [];
   const hasRefactorOnlyChanges = modifiedSections.some((section) => (refactorOnlySections as readonly string[]).includes(section));
   const isLegacyJcproProject = loadedProject?.summary.path?.toLowerCase().endsWith('.jcpro') ?? false;
+  const projectMissingSections = loadedProject?.validation.missing_sections ?? [];
+  const compatibleMissingSections = projectMissingSections.filter((section) => !(refactorOnlySections as readonly string[]).includes(section));
+  const sidecarMissingSections = projectMissingSections.filter((section) => (refactorOnlySections as readonly string[]).includes(section));
+  const effectiveProjectValid = compatibleMissingSections.length === 0;
 
   function updateProjectDocument(section: string, value: unknown) {
     if (!loadedProject) return;
@@ -591,9 +596,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       try {
         const sidecar = await loadJsonFile(candidatePath);
         const document = mergeRefactorConfigDocument(project.document, sidecar);
+        const validation = await validateProjectDocument(document);
         setRefactorConfigPath(candidatePath);
         setRefactorConfigStatus(`已自动挂载：${candidatePath}`);
-        return { ...project, document };
+        return { ...project, document, validation };
       } catch {
         // Candidate sidecar is optional.
       }
@@ -2246,7 +2252,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     try {
       const sidecar = await loadJsonFile(selected);
       const document = mergeRefactorConfigDocument(loadedProject.document, sidecar);
-      const nextProject = { ...loadedProject, document };
+      const validation = await validateProjectDocument(document);
+      const nextProject = { ...loadedProject, document, validation };
       const nextBaseline = cloneJson(document);
       setRefactorConfigPath(selected);
       setRefactorConfigStatus(`已挂载：${selected}`);
@@ -2262,9 +2269,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (!loadedProject) return;
     const created = await saveRefactorConfigAsJson();
     if (created) {
+      const validation = await validateProjectDocument(loadedProject.document);
       const nextBaseline = cloneJson(loadedProject.document);
       setBaselineDocument(nextBaseline);
-      applyLoadedProject({ ...loadedProject }, nextBaseline);
+      applyLoadedProject({ ...loadedProject, validation }, nextBaseline);
     }
   }
 
@@ -2286,9 +2294,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         path: loadedProject.summary.path,
         document: documentToSave,
       });
+      const validation = isLegacyJcproProject ? await validateProjectDocument(loadedProject.document) : savedProject.validation;
       const nextBaseline = isLegacyJcproProject ? cloneJson(loadedProject.document) : cloneJson(savedProject.document);
       setBaselineDocument(nextBaseline);
-      applyLoadedProject(isLegacyJcproProject ? { ...loadedProject } : savedProject, nextBaseline);
+      applyLoadedProject(isLegacyJcproProject ? { ...loadedProject, validation } : savedProject, nextBaseline);
       updateRecentProjects(savedProject, loadedProject.summary.path);
       setShowSaveModal(false);
       setSaveStatus(isLegacyJcproProject && hasRefactorOnlyChanges ? '已保存 .jcpro 兼容段，并已导出重构专属 JSON。' : '已保存');
@@ -2332,9 +2341,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
         setRefactorConfigPath(selected);
         setRefactorConfigStatus(`已挂载：${selected}`);
+        const validation = await validateProjectDocument(loadedProject.document);
         const nextBaseline = cloneJson(loadedProject.document);
         setBaselineDocument(nextBaseline);
-        applyLoadedProject({ ...loadedProject }, nextBaseline);
+        applyLoadedProject({ ...loadedProject, validation }, nextBaseline);
         setSaveStatus(`重构专属配置已另存为：${selected}；当前 .jcpro 未写入新字段。`);
         return;
       }
@@ -3068,8 +3078,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   </div>
                   <div className="project-info-item">
                     <span>校验</span>
-                    <strong className={loadedProject.validation.valid ? 'text-success' : 'text-danger'}>
-                      {loadedProject.validation.valid ? '通过' : '缺少段落'}
+                    <strong className={effectiveProjectValid ? 'text-success' : 'text-danger'}>
+                      {effectiveProjectValid ? '兼容段通过' : '缺少兼容段'}
                     </strong>
                   </div>
                   <div className="project-info-item">
@@ -3078,8 +3088,11 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   </div>
                 </div>
                 {refactorConfigStatus ? <p className={refactorConfigPath ? 'text-success' : 'project-open-warning'}>{refactorConfigStatus}</p> : null}
-                {loadedProject.validation.missing_sections.length > 0 ? (
-                  <p className="project-open-error">缺少：{loadedProject.validation.missing_sections.join('、')}</p>
+                {compatibleMissingSections.length > 0 ? (
+                  <p className="project-open-error">缺少兼容段：{compatibleMissingSections.join('、')}</p>
+                ) : null}
+                {!refactorConfigPath && sidecarMissingSections.length > 0 ? (
+                  <p className="project-open-warning">重构专属段未在 .jcpro 中保存：{sidecarMissingSections.join('、')}。可通过“挂载重构配置”关联独立 JSON。</p>
                 ) : null}
                 {loadedProject.validation.warnings.length > 0 ? (
                   <p className="project-open-warning">警告：{loadedProject.validation.warnings.join('；')}</p>
