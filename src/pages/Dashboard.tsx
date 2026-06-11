@@ -3830,12 +3830,19 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                       </div>
                     </div>
                     <div className="private-frame-props">
-                      <label>帧类型<input value={frame.frame_type} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_type: event.target.value }))} /></label>
+                      <label>帧类型<select value={frame.frame_type} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_type: event.target.value }))}>
+                        <option value="standard">标准帧</option>
+                        <option value="extended">扩展帧</option>
+                      </select></label>
                       <label>周期/超时<input type="number" value={frame.cycle_ms} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, cycle_ms: Number(event.target.value) }))} /></label>
-                      <label>校验<input value={frame.checksum} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, checksum: event.target.value }))} /></label>
+                      <label>校验<select value={frame.checksum} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, checksum: event.target.value }))}>
+                        <option value="none">无</option>
+                        <option value="crc">CRC</option>
+                        <option value="xor">XOR</option>
+                      </select></label>
                       <label>字节序<select value={frame.byte_order} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, byte_order: event.target.value }))}>
-                        <option value="little">little</option>
-                        <option value="big">big</option>
+                        <option value="little">Little-Endian</option>
+                        <option value="big">Big-Endian</option>
                       </select></label>
                     </div>
                     <div className="config-table-toolbar">
