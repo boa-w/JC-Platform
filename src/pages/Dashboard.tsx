@@ -3451,6 +3451,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         {activeModule.key === 'language' ? (
           <LanguagePage
             document={currentLanguageDocument ?? { list_code_language: [], list_inner: [], list_translate: {} }}
+            baseline={baselineLanguageDocument()}
             loaded={!!loadedProject}
             onUpdate={updateLanguageDocument}
           />

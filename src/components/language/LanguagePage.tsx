@@ -8,6 +8,7 @@ import { LanguageComparisonView } from './LanguageComparisonView';
 
 interface LanguagePageProps {
   document: LanguageDocument;
+  baseline: LanguageDocument | null;
   loaded: boolean;
   onUpdate: (document: LanguageDocument) => void;
 }
@@ -50,7 +51,7 @@ function normalizeDocument(document: LanguageDocument, codes: string[], labels?:
   return { list_code_language: codes, list_inner: document.list_inner, list_translate: nextTranslate, language_labels: nextLabels };
 }
 
-export function LanguagePage({ document, loaded, onUpdate }: LanguagePageProps) {
+export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguagePageProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(() => {
     const codes = document.list_code_language;
     return codes.length > 1 ? codes[1] : codes[0] ?? null;
@@ -68,14 +69,20 @@ export function LanguagePage({ document, loaded, onUpdate }: LanguagePageProps) 
 
   const modifiedKeys = useMemo(() => {
     const keys = new Set<string>();
-    for (const key of document.list_inner) {
-      const translations = document.list_translate[key] as Record<string, string> | undefined;
-      if (translations && selectedLanguage && translations[selectedLanguage] !== undefined) {
+    if (!baseline || !selectedLanguage) return keys;
+    for (let i = document.list_code_language.length; i < document.list_inner.length; i++) {
+      const key = document.list_inner[i];
+      const baselineKey = baseline.list_inner[i];
+      const currentTranslations = (document.list_translate[key] as Record<string, string>) ?? {};
+      const baselineTranslations = (baseline.list_translate[baselineKey] as Record<string, string>) ?? {};
+      const currentValue = currentTranslations[selectedLanguage] ?? '';
+      const baselineValue = baselineTranslations[selectedLanguage] ?? '';
+      if (currentValue !== baselineValue) {
         keys.add(key);
       }
     }
     return keys;
-  }, [document.list_translate, document.list_inner, selectedLanguage]);
+  }, [document, baseline, selectedLanguage]);
 
   const rows: TranslationRow[] = useMemo(() => {
     let filtered = translationKeys.map((key, i) => ({
