@@ -278,7 +278,7 @@ pub fn save_project_as(request: SaveProjectAsRequest) -> Result<SaveProjectAsRep
     fs::create_dir_all(&target_dir)
         .map_err(|error| format!("创建目标目录失败 {}：{}", target_dir.display(), error))?;
 
-    let mut document = request.document;
+    let mut document = sanitize_document_for_target(&target_path, request.document);
     let mut context = SaveAsResourceContext::new(source_dir, target_dir.clone());
     copy_project_resources(&mut document, &mut context);
 
@@ -299,6 +299,29 @@ pub fn save_project_as(request: SaveProjectAsRequest) -> Result<SaveProjectAsRep
         copied_resources: context.copied_resources,
         warnings: context.warnings,
     })
+}
+
+fn sanitize_document_for_target(target_path: &Path, mut document: Value) -> Value {
+    if !target_path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("jcpro"))
+        .unwrap_or(false)
+    {
+        return document;
+    }
+
+    if let Some(object) = document.as_object_mut() {
+        for section in [
+            "signal_dictionary",
+            "private_protocol",
+            "protocol_mapping",
+            "battery_monitor_info",
+        ] {
+            object.remove(section);
+        }
+    }
+    document
 }
 
 struct SaveAsResourceContext {

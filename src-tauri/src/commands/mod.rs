@@ -91,8 +91,9 @@ pub fn create_project(request: NewProjectRequest) -> Result<LoadedProject, Strin
 /// 将项目 JSON 写回磁盘并返回更新后的加载结果。
 #[tauri::command]
 pub fn save_project(request: SaveProjectRequest) -> Result<LoadedProject, String> {
-    json_store::write_json(&request.path, &request.document).map_err(|error| error.to_string())?;
-    load_project_from_document(request.path, request.document)
+    let document = sanitize_document_for_target(&request.path, request.document);
+    json_store::write_json(&request.path, &document).map_err(|error| error.to_string())?;
+    load_project_from_document(request.path, document)
 }
 
 /// 将当前项目另存为新文件，并复制引用的 UI 资源。
@@ -202,6 +203,23 @@ fn load_project_from_document(path: String, document: Value) -> Result<LoadedPro
         validation,
         document,
     })
+}
+
+fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
+    if !path.to_lowercase().ends_with(".jcpro") {
+        return document;
+    }
+    if let Some(object) = document.as_object_mut() {
+        for section in [
+            "signal_dictionary",
+            "private_protocol",
+            "protocol_mapping",
+            "battery_monitor_info",
+        ] {
+            object.remove(section);
+        }
+    }
+    document
 }
 
 /// 解析项目文件路径：支持绝对路径、相对路径，以及在当前目录祖先中按文件名搜索。

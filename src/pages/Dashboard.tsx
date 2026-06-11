@@ -63,12 +63,18 @@ import type {
   PdoSimpleFrameDocument,
   PdoSimpleImportReport,
   PdoSimpleSignalDocument,
+  PrivateFrame,
+  PrivatePayloadSignal,
   ProjectExportReport,
   ProjectParseReport,
   ProjectSummary,
+  ProtocolMapping,
+  ProtocolMappingTarget,
   NavigationKey,
   SdoImportReport,
   SdoNodeDocument,
+  SignalDictionary,
+  SignalDefinition,
   UiImageCopyReport,
   UiResourceParseReport,
   UiResourceUpdateRequest,
@@ -134,6 +140,8 @@ const modifiedSectionLabels: Record<string, string> = {
 };
 
 const trackedDocumentSections = Object.keys(modifiedSectionLabels);
+const refactorOnlySections = ['signal_dictionary', 'private_protocol', 'protocol_mapping', 'battery_monitor_info'] as const;
+type RefactorOnlySection = typeof refactorOnlySections[number];
 
 type SdoNodeField = keyof Pick<SdoNodeDocument,
   'name' | 'type' | 'user_auth' | 'name_index' | 'control_protocol' | 'control_rw' | 'control_use_default' |
@@ -343,12 +351,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (activeModule.key === 'language') return document.language_info;
     if (activeModule.key === 'battery-monitor') return document.battery_monitor_info;
     if (activeModule.key === 'signal-dictionary') return document.signal_dictionary;
+    if (activeModule.key === 'private-protocol') return document.private_protocol;
     if (activeModule.key === 'protocol-mapping') {
-      return {
-        signal_dictionary: document.signal_dictionary,
-        private_protocol: document.private_protocol,
-        protocol_mapping: document.protocol_mapping,
-      };
+      return document.protocol_mapping;
     }
     if (jsonEditorKey === 'pdo-advanced') {
       return Object.fromEntries(advancedConfigSections.map((section) => [section, document[section]]));
@@ -427,9 +432,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (activeModule.key === 'language') document = restorePath(document, baselineDocument, ['language_info']);
     if (activeModule.key === 'battery-monitor') document = restorePath(document, baselineDocument, ['battery_monitor_info']);
     if (activeModule.key === 'signal-dictionary') document = restorePath(document, baselineDocument, ['signal_dictionary']);
+    if (activeModule.key === 'private-protocol') document = restorePath(document, baselineDocument, ['private_protocol']);
     if (activeModule.key === 'protocol-mapping') {
-      document = restorePath(document, baselineDocument, ['signal_dictionary']);
-      document = restorePath(document, baselineDocument, ['private_protocol']);
       document = restorePath(document, baselineDocument, ['protocol_mapping']);
     }
     if (jsonEditorKey === 'pdo-advanced') {
@@ -520,6 +524,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const modifiedSections = loadedProject
     ? trackedDocumentSections.filter((section) => isModifiedPath([section]))
     : [];
+  const hasRefactorOnlyChanges = modifiedSections.some((section) => (refactorOnlySections as readonly string[]).includes(section));
+  const isLegacyJcproProject = loadedProject?.summary.path?.toLowerCase().endsWith('.jcpro') ?? false;
 
   function updateProjectDocument(section: string, value: unknown) {
     if (!loadedProject) return;
@@ -533,6 +539,173 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
 
     const document = { ...(loadedProject.document as Record<string, unknown>), ...sections };
     applyLoadedProject({ ...loadedProject, document });
+  }
+
+  function stripRefactorOnlySections(document: unknown) {
+    const next = { ...((document as Record<string, unknown>) ?? {}) };
+    for (const section of refactorOnlySections) {
+      delete next[section];
+    }
+    return next;
+  }
+
+  function refactorConfigDocument(document: unknown) {
+    const source = (document as Record<string, unknown>) ?? {};
+    return {
+      config_version: '0.1.0-tauri-refactor-sidecar',
+      source_project: loadedProject?.summary.path ?? '',
+      project: source.project ?? null,
+      signal_dictionary: source.signal_dictionary ?? { signals: [] },
+      private_protocol: source.private_protocol ?? { enabled: false, frames: [] },
+      protocol_mapping: source.protocol_mapping ?? [],
+      battery_monitor_info: source.battery_monitor_info ?? null,
+    };
+  }
+
+  function signalDictionaryDocument(): SignalDictionary {
+    const document = loadedProject?.document as Record<string, unknown> | undefined;
+    return (document?.signal_dictionary as SignalDictionary | undefined) ?? { signals: [] };
+  }
+
+  function privateProtocolDocument(): { enabled: boolean; frames: PrivateFrame[] } {
+    const document = loadedProject?.document as Record<string, unknown> | undefined;
+    return (document?.private_protocol as { enabled: boolean; frames: PrivateFrame[] } | undefined) ?? { enabled: false, frames: [] };
+  }
+
+  function protocolMappingsDocument(): ProtocolMapping[] {
+    const document = loadedProject?.document as Record<string, unknown> | undefined;
+    return (document?.protocol_mapping as ProtocolMapping[] | undefined) ?? [];
+  }
+
+  function refreshUnifiedProtocolFromDocument(document: unknown) {
+    void refreshUnifiedProtocol(document);
+  }
+
+  function updateSignalDictionaryDocument(next: SignalDictionary) {
+    updateProjectDocument('signal_dictionary', next);
+    refreshUnifiedProtocolFromDocument({ ...((loadedProject?.document as Record<string, unknown>) ?? {}), signal_dictionary: next });
+  }
+
+  function updateSignalDefinition(index: number, updater: (signal: SignalDefinition) => SignalDefinition) {
+    const document = signalDictionaryDocument();
+    updateSignalDictionaryDocument({
+      ...document,
+      signals: document.signals.map((signal, currentIndex) => (currentIndex === index ? updater(signal) : signal)),
+    });
+  }
+
+  function addSignalDefinition() {
+    const document = signalDictionaryDocument();
+    const index = document.signals.length + 1;
+    updateSignalDictionaryDocument({
+      ...document,
+      signals: [
+        ...document.signals,
+        {
+          signal_id: `CUSTOM_SIGNAL_${index}`,
+          name: `新业务信号${index}`,
+          data_type: 'u16',
+          default_value: '0',
+          min_value: '',
+          max_value: '',
+          inner: -1,
+          scale: { scale_num: 1, scale_den: 1, offset: 0, decimals: 0 },
+          display: { unit: '', format: 'decimal', description: '' },
+        },
+      ],
+    });
+  }
+
+  function removeSignalDefinition(index: number) {
+    const document = signalDictionaryDocument();
+    updateSignalDictionaryDocument({ ...document, signals: document.signals.filter((_, currentIndex) => currentIndex !== index) });
+  }
+
+  function updatePrivateProtocolDocument(next: { enabled: boolean; frames: PrivateFrame[] }) {
+    updateProjectDocument('private_protocol', next);
+    refreshUnifiedProtocolFromDocument({ ...((loadedProject?.document as Record<string, unknown>) ?? {}), private_protocol: next });
+  }
+
+  function updatePrivateFrame(index: number, updater: (frame: PrivateFrame) => PrivateFrame) {
+    const document = privateProtocolDocument();
+    updatePrivateProtocolDocument({
+      ...document,
+      frames: document.frames.map((frame, currentIndex) => (currentIndex === index ? updater(frame) : frame)),
+    });
+  }
+
+  function addPrivateFrame() {
+    const document = privateProtocolDocument();
+    const index = document.frames.length + 1;
+    updatePrivateProtocolDocument({
+      ...document,
+      enabled: true,
+      frames: [
+        ...document.frames,
+        {
+          frame_id: 0,
+          frame_key: `private_frame_${index}`,
+          name: `新私有帧${index}`,
+          frame_type: 'standard',
+          cycle_ms: 100,
+          checksum: 'none',
+          byte_order: 'little',
+          payload: [],
+          source: 'manual',
+        },
+      ],
+    });
+  }
+
+  function removePrivateFrame(index: number) {
+    const document = privateProtocolDocument();
+    updatePrivateProtocolDocument({ ...document, frames: document.frames.filter((_, currentIndex) => currentIndex !== index) });
+  }
+
+  function updatePrivatePayload(frameIndex: number, payloadIndex: number, updater: (payload: PrivatePayloadSignal) => PrivatePayloadSignal) {
+    updatePrivateFrame(frameIndex, (frame) => ({
+      ...frame,
+      payload: frame.payload.map((payload, currentIndex) => (currentIndex === payloadIndex ? updater(payload) : payload)),
+    }));
+  }
+
+  function addPrivatePayload(frameIndex: number) {
+    updatePrivateFrame(frameIndex, (frame) => ({
+      ...frame,
+      payload: [...frame.payload, { signal_id: '', bit_offset: 0, bit_length: 8, byte_order: frame.byte_order || 'little' }],
+    }));
+  }
+
+  function removePrivatePayload(frameIndex: number, payloadIndex: number) {
+    updatePrivateFrame(frameIndex, (frame) => ({
+      ...frame,
+      payload: frame.payload.filter((_, currentIndex) => currentIndex !== payloadIndex),
+    }));
+  }
+
+  function updateProtocolMappings(next: ProtocolMapping[]) {
+    updateProjectDocument('protocol_mapping', next);
+    refreshUnifiedProtocolFromDocument({ ...((loadedProject?.document as Record<string, unknown>) ?? {}), protocol_mapping: next });
+  }
+
+  function updateProtocolMapping(index: number, updater: (mapping: ProtocolMapping) => ProtocolMapping) {
+    const mappings = protocolMappingsDocument();
+    updateProtocolMappings(mappings.map((mapping, currentIndex) => (currentIndex === index ? updater(mapping) : mapping)));
+  }
+
+  function addProtocolMapping(kind: ProtocolMappingTarget['kind'] = 'can_open_pdo') {
+    const mappings = protocolMappingsDocument();
+    const target: ProtocolMappingTarget = kind === 'can_open_sdo'
+      ? { kind: 'can_open_sdo', index: 0, subindex: 0 }
+      : kind === 'private_frame'
+        ? { kind: 'private_frame', frame_key: '', frame_id: 0, bit_offset: 0, bit_length: 8 }
+        : { kind: 'can_open_pdo', direction: 'receive', frame_id: 0, bit_offset: 0, bit_length: 8 };
+    updateProtocolMappings([...mappings, { signal_id: '', target }]);
+  }
+
+  function removeProtocolMapping(index: number) {
+    const mappings = protocolMappingsDocument();
+    updateProtocolMappings(mappings.filter((_, currentIndex) => currentIndex !== index));
   }
 
   async function refreshUnifiedProtocol(documentOverride?: unknown) {
@@ -592,11 +765,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       if (activeModule.key === 'language') document.language_info = parsed;
       if (activeModule.key === 'battery-monitor') document.battery_monitor_info = parsed;
       if (activeModule.key === 'signal-dictionary') document.signal_dictionary = parsed;
-      if (activeModule.key === 'protocol-mapping') {
-        document.signal_dictionary = parsed?.signal_dictionary;
-        document.private_protocol = parsed?.private_protocol;
-        document.protocol_mapping = parsed?.protocol_mapping;
-      }
+      if (activeModule.key === 'private-protocol') document.private_protocol = parsed;
+      if (activeModule.key === 'protocol-mapping') document.protocol_mapping = parsed;
       if (jsonEditorKey === 'pdo-advanced') {
         for (const section of advancedConfigSections) {
           document[section] = parsed?.[section];
@@ -1983,6 +2153,27 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     setShowSaveModal(true);
   }
 
+  async function saveRefactorConfigAsJson() {
+    if (!loadedProject) return false;
+
+    if (!isTauriRuntime()) {
+      setSaveStatus('旧 .jcpro 的重构配置需要另存为 JSON；系统保存对话框只能在 Tauri 桌面应用中使用。');
+      return false;
+    }
+
+    const sourcePath = loadedProject.summary.path ?? loadedProject.summary.name ?? 'project';
+    const baseName = sourcePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') || 'project';
+    const selected = await save({
+      defaultPath: `${baseName}.refactor-config.json`,
+      filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
+    });
+    if (!selected) return false;
+
+    await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
+    setSaveStatus(`重构专属配置已另存为：${selected}；原 .jcpro 不会写入这些字段。`);
+    return true;
+  }
+
   async function confirmSaveProject() {
     if (!loadedProject?.summary.path) return;
 
@@ -1990,16 +2181,23 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     setSaveStatus(null);
 
     try {
+      if (isLegacyJcproProject && hasRefactorOnlyChanges) {
+        const exported = await saveRefactorConfigAsJson();
+        if (!exported) return;
+      }
+      const documentToSave = isLegacyJcproProject
+        ? stripRefactorOnlySections(loadedProject.document)
+        : loadedProject.document;
       const savedProject = await saveProject({
         path: loadedProject.summary.path,
-        document: loadedProject.document,
+        document: documentToSave,
       });
-      const nextBaseline = cloneJson(savedProject.document);
+      const nextBaseline = isLegacyJcproProject ? cloneJson(loadedProject.document) : cloneJson(savedProject.document);
       setBaselineDocument(nextBaseline);
-      applyLoadedProject(savedProject, nextBaseline);
+      applyLoadedProject(isLegacyJcproProject ? { ...loadedProject } : savedProject, nextBaseline);
       updateRecentProjects(savedProject, loadedProject.summary.path);
       setShowSaveModal(false);
-      setSaveStatus('已保存');
+      setSaveStatus(isLegacyJcproProject && hasRefactorOnlyChanges ? '已保存 .jcpro 兼容段，并已导出重构专属 JSON。' : '已保存');
     } catch (error) {
       setSaveStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -2019,13 +2217,16 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     }
 
     const currentName = sourcePath.split(/[\\/]/).pop() || `${loadedProject.summary.name || 'project'}.jcpro`;
+    const isRefactorSidecarSave = isLegacyJcproProject && hasRefactorOnlyChanges;
     const selected = await save({
-      defaultPath: currentName,
-      filters: [{ name: '项目文件', extensions: ['jcpro'] }],
+      defaultPath: isRefactorSidecarSave ? currentName.replace(/\.[^.]+$/, '.refactor-config.json') : currentName,
+      filters: isRefactorSidecarSave
+        ? [{ name: '重构配置 JSON', extensions: ['json'] }]
+        : [{ name: '项目文件', extensions: ['jcpro', 'json'] }],
     });
     if (!selected) return;
 
-    if (selected === sourcePath) {
+    if (!isRefactorSidecarSave && selected === sourcePath) {
       setSaveStatus('另存为目标不能与当前项目路径相同。');
       return;
     }
@@ -2033,10 +2234,18 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     setSavingProjectAction('saveAs');
 
     try {
+      if (isRefactorSidecarSave) {
+        await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
+        const nextBaseline = cloneJson(loadedProject.document);
+        setBaselineDocument(nextBaseline);
+        applyLoadedProject({ ...loadedProject }, nextBaseline);
+        setSaveStatus(`重构专属配置已另存为：${selected}；当前 .jcpro 未写入新字段。`);
+        return;
+      }
       const report = await saveProjectAs({
         source_path: sourcePath,
         target_path: selected,
-        document: loadedProject.document,
+        document: selected.toLowerCase().endsWith('.jcpro') ? stripRefactorOnlySections(loadedProject.document) : loadedProject.document,
       });
       acceptLoadedProject(report.project, selected);
       const nextPreview = await parseUiPreview(report.project.document, report.project.summary.path ?? selected);
@@ -2452,6 +2661,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const activeAdvancedFrame = selectedAdvancedFrame();
   const activeAdvancedFrameIndex = selectedAdvancedFrameIndex();
   const currentLegacyTableKind = activeLegacyTableKind();
+  const currentSignalDictionary = signalDictionaryDocument();
+  const currentPrivateProtocol = privateProtocolDocument();
+  const currentProtocolMappings = protocolMappingsDocument();
 
   return (
     <main className="workspace">
@@ -2584,6 +2796,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
             <h3>确认保存</h3>
             <p>将当前所有配置修改写入项目文件：</p>
             <div className="modal-path">{loadedProject.summary.path}</div>
+            {isLegacyJcproProject && hasRefactorOnlyChanges ? (
+              <p className="project-open-warning">检测到重构专属配置修改，将强制另存为独立 JSON；原 .jcpro 只保存兼容字段。</p>
+            ) : null}
             {modifiedSections.length > 0 ? (
               <div className="action-bar-pills">
                 {modifiedSections.map((section) => (
@@ -3584,6 +3799,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <button disabled={!loadedProject || isParsingUnifiedProtocol} onClick={() => void refreshUnifiedProtocol()} type="button">
                   {isParsingUnifiedProtocol ? '解析中...' : '刷新字典'}
                 </button>
+                <button disabled={!loadedProject} onClick={addSignalDefinition} type="button">
+                  新增 Signal
+                </button>
                 <button
                   disabled={!loadedProject || !unifiedProtocol}
                   onClick={() => {
@@ -3592,7 +3810,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   }}
                   type="button"
                 >
-                  写入项目
+                  从旧配置派生
                 </button>
               </div>
             </div>
@@ -3602,7 +3820,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <div className="project-open-report">
                   <article>
                     <span>Signal 总数</span>
-                    <strong>{unifiedProtocol.signal_dictionary.signals.length}</strong>
+                    <strong>{currentSignalDictionary.signals.length}</strong>
                   </article>
                   <article>
                     <span>CANopen PDO 映射</span>
@@ -3614,7 +3832,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   </article>
                   <article>
                     <span>私有协议帧</span>
-                    <strong>{unifiedProtocol.private_protocol.frames.length}</strong>
+                    <strong>{currentPrivateProtocol.frames.length}</strong>
                   </article>
                 </div>
                 <div className="config-table-frame">
@@ -3629,19 +3847,29 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                         <th>默认值</th>
                         <th>旧索引</th>
                         <th>来源</th>
+                        <th>操作</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {unifiedProtocol.signal_dictionary.signals.map((signal) => (
-                        <tr key={signal.signal_id}>
-                          <td><code>{signal.signal_id}</code></td>
-                          <td>{signal.name}</td>
-                          <td>{typeof signal.data_type === 'string' ? signal.data_type : signal.data_type.custom}</td>
-                          <td>{signal.display.unit || '-'}</td>
-                          <td>{signal.scale.scale_num}/{signal.scale.scale_den} offset {signal.scale.offset}</td>
-                          <td>{signal.default_value ?? '-'}</td>
-                          <td>{signal.inner ?? '-'}</td>
-                          <td>{signal.display.description || '-'}</td>
+                      {currentSignalDictionary.signals.map((signal, signalIndex) => (
+                        <tr className={isModifiedPath(['signal_dictionary', 'signals', signalIndex]) ? 'config-entry-modified' : undefined} key={`${signal.signal_id}-${signalIndex}`}>
+                          <td><input value={signal.signal_id} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, signal_id: event.target.value }))} /></td>
+                          <td><input value={signal.name} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, name: event.target.value }))} /></td>
+                          <td>
+                            <select value={typeof signal.data_type === 'string' ? signal.data_type : signal.data_type.custom} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, data_type: event.target.value as SignalDefinition['data_type'] }))}>
+                              {['bool', 'u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'f32', 'string', 'bytes'].map((type) => <option key={type} value={type}>{type}</option>)}
+                            </select>
+                          </td>
+                          <td><input value={signal.display.unit || ''} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, display: { ...item.display, unit: event.target.value } }))} /></td>
+                          <td>
+                            <input type="number" value={signal.scale.scale_num} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, scale: { ...item.scale, scale_num: Number(event.target.value) } }))} />
+                            <input type="number" value={signal.scale.scale_den} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, scale: { ...item.scale, scale_den: Number(event.target.value) } }))} />
+                            <input type="number" value={signal.scale.offset} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, scale: { ...item.scale, offset: Number(event.target.value) } }))} />
+                          </td>
+                          <td><input value={signal.default_value ?? ''} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, default_value: event.target.value }))} /></td>
+                          <td><input type="number" value={signal.inner ?? -1} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, inner: Number(event.target.value) }))} /></td>
+                          <td><input value={signal.display.description || ''} onChange={(event) => updateSignalDefinition(signalIndex, (item) => ({ ...item, display: { ...item.display, description: event.target.value } }))} /></td>
+                          <td><button className="danger" onClick={() => removeSignalDefinition(signalIndex)} type="button">删除</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -3663,6 +3891,12 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <button disabled={!loadedProject || isParsingUnifiedProtocol} onClick={() => void refreshUnifiedProtocol()} type="button">
                   {isParsingUnifiedProtocol ? '解析中...' : '刷新私有协议'}
                 </button>
+                <button disabled={!loadedProject} onClick={() => updatePrivateProtocolDocument({ ...currentPrivateProtocol, enabled: !currentPrivateProtocol.enabled })} type="button">
+                  {currentPrivateProtocol.enabled ? '停用' : '启用'}
+                </button>
+                <button disabled={!loadedProject} onClick={addPrivateFrame} type="button">
+                  新增私有帧
+                </button>
                 <button
                   disabled={!loadedProject || !unifiedProtocol}
                   onClick={() => {
@@ -3671,7 +3905,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   }}
                   type="button"
                 >
-                  写入项目
+                  从旧配置派生
                 </button>
               </div>
             </div>
@@ -3681,45 +3915,56 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <div className="project-open-report">
                   <article>
                     <span>启用状态</span>
-                    <strong>{unifiedProtocol.private_protocol.enabled ? '启用' : '未启用'}</strong>
+                    <strong>{currentPrivateProtocol.enabled ? '启用' : '未启用'}</strong>
                   </article>
                   <article>
                     <span>私有帧数量</span>
-                    <strong>{unifiedProtocol.private_protocol.frames.length}</strong>
+                    <strong>{currentPrivateProtocol.frames.length}</strong>
                   </article>
                   <article>
                     <span>载荷 Signal</span>
-                    <strong>{unifiedProtocol.private_protocol.frames.reduce((total, frame) => total + frame.payload.length, 0)}</strong>
+                    <strong>{currentPrivateProtocol.frames.reduce((total, frame) => total + frame.payload.length, 0)}</strong>
                   </article>
                   <article>
                     <span>校验状态</span>
                     <strong>{unifiedProtocol.validation.valid ? '通过' : '存在错误'}</strong>
                   </article>
                 </div>
-                {unifiedProtocol.private_protocol.frames.map((frame, frameIndex) => (
-                  <article className="pdo-frame-card" key={`private-protocol-${frame.frame_key}-${frameIndex}`}>
+                {currentPrivateProtocol.frames.map((frame, frameIndex) => (
+                  <article className={isModifiedPath(['private_protocol', 'frames', frameIndex]) ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`private-protocol-${frame.frame_key}-${frameIndex}`}>
                     <div className="pdo-frame-grid">
-                      <label>帧 Key<input readOnly value={frame.frame_key || '-'} /></label>
-                      <label>帧 ID<input readOnly value={formatFrameId(frame.frame_id)} /></label>
-                      <label>名称<input readOnly value={frame.name || '-'} /></label>
+                      <label>帧 Key<input value={frame.frame_key || ''} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_key: event.target.value }))} /></label>
+                      <label>帧 ID<input inputMode="text" value={formatFrameId(frame.frame_id)} onChange={(event) => {
+                        const nextId = parseFrameId(event.target.value);
+                        if (nextId !== null) updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_id: nextId }));
+                      }} /></label>
+                      <label>名称<input value={frame.name || ''} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, name: event.target.value }))} /></label>
                     </div>
                     <div className="project-open-report">
                       <article>
                         <span>帧类型</span>
-                        <strong>{frame.frame_type}</strong>
+                        <input value={frame.frame_type} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, frame_type: event.target.value }))} />
                       </article>
                       <article>
                         <span>周期/超时</span>
-                        <strong>{frame.cycle_ms} ms</strong>
+                        <input type="number" value={frame.cycle_ms} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, cycle_ms: Number(event.target.value) }))} />
                       </article>
                       <article>
                         <span>校验</span>
-                        <strong>{frame.checksum}</strong>
+                        <input value={frame.checksum} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, checksum: event.target.value }))} />
                       </article>
                       <article>
                         <span>字节序</span>
-                        <strong>{frame.byte_order}</strong>
+                        <select value={frame.byte_order} onChange={(event) => updatePrivateFrame(frameIndex, (item) => ({ ...item, byte_order: event.target.value }))}>
+                          <option value="little">little</option>
+                          <option value="big">big</option>
+                        </select>
                       </article>
+                    </div>
+                    <div className="config-table-toolbar">
+                      <span>载荷 Signal（{frame.payload.length}）</span>
+                      <button onClick={() => addPrivatePayload(frameIndex)} type="button">新增载荷</button>
+                      <button className="danger" onClick={() => removePrivateFrame(frameIndex)} type="button">删除帧</button>
                     </div>
                     <div className="config-table-frame">
                       <table className="config-table">
@@ -3729,15 +3974,17 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                             <th>Bit Offset</th>
                             <th>Bit Length</th>
                             <th>字节序</th>
+                            <th>操作</th>
                           </tr>
                         </thead>
                         <tbody>
                           {frame.payload.map((mapping, mappingIndex) => (
                             <tr key={`private-payload-${frame.frame_key}-${mapping.signal_id}-${mappingIndex}`}>
-                              <td><code>{mapping.signal_id}</code></td>
-                              <td>{mapping.bit_offset}</td>
-                              <td>{mapping.bit_length}</td>
-                              <td>{mapping.byte_order}</td>
+                              <td><input value={mapping.signal_id} onChange={(event) => updatePrivatePayload(frameIndex, mappingIndex, (item) => ({ ...item, signal_id: event.target.value }))} /></td>
+                              <td><input type="number" value={mapping.bit_offset} onChange={(event) => updatePrivatePayload(frameIndex, mappingIndex, (item) => ({ ...item, bit_offset: Number(event.target.value) }))} /></td>
+                              <td><input type="number" value={mapping.bit_length} onChange={(event) => updatePrivatePayload(frameIndex, mappingIndex, (item) => ({ ...item, bit_length: Number(event.target.value) }))} /></td>
+                              <td><select value={mapping.byte_order} onChange={(event) => updatePrivatePayload(frameIndex, mappingIndex, (item) => ({ ...item, byte_order: event.target.value }))}><option value="little">little</option><option value="big">big</option></select></td>
+                              <td><button className="danger" onClick={() => removePrivatePayload(frameIndex, mappingIndex)} type="button">删除</button></td>
                             </tr>
                           ))}
                         </tbody>
@@ -3773,8 +4020,11 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   }}
                   type="button"
                 >
-                  写入三层模型
+                  从解析结果写入
                 </button>
+                <button disabled={!loadedProject} onClick={() => addProtocolMapping('can_open_pdo')} type="button">新增 PDO 映射</button>
+                <button disabled={!loadedProject} onClick={() => addProtocolMapping('can_open_sdo')} type="button">新增 SDO 映射</button>
+                <button disabled={!loadedProject} onClick={() => addProtocolMapping('private_frame')} type="button">新增私有映射</button>
                 <button disabled={!loadedProject || isParsingUnifiedProtocol} onClick={() => void handleFlattenUnifiedProtocol()} type="button">
                   生成旧版 PDO 段
                 </button>
@@ -3789,7 +4039,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   </article>
                   <article>
                     <span>映射总数</span>
-                    <strong>{unifiedProtocol.mappings.length}</strong>
+                    <strong>{currentProtocolMappings.length}</strong>
                   </article>
                   <article>
                     <span>CANopen 帧</span>
@@ -3803,6 +4053,67 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 {protocolFlattenStatus ? <p className="text-success">{protocolFlattenStatus}</p> : null}
                 {unifiedProtocol.validation.errors.length > 0 ? <p className="project-open-error">{unifiedProtocol.validation.errors.join('；')}</p> : null}
                 {unifiedProtocol.validation.warnings.length > 0 ? <p className="export-warning">{unifiedProtocol.validation.warnings.join('；')}</p> : null}
+                <section className="pdo-frame-section">
+                  <div className="config-table-toolbar">
+                    <strong>协议映射编辑</strong>
+                  </div>
+                  <div className="config-table-frame">
+                    <table className="config-table">
+                      <thead>
+                        <tr>
+                          <th>Signal ID</th>
+                          <th>目标类型</th>
+                          <th>方向/Frame Key</th>
+                          <th>Frame ID / Index</th>
+                          <th>Subindex</th>
+                          <th>Bit Offset</th>
+                          <th>Bit Length</th>
+                          <th>操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {currentProtocolMappings.map((mapping, mappingIndex) => (
+                          <tr className={isModifiedPath(['protocol_mapping', mappingIndex]) ? 'config-entry-modified' : undefined} key={`protocol-mapping-${mappingIndex}`}>
+                            <td><input value={mapping.signal_id} onChange={(event) => updateProtocolMapping(mappingIndex, (item) => ({ ...item, signal_id: event.target.value }))} /></td>
+                            <td>
+                              <select value={mapping.target.kind} onChange={(event) => {
+                                const kind = event.target.value as ProtocolMappingTarget['kind'];
+                                const target: ProtocolMappingTarget = kind === 'can_open_sdo'
+                                  ? { kind: 'can_open_sdo', index: 0, subindex: 0 }
+                                  : kind === 'private_frame'
+                                    ? { kind: 'private_frame', frame_key: '', frame_id: 0, bit_offset: 0, bit_length: 8 }
+                                    : { kind: 'can_open_pdo', direction: 'receive', frame_id: 0, bit_offset: 0, bit_length: 8 };
+                                updateProtocolMapping(mappingIndex, (item) => ({ ...item, target }));
+                              }}>
+                                <option value="can_open_pdo">CANopen PDO</option>
+                                <option value="can_open_sdo">CANopen SDO</option>
+                                <option value="private_frame">私有帧</option>
+                              </select>
+                            </td>
+                            <td>
+                              {mapping.target.kind === 'can_open_pdo' ? (
+                                <select value={mapping.target.direction} onChange={(event) => updateProtocolMapping(mappingIndex, (item) => ({ ...item, target: { ...(item.target as Extract<ProtocolMappingTarget, { kind: 'can_open_pdo' }>), direction: event.target.value as 'receive' | 'send' } }))}>
+                                  <option value="receive">receive</option>
+                                  <option value="send">send</option>
+                                </select>
+                              ) : mapping.target.kind === 'private_frame' ? (
+                                <input value={mapping.target.frame_key} onChange={(event) => updateProtocolMapping(mappingIndex, (item) => ({ ...item, target: { ...(item.target as Extract<ProtocolMappingTarget, { kind: 'private_frame' }>), frame_key: event.target.value } }))} />
+                              ) : '-'}
+                            </td>
+                            <td><input type="number" value={mapping.target.kind === 'can_open_sdo' ? mapping.target.index : mapping.target.frame_id} onChange={(event) => updateProtocolMapping(mappingIndex, (item) => {
+                              if (item.target.kind === 'can_open_sdo') return { ...item, target: { ...item.target, index: Number(event.target.value) } };
+                              return { ...item, target: { ...item.target, frame_id: Number(event.target.value) } };
+                            })} /></td>
+                            <td>{mapping.target.kind === 'can_open_sdo' ? <input type="number" value={mapping.target.subindex} onChange={(event) => updateProtocolMapping(mappingIndex, (item) => ({ ...item, target: { ...(item.target as Extract<ProtocolMappingTarget, { kind: 'can_open_sdo' }>), subindex: Number(event.target.value) } }))} /> : '-'}</td>
+                            <td>{mapping.target.kind !== 'can_open_sdo' ? <input type="number" value={mapping.target.bit_offset} onChange={(event) => updateProtocolMapping(mappingIndex, (item) => ({ ...item, target: { ...(item.target as Exclude<ProtocolMappingTarget, { kind: 'can_open_sdo' }>), bit_offset: Number(event.target.value) } }))} /> : '-'}</td>
+                            <td>{mapping.target.kind !== 'can_open_sdo' ? <input type="number" value={mapping.target.bit_length} onChange={(event) => updateProtocolMapping(mappingIndex, (item) => ({ ...item, target: { ...(item.target as Exclude<ProtocolMappingTarget, { kind: 'can_open_sdo' }>), bit_length: Number(event.target.value) } }))} /> : '-'}</td>
+                            <td><button className="danger" onClick={() => removeProtocolMapping(mappingIndex)} type="button">删除</button></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
                 <section className="pdo-frame-section">
                   <div className="config-table-toolbar">
                     <strong>CANopen PDO</strong>
