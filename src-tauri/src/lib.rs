@@ -23,12 +23,12 @@ use commands::{
     import_pdo_simple_csv, import_pdo_simple_table, import_pdo_simple_workbook, import_sdo_csv,
     import_sdo_table, import_sdo_workbook, language_document_table, legacy_table_spec,
     load_json_file, load_project, migrate_project_document, migrate_project_file,
-    parse_pdo_advanced_file, parse_pdo_advanced_project, parse_project_document,
-    parse_project_file, parse_ui_resource_file, parse_ui_resources,
-    parse_ui_resources_with_project_path, pdo_simple_document_table, project_summary,
-    remove_ui_resource_option_document, save_json_file, save_project, save_project_as,
-    save_text_file, sdo_document_table, update_ui_resource_document, validate_project_document,
-    validate_table_headers,
+    migrate_unified_protocol_document, parse_pdo_advanced_file, parse_pdo_advanced_project,
+    parse_project_document, parse_project_file, parse_ui_resource_file, parse_ui_resources,
+    parse_ui_resources_with_project_path, parse_unified_protocol_project,
+    pdo_simple_document_table, project_summary, remove_ui_resource_option_document, save_json_file,
+    save_project, save_project_as, save_text_file, sdo_document_table, update_ui_resource_document,
+    validate_project_document, validate_table_headers,
 };
 
 /// 构建并启动 Tauri 应用。
@@ -54,6 +54,8 @@ pub fn run() {
             migrate_project_file,
             parse_project_document,
             parse_project_file,
+            parse_unified_protocol_project,
+            migrate_unified_protocol_document,
             parse_ui_resources,
             parse_ui_resources_with_project_path,
             parse_ui_resource_file,

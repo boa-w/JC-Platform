@@ -12,6 +12,9 @@
 pub mod export;
 pub mod language;
 pub mod pdo;
+pub mod private_protocol;
 pub mod project;
+pub mod protocol_manager;
 pub mod sdo;
+pub mod signal;
 pub mod ui_resource;

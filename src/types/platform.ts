@@ -1,4 +1,4 @@
-export type NavigationKey = 'project' | 'ui' | 'pdo-simple' | 'pdo-advanced' | 'sdo' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
+export type NavigationKey = 'project' | 'signal-dictionary' | 'private-protocol' | 'protocol-mapping' | 'ui' | 'pdo-simple' | 'pdo-advanced' | 'sdo' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
 
 export interface ProjectSummary {
   name: string;
@@ -63,8 +63,132 @@ export interface ProjectDocument {
   pdo_recv: unknown[];
   pdo_send: unknown[];
   sdo_info: SdoNodeDocument;
+  signal_dictionary: SignalDictionary;
+  private_protocol: PrivateProtocolDocument;
+  protocol_mapping: ProtocolMapping[];
   language_info: LanguageDocument;
   battery_monitor_info: BatteryMonitorInfo;
+}
+
+export interface UnifiedProtocolModel {
+  signal_dictionary: SignalDictionary;
+  canopen: CanOpenTransport;
+  private_protocol: PrivateProtocolDocument;
+  mappings: ProtocolMapping[];
+  validation: ProtocolValidationReport;
+}
+
+export interface SignalDictionary {
+  signals: SignalDefinition[];
+}
+
+export interface SignalDefinition {
+  signal_id: string;
+  name: string;
+  data_type: SignalDataType;
+  default_value?: string;
+  min_value?: string;
+  max_value?: string;
+  inner?: number;
+  scale: SignalScale;
+  display: SignalDisplay;
+}
+
+export type SignalDataType =
+  | 'bool'
+  | 'u8'
+  | 'u16'
+  | 'u32'
+  | 'i8'
+  | 'i16'
+  | 'i32'
+  | 'f32'
+  | 'string'
+  | 'bytes'
+  | { custom: string };
+
+export interface SignalScale {
+  scale_num: number;
+  scale_den: number;
+  offset: number;
+  decimals: number;
+}
+
+export interface SignalDisplay {
+  unit: string;
+  format: string;
+  description: string;
+}
+
+export interface CanOpenTransport {
+  sdo_objects: CanOpenSdoObject[];
+  pdo_recv: CanOpenPdoFrame[];
+  pdo_send: CanOpenPdoFrame[];
+}
+
+export interface CanOpenSdoObject {
+  signal_id?: string;
+  name: string;
+  frame_id: number;
+  index: number;
+  subindex: number;
+  access: number;
+  data_type: string;
+}
+
+export interface CanOpenPdoFrame {
+  frame_id: number;
+  frame_type: number;
+  direction: 'receive' | 'send';
+  description: string;
+  mappings: CanOpenPdoMapping[];
+}
+
+export interface CanOpenPdoMapping {
+  signal_id: string;
+  bit_offset: number;
+  bit_length: number;
+  show_type: number;
+}
+
+export interface PrivateProtocolDocument {
+  enabled: boolean;
+  frames: PrivateFrame[];
+}
+
+export interface PrivateFrame {
+  frame_id: number;
+  frame_key: string;
+  name: string;
+  frame_type: string;
+  cycle_ms: number;
+  checksum: string;
+  byte_order: string;
+  payload: PrivatePayloadSignal[];
+  source: string;
+}
+
+export interface PrivatePayloadSignal {
+  signal_id: string;
+  bit_offset: number;
+  bit_length: number;
+  byte_order: string;
+}
+
+export interface ProtocolMapping {
+  signal_id: string;
+  target: ProtocolMappingTarget;
+}
+
+export type ProtocolMappingTarget =
+  | { kind: 'can_open_sdo'; index: number; subindex: number }
+  | { kind: 'can_open_pdo'; direction: 'receive' | 'send'; frame_id: number; bit_offset: number; bit_length: number }
+  | { kind: 'private_frame'; frame_key: string; frame_id: number; bit_offset: number; bit_length: number };
+
+export interface ProtocolValidationReport {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
 }
 
 export interface BatteryMonitorInfo {

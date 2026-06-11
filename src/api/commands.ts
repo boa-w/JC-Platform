@@ -35,6 +35,7 @@ import type {
   UiResourceParseRequest,
   UiResourceUpdateReport,
   UiResourceUpdateRequest,
+  UnifiedProtocolModel,
 } from '../types/platform';
 
 const fallbackHealth: BackendHealth = {
@@ -100,6 +101,14 @@ export async function parseProjectDocument(document: unknown): Promise<ProjectPa
 
 export async function parseProjectFile(path: string): Promise<ProjectParseReport> {
   return invoke<ProjectParseReport>('parse_project_file', { path });
+}
+
+export async function parseUnifiedProtocolProject(document: unknown): Promise<UnifiedProtocolModel> {
+  return invoke<UnifiedProtocolModel>('parse_unified_protocol_project', { document });
+}
+
+export async function migrateUnifiedProtocolDocument(document: unknown): Promise<unknown> {
+  return invoke<unknown>('migrate_unified_protocol_document', { document });
 }
 
 export async function parseUiResources(document: unknown): Promise<UiResourceParseReport> {

@@ -22,6 +22,9 @@ use crate::domain::project::{
     ProjectParseReport, ProjectSummary, ProjectValidationReport, SaveProjectAsReport,
     SaveProjectAsRequest, SaveProjectRequest,
 };
+use crate::domain::protocol_manager::{
+    build_unified_protocol_model, migrate_project_to_unified_protocol, UnifiedProtocolModel,
+};
 use crate::domain::sdo::{parse_sdo_table, sdo_document_to_table, SdoImportReport};
 use crate::domain::ui_resource::{
     add_ui_resource_option, parse_ui_info, remove_ui_resource_option, update_ui_resource,
@@ -127,6 +130,16 @@ pub fn parse_project_document(document: Value) -> ProjectParseReport {
 pub fn parse_project_file(path: String) -> Result<ProjectParseReport, String> {
     let document = json_store::read_json::<Value>(&path).map_err(|error| error.to_string())?;
     Ok(parse_legacy_project_document(Some(path), document))
+}
+
+#[tauri::command]
+pub fn parse_unified_protocol_project(document: Value) -> UnifiedProtocolModel {
+    build_unified_protocol_model(&document)
+}
+
+#[tauri::command]
+pub fn migrate_unified_protocol_document(document: Value) -> Value {
+    migrate_project_to_unified_protocol(document)
 }
 
 /// UI 资源解析请求（可选附带项目路径用于解析相对图片路径）。
@@ -434,20 +447,36 @@ pub struct CanTestGenerateResponse {
 /// 从信号的 name 推测一个有意义的初始显示值
 fn guess_display_value(name: &str) -> f64 {
     let lower = name.to_lowercase();
-    if lower.contains("电压") || lower.contains("voltage") { 48.0 }
-    else if lower.contains("电流") || lower.contains("current") { 10.0 }
-    else if lower.contains("soc") { 50.0 }
-    else if lower.contains("温度") || lower.contains("temp") { 25.0 }
-    else if lower.contains("soh") { 80.0 }
-    else if lower.contains("容量") || lower.contains("capacity") { 100.0 }
-    else if lower.contains("转速") || lower.contains("speed") { 1000.0 }
-    else if lower.contains("故障") || lower.contains("error") { 0.0 }
-    else { 0.0 }
+    if lower.contains("电压") || lower.contains("voltage") {
+        48.0
+    } else if lower.contains("电流") || lower.contains("current") {
+        10.0
+    } else if lower.contains("soc") {
+        50.0
+    } else if lower.contains("温度") || lower.contains("temp") {
+        25.0
+    } else if lower.contains("soh") {
+        80.0
+    } else if lower.contains("容量") || lower.contains("capacity") {
+        100.0
+    } else if lower.contains("转速") || lower.contains("speed") {
+        1000.0
+    } else if lower.contains("故障") || lower.contains("error") {
+        0.0
+    } else {
+        0.0
+    }
 }
 
 /// 根据 len 计算 raw_value 的默认最小值（非零以便肉眼可辨）
 fn default_raw(len: u32) -> u32 {
-    if len >= 16 { 0x0100 } else if len >= 8 { 0x40 } else { 1 }
+    if len >= 16 {
+        0x0100
+    } else if len >= 8 {
+        0x40
+    } else {
+        1
+    }
 }
 
 /// 将 signals 的 raw_value 写入 dlc 字节的对应 bit 位置，返回 hex 字符串
@@ -459,7 +488,9 @@ fn compute_data_bytes(dlc: u8, signals: &[CanTestSignalValue]) -> String {
         let mut bits_rem = sig.len;
         while bits_rem > 0 {
             let byte_idx = (bit_pos / 8) as usize;
-            if byte_idx >= dlc as usize { break; }
+            if byte_idx >= dlc as usize {
+                break;
+            }
             let bit_off = bit_pos % 8;
             let bits_this = (8 - bit_off).min(bits_rem);
             bytes[byte_idx] |= ((value & ((1u32 << bits_this) - 1)) as u8) << bit_off;
@@ -468,7 +499,11 @@ fn compute_data_bytes(dlc: u8, signals: &[CanTestSignalValue]) -> String {
             bits_rem -= bits_this;
         }
     }
-    bytes.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join(" ")
+    bytes
+        .iter()
+        .map(|b| format!("{:02X}", b))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// 从 PDO 帧的 data 数组中提取信号列表（不含 unit/scale/offset）
@@ -478,7 +513,8 @@ fn extract_pdo_signal_list(frame: &Value) -> Vec<CanTestSignalValue> {
         for sig in data {
             let pos = sig.get("pos").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let len = sig.get("len").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-            let sig_name = sig.get("pdo_param_name")
+            let sig_name = sig
+                .get("pdo_param_name")
                 .or_else(|| sig.get("param_id"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("信号")
@@ -488,9 +524,13 @@ fn extract_pdo_signal_list(frame: &Value) -> Vec<CanTestSignalValue> {
             signals.push(CanTestSignalValue {
                 name: sig_name,
                 unit: String::new(),
-                pos, len,
-                scale_num: 1, scale_den: 1, offset: 0.0,
-                raw_value: raw, display_value: display,
+                pos,
+                len,
+                scale_num: 1,
+                scale_den: 1,
+                offset: 0.0,
+                raw_value: raw,
+                display_value: display,
             });
         }
     }
@@ -502,13 +542,29 @@ fn build_battery_item_map(bmi: &Value) -> HashMap<String, (String, f64, i32, i32
     let mut map = HashMap::new();
     if let Some(items) = bmi.get("items").and_then(|v| v.as_array()) {
         for item in items {
-            let signal_key = item.get("signal_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            if signal_key.is_empty() { continue; }
-            let unit = item.get("unit").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let signal_key = item
+                .get("signal_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if signal_key.is_empty() {
+                continue;
+            }
+            let unit = item
+                .get("unit")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let fmt = item.get("formatter");
-            let offset = fmt.and_then(|f| f.get("offset").and_then(|v| v.as_f64())).unwrap_or(0.0);
-            let scale_num = fmt.and_then(|f| f.get("scale_num").and_then(|v| v.as_i64())).unwrap_or(1) as i32;
-            let scale_den = fmt.and_then(|f| f.get("scale_den").and_then(|v| v.as_i64())).unwrap_or(1) as i32;
+            let offset = fmt
+                .and_then(|f| f.get("offset").and_then(|v| v.as_f64()))
+                .unwrap_or(0.0);
+            let scale_num = fmt
+                .and_then(|f| f.get("scale_num").and_then(|v| v.as_i64()))
+                .unwrap_or(1) as i32;
+            let scale_den = fmt
+                .and_then(|f| f.get("scale_den").and_then(|v| v.as_i64()))
+                .unwrap_or(1) as i32;
             map.insert(signal_key, (unit, offset, scale_num, scale_den));
         }
     }
@@ -516,25 +572,48 @@ fn build_battery_item_map(bmi: &Value) -> HashMap<String, (String, f64, i32, i32
 }
 
 /// 提取电池监控信号，通过 item_map 补充 unit/scale/offset
-fn extract_battery_signal_list(bmi: &Value, frame_key: &str, item_map: &HashMap<String, (String, f64, i32, i32)>) -> Vec<CanTestSignalValue> {
+fn extract_battery_signal_list(
+    bmi: &Value,
+    frame_key: &str,
+    item_map: &HashMap<String, (String, f64, i32, i32)>,
+) -> Vec<CanTestSignalValue> {
     let mut signals = Vec::new();
     if let Some(all_sigs) = bmi.get("signals").and_then(|v| v.as_array()) {
         for sig in all_sigs {
             let fk = sig.get("frame_key").and_then(|v| v.as_str()).unwrap_or("");
-            if fk != frame_key { continue; }
-            let sig_key = sig.get("signal_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let name = sig.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            if fk != frame_key {
+                continue;
+            }
+            let sig_key = sig
+                .get("signal_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let name = sig
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let pos = sig.get("pos").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let len = sig.get("len").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-            let (unit, offset, scale_num, scale_den) = item_map.get(&sig_key).cloned().unwrap_or_default();
+            let (unit, offset, scale_num, scale_den) =
+                item_map.get(&sig_key).cloned().unwrap_or_default();
             let display = guess_display_value(&name);
             let raw = if display != 0.0 {
                 ((display - offset) * scale_den as f64 / scale_num as f64).round() as u32
-            } else { default_raw(len) };
+            } else {
+                default_raw(len)
+            };
             signals.push(CanTestSignalValue {
-                name, unit, pos, len,
-                scale_num, scale_den, offset,
-                raw_value: raw, display_value: display,
+                name,
+                unit,
+                pos,
+                len,
+                scale_num,
+                scale_den,
+                offset,
+                raw_value: raw,
+                display_value: display,
             });
         }
     }
@@ -552,10 +631,7 @@ fn extract_can_frame(
         .or_else(|| frame.get("can_id"))
         .and_then(|v| v.as_u64())
         .unwrap_or(0) as u32;
-    let frame_type = frame
-        .get("type")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as u8;
+    let frame_type = frame.get("type").and_then(|v| v.as_u64()).unwrap_or(0) as u8;
     let desc = frame
         .get("desc")
         .and_then(|v| v.as_str())
@@ -569,7 +645,10 @@ fn extract_can_frame(
 
     // 提取信号
     let signals = if let Some((bmi, item_map)) = battery_ctx {
-        let frame_key = frame.get("frame_key").and_then(|v| v.as_str()).unwrap_or("");
+        let frame_key = frame
+            .get("frame_key")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         extract_battery_signal_list(bmi, frame_key, item_map)
     } else {
         extract_pdo_signal_list(frame)
@@ -601,11 +680,19 @@ pub fn generate_can_test_data(document: Value) -> CanTestGenerateResponse {
 
     if let Some(simple) = document.get("pdo_simple_send_recv") {
         for kind in &["pdo_recv", "pdo_send"] {
-            let label = if *kind == "pdo_recv" { "PDO接收" } else { "PDO发送" };
+            let label = if *kind == "pdo_recv" {
+                "PDO接收"
+            } else {
+                "PDO发送"
+            };
             if let Some(arr) = simple.get(*kind).and_then(|v| v.as_array()) {
                 for frame in arr {
                     let mut cf = extract_can_frame(frame, label, frames.len(), None);
-                    if seen.insert(cf.id) { cf.cycle_ms = 100; } else { cf.cycle_ms = 0; }
+                    if seen.insert(cf.id) {
+                        cf.cycle_ms = 100;
+                    } else {
+                        cf.cycle_ms = 0;
+                    }
                     frames.push(cf);
                 }
             }
@@ -613,11 +700,19 @@ pub fn generate_can_test_data(document: Value) -> CanTestGenerateResponse {
     }
 
     for kind in &["pdo_recv", "pdo_send"] {
-        let label = if *kind == "pdo_recv" { "高级PDO接收" } else { "高级PDO发送" };
+        let label = if *kind == "pdo_recv" {
+            "高级PDO接收"
+        } else {
+            "高级PDO发送"
+        };
         if let Some(arr) = document.get(*kind).and_then(|v| v.as_array()) {
             for frame in arr {
                 let mut cf = extract_can_frame(frame, label, frames.len(), None);
-                if seen.insert(cf.id) { cf.cycle_ms = 100; } else { cf.cycle_ms = 0; }
+                if seen.insert(cf.id) {
+                    cf.cycle_ms = 100;
+                } else {
+                    cf.cycle_ms = 0;
+                }
                 frames.push(cf);
             }
         }
@@ -628,14 +723,21 @@ pub fn generate_can_test_data(document: Value) -> CanTestGenerateResponse {
         if let Some(arr) = bmi.get("frames").and_then(|v| v.as_array()) {
             for frame in arr {
                 let mut cf = extract_can_frame(frame, "锂电", frames.len(), Some((bmi, &item_map)));
-                if seen.insert(cf.id) { cf.cycle_ms = 200; } else { cf.cycle_ms = 0; }
+                if seen.insert(cf.id) {
+                    cf.cycle_ms = 200;
+                } else {
+                    cf.cycle_ms = 0;
+                }
                 frames.push(cf);
             }
         }
     }
 
     let frame_count = frames.len() as u32;
-    CanTestGenerateResponse { frames, frame_count }
+    CanTestGenerateResponse {
+        frames,
+        frame_count,
+    }
 }
 
 /// 将文本内容写入到指定文件路径。
@@ -655,7 +757,6 @@ pub fn save_json_file(path: String, content: Value) -> Result<(), String> {
 /// 从指定文件路径读取 JSON 内容。
 #[tauri::command]
 pub fn load_json_file(path: String) -> Result<Value, String> {
-    let content =
-        std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败：{}", e))?;
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败：{}", e))?;
     serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败：{}", e))
 }

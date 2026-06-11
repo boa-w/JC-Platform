@@ -23,6 +23,7 @@ import {
   migrateProjectDocument,
   parsePdoAdvancedProject,
   parseProjectDocument,
+  parseUnifiedProtocolProject,
   parseUiResources,
   parseUiResourcesWithProjectPath,
   pdoSimpleDocumentTable,
@@ -70,6 +71,7 @@ import type {
   UiImageCopyReport,
   UiResourceParseReport,
   UiResourceUpdateRequest,
+  UnifiedProtocolModel,
 } from '../types/platform';
 import { UiCanvasPreview } from '../components/UiCanvasPreview';
 import { cloneJson, deepEqual, isPathModified, restorePath, type JsonPath } from '../utils/projectDirty';
@@ -125,6 +127,9 @@ const modifiedSectionLabels: Record<string, string> = {
   pdo_send: 'PDO 发送帧',
   language_info: '多国语言',
   battery_monitor_info: '锂电监控配置',
+  signal_dictionary: '业务信号字典',
+  private_protocol: '私有协议',
+  protocol_mapping: '协议映射',
 };
 
 const trackedDocumentSections = Object.keys(modifiedSectionLabels);
@@ -213,6 +218,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [pdoAdvancedReport, setPdoAdvancedReport] = useState<PdoAdvancedParseReport | null>(null);
   const [pdoAdvancedError, setPdoAdvancedError] = useState<string | null>(null);
   const [isParsingPdoAdvanced, setIsParsingPdoAdvanced] = useState(false);
+  const [unifiedProtocol, setUnifiedProtocol] = useState<UnifiedProtocolModel | null>(null);
+  const [unifiedProtocolError, setUnifiedProtocolError] = useState<string | null>(null);
+  const [isParsingUnifiedProtocol, setIsParsingUnifiedProtocol] = useState(false);
   const [exportOutputDir, setExportOutputDir] = useState('jc-export');
   const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
   const [imageCopyReport, setImageCopyReport] = useState<UiImageCopyReport | null>(null);
@@ -259,6 +267,12 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   }, [activeModule.key, loadedProject?.document]);
 
   useEffect(() => {
+    if (loadedProject && (activeModule.key === 'signal-dictionary' || activeModule.key === 'private-protocol' || activeModule.key === 'protocol-mapping')) {
+      void refreshUnifiedProtocol(loadedProject.document);
+    }
+  }, [activeModule.key, loadedProject?.document]);
+
+  useEffect(() => {
     if (showJsonEditor && !jsonPopupInitialized.current) {
       setJsonPopupPos({ x: window.innerWidth - 12 - jsonPopupSize.w, y: 64 });
       jsonPopupInitialized.current = true;
@@ -302,6 +316,14 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (activeModule.key === 'pdo-simple') return document.pdo_simple_send_recv;
     if (activeModule.key === 'language') return document.language_info;
     if (activeModule.key === 'battery-monitor') return document.battery_monitor_info;
+    if (activeModule.key === 'signal-dictionary') return document.signal_dictionary;
+    if (activeModule.key === 'protocol-mapping') {
+      return {
+        signal_dictionary: document.signal_dictionary,
+        private_protocol: document.private_protocol,
+        protocol_mapping: document.protocol_mapping,
+      };
+    }
     if (activeModule.key === 'pdo-advanced') {
       return Object.fromEntries(advancedConfigSections.map((section) => [section, document[section]]));
     }
@@ -377,6 +399,12 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (activeModule.key === 'pdo-simple') document = restorePath(document, baselineDocument, ['pdo_simple_send_recv']);
     if (activeModule.key === 'language') document = restorePath(document, baselineDocument, ['language_info']);
     if (activeModule.key === 'battery-monitor') document = restorePath(document, baselineDocument, ['battery_monitor_info']);
+    if (activeModule.key === 'signal-dictionary') document = restorePath(document, baselineDocument, ['signal_dictionary']);
+    if (activeModule.key === 'protocol-mapping') {
+      document = restorePath(document, baselineDocument, ['signal_dictionary']);
+      document = restorePath(document, baselineDocument, ['private_protocol']);
+      document = restorePath(document, baselineDocument, ['protocol_mapping']);
+    }
     if (activeModule.key === 'pdo-advanced') {
       for (const section of advancedConfigSections) {
         document = restorePath(document, baselineDocument, [section]);
@@ -480,6 +508,29 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     applyLoadedProject({ ...loadedProject, document });
   }
 
+  async function refreshUnifiedProtocol(documentOverride?: unknown) {
+    const document = documentOverride ?? loadedProject?.document;
+    if (!document) return null;
+
+    setIsParsingUnifiedProtocol(true);
+    setUnifiedProtocolError(null);
+
+    try {
+      const report = await parseUnifiedProtocolProject(document);
+      setUnifiedProtocol(report);
+      if (!report.validation.valid) {
+        setUnifiedProtocolError(report.validation.errors.join('；') || '协议映射校验存在问题');
+      }
+      return report;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setUnifiedProtocolError(message);
+      return null;
+    } finally {
+      setIsParsingUnifiedProtocol(false);
+    }
+  }
+
   function applyConfigEditor() {
     if (!loadedProject) return;
 
@@ -490,6 +541,12 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       if (activeModule.key === 'pdo-simple') document.pdo_simple_send_recv = parsed;
       if (activeModule.key === 'language') document.language_info = parsed;
       if (activeModule.key === 'battery-monitor') document.battery_monitor_info = parsed;
+      if (activeModule.key === 'signal-dictionary') document.signal_dictionary = parsed;
+      if (activeModule.key === 'protocol-mapping') {
+        document.signal_dictionary = parsed?.signal_dictionary;
+        document.private_protocol = parsed?.private_protocol;
+        document.protocol_mapping = parsed?.protocol_mapping;
+      }
       if (activeModule.key === 'pdo-advanced') {
         for (const section of advancedConfigSections) {
           document[section] = parsed?.[section];
@@ -1690,6 +1747,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       });
       const nextPreview = await parseUiPreview(migrated.document, loadedProject.summary.path);
       setUiPreview(nextPreview);
+      void refreshUnifiedProtocol(migrated.document);
       setSaveStatus(`已规范化：${migrated.migrated_version}`);
     } catch (error) {
       setOpenError(error instanceof Error ? error.message : String(error));
@@ -2228,7 +2286,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 {generatingTestKey === activeModule.key ? '生成中...' : '生成测试数据'}
               </button>
             ) : null}
-            {(['sdo', 'pdo-simple', 'pdo-advanced', 'battery-monitor', 'language'] as string[]).includes(activeModule.key) ? (
+            {(['sdo', 'pdo-simple', 'pdo-advanced', 'battery-monitor', 'language', 'signal-dictionary', 'private-protocol', 'protocol-mapping'] as string[]).includes(activeModule.key) ? (
               <>
                 <button
                   className={`action-bar-btn ${showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'}`}
@@ -3243,6 +3301,309 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
               </div>
             ) : null}
             {pdoAdvancedError ? <p className="project-open-error">{pdoAdvancedError}</p> : null}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'signal-dictionary' ? (
+          <section className="project-open-card">
+            <div className="config-table-toolbar">
+              <div>
+                <h2>业务信号字典</h2>
+                <p>从旧版 SDO、PDO 和锂电配置派生业务 Signal，集中查看数据类型、单位、缩放和旧系统变量索引。</p>
+              </div>
+              <div className="sample-actions">
+                <button disabled={!loadedProject || isParsingUnifiedProtocol} onClick={() => void refreshUnifiedProtocol()} type="button">
+                  {isParsingUnifiedProtocol ? '解析中...' : '刷新字典'}
+                </button>
+                <button
+                  disabled={!loadedProject || !unifiedProtocol}
+                  onClick={() => {
+                    if (!unifiedProtocol) return;
+                    updateProjectDocument('signal_dictionary', unifiedProtocol.signal_dictionary);
+                  }}
+                  type="button"
+                >
+                  写入项目
+                </button>
+              </div>
+            </div>
+            {unifiedProtocolError ? <p className="project-open-error">{unifiedProtocolError}</p> : null}
+            {unifiedProtocol ? (
+              <>
+                <div className="project-open-report">
+                  <article>
+                    <span>Signal 总数</span>
+                    <strong>{unifiedProtocol.signal_dictionary.signals.length}</strong>
+                  </article>
+                  <article>
+                    <span>CANopen PDO 映射</span>
+                    <strong>{unifiedProtocol.canopen.pdo_recv.reduce((total, frame) => total + frame.mappings.length, 0) + unifiedProtocol.canopen.pdo_send.reduce((total, frame) => total + frame.mappings.length, 0)}</strong>
+                  </article>
+                  <article>
+                    <span>SDO 对象</span>
+                    <strong>{unifiedProtocol.canopen.sdo_objects.length}</strong>
+                  </article>
+                  <article>
+                    <span>私有协议帧</span>
+                    <strong>{unifiedProtocol.private_protocol.frames.length}</strong>
+                  </article>
+                </div>
+                <div className="config-table-frame">
+                  <table className="config-table">
+                    <thead>
+                      <tr>
+                        <th>Signal ID</th>
+                        <th>名称</th>
+                        <th>类型</th>
+                        <th>单位</th>
+                        <th>缩放</th>
+                        <th>默认值</th>
+                        <th>旧索引</th>
+                        <th>来源</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unifiedProtocol.signal_dictionary.signals.map((signal) => (
+                        <tr key={signal.signal_id}>
+                          <td><code>{signal.signal_id}</code></td>
+                          <td>{signal.name}</td>
+                          <td>{typeof signal.data_type === 'string' ? signal.data_type : signal.data_type.custom}</td>
+                          <td>{signal.display.unit || '-'}</td>
+                          <td>{signal.scale.scale_num}/{signal.scale.scale_den} offset {signal.scale.offset}</td>
+                          <td>{signal.default_value ?? '-'}</td>
+                          <td>{signal.inner ?? '-'}</td>
+                          <td>{signal.display.description || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : <div className="empty-state"><div className="empty-state-icon">SIG</div><p>请先打开项目并刷新业务信号字典。</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'private-protocol' ? (
+          <section className="project-open-card">
+            <div className="config-table-toolbar">
+              <div>
+                <h2>私有协议</h2>
+                <p>集中查看私有协议帧、校验方式、字节序和 Signal 载荷布局；当前会从锂电监控帧自动派生初始私有协议模型。</p>
+              </div>
+              <div className="sample-actions">
+                <button disabled={!loadedProject || isParsingUnifiedProtocol} onClick={() => void refreshUnifiedProtocol()} type="button">
+                  {isParsingUnifiedProtocol ? '解析中...' : '刷新私有协议'}
+                </button>
+                <button
+                  disabled={!loadedProject || !unifiedProtocol}
+                  onClick={() => {
+                    if (!unifiedProtocol) return;
+                    updateProjectDocument('private_protocol', unifiedProtocol.private_protocol);
+                  }}
+                  type="button"
+                >
+                  写入项目
+                </button>
+              </div>
+            </div>
+            {unifiedProtocolError ? <p className="project-open-error">{unifiedProtocolError}</p> : null}
+            {unifiedProtocol ? (
+              <>
+                <div className="project-open-report">
+                  <article>
+                    <span>启用状态</span>
+                    <strong>{unifiedProtocol.private_protocol.enabled ? '启用' : '未启用'}</strong>
+                  </article>
+                  <article>
+                    <span>私有帧数量</span>
+                    <strong>{unifiedProtocol.private_protocol.frames.length}</strong>
+                  </article>
+                  <article>
+                    <span>载荷 Signal</span>
+                    <strong>{unifiedProtocol.private_protocol.frames.reduce((total, frame) => total + frame.payload.length, 0)}</strong>
+                  </article>
+                  <article>
+                    <span>校验状态</span>
+                    <strong>{unifiedProtocol.validation.valid ? '通过' : '存在错误'}</strong>
+                  </article>
+                </div>
+                {unifiedProtocol.private_protocol.frames.map((frame, frameIndex) => (
+                  <article className="pdo-frame-card" key={`private-protocol-${frame.frame_key}-${frameIndex}`}>
+                    <div className="pdo-frame-grid">
+                      <label>帧 Key<input readOnly value={frame.frame_key || '-'} /></label>
+                      <label>帧 ID<input readOnly value={formatFrameId(frame.frame_id)} /></label>
+                      <label>名称<input readOnly value={frame.name || '-'} /></label>
+                    </div>
+                    <div className="project-open-report">
+                      <article>
+                        <span>帧类型</span>
+                        <strong>{frame.frame_type}</strong>
+                      </article>
+                      <article>
+                        <span>周期/超时</span>
+                        <strong>{frame.cycle_ms} ms</strong>
+                      </article>
+                      <article>
+                        <span>校验</span>
+                        <strong>{frame.checksum}</strong>
+                      </article>
+                      <article>
+                        <span>字节序</span>
+                        <strong>{frame.byte_order}</strong>
+                      </article>
+                    </div>
+                    <div className="config-table-frame">
+                      <table className="config-table">
+                        <thead>
+                          <tr>
+                            <th>Signal ID</th>
+                            <th>Bit Offset</th>
+                            <th>Bit Length</th>
+                            <th>字节序</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {frame.payload.map((mapping, mappingIndex) => (
+                            <tr key={`private-payload-${frame.frame_key}-${mapping.signal_id}-${mappingIndex}`}>
+                              <td><code>{mapping.signal_id}</code></td>
+                              <td>{mapping.bit_offset}</td>
+                              <td>{mapping.bit_length}</td>
+                              <td>{mapping.byte_order}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </article>
+                ))}
+              </>
+            ) : <div className="empty-state"><div className="empty-state-icon">PRV</div><p>请先打开项目并刷新私有协议。</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'protocol-mapping' ? (
+          <section className="project-open-card">
+            <div className="config-table-toolbar">
+              <div>
+                <h2>协议拓扑概览</h2>
+                <p>统一查看业务 Signal 到 CANopen SDO/PDO 与私有协议帧的映射关系，并执行帧长度、引用和重叠校验。</p>
+              </div>
+              <div className="sample-actions">
+                <button disabled={!loadedProject || isParsingUnifiedProtocol} onClick={() => void refreshUnifiedProtocol()} type="button">
+                  {isParsingUnifiedProtocol ? '解析中...' : '刷新拓扑'}
+                </button>
+                <button
+                  disabled={!loadedProject || !unifiedProtocol}
+                  onClick={() => {
+                    if (!unifiedProtocol) return;
+                    updateProjectSections({
+                      signal_dictionary: unifiedProtocol.signal_dictionary,
+                      private_protocol: unifiedProtocol.private_protocol,
+                      protocol_mapping: unifiedProtocol.mappings,
+                    });
+                  }}
+                  type="button"
+                >
+                  写入三层模型
+                </button>
+              </div>
+            </div>
+            {unifiedProtocol ? (
+              <>
+                <div className="project-open-report">
+                  <article>
+                    <span>校验状态</span>
+                    <strong>{unifiedProtocol.validation.valid ? '通过' : '存在错误'}</strong>
+                  </article>
+                  <article>
+                    <span>映射总数</span>
+                    <strong>{unifiedProtocol.mappings.length}</strong>
+                  </article>
+                  <article>
+                    <span>CANopen 帧</span>
+                    <strong>{unifiedProtocol.canopen.pdo_recv.length + unifiedProtocol.canopen.pdo_send.length}</strong>
+                  </article>
+                  <article>
+                    <span>私有帧</span>
+                    <strong>{unifiedProtocol.private_protocol.frames.length}</strong>
+                  </article>
+                </div>
+                {unifiedProtocol.validation.errors.length > 0 ? <p className="project-open-error">{unifiedProtocol.validation.errors.join('；')}</p> : null}
+                {unifiedProtocol.validation.warnings.length > 0 ? <p className="export-warning">{unifiedProtocol.validation.warnings.join('；')}</p> : null}
+                <section className="pdo-frame-section">
+                  <div className="config-table-toolbar">
+                    <strong>CANopen PDO</strong>
+                  </div>
+                  {[...unifiedProtocol.canopen.pdo_recv, ...unifiedProtocol.canopen.pdo_send].map((frame, frameIndex) => (
+                    <article className="pdo-frame-card" key={`overview-pdo-${frame.direction}-${frame.frame_id}-${frameIndex}`}>
+                      <div className="pdo-frame-grid">
+                        <label>方向<input readOnly value={frame.direction === 'receive' ? '接收' : '发送'} /></label>
+                        <label>帧 ID<input readOnly value={formatFrameId(frame.frame_id)} /></label>
+                        <label>描述<input readOnly value={frame.description || '-'} /></label>
+                      </div>
+                      <div className="config-table-frame">
+                        <table className="config-table">
+                          <thead>
+                            <tr>
+                              <th>Signal ID</th>
+                              <th>Bit Offset</th>
+                              <th>Bit Length</th>
+                              <th>Show Type</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {frame.mappings.map((mapping, mappingIndex) => (
+                              <tr key={`pdo-map-${frame.frame_id}-${mapping.signal_id}-${mappingIndex}`}>
+                                <td><code>{mapping.signal_id}</code></td>
+                                <td>{mapping.bit_offset}</td>
+                                <td>{mapping.bit_length}</td>
+                                <td>{mapping.show_type}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+                <section className="pdo-frame-section">
+                  <div className="config-table-toolbar">
+                    <strong>私有协议帧</strong>
+                  </div>
+                  {unifiedProtocol.private_protocol.frames.map((frame, frameIndex) => (
+                    <article className="pdo-frame-card" key={`overview-private-${frame.frame_key}-${frameIndex}`}>
+                      <div className="pdo-frame-grid">
+                        <label>帧 Key<input readOnly value={frame.frame_key || '-'} /></label>
+                        <label>帧 ID<input readOnly value={formatFrameId(frame.frame_id)} /></label>
+                        <label>名称<input readOnly value={frame.name || '-'} /></label>
+                      </div>
+                      <div className="config-table-frame">
+                        <table className="config-table">
+                          <thead>
+                            <tr>
+                              <th>Signal ID</th>
+                              <th>Bit Offset</th>
+                              <th>Bit Length</th>
+                              <th>字节序</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {frame.payload.map((mapping, mappingIndex) => (
+                              <tr key={`private-map-${frame.frame_key}-${mapping.signal_id}-${mappingIndex}`}>
+                                <td><code>{mapping.signal_id}</code></td>
+                                <td>{mapping.bit_offset}</td>
+                                <td>{mapping.bit_length}</td>
+                                <td>{mapping.byte_order}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+              </>
+            ) : <div className="empty-state"><div className="empty-state-icon">MAP</div><p>请先打开项目并刷新协议拓扑。</p></div>}
           </section>
         ) : null}
 

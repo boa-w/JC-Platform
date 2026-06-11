@@ -747,7 +747,11 @@ fn merge_battery_monitor_pdo(
     let Some(root) = source_document.get("battery_monitor_info") else {
         return;
     };
-    if !root.get("enabled").and_then(Value::as_bool).unwrap_or(false) {
+    if !root
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
         return;
     }
 
@@ -780,7 +784,10 @@ fn merge_battery_monitor_pdo(
     for signal in &signals {
         let param_id = object_string(signal, "param_id");
         if param_id.is_empty() {
-            errors.push(format!("锂电信号 {} 缺少 param_id", object_string(signal, "signal_key")));
+            errors.push(format!(
+                "锂电信号 {} 缺少 param_id",
+                object_string(signal, "signal_key")
+            ));
             continue;
         }
         if existing_params.insert(param_id.clone()) {
@@ -821,10 +828,17 @@ fn merge_battery_monitor_pdo(
     for signal in &signals {
         let frame_key = object_string(signal, "frame_key");
         let Some(frame) = frame_map.get(&frame_key) else {
-            errors.push(format!("锂电信号 {} 引用了不存在的帧 {}", object_string(signal, "signal_key"), frame_key));
+            errors.push(format!(
+                "锂电信号 {} 引用了不存在的帧 {}",
+                object_string(signal, "signal_key"),
+                frame_key
+            ));
             continue;
         };
-        let key = (object_i64(frame, "can_id", 0) as u32, object_i64(frame, "type", 0) as u8);
+        let key = (
+            object_i64(frame, "can_id", 0) as u32,
+            object_i64(frame, "type", 0) as u8,
+        );
         let Some(frame_index) = recv_by_key.get(&key).copied() else {
             continue;
         };
@@ -839,14 +853,16 @@ fn merge_battery_monitor_pdo(
         {
             continue;
         }
-        pdo_document.pdo_recv[frame_index].data.push(PdoAdvancedSignal {
-            pos: object_i64(signal, "pos", 0) as u32,
-            len: object_i64(signal, "len", 0) as u32,
-            show_type: object_i64(signal, "show_type", 0) as u8,
-            handle: object_i64(signal, "handle", 0) as u8,
-            handle_param: object_string(signal, "handle_param"),
-            param_id,
-        });
+        pdo_document.pdo_recv[frame_index]
+            .data
+            .push(PdoAdvancedSignal {
+                pos: object_i64(signal, "pos", 0) as u32,
+                len: object_i64(signal, "len", 0) as u32,
+                show_type: object_i64(signal, "show_type", 0) as u8,
+                handle: object_i64(signal, "handle", 0) as u8,
+                handle_param: object_string(signal, "handle_param"),
+                param_id,
+            });
     }
 }
 
@@ -1099,11 +1115,23 @@ fn build_battery_monitor_bytes(
     warnings: &mut Vec<String>,
 ) -> Option<(Vec<u8>, usize, usize, usize)> {
     let root = document.get("battery_monitor_info")?;
-    if !root.get("enabled").and_then(Value::as_bool).unwrap_or(false) {
+    if !root
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
         return None;
     }
-    let frames = root.get("frames").and_then(Value::as_array).cloned().unwrap_or_default();
-    let mut items = root.get("items").and_then(Value::as_array).cloned().unwrap_or_default();
+    let frames = root
+        .get("frames")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut items = root
+        .get("items")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     if frames.is_empty() || items.is_empty() {
         warnings.push("锂电监控已启用但帧或显示项为空，跳过 battery monitor 段".to_string());
         return None;
@@ -1115,7 +1143,11 @@ fn build_battery_monitor_bytes(
         return None;
     }
 
-    let signals = root.get("signals").and_then(Value::as_array).cloned().unwrap_or_default();
+    let signals = root
+        .get("signals")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let signal_map = signals
         .iter()
         .map(|signal| (object_string(signal, "signal_key"), signal.clone()))
@@ -1147,14 +1179,21 @@ fn build_battery_monitor_bytes(
         write_u32(&mut bytes, object_i64(frame, "can_id", 0).max(0) as u32);
         write_u8(&mut bytes, object_i64(frame, "type", 0).max(0) as u8);
         write_u8(&mut bytes, 0);
-        write_u16(&mut bytes, object_i64(frame, "timeout_ticks", default_timeout as i64).max(0) as u16);
+        write_u16(
+            &mut bytes,
+            object_i64(frame, "timeout_ticks", default_timeout as i64).max(0) as u16,
+        );
     }
 
     for item in &items {
         let signal_key = object_string(item, "signal_key");
         let signal = signal_map.get(&signal_key);
         if signal.is_none() {
-            warnings.push(format!("锂电显示项 {} 引用了不存在的信号 {}", object_string(item, "item_key"), signal_key));
+            warnings.push(format!(
+                "锂电显示项 {} 引用了不存在的信号 {}",
+                object_string(item, "item_key"),
+                signal_key
+            ));
         }
         let signal = signal.cloned().unwrap_or(Value::Null);
         let param_id = object_string(&signal, "param_id");
@@ -1163,23 +1202,56 @@ fn build_battery_monitor_bytes(
         let frame_key = object_string(validity, "frame_key");
         let scale_den = object_i64(formatter, "scale_den", 1);
 
-        write_u16(&mut bytes, param_indexes.get(&param_id).copied().unwrap_or(0));
+        write_u16(
+            &mut bytes,
+            param_indexes.get(&param_id).copied().unwrap_or(0),
+        );
         write_u16(&mut bytes, object_i64(&signal, "inner", -1).max(0) as u16);
-        write_u16(&mut bytes, language_text_index(&object_string(item, "name_key"), language_entries));
-        write_u16(&mut bytes, frame_map.get(&frame_key).copied().unwrap_or(0xffff));
+        write_u16(
+            &mut bytes,
+            language_text_index(&object_string(item, "name_key"), language_entries),
+        );
+        write_u16(
+            &mut bytes,
+            frame_map.get(&frame_key).copied().unwrap_or(0xffff),
+        );
         write_u8(&mut bytes, 1);
         write_u8(&mut bytes, object_i64(item, "order", 0).max(0) as u8);
         write_u8(&mut bytes, object_i64(&signal, "type", 0).max(0) as u8);
-        write_u8(&mut bytes, battery_formatter_kind(&object_string(formatter, "kind")));
+        write_u8(
+            &mut bytes,
+            battery_formatter_kind(&object_string(formatter, "kind")),
+        );
         write_i32(&mut bytes, object_i64(formatter, "offset", 0) as i32);
         write_i32(&mut bytes, object_i64(formatter, "scale_num", 1) as i32);
-        write_i32(&mut bytes, if scale_den == 0 { 1 } else { scale_den } as i32);
-        write_u8(&mut bytes, object_i64(formatter, "decimals", 0).max(0) as u8);
-        write_u8(&mut bytes, object_i64(formatter, "display_base", 10).max(0) as u8);
-        write_u16(&mut bytes, language_text_index(&object_string(item, "unit"), language_entries));
-        write_u16(&mut bytes, language_text_index(&object_string(formatter, "true_text"), language_entries));
-        write_u16(&mut bytes, language_text_index(&object_string(formatter, "false_text"), language_entries));
-        write_u16(&mut bytes, language_text_index(&object_string(validity, "empty_text"), language_entries));
+        write_i32(
+            &mut bytes,
+            if scale_den == 0 { 1 } else { scale_den } as i32,
+        );
+        write_u8(
+            &mut bytes,
+            object_i64(formatter, "decimals", 0).max(0) as u8,
+        );
+        write_u8(
+            &mut bytes,
+            object_i64(formatter, "display_base", 10).max(0) as u8,
+        );
+        write_u16(
+            &mut bytes,
+            language_text_index(&object_string(item, "unit"), language_entries),
+        );
+        write_u16(
+            &mut bytes,
+            language_text_index(&object_string(formatter, "true_text"), language_entries),
+        );
+        write_u16(
+            &mut bytes,
+            language_text_index(&object_string(formatter, "false_text"), language_entries),
+        );
+        write_u16(
+            &mut bytes,
+            language_text_index(&object_string(validity, "empty_text"), language_entries),
+        );
         write_u32(&mut bytes, 0);
         write_u16(&mut bytes, 0);
     }
@@ -2055,20 +2127,33 @@ mod tests {
 
         let report = build_project_binary(&document);
 
-        assert!(report.valid, "unexpected export errors: {:?}", report.errors);
+        assert!(
+            report.valid,
+            "unexpected export errors: {:?}",
+            report.errors
+        );
         assert_eq!(report.data_description.global_param_total, 1);
         assert_eq!(report.data_description.pdo_recv_total, 1);
         assert_eq!(report.data_description.pdo_send_total, 0);
         let recv_base = report.data_description.pdo_recv_base_addr as usize;
-        assert_eq!(u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()), 0x111);
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()),
+            0x111
+        );
     }
 
     #[test]
     fn build_project_binary_uses_simple_pdo_when_advanced_sections_are_empty() {
         let mut document = empty_pdo_advanced_sections();
         let object = document.as_object_mut().unwrap();
-        object.insert("language_info".to_string(), language_info_without_selected_languages());
-        object.insert("battery_monitor_info".to_string(), disabled_battery_monitor());
+        object.insert(
+            "language_info".to_string(),
+            language_info_without_selected_languages(),
+        );
+        object.insert(
+            "battery_monitor_info".to_string(),
+            disabled_battery_monitor(),
+        );
         object.insert(
             "sdo_info".to_string(),
             json!({ "type": 0, "user_auth": 0, "name": "菜单", "children": [] }),
@@ -2088,13 +2173,24 @@ mod tests {
 
         let report = build_project_binary(&document);
 
-        assert!(report.valid, "unexpected export errors: {:?}", report.errors);
+        assert!(
+            report.valid,
+            "unexpected export errors: {:?}",
+            report.errors
+        );
         assert_eq!(report.data_description.global_param_total, 1);
         assert_eq!(report.data_description.global_param_index_total, 1);
         assert_eq!(report.data_description.pdo_recv_total, 1);
         let recv_base = report.data_description.pdo_recv_base_addr as usize;
-        assert_eq!(u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()), 0x321);
-        let data_base = u32::from_le_bytes(report.bytes[recv_base + 4..recv_base + 8].try_into().unwrap()) as usize;
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()),
+            0x321
+        );
+        let data_base = u32::from_le_bytes(
+            report.bytes[recv_base + 4..recv_base + 8]
+                .try_into()
+                .unwrap(),
+        ) as usize;
         assert_eq!(report.bytes[data_base], 8);
         assert_eq!(report.bytes[data_base + 1], 8);
     }
@@ -2144,7 +2240,11 @@ mod tests {
 
         let report = build_project_binary(&document);
 
-        assert!(report.valid, "unexpected export errors: {:?}", report.errors);
+        assert!(
+            report.valid,
+            "unexpected export errors: {:?}",
+            report.errors
+        );
         assert_eq!(report.data_description.global_param_total, 1);
         assert_eq!(report.data_description.global_param_index_total, 1);
         assert_eq!(report.data_description.pdo_recv_total, 1);
@@ -2152,9 +2252,18 @@ mod tests {
         assert_eq!(report.data_description.battery_monitor_frame_total, 1);
         assert_eq!(report.data_description.battery_monitor_version, 2);
         let recv_base = report.data_description.pdo_recv_base_addr as usize;
-        assert_eq!(u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()), 0x2f0);
-        assert!(report.data_description.battery_monitor_base_addr > report.data_description.pdo_recv_base_addr);
-        assert!(report.data_description.sdo_base_addr > report.data_description.battery_monitor_base_addr);
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[recv_base..recv_base + 4].try_into().unwrap()),
+            0x2f0
+        );
+        assert!(
+            report.data_description.battery_monitor_base_addr
+                > report.data_description.pdo_recv_base_addr
+        );
+        assert!(
+            report.data_description.sdo_base_addr
+                > report.data_description.battery_monitor_base_addr
+        );
     }
 
     #[test]
@@ -2205,7 +2314,11 @@ mod tests {
 
         let report = build_project_binary(&document);
 
-        assert!(report.valid, "unexpected export errors: {:?}", report.errors);
+        assert!(
+            report.valid,
+            "unexpected export errors: {:?}",
+            report.errors
+        );
         assert_eq!(report.data_description.sdo_base_addr, 5);
         assert_eq!(report.data_description.file_size, 85);
         assert_eq!(report.bytes.len(), 85);

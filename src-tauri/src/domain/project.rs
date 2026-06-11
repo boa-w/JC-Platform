@@ -9,6 +9,9 @@
 //! 项目文件为 JSON 格式，包含 `project`、`device`、`ui_info`、
 //! `pdo_*`、`sdo_info`、`language_info` 等段落。
 
+use crate::domain::private_protocol::PrivateProtocolDocument;
+use crate::domain::protocol_manager::migrate_project_to_unified_protocol;
+use crate::domain::signal::SignalDictionary;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
@@ -198,6 +201,9 @@ pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_
         "pdo_recv": [],
         "pdo_send": [],
         "sdo_info": default_sdo_info(),
+        "signal_dictionary": SignalDictionary::default(),
+        "private_protocol": PrivateProtocolDocument::default(),
+        "protocol_mapping": [],
         "language_info": default_language_info(),
         "battery_monitor_info": default_battery_monitor_info()
     })
@@ -211,9 +217,13 @@ pub fn migrate_legacy_project_document(path: Option<String>, value: Value) -> Mi
         Value::Object(map) => map,
         _ => Map::new(),
     };
+    let initial_sections = document.keys().cloned().collect::<HashSet<_>>();
     let mut added_sections = Vec::new();
 
     for section in required_project_sections() {
+        if is_unified_protocol_section(section) {
+            continue;
+        }
         if !document.contains_key(*section) {
             document.insert((*section).to_string(), default_section_value(section));
             added_sections.push((*section).to_string());
@@ -224,7 +234,18 @@ pub fn migrate_legacy_project_document(path: Option<String>, value: Value) -> Mi
         "config_version".to_string(),
         Value::String("0.1.0-tauri-refactor".to_string()),
     );
-    let document = Value::Object(document);
+    let mut document = migrate_project_to_unified_protocol(Value::Object(document));
+    if let Some(object) = document.as_object_mut() {
+        for section in ["signal_dictionary", "private_protocol", "protocol_mapping"] {
+            if !initial_sections.contains(section) {
+                added_sections.push(section.to_string());
+            }
+        }
+        object.insert(
+            "config_version".to_string(),
+            Value::String("0.1.0-tauri-refactor".to_string()),
+        );
+    }
     let summary = ProjectSummary::from_legacy_value(path, &document);
     let validation = ProjectValidationReport::from_legacy_value(&document);
 
@@ -661,9 +682,19 @@ fn required_project_sections() -> &'static [&'static str] {
         "pdo_recv",
         "pdo_send",
         "sdo_info",
+        "signal_dictionary",
+        "private_protocol",
+        "protocol_mapping",
         "language_info",
         "battery_monitor_info",
     ]
+}
+
+fn is_unified_protocol_section(section: &str) -> bool {
+    matches!(
+        section,
+        "signal_dictionary" | "private_protocol" | "protocol_mapping"
+    )
 }
 
 fn default_section_value(section: &str) -> Value {
@@ -681,6 +712,9 @@ fn default_section_value(section: &str) -> Value {
         }),
         "pdo_simple_send_recv" => default_pdo_simple(),
         "sdo_info" => default_sdo_info(),
+        "signal_dictionary" => json!(SignalDictionary::default()),
+        "private_protocol" => json!(PrivateProtocolDocument::default()),
+        "protocol_mapping" => Value::Array(Vec::new()),
         "language_info" => default_language_info(),
         "battery_monitor_info" => default_battery_monitor_info(),
         _ => Value::Array(Vec::new()),
@@ -792,6 +826,12 @@ pub struct ProjectDocument {
     pub pdo_send: Vec<Value>,
     #[serde(default)]
     pub sdo_info: SdoNodeDocument,
+    #[serde(default)]
+    pub signal_dictionary: SignalDictionary,
+    #[serde(default)]
+    pub private_protocol: PrivateProtocolDocument,
+    #[serde(default)]
+    pub protocol_mapping: Vec<Value>,
     #[serde(default)]
     pub language_info: LanguageDocument,
     #[serde(default = "default_battery_monitor_info")]

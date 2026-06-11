@@ -7,6 +7,21 @@ export const featureModules: FeatureModule[] = [
     description: '负责项目创建、打开、结构检查、保存和基础目录管理。',
   },
   {
+    key: 'signal-dictionary',
+    title: '业务信号字典',
+    description: '负责统一维护 Signal、数据类型、单位、缩放比例和业务含义。',
+  },
+  {
+    key: 'private-protocol',
+    title: '私有协议',
+    description: '负责自定义帧、周期、校验方式、字节序和载荷布局。',
+  },
+  {
+    key: 'protocol-mapping',
+    title: '协议映射',
+    description: '统一展示 CANopen、私有协议和业务 Signal 之间的映射与校验结果。',
+  },
+  {
     key: 'ui',
     title: 'UI 资源编辑',
     description: '负责设备分辨率画布、图标/动画资源、属性编辑、选项增删和资源导出路径维护。',
