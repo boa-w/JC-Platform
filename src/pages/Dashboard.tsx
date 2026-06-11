@@ -231,6 +231,12 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [pdoJumpTarget, setPdoJumpTarget] = useState<number | null>(null);
+  const [selectedSettingPath, setSelectedSettingPath] = useState<string | null>(null);
+  const [editingSettingPath, setEditingSettingPath] = useState<number[] | null>(null);
+  const [selectedRealtimeKind, setSelectedRealtimeKind] = useState<'pdo_recv' | 'pdo_send'>('pdo_recv');
+  const [selectedRealtimeFrameId, setSelectedRealtimeFrameId] = useState<number | null>(null);
+  const [realtimeMode, setRealtimeMode] = useState<'simple' | 'advanced'>('simple');
+  const [selectedAdvancedFrameId, setSelectedAdvancedFrameId] = useState<number | null>(null);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [canTestFrames, setCanTestFrames] = useState<CanTestFrame[]>([]);
   const [canTestDefaultCycle, setCanTestDefaultCycle] = useState(100);
@@ -258,10 +264,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   }, []);
 
   useEffect(() => {
-    if (activeModule.key === 'pdo-simple' && pdoJumpTarget !== null) {
+    if (activeModule.key === 'realtime-data' && realtimeMode === 'simple' && pdoJumpTarget !== null) {
       pdoJumpRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [activeModule.key, pdoJumpTarget]);
+  }, [activeModule.key, realtimeMode, pdoJumpTarget]);
 
   useEffect(() => {
     setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2));
@@ -295,6 +301,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     return `0x${Math.max(0, value).toString(16).toUpperCase()}`;
   }
 
+  function formatFrameIdPadded(value: number, width = 3) {
+    return `0x${Math.max(0, value).toString(16).toUpperCase().padStart(width, '0')}`;
+  }
+
   function parseFrameId(value: string) {
     const normalized = value.trim().replace(/^0x/i, '');
     if (!/^[0-9a-f]*$/i.test(normalized)) return null;
@@ -311,11 +321,25 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (nextId !== null) updatePdoAdvancedFrame(kind, frameIndex, 'id', nextId);
   }
 
+  function activeLegacyTableKind(): TableConfigKind | null {
+    if (activeModule.key === 'setting-data') return 'sdo';
+    if (activeModule.key === 'realtime-data') return 'pdoSimple';
+    if (activeModule.key === 'language') return 'language';
+    return null;
+  }
+
+  function activeJsonEditorKey() {
+    if (activeModule.key === 'setting-data') return 'sdo';
+    if (activeModule.key === 'realtime-data') return realtimeMode === 'simple' ? 'pdo-simple' : 'pdo-advanced';
+    return activeModule.key;
+  }
+
   function currentConfigSection() {
     if (!loadedProject) return null;
     const document = loadedProject.document as Record<string, unknown>;
-    if (activeModule.key === 'sdo') return document.sdo_info;
-    if (activeModule.key === 'pdo-simple') return document.pdo_simple_send_recv;
+    const jsonEditorKey = activeJsonEditorKey();
+    if (jsonEditorKey === 'sdo') return document.sdo_info;
+    if (jsonEditorKey === 'pdo-simple') return document.pdo_simple_send_recv;
     if (activeModule.key === 'language') return document.language_info;
     if (activeModule.key === 'battery-monitor') return document.battery_monitor_info;
     if (activeModule.key === 'signal-dictionary') return document.signal_dictionary;
@@ -326,7 +350,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         protocol_mapping: document.protocol_mapping,
       };
     }
-    if (activeModule.key === 'pdo-advanced') {
+    if (jsonEditorKey === 'pdo-advanced') {
       return Object.fromEntries(advancedConfigSections.map((section) => [section, document[section]]));
     }
     return null;
@@ -397,8 +421,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   function restoreCurrentConfigSection() {
     if (!loadedProject || !baselineDocument) return;
     let document = loadedProject.document;
-    if (activeModule.key === 'sdo') document = restorePath(document, baselineDocument, ['sdo_info']);
-    if (activeModule.key === 'pdo-simple') document = restorePath(document, baselineDocument, ['pdo_simple_send_recv']);
+    const jsonEditorKey = activeJsonEditorKey();
+    if (jsonEditorKey === 'sdo') document = restorePath(document, baselineDocument, ['sdo_info']);
+    if (jsonEditorKey === 'pdo-simple') document = restorePath(document, baselineDocument, ['pdo_simple_send_recv']);
     if (activeModule.key === 'language') document = restorePath(document, baselineDocument, ['language_info']);
     if (activeModule.key === 'battery-monitor') document = restorePath(document, baselineDocument, ['battery_monitor_info']);
     if (activeModule.key === 'signal-dictionary') document = restorePath(document, baselineDocument, ['signal_dictionary']);
@@ -407,7 +432,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       document = restorePath(document, baselineDocument, ['private_protocol']);
       document = restorePath(document, baselineDocument, ['protocol_mapping']);
     }
-    if (activeModule.key === 'pdo-advanced') {
+    if (jsonEditorKey === 'pdo-advanced') {
       for (const section of advancedConfigSections) {
         document = restorePath(document, baselineDocument, [section]);
       }
@@ -561,8 +586,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     try {
       const parsed = JSON.parse(configEditorText);
       const document = { ...(loadedProject.document as Record<string, unknown>) };
-      if (activeModule.key === 'sdo') document.sdo_info = parsed;
-      if (activeModule.key === 'pdo-simple') document.pdo_simple_send_recv = parsed;
+      const jsonEditorKey = activeJsonEditorKey();
+      if (jsonEditorKey === 'sdo') document.sdo_info = parsed;
+      if (jsonEditorKey === 'pdo-simple') document.pdo_simple_send_recv = parsed;
       if (activeModule.key === 'language') document.language_info = parsed;
       if (activeModule.key === 'battery-monitor') document.battery_monitor_info = parsed;
       if (activeModule.key === 'signal-dictionary') document.signal_dictionary = parsed;
@@ -571,7 +597,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         document.private_protocol = parsed?.private_protocol;
         document.protocol_mapping = parsed?.protocol_mapping;
       }
-      if (activeModule.key === 'pdo-advanced') {
+      if (jsonEditorKey === 'pdo-advanced') {
         for (const section of advancedConfigSections) {
           document[section] = parsed?.[section];
         }
@@ -1406,6 +1432,191 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     });
   }
 
+  interface SettingMenuRow {
+    key: string;
+    name: string;
+    level: number;
+    auth: string;
+    parameterCount: number;
+  }
+
+  interface SettingParameterRow {
+    index: number;
+    path: number[];
+    name: string;
+    auth: string;
+    protocol: string;
+    frameId: string;
+    mainIndex: string;
+    subIndex: string;
+    access: string;
+    maxValue: string;
+    minValue: string;
+    defaultValue: string;
+    dataType: string;
+    bitStart: string;
+    bitLength: string;
+    preprocess: string;
+    scale: string;
+    offset: string;
+    decimals: string;
+  }
+
+  function sdoAuthLabel(value?: number) {
+    return ['普通用户', '普通用户', '管理员', '超级管理员'][value ?? 0] ?? '普通用户';
+  }
+
+  function sdoAccessLabel(value?: number) {
+    return ['只读', '读写', '只写'][value ?? 0] ?? '只读';
+  }
+
+  function sdoProtocolLabel(value?: number) {
+    return value === 0 || value === undefined ? 'CAN_OPEN' : String(value);
+  }
+
+  function formatHex(value?: number, width = 0) {
+    if (typeof value !== 'number') return '';
+    return `0x${Math.max(0, value).toString(16).toUpperCase().padStart(width, '0')}`;
+  }
+
+  function parseHandleParam(value?: string) {
+    const parts = (value ?? '').split('->').map((item) => Number.parseInt(item, 10));
+    if (parts.length < 2 || parts.some((item) => Number.isNaN(item))) {
+      return { bitStart: '', bitLength: '' };
+    }
+    const [start, end] = parts;
+    return {
+      bitStart: `bit${start}`,
+      bitLength: `${Math.max(1, end - start + 1)}个bits`,
+    };
+  }
+
+  function countSdoParameters(node: SdoNodeDocument): number {
+    if (node.type === 1) return 1;
+    return (node.children ?? []).reduce((total, child) => total + countSdoParameters(child), 0);
+  }
+
+  function collectSettingMenus(root: SdoNodeDocument | null): SettingMenuRow[] {
+    if (!root) return [];
+    const rows: SettingMenuRow[] = [];
+    (root.children ?? []).forEach((node, index) => {
+      if (node.type !== 0) return;
+      const key = `${index}`;
+      rows.push({
+        key,
+        name: node.name || `菜单${index + 1}`,
+        level: 0,
+        auth: sdoAuthLabel(node.user_auth),
+        parameterCount: countSdoParameters(node),
+      });
+      (node.children ?? []).forEach((child, childIndex) => {
+        if (child.type !== 0) return;
+        rows.push({
+          key: `${index}/${childIndex}`,
+          name: child.name || `子菜单${childIndex + 1}`,
+          level: 1,
+          auth: sdoAuthLabel(child.user_auth),
+          parameterCount: countSdoParameters(child),
+        });
+      });
+    });
+    return rows;
+  }
+
+  function sdoNodeByPath(root: SdoNodeDocument | null, path: string | null) {
+    if (!root || !path) return null;
+    return path.split('/').reduce<SdoNodeDocument | null>((node, segment) => {
+      if (!node) return null;
+      return node.children?.[Number(segment)] ?? null;
+    }, root);
+  }
+
+  function pathStringToNumbers(path: string | null): number[] {
+    if (!path) return [];
+    return path.split('/').map((segment) => Number(segment)).filter((segment) => Number.isFinite(segment));
+  }
+
+  function sdoNodeByNumberPath(root: SdoNodeDocument | null, path: number[] | null) {
+    if (!root || !path) return null;
+    return path.reduce<SdoNodeDocument | null>((node, segment) => {
+      if (!node) return null;
+      return node.children?.[segment] ?? null;
+    }, root);
+  }
+
+  function collectSettingParameters(node: SdoNodeDocument | null, basePath: number[]): SettingParameterRow[] {
+    if (!node) return [];
+    const rows: SettingParameterRow[] = [];
+    function visit(current: SdoNodeDocument, path: number[]) {
+      if (current.type === 1) {
+        const handle = parseHandleParam(current.handle_param);
+        rows.push({
+          index: rows.length + 1,
+          path,
+          name: current.name || '-',
+          auth: sdoAuthLabel(current.user_auth),
+          protocol: sdoProtocolLabel(current.control_protocol),
+          frameId: formatHex(current.fid, 2),
+          mainIndex: formatHex(current.mid, 4),
+          subIndex: String(current.sid ?? ''),
+          access: sdoAccessLabel(current.control_rw),
+          maxValue: current.data_max ?? '',
+          minValue: current.data_min ?? '',
+          defaultValue: current.data_default ?? '',
+          dataType: current.handle_name ?? '',
+          bitStart: handle.bitStart,
+          bitLength: handle.bitLength,
+          preprocess: current.pre_handle_name ?? '原始数据',
+          scale: current.pre_handle_scale ?? '',
+          offset: current.pre_handle_offset ?? '',
+          decimals: current.pre_handle_decimal_name ?? String(current.pre_handle_decimal ?? ''),
+        });
+        return;
+      }
+      (current.children ?? []).forEach((child, index) => visit(child, [...path, index]));
+    }
+    (node.children ?? []).forEach((child, index) => visit(child, [...basePath, index]));
+    return rows;
+  }
+
+  function realtimeFrames(kind: 'pdo_recv' | 'pdo_send') {
+    return pdoFrames(kind);
+  }
+
+  function selectedRealtimeFrame() {
+    if (selectedRealtimeFrameId === null) return null;
+    const frames = realtimeFrames(selectedRealtimeKind);
+    return frames.find((frame) => frame.id === selectedRealtimeFrameId) ?? null;
+  }
+
+  function selectedRealtimeFrameIndex() {
+    if (selectedRealtimeFrameId === null) return -1;
+    return realtimeFrames(selectedRealtimeKind).findIndex((frame) => frame.id === selectedRealtimeFrameId);
+  }
+
+  function advancedFrames(kind: 'pdo_recv' | 'pdo_send') {
+    const document = pdoAdvancedDocument();
+    return document?.[kind] ?? [];
+  }
+
+  function selectedAdvancedFrame() {
+    if (selectedAdvancedFrameId === null) return null;
+    return advancedFrames(selectedRealtimeKind).find((frame) => frame.id === selectedAdvancedFrameId) ?? null;
+  }
+
+  function selectedAdvancedFrameIndex() {
+    if (selectedAdvancedFrameId === null) return -1;
+    return advancedFrames(selectedRealtimeKind).findIndex((frame) => frame.id === selectedAdvancedFrameId);
+  }
+
+  function realtimeFrameTypeLabel(value?: number) {
+    return value === 1 ? '扩展帧' : '标准帧';
+  }
+
+  function realtimeModeLabel(value?: number) {
+    return ['按照字节取数据', '按照字节+bit位取数据', '按照bit位取数据'][value ?? 0] ?? '按照字节取数据';
+  }
+
   function sdoDocument(): SdoNodeDocument | null {
     if (!loadedProject) return null;
     return (loadedProject.document as Record<string, unknown>).sdo_info as SdoNodeDocument;
@@ -1433,12 +1644,53 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     updateSdoDocument(updateSdoNodeAtPath(document, path, (node) => ({ ...node, [field]: value })));
   }
 
-  function addSdoChild(path: number[]) {
+  function addSdoMenu(parentPath: number[]) {
     const document = sdoDocument();
     if (!document) return;
 
-    const child: SdoNodeDocument = { type: 0, user_auth: 0, name_index: 0, name: '新节点', children: [] };
-    updateSdoDocument(updateSdoNodeAtPath(document, path, (node) => ({ ...node, children: [...(node.children ?? []), child] })));
+    const parentNode = sdoNodeByNumberPath(document, parentPath);
+    const nextIndex = parentNode?.children?.length ?? 0;
+    const child: SdoNodeDocument = { type: 0, user_auth: 0, name_index: 0, name: `新菜单${nextIndex + 1}`, children: [] };
+    updateSdoDocument(updateSdoNodeAtPath(document, parentPath, (node) => ({ ...node, children: [...(node.children ?? []), child] })));
+    const nextPath = [...parentPath, nextIndex];
+    setSelectedSettingPath(nextPath.join('/'));
+    setEditingSettingPath(nextPath);
+  }
+
+  function addSdoParameter(parentPath: number[]) {
+    const document = sdoDocument();
+    if (!document) return;
+
+    const parentNode = sdoNodeByNumberPath(document, parentPath);
+    const nextIndex = parentNode?.children?.length ?? 0;
+    const child: SdoNodeDocument = {
+      type: 1,
+      user_auth: 0,
+      name_index: 0,
+      name: `新参数${nextIndex + 1}`,
+      children: [],
+      control_protocol: 0,
+      control_rw: 0,
+      control_use_default: 0,
+      control_use_min_max: 0,
+      fid: 0,
+      mid: 0,
+      sid: 0,
+      handle: 0,
+      handle_name: '',
+      handle_param: '',
+      data_default: '',
+      data_min: '',
+      data_max: '',
+      pre_handle: 0,
+      pre_handle_name: '原始数据',
+      pre_handle_scale: '',
+      pre_handle_offset: '',
+      pre_handle_decimal: 0,
+      pre_handle_decimal_name: '',
+    };
+    updateSdoDocument(updateSdoNodeAtPath(document, parentPath, (node) => ({ ...node, children: [...(node.children ?? []), child] })));
+    setEditingSettingPath([...parentPath, nextIndex]);
   }
 
   function removeSdoNode(path: number[]) {
@@ -1451,61 +1703,6 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       ...node,
       children: (node.children ?? []).filter((_, currentIndex) => currentIndex !== removeIndex),
     })));
-  }
-
-  function renderSdoNode(node: SdoNodeDocument, path: number[] = []) {
-    const documentPath = sdoNodeDocumentPath(path);
-    const isModified = isModifiedPath(documentPath);
-    return (
-      <article className={isModified ? 'sdo-node-card config-entry-modified' : 'sdo-node-card'} key={path.join('.') || 'root'}>
-        <div className="sdo-node-header">
-          <strong>{path.length === 0 ? '根节点' : `层级 ${path.join('.')}`} — {node.name || '未命名'}</strong>
-          <div>
-            {isModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(documentPath)} type="button">恢复节点</button> : null}
-            <button onClick={() => addSdoChild(path)} type="button">新增子节点</button>
-            {path.length > 0 ? <button onClick={() => removeSdoNode(path)} type="button">删除节点</button> : null}
-          </div>
-        </div>
-        <div className="sdo-node-grid">
-          <label>名称<input value={node.name ?? ''} onChange={(event) => updateSdoNode(path, 'name', event.target.value)} /></label>
-          <label>类型<input type="number" value={node.type ?? 0} onChange={(event) => updateSdoNode(path, 'type', Number(event.target.value))} /></label>
-          <label>权限<input type="number" value={node.user_auth ?? 0} onChange={(event) => updateSdoNode(path, 'user_auth', Number(event.target.value))} /></label>
-          <label>语言索引<input type="number" value={node.name_index ?? 0} onChange={(event) => updateSdoNode(path, 'name_index', Number(event.target.value))} /></label>
-        </div>
-        <div className="sdo-node-grid">
-          <label>协议<input type="number" value={node.control_protocol ?? 0} onChange={(event) => updateSdoNode(path, 'control_protocol', Number(event.target.value))} /></label>
-          <label>读写<input type="number" value={node.control_rw ?? 0} onChange={(event) => updateSdoNode(path, 'control_rw', Number(event.target.value))} /></label>
-          <label>使用默认值<input type="number" value={node.control_use_default ?? 0} onChange={(event) => updateSdoNode(path, 'control_use_default', Number(event.target.value))} /></label>
-          <label>使用范围<input type="number" value={node.control_use_min_max ?? 0} onChange={(event) => updateSdoNode(path, 'control_use_min_max', Number(event.target.value))} /></label>
-          <label>FID<input type="number" value={node.fid ?? 0} onChange={(event) => updateSdoNode(path, 'fid', Number(event.target.value))} /></label>
-          <label>MID<input type="number" value={node.mid ?? 0} onChange={(event) => updateSdoNode(path, 'mid', Number(event.target.value))} /></label>
-          <label>SID<input type="number" value={node.sid ?? 0} onChange={(event) => updateSdoNode(path, 'sid', Number(event.target.value))} /></label>
-        </div>
-        <div className="sdo-node-grid">
-          <label>句柄<input type="number" value={node.handle ?? 0} onChange={(event) => updateSdoNode(path, 'handle', Number(event.target.value))} /></label>
-          <label>句柄名<input value={node.handle_name ?? ''} onChange={(event) => updateSdoNode(path, 'handle_name', event.target.value)} /></label>
-          <label>句柄参数<input value={node.handle_param ?? ''} onChange={(event) => updateSdoNode(path, 'handle_param', event.target.value)} /></label>
-        </div>
-        <div className="sdo-node-grid">
-          <label>默认值<input value={node.data_default ?? ''} onChange={(event) => updateSdoNode(path, 'data_default', event.target.value)} /></label>
-          <label>最小值<input value={node.data_min ?? ''} onChange={(event) => updateSdoNode(path, 'data_min', event.target.value)} /></label>
-          <label>最大值<input value={node.data_max ?? ''} onChange={(event) => updateSdoNode(path, 'data_max', event.target.value)} /></label>
-        </div>
-        <div className="sdo-node-grid">
-          <label>预处理<input type="number" value={node.pre_handle ?? 0} onChange={(event) => updateSdoNode(path, 'pre_handle', Number(event.target.value))} /></label>
-          <label>预处理名<input value={node.pre_handle_name ?? ''} onChange={(event) => updateSdoNode(path, 'pre_handle_name', event.target.value)} /></label>
-          <label>缩放<input value={node.pre_handle_scale ?? ''} onChange={(event) => updateSdoNode(path, 'pre_handle_scale', event.target.value)} /></label>
-          <label>偏移<input value={node.pre_handle_offset ?? ''} onChange={(event) => updateSdoNode(path, 'pre_handle_offset', event.target.value)} /></label>
-          <label>小数位<input type="number" value={node.pre_handle_decimal ?? 0} onChange={(event) => updateSdoNode(path, 'pre_handle_decimal', Number(event.target.value))} /></label>
-          <label>小数位名<input value={node.pre_handle_decimal_name ?? ''} onChange={(event) => updateSdoNode(path, 'pre_handle_decimal_name', event.target.value)} /></label>
-        </div>
-        {(node.children ?? []).length > 0 ? (
-          <div className="sdo-children">
-            {(node.children ?? []).map((child, index) => renderSdoNode(child, [...path, index]))}
-          </div>
-        ) : null}
-      </article>
-    );
   }
 
   function pdoAdvancedDocument(): PdoAdvancedDocument | null {
@@ -2129,7 +2326,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
 
   function handleJumpToPdo(pdoParamIndex: number) {
     setPdoJumpTarget(pdoParamIndex);
-    onNavigate('pdo-simple');
+    setRealtimeMode('simple');
+    setSelectedRealtimeFrameId(null);
+    onNavigate('realtime-data');
   }
 
   async function handleCopyUiImages() {
@@ -2242,6 +2441,17 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const currentPdoAdvancedDocument = pdoAdvancedDocument();
   const currentLanguageDocument = languageDocument();
   const currentBatteryMonitorDocument = batteryMonitorDocument();
+  const settingMenus = collectSettingMenus(currentSdoDocument);
+  const activeSettingPath = selectedSettingPath ?? settingMenus[0]?.key ?? null;
+  const activeSettingPathNumbers = pathStringToNumbers(activeSettingPath);
+  const activeSettingNode = sdoNodeByPath(currentSdoDocument, activeSettingPath);
+  const settingParameters = collectSettingParameters(activeSettingNode, activeSettingPathNumbers);
+  const editingSettingNode = sdoNodeByNumberPath(currentSdoDocument, editingSettingPath);
+  const activeRealtimeFrame = selectedRealtimeFrame();
+  const activeRealtimeFrameIndex = selectedRealtimeFrameIndex();
+  const activeAdvancedFrame = selectedAdvancedFrame();
+  const activeAdvancedFrameIndex = selectedAdvancedFrameIndex();
+  const currentLegacyTableKind = activeLegacyTableKind();
 
   return (
     <main className="workspace">
@@ -2261,12 +2471,12 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
             ) : null}
           </div>
           <div className="action-bar-right">
-            {(['sdo', 'pdo-simple', 'language'] as string[]).includes(activeModule.key) ? (
+            {currentLegacyTableKind ? (
               <>
                 <button
                   className="action-bar-btn action-bar-btn--secondary"
                   disabled={!loadedProject || isImportingTable}
-                  onClick={() => void handleImportTableConfig(activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind)}
+                  onClick={() => void handleImportTableConfig(currentLegacyTableKind)}
                   type="button"
                   title="从 CSV/XLS/XLSX/XML 文件导入"
                 >
@@ -2276,7 +2486,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <button
                   className="action-bar-btn action-bar-btn--ghost"
                   disabled={!loadedProject || isExportingTable}
-                  onClick={() => void handleExportTableConfig(activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind, 'csv')}
+                  onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'csv')}
                   type="button"
                   title="导出为 CSV 格式"
                 >
@@ -2285,7 +2495,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <button
                   className="action-bar-btn action-bar-btn--ghost"
                   disabled={!loadedProject || isExportingTable}
-                  onClick={() => void handleExportTableConfig(activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind, 'xml')}
+                  onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'xml')}
                   type="button"
                   title="导出为 Excel XML 格式"
                 >
@@ -2294,23 +2504,23 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <span className="action-bar-sep" />
               </>
             ) : null}
-            {(['pdo-simple', 'pdo-advanced', 'battery-monitor'] as string[]).includes(activeModule.key) ? (
+            {(['realtime-data', 'battery-monitor'] as string[]).includes(activeModule.key) ? (
               <button
                 className="action-bar-btn action-bar-btn--secondary"
                 disabled={!loadedProject || generatingTestKey !== null}
                 onClick={() => {
-                  if (activeModule.key === 'pdo-simple') generateSimplePdoTestData();
-                  else if (activeModule.key === 'pdo-advanced') generateAdvancedPdoTestData();
+                  if (activeModule.key === 'realtime-data' && realtimeMode === 'simple') generateSimplePdoTestData();
+                  else if (activeModule.key === 'realtime-data') generateAdvancedPdoTestData();
                   else if (activeModule.key === 'battery-monitor') generateBatteryMonitorTestData();
                 }}
                 type="button"
                 title="自动构建当前页面的 CAN 测试数据"
               >
                 <span className="action-bar-icon">⚡</span>
-                {generatingTestKey === activeModule.key ? '生成中...' : '生成测试数据'}
+                {generatingTestKey !== null ? '生成中...' : '生成测试数据'}
               </button>
             ) : null}
-            {(['sdo', 'pdo-simple', 'pdo-advanced', 'battery-monitor', 'language', 'signal-dictionary', 'private-protocol', 'protocol-mapping'] as string[]).includes(activeModule.key) ? (
+            {(['setting-data', 'realtime-data', 'battery-monitor', 'language', 'signal-dictionary', 'private-protocol', 'protocol-mapping'] as string[]).includes(activeModule.key) ? (
               <>
                 <button
                   className={`action-bar-btn ${showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'}`}
@@ -2575,14 +2785,359 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
           </section>
         ) : null}
 
-        {(['sdo', 'pdoSimple', 'language'] as TableConfigKind[]).includes(activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind) ? (
+        {activeModule.key === 'setting-data' ? (
+          <section className="legacy-data-page">
+            <div className="legacy-data-sidebar">
+              <div className="legacy-data-sidebar-title">菜单</div>
+              <div className="legacy-menu-list">
+                {settingMenus.map((menu) => (
+                  <button
+                    className={menu.key === activeSettingPath ? 'legacy-menu-item active' : 'legacy-menu-item'}
+                    key={menu.key}
+                    onClick={() => setSelectedSettingPath(menu.key)}
+                    style={{ paddingLeft: `${16 + menu.level * 22}px` }}
+                    type="button"
+                  >
+                    <span className="legacy-menu-arrow">{menu.level === 0 ? '▸' : ''}</span>
+                    <span>{menu.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="legacy-data-content">
+              <div className="legacy-data-header">
+                <strong>{activeSettingNode ? `菜单->${activeSettingNode.name}` : '菜单'}</strong>
+                <div className="legacy-data-actions">
+                  <button disabled={!currentSdoDocument} onClick={() => addSdoMenu(activeSettingNode ? activeSettingPathNumbers : [])} type="button">新增菜单</button>
+                  <button disabled={!activeSettingNode} onClick={() => setEditingSettingPath(activeSettingPathNumbers)} type="button">修改菜单</button>
+                  <button disabled={!activeSettingNode} onClick={() => addSdoParameter(activeSettingPathNumbers)} type="button">新增参数</button>
+                  <button
+                    className="danger"
+                    disabled={!activeSettingNode}
+                    onClick={() => {
+                      removeSdoNode(activeSettingPathNumbers);
+                      setSelectedSettingPath(null);
+                      setEditingSettingPath(null);
+                    }}
+                    type="button"
+                  >
+                    删除菜单
+                  </button>
+                </div>
+              </div>
+              <div className="legacy-data-table-wrap">
+                {editingSettingPath && editingSettingNode ? (
+                  <section className="legacy-edit-panel">
+                    <div className="legacy-edit-panel-header">
+                      <strong>{editingSettingNode.type === 0 ? '菜单编辑' : '参数编辑'}：{editingSettingNode.name || '未命名'}</strong>
+                      <div>
+                        {isModifiedPath(sdoNodeDocumentPath(editingSettingPath)) ? (
+                          <button className="config-restore-button" onClick={() => restoreModifiedPath(sdoNodeDocumentPath(editingSettingPath))} type="button">恢复</button>
+                        ) : null}
+                        <button onClick={() => setEditingSettingPath(null)} type="button">关闭</button>
+                      </div>
+                    </div>
+                    <div className="legacy-edit-grid">
+                      <label>名称<input value={editingSettingNode.name ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'name', event.target.value)} /></label>
+                      <label>类型<select value={editingSettingNode.type ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'type', Number(event.target.value))}><option value={0}>菜单</option><option value={1}>参数</option></select></label>
+                      <label>权限<input type="number" value={editingSettingNode.user_auth ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'user_auth', Number(event.target.value))} /></label>
+                      <label>语言索引<input type="number" value={editingSettingNode.name_index ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'name_index', Number(event.target.value))} /></label>
+                      <label>协议<input type="number" value={editingSettingNode.control_protocol ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'control_protocol', Number(event.target.value))} /></label>
+                      <label>读写<input type="number" value={editingSettingNode.control_rw ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'control_rw', Number(event.target.value))} /></label>
+                      <label>使用默认值<input type="number" value={editingSettingNode.control_use_default ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'control_use_default', Number(event.target.value))} /></label>
+                      <label>使用范围<input type="number" value={editingSettingNode.control_use_min_max ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'control_use_min_max', Number(event.target.value))} /></label>
+                      <label>FID<input type="number" value={editingSettingNode.fid ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'fid', Number(event.target.value))} /></label>
+                      <label>MID<input type="number" value={editingSettingNode.mid ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'mid', Number(event.target.value))} /></label>
+                      <label>SID<input type="number" value={editingSettingNode.sid ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'sid', Number(event.target.value))} /></label>
+                      <label>句柄<input type="number" value={editingSettingNode.handle ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'handle', Number(event.target.value))} /></label>
+                      <label>句柄名<input value={editingSettingNode.handle_name ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'handle_name', event.target.value)} /></label>
+                      <label>句柄参数<input value={editingSettingNode.handle_param ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'handle_param', event.target.value)} /></label>
+                      <label>默认值<input value={editingSettingNode.data_default ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'data_default', event.target.value)} /></label>
+                      <label>最小值<input value={editingSettingNode.data_min ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'data_min', event.target.value)} /></label>
+                      <label>最大值<input value={editingSettingNode.data_max ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'data_max', event.target.value)} /></label>
+                      <label>预处理<input type="number" value={editingSettingNode.pre_handle ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle', Number(event.target.value))} /></label>
+                      <label>预处理名<input value={editingSettingNode.pre_handle_name ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_name', event.target.value)} /></label>
+                      <label>缩放<input value={editingSettingNode.pre_handle_scale ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_scale', event.target.value)} /></label>
+                      <label>偏移<input value={editingSettingNode.pre_handle_offset ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_offset', event.target.value)} /></label>
+                      <label>小数位<input type="number" value={editingSettingNode.pre_handle_decimal ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_decimal', Number(event.target.value))} /></label>
+                      <label>小数位名<input value={editingSettingNode.pre_handle_decimal_name ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_decimal_name', event.target.value)} /></label>
+                    </div>
+                  </section>
+                ) : null}
+                {activeSettingNode && settingParameters.length > 0 ? (
+                  <table className="legacy-data-table">
+                    <thead>
+                      <tr>
+                        <th />
+                        <th>参数名称</th>
+                        <th>使用权限</th>
+                        <th>协议类型</th>
+                        <th>帧ID</th>
+                        <th>主索引</th>
+                        <th>子索引</th>
+                        <th>读写权限</th>
+                        <th>最大值</th>
+                        <th>最小值</th>
+                        <th>默认值</th>
+                        <th>数据类型</th>
+                        <th>bit开始位置</th>
+                        <th>bit长度</th>
+                        <th>数据预处理</th>
+                        <th>缩放值</th>
+                        <th>偏移值</th>
+                        <th>保留小数</th>
+                        <th>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {settingParameters.map((row) => (
+                        <tr key={`${row.index}-${row.name}-${row.mainIndex}-${row.subIndex}`}>
+                          <td>{row.index}</td>
+                          <td title={row.name}>{row.name}</td>
+                          <td>{row.auth}</td>
+                          <td>{row.protocol}</td>
+                          <td>{row.frameId}</td>
+                          <td>{row.mainIndex}</td>
+                          <td>{row.subIndex}</td>
+                          <td>{row.access}</td>
+                          <td>{row.maxValue}</td>
+                          <td>{row.minValue}</td>
+                          <td>{row.defaultValue}</td>
+                          <td>{row.dataType}</td>
+                          <td>{row.bitStart}</td>
+                          <td>{row.bitLength}</td>
+                          <td>{row.preprocess || '原始数据'}</td>
+                          <td>{row.scale}</td>
+                          <td>{row.offset}</td>
+                          <td>{row.decimals}</td>
+                          <td>
+                            <button onClick={() => setEditingSettingPath(row.path)} type="button">修改</button>
+                            <button className="danger" onClick={() => {
+                              removeSdoNode(row.path);
+                              setEditingSettingPath(null);
+                            }} type="button">删除</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : activeSettingNode ? (
+                  <div className="legacy-data-empty">当前菜单没有参数</div>
+                ) : (
+                  <div className="legacy-data-empty">请先在项目管理中打开 .jcpro 项目文件</div>
+                )}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeModule.key === 'realtime-data' ? (
+          <section className="legacy-data-page">
+            <div className="legacy-data-sidebar">
+              <div className="legacy-data-sidebar-title">菜单</div>
+              <div className="legacy-mode-tabs">
+                <button className={realtimeMode === 'simple' ? 'active' : ''} onClick={() => setRealtimeMode('simple')} type="button">简化配置</button>
+                <button className={realtimeMode === 'advanced' ? 'active' : ''} onClick={() => setRealtimeMode('advanced')} type="button">高级配置</button>
+              </div>
+              <div className="legacy-menu-list">
+                {(['pdo_recv', 'pdo_send'] as const).map((kind) => (
+                  <div key={kind}>
+                    <button
+                      className={selectedRealtimeKind === kind ? 'legacy-menu-item active' : 'legacy-menu-item'}
+                      onClick={() => {
+                        setSelectedRealtimeKind(kind);
+                        setSelectedRealtimeFrameId(null);
+                        setSelectedAdvancedFrameId(null);
+                      }}
+                      type="button"
+                    >
+                      <span className="legacy-menu-arrow">▾</span>
+                      <span>{kind === 'pdo_recv' ? '接收表' : '发送表'}</span>
+                    </button>
+                    {selectedRealtimeKind === kind ? (realtimeMode === 'simple' ? realtimeFrames(kind) : advancedFrames(kind)).map((frame) => {
+                      const isActive = realtimeMode === 'simple' ? selectedRealtimeFrameId === frame.id : selectedAdvancedFrameId === frame.id;
+                      return (
+                        <button
+                          className={isActive ? 'legacy-menu-item child active' : 'legacy-menu-item child'}
+                          key={`${realtimeMode}-${kind}-${frame.id}`}
+                          onClick={() => {
+                            setSelectedRealtimeKind(kind);
+                            if (realtimeMode === 'simple') setSelectedRealtimeFrameId(frame.id);
+                            else setSelectedAdvancedFrameId(frame.id);
+                          }}
+                          type="button"
+                        >
+                          {formatFrameIdPadded(frame.id)}
+                        </button>
+                      );
+                    }) : null}
+                  </div>
+                ))}
+                {realtimeMode === 'advanced' ? (
+                  <>
+                    <button className="legacy-menu-item child" onClick={() => setSelectedAdvancedFrameId(null)} type="button">全局变量</button>
+                    <button className="legacy-menu-item child" onClick={() => setSelectedAdvancedFrameId(null)} type="button">条件表</button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+            <div className="legacy-data-content">
+              <div className="legacy-data-header">
+                <strong>{selectedRealtimeKind === 'pdo_recv' ? '菜单->接收表' : '菜单->发送表'}（{realtimeMode === 'simple' ? '简化配置' : '高级配置'}）</strong>
+                <div className="legacy-data-actions">
+                  <button onClick={() => realtimeMode === 'simple' ? addPdoFrame(selectedRealtimeKind) : addPdoAdvancedFrame(selectedRealtimeKind)} type="button">新增帧ID</button>
+                  <button disabled={realtimeMode === 'simple' ? !activeRealtimeFrame : !activeAdvancedFrame} onClick={() => {
+                    if (realtimeMode === 'simple' && activeRealtimeFrameIndex >= 0) addPdoSignal(selectedRealtimeKind, activeRealtimeFrameIndex);
+                    if (realtimeMode === 'advanced' && activeAdvancedFrameIndex >= 0) addPdoAdvancedSignal(selectedRealtimeKind, activeAdvancedFrameIndex);
+                  }} type="button">新增协议</button>
+                  {realtimeMode === 'advanced' ? (
+                    <>
+                      <button onClick={addPdoGlobalParam} type="button">新增全局变量</button>
+                      <button onClick={addPdoCondition} type="button">新增条件</button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+              <div className="legacy-data-table-wrap">
+                {!currentPdoSimpleDocument && !currentPdoAdvancedDocument ? (
+                  <div className="legacy-data-empty">请先在项目管理中打开 .jcpro 项目文件</div>
+                ) : realtimeMode === 'simple' ? (
+                  selectedRealtimeFrameId === null ? (
+                    <table className="legacy-data-table">
+                      <thead><tr><th /><th>帧ID</th><th>帧类型</th><th>帧描述</th><th>数据项</th><th>操作</th></tr></thead>
+                      <tbody>
+                        {realtimeFrames(selectedRealtimeKind).map((frame, index) => {
+                          const framePath: JsonPath = ['pdo_simple_send_recv', selectedRealtimeKind, index];
+                          return (
+                            <tr className={isModifiedPath(framePath) ? 'config-entry-modified' : undefined} key={`${selectedRealtimeKind}-frame-${index}`}>
+                              <td>{index + 1}</td>
+                              <td><input inputMode="text" value={formatFrameId(frame.id)} onChange={(event) => updatePdoFrameId(selectedRealtimeKind, index, event.target.value)} /></td>
+                              <td><select value={frame.type} onChange={(event) => updatePdoFrame(selectedRealtimeKind, index, 'type', Number(event.target.value))}><option value={0}>标准帧</option><option value={1}>扩展帧</option></select></td>
+                              <td><input value={frame.desc} onChange={(event) => updatePdoFrame(selectedRealtimeKind, index, 'desc', event.target.value)} /></td>
+                              <td>{frame.data.length}</td>
+                              <td>
+                                <button onClick={() => setSelectedRealtimeFrameId(frame.id)} type="button">协议</button>
+                                {isModifiedPath(framePath) ? <button onClick={() => restoreModifiedPath(framePath)} type="button">恢复</button> : null}
+                                <button className="danger" onClick={() => removePdoFrame(selectedRealtimeKind, index)} type="button">删除</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : activeRealtimeFrame && activeRealtimeFrameIndex >= 0 ? (
+                    <table className="legacy-data-table">
+                      <thead><tr><th /><th>参数名称</th><th>读取方式</th><th>bit开始位置</th><th>bit长度</th><th>参数索引</th><th>操作</th></tr></thead>
+                      <tbody>
+                        {activeRealtimeFrame.data.map((signal, index) => {
+                          const signalPath: JsonPath = ['pdo_simple_send_recv', selectedRealtimeKind, activeRealtimeFrameIndex, 'data', index];
+                          const isJumpTarget = pdoJumpTarget === signal.pdo_param_index;
+                          return (
+                            <tr
+                              className={[isJumpTarget ? 'pdo-row-highlight' : '', isModifiedPath(signalPath) ? 'config-entry-modified' : ''].filter(Boolean).join(' ') || undefined}
+                              key={`${activeRealtimeFrame.id}-${index}`}
+                              ref={isJumpTarget ? (element) => { pdoJumpRowRef.current = element; } : undefined}
+                            >
+                              <td>{index + 1}</td>
+                              <td><input value={signal.pdo_param_name || ''} onChange={(event) => updatePdoSignal(selectedRealtimeKind, activeRealtimeFrameIndex, index, 'pdo_param_name', event.target.value)} /></td>
+                              <td><select value={signal.show_type} onChange={(event) => updatePdoSignal(selectedRealtimeKind, activeRealtimeFrameIndex, index, 'show_type', Number(event.target.value))}><option value={0}>按照字节取数据</option><option value={1}>按照字节+bit位取数据</option><option value={2}>按照bit位取数据</option></select></td>
+                              <td><input type="number" value={signal.pos} onChange={(event) => updatePdoSignal(selectedRealtimeKind, activeRealtimeFrameIndex, index, 'pos', Number(event.target.value))} /></td>
+                              <td><input type="number" value={signal.len} onChange={(event) => updatePdoSignal(selectedRealtimeKind, activeRealtimeFrameIndex, index, 'len', Number(event.target.value))} /></td>
+                              <td><input type="number" value={signal.pdo_param_index} onChange={(event) => updatePdoSignal(selectedRealtimeKind, activeRealtimeFrameIndex, index, 'pdo_param_index', Number(event.target.value))} /></td>
+                              <td>
+                                {isModifiedPath(signalPath) ? <button onClick={() => restoreModifiedPath(signalPath)} type="button">恢复</button> : null}
+                                <button className="danger" onClick={() => removePdoSignal(selectedRealtimeKind, activeRealtimeFrameIndex, index)} type="button">删除</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  ) : <div className="legacy-data-empty">请选择或新增 PDO 帧</div>
+                ) : (
+                  <div className="legacy-advanced-stack">
+                    <section className="legacy-edit-panel">
+                      <div className="legacy-edit-panel-header"><strong>全局变量</strong><button onClick={addPdoGlobalParam} type="button">新增</button></div>
+                      <table className="legacy-data-table legacy-data-table--compact">
+                        <thead><tr><th /><th>参数ID</th><th>名称</th><th>默认值</th><th>保留</th><th>类型</th><th>内部变量</th><th>操作</th></tr></thead>
+                        <tbody>{currentPdoAdvancedDocument?.pdo_global_param.map((item, index) => (
+                          <tr className={isModifiedPath(['pdo_global_param', index]) ? 'config-entry-modified' : undefined} key={`global-${index}`}>
+                            <td>{index + 1}</td>
+                            <td><input value={item.param_id} onChange={(event) => updatePdoGlobalParam(index, 'param_id', event.target.value)} /></td>
+                            <td><input value={item.name} onChange={(event) => updatePdoGlobalParam(index, 'name', event.target.value)} /></td>
+                            <td><input value={item.def} onChange={(event) => updatePdoGlobalParam(index, 'def', event.target.value)} /></td>
+                            <td><input type="number" value={item.reserved} onChange={(event) => updatePdoGlobalParam(index, 'reserved', Number(event.target.value))} /></td>
+                            <td><input type="number" value={item.type} onChange={(event) => updatePdoGlobalParam(index, 'type', Number(event.target.value))} /></td>
+                            <td><input type="number" value={item.inner} onChange={(event) => updatePdoGlobalParam(index, 'inner', Number(event.target.value))} /></td>
+                            <td><button className="danger" onClick={() => removePdoGlobalParam(index)} type="button">删除</button></td>
+                          </tr>
+                        ))}</tbody>
+                      </table>
+                    </section>
+                    <section className="legacy-edit-panel">
+                      <div className="legacy-edit-panel-header"><strong>条件表</strong><button onClick={addPdoCondition} type="button">新增</button></div>
+                      {(currentPdoAdvancedDocument?.pdo_condition ?? []).map((condition, conditionIndex) => (
+                        <div className="legacy-condition-row" key={`condition-${conditionIndex}`}>
+                          <label>参数 ID<input value={condition.param_id} onChange={(event) => updatePdoCondition(conditionIndex, 'param_id', event.target.value)} /></label>
+                          <label>处理方式<input type="number" value={condition.process} onChange={(event) => updatePdoCondition(conditionIndex, 'process', Number(event.target.value))} /></label>
+                          <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">新增输入</button>
+                          <button className="danger" onClick={() => removePdoCondition(conditionIndex)} type="button">删除条件</button>
+                          {condition.data.map((input, inputIndex) => (
+                            <label key={`condition-input-${conditionIndex}-${inputIndex}`}>输入参数<input value={input.param_id} onChange={(event) => updatePdoConditionInput(conditionIndex, inputIndex, event.target.value)} /><button className="danger" onClick={() => removePdoConditionInput(conditionIndex, inputIndex)} type="button">删除</button></label>
+                          ))}
+                        </div>
+                      ))}
+                    </section>
+                    {selectedAdvancedFrameId === null ? (
+                      <table className="legacy-data-table">
+                        <thead><tr><th /><th>帧ID</th><th>帧类型</th><th>帧描述</th><th>数据项</th><th>操作</th></tr></thead>
+                        <tbody>
+                          {advancedFrames(selectedRealtimeKind).map((frame, index) => (
+                            <tr className={isModifiedPath([selectedRealtimeKind, index]) ? 'config-entry-modified' : undefined} key={`advanced-frame-${selectedRealtimeKind}-${index}`}>
+                              <td>{index + 1}</td>
+                              <td><input inputMode="text" value={formatFrameId(frame.id)} onChange={(event) => updatePdoAdvancedFrameId(selectedRealtimeKind, index, event.target.value)} /></td>
+                              <td><input type="number" value={frame.type} onChange={(event) => updatePdoAdvancedFrame(selectedRealtimeKind, index, 'type', Number(event.target.value))} /></td>
+                              <td><input value={frame.desc} onChange={(event) => updatePdoAdvancedFrame(selectedRealtimeKind, index, 'desc', event.target.value)} /></td>
+                              <td>{frame.data.length}</td>
+                              <td><button onClick={() => setSelectedAdvancedFrameId(frame.id)} type="button">协议</button><button className="danger" onClick={() => removePdoAdvancedFrame(selectedRealtimeKind, index)} type="button">删除</button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : activeAdvancedFrame && activeAdvancedFrameIndex >= 0 ? (
+                      <table className="legacy-data-table">
+                        <thead><tr><th /><th>参数ID</th><th>位置</th><th>长度</th><th>显示类型</th><th>句柄</th><th>句柄参数</th><th>操作</th></tr></thead>
+                        <tbody>
+                          {activeAdvancedFrame.data.map((signal, index) => (
+                            <tr className={isModifiedPath([selectedRealtimeKind, activeAdvancedFrameIndex, 'data', index]) ? 'config-entry-modified' : undefined} key={`advanced-signal-${index}`}>
+                              <td>{index + 1}</td>
+                              <td><input value={signal.param_id} onChange={(event) => updatePdoAdvancedSignal(selectedRealtimeKind, activeAdvancedFrameIndex, index, 'param_id', event.target.value)} /></td>
+                              <td><input type="number" value={signal.pos} onChange={(event) => updatePdoAdvancedSignal(selectedRealtimeKind, activeAdvancedFrameIndex, index, 'pos', Number(event.target.value))} /></td>
+                              <td><input type="number" value={signal.len} onChange={(event) => updatePdoAdvancedSignal(selectedRealtimeKind, activeAdvancedFrameIndex, index, 'len', Number(event.target.value))} /></td>
+                              <td><input type="number" value={signal.show_type} onChange={(event) => updatePdoAdvancedSignal(selectedRealtimeKind, activeAdvancedFrameIndex, index, 'show_type', Number(event.target.value))} /></td>
+                              <td><input type="number" value={signal.handle} onChange={(event) => updatePdoAdvancedSignal(selectedRealtimeKind, activeAdvancedFrameIndex, index, 'handle', Number(event.target.value))} /></td>
+                              <td><input value={signal.handle_param} onChange={(event) => updatePdoAdvancedSignal(selectedRealtimeKind, activeAdvancedFrameIndex, index, 'handle_param', event.target.value)} /></td>
+                              <td><button className="danger" onClick={() => removePdoAdvancedSignal(selectedRealtimeKind, activeAdvancedFrameIndex, index)} type="button">删除</button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : <div className="legacy-data-empty">请选择或新增高级 PDO 帧</div>}
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {currentLegacyTableKind ? (
           <section className="table-spec-card">
             <div>
-              <h2>{tableConfigTitles[activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind]}</h2>
+              <h2>{tableConfigTitles[currentLegacyTableKind]}</h2>
               <p>导入/导出操作请使用顶部工具栏按钮。支持 CSV、XLS、XLSX、XML 格式。</p>
             </div>
             {tableSpecs
-              .filter((spec) => spec.kind === (activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key))
+              .filter((spec) => spec.kind === currentLegacyTableKind)
               .map((spec) => (
                 <div className="table-format-ref" key={spec.kind}>
                   <strong>表头格式（{spec.headers.length} 列）</strong>
@@ -2606,154 +3161,11 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 </div>
                 <div className="table-io-result-row">
                   <span>写回段落</span>
-                  <strong>{tableConfigSections[activeModule.key === 'pdo-simple' ? 'pdoSimple' : activeModule.key as TableConfigKind]}</strong>
+                  <strong>{tableConfigSections[currentLegacyTableKind]}</strong>
                 </div>
               </div>
             ) : null}
             {tableExportStatus ? <p className="config-helper-text">{tableExportStatus}</p> : null}
-          </section>
-        ) : null}
-
-        {activeModule.key === 'sdo' ? (
-          <section className="table-spec-card">
-            <div>
-              <h2>SDO 参数树</h2>
-              <p>维护 SDO 菜单树、权限、CAN Open 参数、数据范围和预处理字段，修改后直接写回 sdo_info。</p>
-            </div>
-            {currentSdoDocument ? (
-              <>
-                <div className="config-summary-strip">
-                  <article>
-                    <span>根节点</span>
-                    <strong>{currentSdoDocument.name}</strong>
-                  </article>
-                  <article>
-                    <span>直接子节点</span>
-                    <strong>{currentSdoDocument.children?.length ?? 0}</strong>
-                  </article>
-                  <article>
-                    <span>写回段落</span>
-                    <strong>sdo_info</strong>
-                  </article>
-                </div>
-                <p className="config-helper-text">每个节点按基础信息、通信控制、数据范围和预处理字段分组展示；新增/删除会立即同步到内存项目文档。</p>
-                <div className="sdo-tree-editor">{renderSdoNode(currentSdoDocument)}</div>
-              </>
-            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
-          </section>
-        ) : null}
-
-        {activeModule.key === 'pdo-simple' ? (
-          <section className="table-spec-card">
-            <div>
-              <h2>PDO 简化配置</h2>
-              <p>维护接收表和发送表中的 CAN 帧、显示变量名、读取方式、位置和长度，修改后直接写回 pdo_simple_send_recv。</p>
-            </div>
-            {currentPdoSimpleDocument ? (
-              <div className="pdo-simple-editor">
-                <div className="config-summary-strip">
-                  <article>
-                    <span>接收帧</span>
-                    <strong>{currentPdoSimpleDocument.pdo_recv.length}</strong>
-                  </article>
-                  <article>
-                    <span>发送帧</span>
-                    <strong>{currentPdoSimpleDocument.pdo_send.length}</strong>
-                  </article>
-                  <article>
-                    <span>写回段落</span>
-                    <strong>pdo_simple_send_recv</strong>
-                  </article>
-                </div>
-                <p className="config-helper-text">帧信息在卡片顶部维护，帧 ID 以 16 进制显示和编辑；位置和长度沿用 bit/byte 数值含义。</p>
-                {pdoJumpTarget !== null ? <p className="config-helper-text">来自 UI 资源跳转的 PDO 参数索引：{pdoJumpTarget}</p> : null}
-                {(['pdo_recv', 'pdo_send'] as const).map((kind) => (
-                  <section className="pdo-frame-section" key={kind}>
-                    <div className="config-table-toolbar">
-                      <strong>{kind === 'pdo_recv' ? '接收表' : '发送表'}（{pdoFrames(kind).length} 帧）</strong>
-                      <button onClick={() => addPdoFrame(kind)} type="button">新增帧</button>
-                    </div>
-                    {pdoFrames(kind).map((frame, frameIndex) => {
-                      const framePath: JsonPath = ['pdo_simple_send_recv', kind, frameIndex];
-                      const frameModified = isModifiedPath(framePath);
-                      return (
-                        <article className={frameModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`${kind}-${frameIndex}`}>
-                          <div className="pdo-frame-grid">
-                            <label>
-                              帧 ID
-                              <input inputMode="text" value={formatFrameId(frame.id)} onChange={(event) => updatePdoFrameId(kind, frameIndex, event.target.value)} />
-                            </label>
-                            <label>
-                              帧类型
-                              <select value={frame.type} onChange={(event) => updatePdoFrame(kind, frameIndex, 'type', Number(event.target.value))}>
-                                <option value={0}>标准帧</option>
-                                <option value={1}>扩展帧</option>
-                              </select>
-                            </label>
-                            <label>
-                              描述
-                              <input value={frame.desc} onChange={(event) => updatePdoFrame(kind, frameIndex, 'desc', event.target.value)} />
-                            </label>
-                          </div>
-                          <div className="pdo-frame-actions">
-                            {frameModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(framePath)} type="button">恢复帧</button> : null}
-                            <button onClick={() => removePdoFrame(kind, frameIndex)} type="button">删除帧</button>
-                          </div>
-                          <div className="config-table-toolbar">
-                            <span>数据项（{frame.data.length}）</span>
-                            <button onClick={() => addPdoSignal(kind, frameIndex)} type="button">新增数据项</button>
-                          </div>
-                          <div className="config-table-frame">
-                            <table className="config-table">
-                              <thead>
-                                <tr>
-                                  <th>变量名</th>
-                                  <th>读取方式</th>
-                                  <th>位置</th>
-                                  <th>长度</th>
-                                  <th>参数索引</th>
-                                  <th>操作</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {frame.data.map((signal, signalIndex) => {
-                                  const signalPath: JsonPath = ['pdo_simple_send_recv', kind, frameIndex, 'data', signalIndex];
-                                  const signalModified = isModifiedPath(signalPath);
-                                  const isJumpTarget = pdoJumpTarget === signal.pdo_param_index;
-                                  return (
-                                    <tr
-                                      className={[isJumpTarget ? 'pdo-row-highlight' : '', signalModified ? 'config-entry-modified' : ''].filter(Boolean).join(' ') || undefined}
-                                      key={`${kind}-${frameIndex}-${signalIndex}`}
-                                      ref={isJumpTarget ? (element) => { pdoJumpRowRef.current = element; } : undefined}
-                                    >
-                                      <td><input value={signal.pdo_param_name ?? ''} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pdo_param_name', event.target.value)} /></td>
-                                      <td>
-                                        <select value={signal.show_type} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'show_type', Number(event.target.value))}>
-                                          <option value={0}>按字节</option>
-                                          <option value={1}>按位</option>
-                                          <option value={2}>按字符串</option>
-                                        </select>
-                                      </td>
-                                      <td><input type="number" value={signal.pos} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pos', Number(event.target.value))} /></td>
-                                      <td><input type="number" value={signal.len} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'len', Number(event.target.value))} /></td>
-                                      <td><input type="number" value={signal.pdo_param_index} onChange={(event) => updatePdoSignal(kind, frameIndex, signalIndex, 'pdo_param_index', Number(event.target.value))} /></td>
-                                      <td>
-                                        {signalModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(signalPath)} type="button">恢复</button> : null}
-                                        <button onClick={() => removePdoSignal(kind, frameIndex, signalIndex)} type="button">删除</button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </section>
-                ))}
-              </div>
-            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
           </section>
         ) : null}
 
@@ -3123,174 +3535,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
           </section>
         ) : null}
 
-        {activeModule.key === 'pdo-advanced' ? (
-          <section className="table-spec-card">
-            <div>
-              <h2>PDO 高级配置</h2>
-              <p>维护全局变量、条件表、PDO 接收帧和发送帧，修改后直接写回 pdo_global_param、pdo_condition、pdo_recv 和 pdo_send。</p>
-            </div>
-            {currentPdoAdvancedDocument ? (
-              <div className="pdo-advanced-editor">
-                <div className="config-summary-strip">
-                  <article>
-                    <span>全局变量</span>
-                    <strong>{currentPdoAdvancedDocument.pdo_global_param.length}</strong>
-                  </article>
-                  <article>
-                    <span>条件表</span>
-                    <strong>{currentPdoAdvancedDocument.pdo_condition.length}</strong>
-                  </article>
-                  <article>
-                    <span>接收 / 发送帧</span>
-                    <strong>{currentPdoAdvancedDocument.pdo_recv.length} / {currentPdoAdvancedDocument.pdo_send.length}</strong>
-                  </article>
-                </div>
-                <p className="config-helper-text">参数 ID 保持十六进制字符串，不会转换为数字；帧 ID 以 16 进制显示和编辑。</p>
-                <section className="pdo-frame-section">
-                  <div className="config-table-toolbar">
-                    <strong>全局变量（{currentPdoAdvancedDocument.pdo_global_param.length}）</strong>
-                    <button onClick={addPdoGlobalParam} type="button">新增全局变量</button>
-                  </div>
-                  <div className="config-table-frame">
-                    <table className="config-table">
-                      <thead>
-                        <tr>
-                          <th>参数 ID</th>
-                          <th>名称</th>
-                          <th>默认值</th>
-                          <th>保留</th>
-                          <th>类型</th>
-                          <th>内部变量</th>
-                          <th>操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {currentPdoAdvancedDocument.pdo_global_param.map((item, index) => {
-                          const itemPath: JsonPath = ['pdo_global_param', index];
-                          const itemModified = isModifiedPath(itemPath);
-                          return (
-                            <tr className={itemModified ? 'config-entry-modified' : undefined} key={`global-${index}`}>
-                              <td><input value={item.param_id} onChange={(event) => updatePdoGlobalParam(index, 'param_id', event.target.value)} /></td>
-                              <td><input value={item.name} onChange={(event) => updatePdoGlobalParam(index, 'name', event.target.value)} /></td>
-                              <td><input value={item.def} onChange={(event) => updatePdoGlobalParam(index, 'def', event.target.value)} /></td>
-                              <td><input type="number" value={item.reserved} onChange={(event) => updatePdoGlobalParam(index, 'reserved', Number(event.target.value))} /></td>
-                              <td><input type="number" value={item.type} onChange={(event) => updatePdoGlobalParam(index, 'type', Number(event.target.value))} /></td>
-                              <td><input type="number" value={item.inner} onChange={(event) => updatePdoGlobalParam(index, 'inner', Number(event.target.value))} /></td>
-                              <td>
-                                {itemModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(itemPath)} type="button">恢复</button> : null}
-                                <button onClick={() => removePdoGlobalParam(index)} type="button">删除</button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-
-                <section className="pdo-frame-section">
-                  <div className="config-table-toolbar">
-                    <strong>条件表（{currentPdoAdvancedDocument.pdo_condition.length}）</strong>
-                    <button onClick={addPdoCondition} type="button">新增条件</button>
-                  </div>
-                  {currentPdoAdvancedDocument.pdo_condition.map((condition, conditionIndex) => {
-                    const conditionPath: JsonPath = ['pdo_condition', conditionIndex];
-                    const conditionModified = isModifiedPath(conditionPath);
-                    return (
-                      <article className={conditionModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`condition-${conditionIndex}`}>
-                        <div className="pdo-frame-grid">
-                          <label>参数 ID<input value={condition.param_id} onChange={(event) => updatePdoCondition(conditionIndex, 'param_id', event.target.value)} /></label>
-                          <label>处理方式<input type="number" value={condition.process} onChange={(event) => updatePdoCondition(conditionIndex, 'process', Number(event.target.value))} /></label>
-                        </div>
-                        <div className="pdo-frame-actions">
-                          {conditionModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(conditionPath)} type="button">恢复条件</button> : null}
-                          <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">新增输入</button>
-                          <button onClick={() => removePdoCondition(conditionIndex)} type="button">删除条件</button>
-                        </div>
-                        <div className="structured-list">
-                          {condition.data.map((item, inputIndex) => (
-                            <label key={`condition-${conditionIndex}-${inputIndex}`}>
-                              输入参数 ID
-                              <input value={item.param_id} onChange={(event) => updatePdoConditionInput(conditionIndex, inputIndex, event.target.value)} />
-                              <button onClick={() => removePdoConditionInput(conditionIndex, inputIndex)} type="button">删除输入</button>
-                            </label>
-                          ))}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </section>
-
-                {(['pdo_recv', 'pdo_send'] as const).map((kind) => (
-                  <section className="pdo-frame-section" key={`advanced-${kind}`}>
-                    <div className="config-table-toolbar">
-                      <strong>{kind === 'pdo_recv' ? '高级接收帧' : '高级发送帧'}（{currentPdoAdvancedDocument[kind].length ?? 0}）</strong>
-                      <button onClick={() => addPdoAdvancedFrame(kind)} type="button">新增帧</button>
-                    </div>
-                    {currentPdoAdvancedDocument[kind].map((frame, frameIndex) => {
-                      const framePath: JsonPath = [kind, frameIndex];
-                      const frameModified = isModifiedPath(framePath);
-                      return (
-                        <article className={frameModified ? 'pdo-frame-card config-entry-modified' : 'pdo-frame-card'} key={`advanced-${kind}-${frameIndex}`}>
-                          <div className="pdo-frame-grid">
-                            <label>帧 ID<input inputMode="text" value={formatFrameId(frame.id)} onChange={(event) => updatePdoAdvancedFrameId(kind, frameIndex, event.target.value)} /></label>
-                            <label>帧类型<input type="number" value={frame.type} onChange={(event) => updatePdoAdvancedFrame(kind, frameIndex, 'type', Number(event.target.value))} /></label>
-                            <label>描述<input value={frame.desc} onChange={(event) => updatePdoAdvancedFrame(kind, frameIndex, 'desc', event.target.value)} /></label>
-                          </div>
-                          <div className="pdo-frame-actions">
-                            {frameModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(framePath)} type="button">恢复帧</button> : null}
-                            <button onClick={() => removePdoAdvancedFrame(kind, frameIndex)} type="button">删除帧</button>
-                          </div>
-                          <div className="config-table-toolbar">
-                            <span>数据项（{frame.data.length}）</span>
-                            <button onClick={() => addPdoAdvancedSignal(kind, frameIndex)} type="button">新增数据项</button>
-                          </div>
-                          <div className="config-table-frame">
-                            <table className="config-table">
-                              <thead>
-                                <tr>
-                                  <th>参数 ID</th>
-                                  <th>位置</th>
-                                  <th>长度</th>
-                                  <th>显示类型</th>
-                                  <th>句柄</th>
-                                  <th>句柄参数</th>
-                                  <th>操作</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {frame.data.map((signal, signalIndex) => {
-                                  const signalPath: JsonPath = [kind, frameIndex, 'data', signalIndex];
-                                  const signalModified = isModifiedPath(signalPath);
-                                  return (
-                                    <tr className={signalModified ? 'config-entry-modified' : undefined} key={`advanced-${kind}-${frameIndex}-${signalIndex}`}>
-                                      <td><input value={signal.param_id} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'param_id', event.target.value)} /></td>
-                                      <td><input type="number" value={signal.pos} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'pos', Number(event.target.value))} /></td>
-                                      <td><input type="number" value={signal.len} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'len', Number(event.target.value))} /></td>
-                                      <td><input type="number" value={signal.show_type} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'show_type', Number(event.target.value))} /></td>
-                                      <td><input type="number" value={signal.handle} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'handle', Number(event.target.value))} /></td>
-                                      <td><input value={signal.handle_param} onChange={(event) => updatePdoAdvancedSignal(kind, frameIndex, signalIndex, 'handle_param', event.target.value)} /></td>
-                                      <td>
-                                        {signalModified ? <button className="config-restore-button" onClick={() => restoreModifiedPath(signalPath)} type="button">恢复</button> : null}
-                                        <button onClick={() => removePdoAdvancedSignal(kind, frameIndex, signalIndex)} type="button">删除</button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </section>
-                ))}
-              </div>
-            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
-          </section>
-        ) : null}
-
-        {activeModule.key === 'pdo-advanced' ? (
+        {activeModule.key === 'realtime-data' && realtimeMode === 'advanced' ? (
           <section className="table-spec-card">
             <div>
               <h2>PDO 高级配置校验</h2>

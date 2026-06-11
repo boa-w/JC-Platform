@@ -7,6 +7,16 @@ export const featureModules: FeatureModule[] = [
     description: '负责项目创建、打开、结构检查、保存和基础目录管理。',
   },
   {
+    key: 'setting-data',
+    title: '设置数据',
+    description: '按旧版上位机布局展示 SDO 菜单和设置参数。',
+  },
+  {
+    key: 'realtime-data',
+    title: '实时数据',
+    description: '按旧版上位机布局展示 PDO 接收表、发送表和帧明细。',
+  },
+  {
     key: 'signal-dictionary',
     title: '业务信号字典',
     description: '负责统一维护 Signal、数据类型、单位、缩放比例和业务含义。',
@@ -25,21 +35,6 @@ export const featureModules: FeatureModule[] = [
     key: 'ui',
     title: 'UI 资源编辑',
     description: '负责设备分辨率画布、图标/动画资源、属性编辑、选项增删和资源导出路径维护。',
-  },
-  {
-    key: 'pdo-simple',
-    title: 'PDO 简化配置',
-    description: '负责接收表/发送表、CAN 帧、系统变量绑定和 byte/bit 取数配置。',
-  },
-  {
-    key: 'pdo-advanced',
-    title: 'PDO 高级配置',
-    description: '负责全局变量、CAN 数据项、条件表和底层 PDO 结构配置。',
-  },
-  {
-    key: 'sdo',
-    title: 'SDO 参数配置',
-    description: '负责 SDO 菜单树、CAN Open 参数、权限、读写属性、缩放偏移和小数位。',
   },
   {
     key: 'battery-monitor',

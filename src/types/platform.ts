@@ -1,4 +1,4 @@
-export type NavigationKey = 'project' | 'signal-dictionary' | 'private-protocol' | 'protocol-mapping' | 'ui' | 'pdo-simple' | 'pdo-advanced' | 'sdo' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
+export type NavigationKey = 'project' | 'setting-data' | 'realtime-data' | 'signal-dictionary' | 'private-protocol' | 'protocol-mapping' | 'ui' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
 
 export interface ProjectSummary {
   name: string;

@@ -2243,6 +2243,326 @@ button {
   background: white;
 }
 
+/* ── Legacy Data Layout (setting/realtime data) ── */
+
+.legacy-data-page {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: calc(100vh - 98px);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.legacy-data-sidebar {
+  border-right: 1px solid var(--color-border);
+  background: #f4f7fb;
+  overflow: auto;
+}
+
+.legacy-data-sidebar-title {
+  height: 40px;
+  padding: 10px 32px;
+  border-bottom: 1px solid var(--color-border-light);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.legacy-menu-list {
+  display: grid;
+  gap: 0;
+}
+
+.legacy-menu-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-left: 4px solid transparent;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.legacy-menu-item.child {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 40px;
+  padding-left: 46px;
+  font-weight: 500;
+}
+
+.legacy-menu-item:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.legacy-menu-item.active {
+  border-left-color: var(--color-primary);
+  background: #cfe3f8;
+  color: #0f4f8f;
+}
+
+.legacy-menu-arrow {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.legacy-data-content {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  background: var(--color-surface);
+}
+
+.legacy-data-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 70px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.legacy-data-header strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.legacy-data-actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.legacy-data-actions button {
+  min-width: 86px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 6px 16px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.legacy-data-actions button:hover:not(:disabled) {
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.legacy-data-actions button:disabled {
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+}
+
+.legacy-data-actions button.danger {
+  color: var(--color-danger);
+}
+
+.legacy-data-table-wrap {
+  min-width: 0;
+  overflow: auto;
+  padding: 18px 10px 24px;
+}
+
+.legacy-data-table {
+  width: 100%;
+  min-width: 1180px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.legacy-data-table th,
+.legacy-data-table td {
+  height: 30px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--color-border-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.legacy-data-table th {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--color-surface);
+}
+
+.legacy-data-table tbody tr:nth-child(odd) td {
+  background: #f2f5f9;
+}
+
+.legacy-data-table tbody tr:nth-child(even) td {
+  background: var(--color-surface);
+}
+
+.legacy-data-table td:first-child,
+.legacy-data-table th:first-child {
+  width: 54px;
+}
+
+.legacy-data-table button {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 13px;
+  padding: 2px 8px;
+}
+
+.legacy-data-table button.danger {
+  color: #ff4b2b;
+}
+
+.legacy-data-table button:hover {
+  text-decoration: underline;
+}
+
+.legacy-data-table input,
+.legacy-data-table select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: center;
+}
+
+.legacy-data-table input:focus,
+.legacy-data-table select:focus {
+  outline: none;
+  border-color: var(--color-primary-border);
+  background: var(--color-surface);
+}
+
+.legacy-data-table--compact {
+  min-width: 980px;
+}
+
+.legacy-data-empty {
+  display: grid;
+  min-height: 280px;
+  place-items: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.legacy-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.legacy-mode-tabs button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.legacy-mode-tabs button.active {
+  border-color: var(--color-primary-border);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.legacy-edit-panel,
+.legacy-advanced-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.legacy-edit-panel {
+  margin-bottom: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: var(--color-surface);
+}
+
+.legacy-edit-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.legacy-edit-panel-header button,
+.legacy-condition-row button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.legacy-edit-grid,
+.legacy-condition-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.legacy-edit-grid label,
+.legacy-condition-row label {
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.legacy-edit-grid input,
+.legacy-edit-grid select,
+.legacy-condition-row input {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .legacy-data-sidebar {
+  background: #202124;
+}
+
+[data-theme="dark"] .legacy-menu-item.active {
+  background: rgba(55, 148, 255, 0.18);
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .legacy-data-table tbody tr:nth-child(odd) td {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .legacy-data-table tbody tr:nth-child(even) td,
+[data-theme="dark"] .legacy-data-table th {
+  background: var(--color-surface);
+}
+
+[data-theme="dark"] .legacy-data-table input:focus,
+[data-theme="dark"] .legacy-data-table select:focus {
+  background: #202124;
+}
+
 /* ── Danger buttons in tables ── */
 
 .config-table button:not(.config-restore-button),
@@ -2258,97 +2578,6 @@ button {
   border-color: var(--color-danger);
   color: var(--color-danger);
   background: var(--color-danger-light);
-}
-
-/* ── SDO Tree Editor ── */
-
-.sdo-tree-editor,
-.sdo-children {
-  display: grid;
-  gap: 12px;
-}
-
-.sdo-children {
-  margin-left: 16px;
-  padding-left: 14px;
-  border-left: 2px solid var(--color-primary-border);
-}
-
-.sdo-node-card {
-  display: grid;
-  gap: 10px;
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  background: var(--color-surface-alt);
-  transition: border-color 0.15s;
-}
-
-.sdo-node-card:hover {
-  border-color: var(--color-primary-border);
-}
-
-.sdo-node-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.sdo-node-header strong {
-  font-size: 14px;
-}
-
-.sdo-node-header div {
-  display: flex;
-  gap: 6px;
-}
-
-.sdo-node-header button {
-  border: 0;
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  background: var(--color-primary);
-  color: white;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 12px;
-  transition: background 0.15s;
-}
-
-.sdo-node-header button:hover {
-  background: var(--color-primary-hover);
-}
-
-.sdo-node-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 8px;
-}
-
-.sdo-node-grid label {
-  display: grid;
-  gap: 4px;
-  color: var(--color-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.sdo-node-grid input {
-  width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  background: white;
-  color: var(--color-text);
-  font-size: 13px;
-  transition: border-color 0.15s;
-}
-
-.sdo-node-grid input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
 /* ── PDO Editors ── */
