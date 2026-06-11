@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { LanguageDocument } from '../../types/platform';
 import type { LanguageProgress } from './types';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface LanguageSidebarProps {
   document: LanguageDocument;
@@ -9,6 +10,28 @@ interface LanguageSidebarProps {
   onAddLanguage: (code: string, label: string) => void;
   onRemoveLanguage: (code: string) => void;
 }
+
+const commonLanguages = [
+  { code: 'zh', label: '中文' },
+  { code: 'en', label: 'English' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'fr', label: 'Français' },
+  { code: 'es', label: 'Español' },
+  { code: 'pt', label: 'Português' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'th', label: 'ไทย' },
+  { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'ms', label: 'Bahasa Melayu' },
+  { code: 'tr', label: 'Türkçe' },
+  { code: 'pl', label: 'Polski' },
+  { code: 'nl', label: 'Nederlands' },
+  { code: 'sv', label: 'Svenska' },
+];
 
 function computeProgress(document: LanguageDocument, code: string): { translated: number; total: number } {
   const keys = document.list_inner.slice(document.list_code_language.length);
@@ -30,6 +53,7 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
   const [newCode, setNewCode] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const totalKeys = document.list_inner.length - document.list_code_language.length;
 
@@ -38,14 +62,34 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
     return { code, label: getLabel(document, code), total, translated };
   });
 
+  const availableLanguages = commonLanguages.filter((l) => !document.list_code_language.includes(l.code));
+
   function handleAdd() {
-    if (newCode.trim() && newLabel.trim()) {
-      onAddLanguage(newCode.trim(), newLabel.trim());
-      setNewCode('');
-      setNewLabel('');
-      setShowAdd(false);
+    const code = newCode.trim().toLowerCase();
+    const label = newLabel.trim();
+    if (!code || !label) return;
+    if (document.list_code_language.includes(code)) return;
+    onAddLanguage(code, label);
+    setNewCode('');
+    setNewLabel('');
+    setShowAdd(false);
+  }
+
+  function handleQuickAdd(code: string, label: string) {
+    if (!document.list_code_language.includes(code)) {
+      onAddLanguage(code, label);
     }
   }
+
+  function handleConfirmDelete() {
+    if (confirmDelete) {
+      onRemoveLanguage(confirmDelete);
+      setConfirmDelete(null);
+    }
+  }
+
+  const deleteTarget = confirmDelete ? getLabel(document, confirmDelete) : '';
+  const deleteCount = confirmDelete ? computeProgress(document, confirmDelete).translated : 0;
 
   return (
     <aside className="lang-sidebar">
@@ -58,21 +102,42 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
 
       {showAdd ? (
         <div className="lang-sidebar-add">
-          <input
-            placeholder="代码 (en)"
-            value={newCode}
-            onChange={(e) => setNewCode(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          />
-          <input
-            placeholder="名称 (English)"
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          />
-          <button className="lang-btn lang-btn--primary" disabled={!newCode.trim() || !newLabel.trim()} onClick={handleAdd} type="button">
-            添加
-          </button>
+          <div className="lang-sidebar-add-common">
+            <span className="lang-sidebar-add-label">常用语言：</span>
+            <div className="lang-sidebar-add-chips">
+              {availableLanguages.slice(0, 8).map((lang) => (
+                <button
+                  className="lang-sidebar-add-chip"
+                  key={lang.code}
+                  onClick={() => handleQuickAdd(lang.code, lang.label)}
+                  type="button"
+                  title={`${lang.label} (${lang.code})`}
+                >
+                  {lang.code}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="lang-sidebar-add-custom">
+            <span className="lang-sidebar-add-label">自定义：</span>
+            <div className="lang-sidebar-add-form">
+              <input
+                placeholder="代码"
+                value={newCode}
+                onChange={(e) => setNewCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              />
+              <input
+                placeholder="名称"
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              />
+              <button className="lang-btn lang-btn--primary" disabled={!newCode.trim() || !newLabel.trim()} onClick={handleAdd} type="button">
+                添加
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -94,7 +159,7 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
                 {!isZh ? (
                   <button
                     className="lang-sidebar-remove"
-                    onClick={(e) => { e.stopPropagation(); onRemoveLanguage(lang.code); }}
+                    onClick={(e) => { e.stopPropagation(); setConfirmDelete(lang.code); }}
                     type="button"
                     title="删除语言"
                   >
@@ -117,6 +182,17 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
         <span>{document.list_code_language.length} 种语言</span>
         <span>{totalKeys} 个翻译键</span>
       </div>
+
+      {confirmDelete ? (
+        <ConfirmDialog
+          title="删除语言"
+          message={`确定要删除「${deleteTarget}」吗？${deleteCount > 0 ? `该语言已有 ${deleteCount} 条翻译将被移除。` : ''}`}
+          confirmLabel="删除"
+          danger
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      ) : null}
     </aside>
   );
 }

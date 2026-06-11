@@ -4,12 +4,15 @@ import type { FilterMode, TranslationRow } from './types';
 import { LanguageSidebar } from './LanguageSidebar';
 import { TranslationToolbar } from './TranslationToolbar';
 import { TranslationTable } from './TranslationTable';
+import { LanguageComparisonView } from './LanguageComparisonView';
 
 interface LanguagePageProps {
   document: LanguageDocument;
   loaded: boolean;
   onUpdate: (document: LanguageDocument) => void;
 }
+
+type ViewMode = 'editor' | 'comparison';
 
 function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
@@ -55,6 +58,7 @@ export function LanguagePage({ document, loaded, onUpdate }: LanguagePageProps) 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [newKeyInput, setNewKeyInput] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('editor');
 
   const sourceLanguage = document.list_code_language[0] ?? 'zh';
 
@@ -191,52 +195,74 @@ export function LanguagePage({ document, loaded, onUpdate }: LanguagePageProps) 
         onRemoveLanguage={handleRemoveLanguage}
       />
       <div className="lang-main">
-        <TranslationToolbar
-          searchQuery={searchQuery}
-          filterMode={filterMode}
-          sourceLanguage={sourceLanguage}
-          targetLanguage={selectedLanguage}
-          totalKeys={translationKeys.length}
-          filteredCount={rows.length}
-          onSearch={setSearchQuery}
-          onFilter={setFilterMode}
-          onAddKey={(key) => { setNewKeyInput(key); handleAddKey(); }}
-          onSyncKeys={() => {}}
-        />
-        <TranslationTable
-          document={document}
-          sourceLanguage={sourceLanguage}
-          targetLanguage={selectedLanguage}
-          rows={rows}
-          modifiedKeys={modifiedKeys}
-          onUpdateValue={handleUpdateValue}
-          onUpdateKey={handleUpdateKey}
-          onRemoveKey={handleRemoveKey}
-          onRestoreKey={(key) => {
-            const original = document.list_translate[key];
-            if (original) onUpdate({ ...document, list_translate: { ...document.list_translate } });
-          }}
-        />
-        <div className="lang-footer">
-          <div className="lang-footer-add">
-            <input
-              placeholder="新增翻译键..."
-              value={newKeyInput}
-              onChange={(e) => setNewKeyInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddKey()}
-            />
-            <button className="lang-btn lang-btn--primary" disabled={!newKeyInput.trim()} onClick={handleAddKey} type="button">
-              添加键
-            </button>
-          </div>
-          <div className="lang-footer-progress">
-            {selectedLanguage ? (
-              <span>{getLabel(document, selectedLanguage)}: {translated}/{total} 已翻译 ({total > 0 ? Math.round((translated / total) * 100) : 0}%)</span>
-            ) : (
-              <span>请选择目标语言</span>
-            )}
-          </div>
+        <div className="lang-view-toggle">
+          <button
+            className={`lang-view-toggle-btn ${viewMode === 'editor' ? 'active' : ''}`}
+            onClick={() => setViewMode('editor')}
+            type="button"
+          >
+            编辑模式
+          </button>
+          <button
+            className={`lang-view-toggle-btn ${viewMode === 'comparison' ? 'active' : ''}`}
+            onClick={() => setViewMode('comparison')}
+            type="button"
+          >
+            全语言对比
+          </button>
         </div>
+        {viewMode === 'editor' ? (
+          <>
+            <TranslationToolbar
+              searchQuery={searchQuery}
+              filterMode={filterMode}
+              sourceLanguage={sourceLanguage}
+              targetLanguage={selectedLanguage}
+              totalKeys={translationKeys.length}
+              filteredCount={rows.length}
+              onSearch={setSearchQuery}
+              onFilter={setFilterMode}
+              onAddKey={(key) => { setNewKeyInput(key); handleAddKey(); }}
+              onSyncKeys={() => {}}
+            />
+            <TranslationTable
+              document={document}
+              sourceLanguage={sourceLanguage}
+              targetLanguage={selectedLanguage}
+              rows={rows}
+              modifiedKeys={modifiedKeys}
+              onUpdateValue={handleUpdateValue}
+              onUpdateKey={handleUpdateKey}
+              onRemoveKey={handleRemoveKey}
+              onRestoreKey={(key) => {
+                const original = document.list_translate[key];
+                if (original) onUpdate({ ...document, list_translate: { ...document.list_translate } });
+              }}
+            />
+            <div className="lang-footer">
+              <div className="lang-footer-add">
+                <input
+                  placeholder="新增翻译键..."
+                  value={newKeyInput}
+                  onChange={(e) => setNewKeyInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddKey()}
+                />
+                <button className="lang-btn lang-btn--primary" disabled={!newKeyInput.trim()} onClick={handleAddKey} type="button">
+                  添加键
+                </button>
+              </div>
+              <div className="lang-footer-progress">
+                {selectedLanguage ? (
+                  <span>{getLabel(document, selectedLanguage)}: {translated}/{total} 已翻译 ({total > 0 ? Math.round((translated / total) * 100) : 0}%)</span>
+                ) : (
+                  <span>请选择目标语言</span>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <LanguageComparisonView document={document} onUpdate={onUpdate} />
+        )}
       </div>
     </section>
   );
