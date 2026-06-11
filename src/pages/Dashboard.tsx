@@ -211,6 +211,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savingProjectAction, setSavingProjectAction] = useState<'save' | 'saveAs' | null>(null);
   const isSavingProject = savingProjectAction !== null;
+  const [refactorConfigPath, setRefactorConfigPath] = useState<string | null>(null);
+  const [refactorConfigStatus, setRefactorConfigStatus] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [jsonPopupSize, setJsonPopupSize] = useState({ w: 520, h: 420 });
@@ -560,6 +562,46 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       protocol_mapping: source.protocol_mapping ?? [],
       battery_monitor_info: source.battery_monitor_info ?? null,
     };
+  }
+
+  function candidateRefactorConfigPaths(projectFilePath: string) {
+    const withoutExtension = projectFilePath.replace(/\.[^\\/\\.]+$/, '');
+    return [`${withoutExtension}.refactor-config.json`, `${withoutExtension}.json`];
+  }
+
+  function mergeRefactorConfigDocument(projectDocument: unknown, sidecarDocument: unknown) {
+    const projectObject = { ...((projectDocument as Record<string, unknown>) ?? {}) };
+    const sidecarObject = (sidecarDocument as Record<string, unknown>) ?? {};
+    for (const section of refactorOnlySections) {
+      if (section in sidecarObject && sidecarObject[section] !== null) {
+        projectObject[section] = sidecarObject[section];
+      }
+    }
+    return projectObject;
+  }
+
+  async function autoMountRefactorConfig(project: LoadedProject, projectFilePath: string) {
+    if (!projectFilePath.toLowerCase().endsWith('.jcpro')) {
+      setRefactorConfigPath(null);
+      setRefactorConfigStatus(null);
+      return project;
+    }
+
+    for (const candidatePath of candidateRefactorConfigPaths(projectFilePath)) {
+      try {
+        const sidecar = await loadJsonFile(candidatePath);
+        const document = mergeRefactorConfigDocument(project.document, sidecar);
+        setRefactorConfigPath(candidatePath);
+        setRefactorConfigStatus(`已自动挂载：${candidatePath}`);
+        return { ...project, document };
+      } catch {
+        // Candidate sidecar is optional.
+      }
+    }
+
+    setRefactorConfigPath(null);
+    setRefactorConfigStatus('未挂载重构配置 JSON；修改重构专属配置时会提示创建 sidecar。');
+    return project;
   }
 
   function signalDictionaryDocument(): SignalDictionary {
@@ -2056,6 +2098,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         resolutionW: newResolutionW,
         resolutionH: newResolutionH,
       });
+      setRefactorConfigPath(null);
+      setRefactorConfigStatus(null);
       acceptLoadedProject(nextProject, selected);
       const nextPreview = await parseUiPreview(nextProject.document, nextProject.summary.path ?? selected);
       setUiPreview(nextPreview);
@@ -2072,8 +2116,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
 
     try {
       const nextProject = await loadProject(path);
-      acceptLoadedProject(nextProject, path);
-      void parseUiPreview(nextProject.document, nextProject.summary.path ?? path).then(setUiPreview);
+      const mountedProject = await autoMountRefactorConfig(nextProject, nextProject.summary.path ?? path);
+      acceptLoadedProject(mountedProject, path);
+      void parseUiPreview(mountedProject.document, mountedProject.summary.path ?? path).then(setUiPreview);
     } catch (error) {
       setOpenError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -2156,6 +2201,13 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   async function saveRefactorConfigAsJson() {
     if (!loadedProject) return false;
 
+    if (refactorConfigPath) {
+      await saveJsonFile(refactorConfigPath, refactorConfigDocument(loadedProject.document));
+      setRefactorConfigStatus(`已写回重构配置：${refactorConfigPath}`);
+      setSaveStatus(`重构专属配置已写回：${refactorConfigPath}；原 .jcpro 不会写入这些字段。`);
+      return true;
+    }
+
     if (!isTauriRuntime()) {
       setSaveStatus('旧 .jcpro 的重构配置需要另存为 JSON；系统保存对话框只能在 Tauri 桌面应用中使用。');
       return false;
@@ -2170,8 +2222,50 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (!selected) return false;
 
     await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
+    setRefactorConfigPath(selected);
+    setRefactorConfigStatus(`已挂载：${selected}`);
     setSaveStatus(`重构专属配置已另存为：${selected}；原 .jcpro 不会写入这些字段。`);
     return true;
+  }
+
+  async function handleMountRefactorConfig() {
+    if (!loadedProject) return;
+    setSaveStatus(null);
+
+    if (!isTauriRuntime()) {
+      setRefactorConfigStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    try {
+      const sidecar = await loadJsonFile(selected);
+      const document = mergeRefactorConfigDocument(loadedProject.document, sidecar);
+      const nextProject = { ...loadedProject, document };
+      const nextBaseline = cloneJson(document);
+      setRefactorConfigPath(selected);
+      setRefactorConfigStatus(`已挂载：${selected}`);
+      setBaselineDocument(nextBaseline);
+      applyLoadedProject(nextProject, nextBaseline);
+      void refreshUnifiedProtocol(document);
+    } catch (error) {
+      setRefactorConfigStatus(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleCreateRefactorConfig() {
+    if (!loadedProject) return;
+    const created = await saveRefactorConfigAsJson();
+    if (created) {
+      const nextBaseline = cloneJson(loadedProject.document);
+      setBaselineDocument(nextBaseline);
+      applyLoadedProject({ ...loadedProject }, nextBaseline);
+    }
   }
 
   async function confirmSaveProject() {
@@ -2236,6 +2330,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     try {
       if (isRefactorSidecarSave) {
         await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
+        setRefactorConfigPath(selected);
+        setRefactorConfigStatus(`已挂载：${selected}`);
         const nextBaseline = cloneJson(loadedProject.document);
         setBaselineDocument(nextBaseline);
         applyLoadedProject({ ...loadedProject }, nextBaseline);
@@ -2248,6 +2344,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         document: selected.toLowerCase().endsWith('.jcpro') ? stripRefactorOnlySections(loadedProject.document) : loadedProject.document,
       });
       acceptLoadedProject(report.project, selected);
+      if (!selected.toLowerCase().endsWith('.jcpro')) {
+        setRefactorConfigPath(null);
+        setRefactorConfigStatus(null);
+      }
       const nextPreview = await parseUiPreview(report.project.document, report.project.summary.path ?? selected);
       setUiPreview(nextPreview);
       const copiedText = `已复制 ${report.copied_resources.length} 个资源`;
@@ -2797,7 +2897,11 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
             <p>将当前所有配置修改写入项目文件：</p>
             <div className="modal-path">{loadedProject.summary.path}</div>
             {isLegacyJcproProject && hasRefactorOnlyChanges ? (
-              <p className="project-open-warning">检测到重构专属配置修改，将强制另存为独立 JSON；原 .jcpro 只保存兼容字段。</p>
+              <p className="project-open-warning">
+                {refactorConfigPath
+                  ? `检测到重构专属配置修改，将写回已挂载 JSON：${refactorConfigPath}；原 .jcpro 只保存兼容字段。`
+                  : '检测到重构专属配置修改，将创建独立 JSON sidecar；原 .jcpro 只保存兼容字段。'}
+              </p>
             ) : null}
             {modifiedSections.length > 0 ? (
               <div className="action-bar-pills">
@@ -2943,6 +3047,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   <div className="project-info-actions">
                     <button className="project-link-btn" disabled={isOpening} onClick={() => void handleParseProject()} type="button">解析</button>
                     <button className="project-link-btn" disabled={isOpening} onClick={() => void handleMigrateProject()} type="button">补齐结构</button>
+                    <button className="project-link-btn" disabled={isOpening} onClick={() => void handleMountRefactorConfig()} type="button">挂载重构配置</button>
+                    <button className="project-link-btn" disabled={isOpening || !loadedProject} onClick={() => void handleCreateRefactorConfig()} type="button">
+                      {refactorConfigPath ? '保存重构配置' : '创建重构配置'}
+                    </button>
                   </div>
                 </div>
                 <div className="project-info-grid">
@@ -2964,7 +3072,12 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                       {loadedProject.validation.valid ? '通过' : '缺少段落'}
                     </strong>
                   </div>
+                  <div className="project-info-item">
+                    <span>重构配置</span>
+                    <strong className="project-info-path">{refactorConfigPath ?? '未挂载'}</strong>
+                  </div>
                 </div>
+                {refactorConfigStatus ? <p className={refactorConfigPath ? 'text-success' : 'project-open-warning'}>{refactorConfigStatus}</p> : null}
                 {loadedProject.validation.missing_sections.length > 0 ? (
                   <p className="project-open-error">缺少：{loadedProject.validation.missing_sections.join('、')}</p>
                 ) : null}
