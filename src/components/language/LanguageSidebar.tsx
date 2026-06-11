@@ -8,6 +8,7 @@ interface LanguageSidebarProps {
   selectedLanguage: string | null;
   onSelectLanguage: (code: string | null) => void;
   onAddLanguage: (code: string, label: string) => void;
+  onUpdateLanguage: (oldCode: string, newCode: string, newLabel: string) => void;
   onRemoveLanguage: (code: string) => void;
 }
 
@@ -49,11 +50,14 @@ function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
 }
 
-export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, onAddLanguage, onRemoveLanguage }: LanguageSidebarProps) {
+export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, onAddLanguage, onUpdateLanguage, onRemoveLanguage }: LanguageSidebarProps) {
   const [newCode, setNewCode] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [editingLang, setEditingLang] = useState<string | null>(null);
+  const [editCode, setEditCode] = useState('');
+  const [editLabel, setEditLabel] = useState('');
 
   const totalKeys = document.list_inner.length - document.list_code_language.length;
 
@@ -86,6 +90,26 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
       onRemoveLanguage(confirmDelete);
       setConfirmDelete(null);
     }
+  }
+
+  function startEditLang(code: string) {
+    setEditingLang(code);
+    setEditCode(code);
+    setEditLabel(getLabel(document, code));
+  }
+
+  function commitEditLang() {
+    if (!editingLang) return;
+    const newCode = editCode.trim().toLowerCase();
+    const newLabel = editLabel.trim();
+    if (!newCode || !newLabel) {
+      setEditingLang(null);
+      return;
+    }
+    if (newCode !== editingLang || newLabel !== getLabel(document, editingLang)) {
+      onUpdateLanguage(editingLang, newCode, newLabel);
+    }
+    setEditingLang(null);
   }
 
   const deleteTarget = confirmDelete ? getLabel(document, confirmDelete) : '';
@@ -146,26 +170,71 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
           const pct = lang.total > 0 ? Math.round((lang.translated / lang.total) * 100) : 0;
           const isSelected = selectedLanguage === lang.code;
           const isZh = lang.code === 'zh';
+          const isEditing = editingLang === lang.code;
           return (
             <button
               className={`lang-sidebar-item ${isSelected ? 'active' : ''} ${isZh ? 'lang-sidebar-item--zh' : ''}`}
               key={lang.code}
-              onClick={() => onSelectLanguage(isSelected ? null : lang.code)}
+              onClick={() => {
+                if (!isEditing) onSelectLanguage(isSelected ? null : lang.code);
+              }}
               type="button"
             >
               <div className="lang-sidebar-item-header">
-                <span className="lang-sidebar-code">{lang.code}</span>
-                <span className="lang-sidebar-label">{lang.label}</span>
-                {!isZh ? (
-                  <button
-                    className="lang-sidebar-remove"
-                    onClick={(e) => { e.stopPropagation(); setConfirmDelete(lang.code); }}
-                    type="button"
-                    title="删除语言"
-                  >
-                    ×
-                  </button>
-                ) : null}
+                {isEditing ? (
+                  <>
+                    <input
+                      className="lang-sidebar-edit-input lang-sidebar-edit-code"
+                      value={editCode}
+                      onChange={(e) => setEditCode(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitEditLang();
+                        if (e.key === 'Escape') setEditingLang(null);
+                      }}
+                      disabled={isZh}
+                      autoFocus
+                    />
+                    <input
+                      className="lang-sidebar-edit-input lang-sidebar-edit-label"
+                      value={editLabel}
+                      onChange={(e) => setEditLabel(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitEditLang();
+                        if (e.key === 'Escape') setEditingLang(null);
+                      }}
+                      onBlur={commitEditLang}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <span className="lang-sidebar-code">{lang.code}</span>
+                    <span className="lang-sidebar-label">{lang.label}</span>
+                    <div className="lang-sidebar-item-actions">
+                      {!isZh ? (
+                        <button
+                          className="lang-sidebar-action-btn"
+                          onClick={(e) => { e.stopPropagation(); startEditLang(lang.code); }}
+                          type="button"
+                          title="编辑语言"
+                        >
+                          ✎
+                        </button>
+                      ) : null}
+                      {!isZh ? (
+                        <button
+                          className="lang-sidebar-remove"
+                          onClick={(e) => { e.stopPropagation(); setConfirmDelete(lang.code); }}
+                          type="button"
+                          title="删除语言"
+                        >
+                          ×
+                        </button>
+                      ) : null}
+                    </div>
+                  </>
+                )}
               </div>
               <div className="lang-sidebar-progress">
                 <div className="lang-sidebar-progress-bar">

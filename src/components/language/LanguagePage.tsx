@@ -134,6 +134,30 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     onUpdate(normalizeDocument({ ...document, language_labels: nextLabels }, nextCodes, nextLabels));
   }
 
+  function handleUpdateLanguage(oldCode: string, newCode: string, newLabel: string) {
+    if (oldCode === newCode && newLabel === getLabel(document, oldCode)) return;
+    if (oldCode !== newCode && document.list_code_language.includes(newCode)) return;
+    const nextCodes = document.list_code_language.map((c) => c === oldCode ? newCode : c);
+    const nextLabels = { ...(document.language_labels ?? {}) };
+    if (oldCode !== newCode) {
+      delete nextLabels[oldCode];
+    }
+    nextLabels[newCode] = newLabel;
+    const nextTranslate = { ...document.list_translate };
+    if (oldCode !== newCode) {
+      for (const key of document.list_inner) {
+        const translations = (nextTranslate[key] as Record<string, string>) ?? {};
+        if (oldCode in translations) {
+          const value = translations[oldCode];
+          delete translations[oldCode];
+          translations[newCode] = value;
+          nextTranslate[key] = translations;
+        }
+      }
+    }
+    onUpdate(normalizeDocument({ ...document, list_translate: nextTranslate, language_labels: nextLabels }, nextCodes, nextLabels));
+  }
+
   function handleUpdateValue(key: string, code: string, value: string) {
     const translations = (document.list_translate[key] as Record<string, string>) ?? {};
     onUpdate({
@@ -199,6 +223,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
         selectedLanguage={selectedLanguage}
         onSelectLanguage={setSelectedLanguage}
         onAddLanguage={handleAddLanguage}
+        onUpdateLanguage={handleUpdateLanguage}
         onRemoveLanguage={handleRemoveLanguage}
       />
       <div className="lang-main">
