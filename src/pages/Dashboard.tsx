@@ -79,6 +79,8 @@ import type {
   UnifiedProtocolModel,
 } from '../types/platform';
 import { UiCanvasPreview } from '../components/UiCanvasPreview';
+import { Breadcrumb } from '../components/Breadcrumb';
+import { featureModules } from '../data/modules';
 import { cloneJson, deepEqual, isPathModified, restorePath, type JsonPath } from '../utils/projectDirty';
 import { getTestData, testDataLabels, type TestDataType } from '../data/test-data';
 import { useCanTestData } from '../hooks/useCanTestData';
@@ -2707,6 +2709,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       ) : null}
 
       <div className={showJsonEditor && loadedProject ? 'workspace-json-active' : undefined}>
+        {activeModule.key !== 'project' ? (
+          <Breadcrumb activeKey={activeModule.key} modules={featureModules} onNavigate={onNavigate} />
+        ) : null}
         {activeModule.key === 'project' ? (
           <section className="project-page">
             {/* Open project */}

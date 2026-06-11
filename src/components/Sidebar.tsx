@@ -1,22 +1,12 @@
 import { useState } from 'react';
 import type { FeatureModule, NavigationKey } from '../types/platform';
+import { navGroups } from '../data/navigation';
 
 interface SidebarProps {
   modules: FeatureModule[];
   activeKey: NavigationKey;
   onSelect: (key: NavigationKey) => void;
 }
-
-const navGroups: { label: string; keys: NavigationKey[] }[] = [
-  { label: '项目', keys: ['project'] },
-  { label: '数据', keys: ['setting-data', 'realtime-data'] },
-  {
-    label: '协议',
-    keys: ['signal-dictionary', 'private-protocol', 'protocol-mapping'],
-  },
-  { label: '配置', keys: ['ui', 'battery-monitor', 'language'] },
-  { label: '输出', keys: ['export', 'can-test-data', 'settings'] },
-];
 
 export function Sidebar({ modules, activeKey, onSelect }: SidebarProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
