@@ -7,7 +7,8 @@ use crate::domain::private_protocol::{
     derive_private_protocol_from_legacy, PrivateProtocolDocument,
 };
 use crate::domain::signal::{
-    derive_signal_dictionary_from_legacy, normalize_signal_id, SignalDictionary, SignalId,
+    derive_signal_dictionary_from_legacy, normalize_signal_id, SignalDataType, SignalDefinition,
+    SignalDictionary, SignalId,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -101,14 +102,32 @@ pub struct ProtocolValidationReport {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProtocolCompatibilityReport {
+    pub valid: bool,
+    pub document: Value,
+    pub updated_sections: Vec<String>,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
 pub fn build_unified_protocol_model(document: &Value) -> UnifiedProtocolModel {
     let signal_dictionary = document
         .get("signal_dictionary")
         .and_then(|value| serde_json::from_value::<SignalDictionary>(value.clone()).ok())
         .unwrap_or_else(|| derive_signal_dictionary_from_legacy(document));
     let private_protocol = derive_private_protocol_from_legacy(document);
-    let canopen = derive_canopen_transport(document);
-    let mappings = derive_mappings(&canopen, &private_protocol);
+    let legacy_canopen = derive_canopen_transport(document);
+    let explicit_mappings = parse_explicit_mappings(document);
+    let (canopen, mappings) = if explicit_mappings.is_empty() {
+        let mappings = derive_mappings(&legacy_canopen, &private_protocol);
+        (legacy_canopen, mappings)
+    } else {
+        (
+            canopen_transport_from_mappings(&legacy_canopen, &explicit_mappings),
+            explicit_mappings,
+        )
+    };
     let validation =
         validate_protocol_model(&signal_dictionary, &canopen, &private_protocol, &mappings);
 
@@ -134,6 +153,284 @@ pub fn migrate_project_to_unified_protocol(document: Value) -> Value {
         .or_insert_with(|| json!(unified.private_protocol));
     map.insert("protocol_mapping".to_string(), json!(unified.mappings));
     Value::Object(map)
+}
+
+/// 将新三层模型拍平为旧版高级 PDO 段，供现有导出引擎继续使用。
+///
+/// 该适配器只更新 `pdo_global_param`、`pdo_recv`、`pdo_send`，不覆盖旧 SDO 树、
+/// 简化 PDO 表或私有协议段，避免影响尚未迁移的配置。
+pub fn flatten_unified_protocol_to_legacy(document: Value) -> ProtocolCompatibilityReport {
+    let source_document = document.clone();
+    let model = build_unified_protocol_model(&source_document);
+    let mut errors = model.validation.errors.clone();
+    let mut warnings = model.validation.warnings.clone();
+
+    if !errors.is_empty() {
+        return ProtocolCompatibilityReport {
+            valid: false,
+            document,
+            updated_sections: Vec::new(),
+            errors,
+            warnings,
+        };
+    }
+
+    let signal_map = model
+        .signal_dictionary
+        .signals
+        .iter()
+        .map(|signal| (signal.signal_id.clone(), signal))
+        .collect::<HashMap<_, _>>();
+    let pdo_signal_order = collect_pdo_signal_order(&model.canopen);
+
+    if pdo_signal_order.is_empty() {
+        warnings.push("协议映射中没有 CANopen PDO 映射，旧版 PDO 段未生成数据项".to_string());
+    }
+
+    let mut missing_signals = Vec::new();
+    let pdo_global_param = pdo_signal_order
+        .iter()
+        .filter_map(|signal_id| {
+            let Some(signal) = signal_map.get(signal_id) else {
+                missing_signals.push(signal_id.clone());
+                return None;
+            };
+            Some(signal_to_legacy_global_param(signal))
+        })
+        .collect::<Vec<_>>();
+
+    if !missing_signals.is_empty() {
+        errors.push(format!(
+            "无法生成旧版 PDO，全局变量缺少 Signal：{}",
+            missing_signals.join("、")
+        ));
+        return ProtocolCompatibilityReport {
+            valid: false,
+            document,
+            updated_sections: Vec::new(),
+            errors,
+            warnings,
+        };
+    }
+
+    let mut map = match document {
+        Value::Object(map) => map,
+        _ => Map::new(),
+    };
+    map.insert("pdo_global_param".to_string(), Value::Array(pdo_global_param));
+    map.insert(
+        "pdo_recv".to_string(),
+        Value::Array(legacy_pdo_frames(&model.canopen.pdo_recv)),
+    );
+    map.insert(
+        "pdo_send".to_string(),
+        Value::Array(legacy_pdo_frames(&model.canopen.pdo_send)),
+    );
+
+    ProtocolCompatibilityReport {
+        valid: errors.is_empty(),
+        document: Value::Object(map),
+        updated_sections: vec![
+            "pdo_global_param".to_string(),
+            "pdo_recv".to_string(),
+            "pdo_send".to_string(),
+        ],
+        errors,
+        warnings,
+    }
+}
+
+fn parse_explicit_mappings(document: &Value) -> Vec<ProtocolMapping> {
+    document
+        .get("protocol_mapping")
+        .and_then(|value| serde_json::from_value::<Vec<ProtocolMapping>>(value.clone()).ok())
+        .unwrap_or_default()
+}
+
+fn canopen_transport_from_mappings(
+    legacy: &CanOpenTransport,
+    mappings: &[ProtocolMapping],
+) -> CanOpenTransport {
+    let mut transport = CanOpenTransport::default();
+
+    for mapping in mappings {
+        if let MappingTarget::CanOpenSdo { index, subindex } = &mapping.target {
+            let existing = legacy
+                .sdo_objects
+                .iter()
+                .find(|item| item.index == *index && item.subindex == *subindex);
+            transport.sdo_objects.push(match existing {
+                Some(item) => CanOpenSdoObject {
+                    signal_id: Some(mapping.signal_id.clone()),
+                    ..item.clone()
+                },
+                None => CanOpenSdoObject {
+                    signal_id: Some(mapping.signal_id.clone()),
+                    name: mapping.signal_id.clone(),
+                    frame_id: 0,
+                    index: *index,
+                    subindex: *subindex,
+                    access: 0,
+                    data_type: String::new(),
+                },
+            });
+        }
+    }
+
+    for direction in [PdoMappingDirection::Receive, PdoMappingDirection::Send] {
+        let frames = pdo_frames_from_mappings(legacy, mappings, direction.clone());
+        match direction {
+            PdoMappingDirection::Receive => transport.pdo_recv = frames,
+            PdoMappingDirection::Send => transport.pdo_send = frames,
+        }
+    }
+
+    transport
+}
+
+fn pdo_frames_from_mappings(
+    legacy: &CanOpenTransport,
+    mappings: &[ProtocolMapping],
+    direction: PdoMappingDirection,
+) -> Vec<CanOpenPdoFrame> {
+    let legacy_frames = match direction {
+        PdoMappingDirection::Receive => &legacy.pdo_recv,
+        PdoMappingDirection::Send => &legacy.pdo_send,
+    };
+    let mut order = Vec::<u32>::new();
+    let mut grouped = HashMap::<u32, Vec<CanOpenPdoMapping>>::new();
+
+    for mapping in mappings {
+        let MappingTarget::CanOpenPdo {
+            direction: mapping_direction,
+            frame_id,
+            bit_offset,
+            bit_length,
+        } = &mapping.target
+        else {
+            continue;
+        };
+        if *mapping_direction != direction {
+            continue;
+        }
+        if !grouped.contains_key(frame_id) {
+            order.push(*frame_id);
+        }
+        let show_type = legacy_show_type(
+            legacy_frames,
+            *frame_id,
+            &mapping.signal_id,
+            *bit_offset,
+            *bit_length,
+        );
+        grouped
+            .entry(*frame_id)
+            .or_default()
+            .push(CanOpenPdoMapping {
+                signal_id: mapping.signal_id.clone(),
+                bit_offset: *bit_offset,
+                bit_length: *bit_length,
+                show_type,
+            });
+    }
+
+    order
+        .into_iter()
+        .map(|frame_id| {
+            let existing = legacy_frames.iter().find(|frame| frame.frame_id == frame_id);
+            CanOpenPdoFrame {
+                frame_id,
+                frame_type: existing.map(|frame| frame.frame_type).unwrap_or(0),
+                direction: direction.clone(),
+                description: existing
+                    .map(|frame| frame.description.clone())
+                    .unwrap_or_default(),
+                mappings: grouped.remove(&frame_id).unwrap_or_default(),
+            }
+        })
+        .collect()
+}
+
+fn legacy_show_type(
+    frames: &[CanOpenPdoFrame],
+    frame_id: u32,
+    signal_id: &str,
+    bit_offset: u16,
+    bit_length: u16,
+) -> u8 {
+    frames
+        .iter()
+        .find(|frame| frame.frame_id == frame_id)
+        .and_then(|frame| {
+            frame.mappings.iter().find(|item| {
+                item.signal_id == signal_id
+                    && item.bit_offset == bit_offset
+                    && item.bit_length == bit_length
+            })
+        })
+        .map(|item| item.show_type)
+        .unwrap_or(0)
+}
+
+fn collect_pdo_signal_order(canopen: &CanOpenTransport) -> Vec<SignalId> {
+    let mut ids = Vec::new();
+    for frame in canopen.pdo_recv.iter().chain(canopen.pdo_send.iter()) {
+        for item in &frame.mappings {
+            if !ids.contains(&item.signal_id) {
+                ids.push(item.signal_id.clone());
+            }
+        }
+    }
+    ids
+}
+
+fn signal_to_legacy_global_param(signal: &SignalDefinition) -> Value {
+    json!({
+        "param_id": signal.signal_id,
+        "name": signal.name,
+        "def": signal.default_value.clone().unwrap_or_default(),
+        "reserved": 0,
+        "type": signal_data_type_to_legacy(&signal.data_type),
+        "inner": signal.inner.unwrap_or(-1)
+    })
+}
+
+fn signal_data_type_to_legacy(data_type: &SignalDataType) -> i64 {
+    match data_type {
+        SignalDataType::U8 | SignalDataType::Bool => 0,
+        SignalDataType::U16 => 1,
+        SignalDataType::U32 => 2,
+        SignalDataType::I8 => 9,
+        SignalDataType::I16 => 10,
+        SignalDataType::I32 => 11,
+        SignalDataType::F32 => 12,
+        SignalDataType::String => 30,
+        SignalDataType::Bytes => 31,
+        SignalDataType::Custom(value) => value.parse::<i64>().unwrap_or(0),
+    }
+}
+
+fn legacy_pdo_frames(frames: &[CanOpenPdoFrame]) -> Vec<Value> {
+    frames
+        .iter()
+        .map(|frame| {
+            json!({
+                "id": frame.frame_id,
+                "type": frame.frame_type,
+                "desc": frame.description,
+                "data": frame.mappings.iter().map(|item| {
+                    json!({
+                        "pos": item.bit_offset,
+                        "len": item.bit_length,
+                        "show_type": item.show_type,
+                        "handle": 0,
+                        "handle_param": "",
+                        "param_id": item.signal_id
+                    })
+                }).collect::<Vec<_>>()
+            })
+        })
+        .collect()
 }
 
 fn derive_canopen_transport(document: &Value) -> CanOpenTransport {
@@ -477,5 +774,56 @@ mod tests {
             .errors
             .iter()
             .any(|error| error.contains("超过 8 字节")));
+    }
+
+    #[test]
+    fn explicit_protocol_mapping_drives_canopen_projection() {
+        let document = json!({
+            "signal_dictionary": { "signals": [{ "signal_id": "A", "name": "Signal A" }] },
+            "pdo_recv": [{ "id": 0x101, "type": 0, "desc": "legacy", "data": [{ "param_id": "A", "pos": 0, "len": 8, "show_type": 0, "handle": 0, "handle_param": "" }] }],
+            "pdo_send": [],
+            "protocol_mapping": [{
+                "signal_id": "A",
+                "target": { "kind": "can_open_pdo", "direction": "receive", "frame_id": 0x202, "bit_offset": 16, "bit_length": 16 }
+            }],
+            "battery_monitor_info": { "enabled": false }
+        });
+
+        let model = build_unified_protocol_model(&document);
+
+        assert!(model.validation.valid, "{:?}", model.validation.errors);
+        assert_eq!(model.canopen.pdo_recv.len(), 1);
+        assert_eq!(model.canopen.pdo_recv[0].frame_id, 0x202);
+        assert_eq!(model.canopen.pdo_recv[0].mappings[0].bit_offset, 16);
+    }
+
+    #[test]
+    fn flatten_unified_protocol_generates_legacy_pdo_sections() {
+        let document = json!({
+            "signal_dictionary": {
+                "signals": [{
+                    "signal_id": "A",
+                    "name": "Signal A",
+                    "data_type": "u16",
+                    "default_value": "7",
+                    "inner": 3
+                }]
+            },
+            "protocol_mapping": [{
+                "signal_id": "A",
+                "target": { "kind": "can_open_pdo", "direction": "receive", "frame_id": 0x202, "bit_offset": 8, "bit_length": 16 }
+            }],
+            "battery_monitor_info": { "enabled": false }
+        });
+
+        let report = flatten_unified_protocol_to_legacy(document);
+
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(report.updated_sections, vec!["pdo_global_param", "pdo_recv", "pdo_send"]);
+        assert_eq!(report.document["pdo_global_param"][0]["param_id"], "A");
+        assert_eq!(report.document["pdo_global_param"][0]["type"], 1);
+        assert_eq!(report.document["pdo_recv"][0]["id"], 0x202);
+        assert_eq!(report.document["pdo_recv"][0]["data"][0]["pos"], 8);
+        assert_eq!(report.document["pdo_recv"][0]["data"][0]["param_id"], "A");
     }
 }

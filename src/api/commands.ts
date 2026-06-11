@@ -21,6 +21,7 @@ import type {
   ProjectParseReport,
   ProjectSummary,
   ProjectValidationReport,
+  ProtocolCompatibilityReport,
   SaveProjectAsReport,
   SaveProjectAsRequest,
   SaveProjectRequest,
@@ -109,6 +110,10 @@ export async function parseUnifiedProtocolProject(document: unknown): Promise<Un
 
 export async function migrateUnifiedProtocolDocument(document: unknown): Promise<unknown> {
   return invoke<unknown>('migrate_unified_protocol_document', { document });
+}
+
+export async function flattenUnifiedProtocolDocument(document: unknown): Promise<ProtocolCompatibilityReport> {
+  return invoke<ProtocolCompatibilityReport>('flatten_unified_protocol_document', { document });
 }
 
 export async function parseUiResources(document: unknown): Promise<UiResourceParseReport> {

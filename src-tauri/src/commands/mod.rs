@@ -23,7 +23,8 @@ use crate::domain::project::{
     SaveProjectAsRequest, SaveProjectRequest,
 };
 use crate::domain::protocol_manager::{
-    build_unified_protocol_model, migrate_project_to_unified_protocol, UnifiedProtocolModel,
+    build_unified_protocol_model, flatten_unified_protocol_to_legacy,
+    migrate_project_to_unified_protocol, ProtocolCompatibilityReport, UnifiedProtocolModel,
 };
 use crate::domain::sdo::{parse_sdo_table, sdo_document_to_table, SdoImportReport};
 use crate::domain::ui_resource::{
@@ -140,6 +141,11 @@ pub fn parse_unified_protocol_project(document: Value) -> UnifiedProtocolModel {
 #[tauri::command]
 pub fn migrate_unified_protocol_document(document: Value) -> Value {
     migrate_project_to_unified_protocol(document)
+}
+
+#[tauri::command]
+pub fn flatten_unified_protocol_document(document: Value) -> ProtocolCompatibilityReport {
+    flatten_unified_protocol_to_legacy(document)
 }
 
 /// UI 资源解析请求（可选附带项目路径用于解析相对图片路径）。

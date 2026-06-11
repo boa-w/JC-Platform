@@ -191,6 +191,14 @@ export interface ProtocolValidationReport {
   warnings: string[];
 }
 
+export interface ProtocolCompatibilityReport {
+  valid: boolean;
+  document: unknown;
+  updated_sections: string[];
+  errors: string[];
+  warnings: string[];
+}
+
 export interface BatteryMonitorInfo {
   enabled: boolean;
   version: number;

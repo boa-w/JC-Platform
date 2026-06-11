@@ -9,6 +9,7 @@ import {
   exportProjectPackage,
   exportTableCsv,
   exportTableWorkbook,
+  flattenUnifiedProtocolDocument,
   generateCanTestData,
   getLegacyTableSpec,
   importLanguageCsv,
@@ -221,6 +222,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [unifiedProtocol, setUnifiedProtocol] = useState<UnifiedProtocolModel | null>(null);
   const [unifiedProtocolError, setUnifiedProtocolError] = useState<string | null>(null);
   const [isParsingUnifiedProtocol, setIsParsingUnifiedProtocol] = useState(false);
+  const [protocolFlattenStatus, setProtocolFlattenStatus] = useState<string | null>(null);
   const [exportOutputDir, setExportOutputDir] = useState('jc-export');
   const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
   const [imageCopyReport, setImageCopyReport] = useState<UiImageCopyReport | null>(null);
@@ -528,6 +530,28 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       return null;
     } finally {
       setIsParsingUnifiedProtocol(false);
+    }
+  }
+
+  async function handleFlattenUnifiedProtocol() {
+    if (!loadedProject) return;
+    setProtocolFlattenStatus(null);
+    setUnifiedProtocolError(null);
+
+    try {
+      const report = await flattenUnifiedProtocolDocument(loadedProject.document);
+      if (!report.valid) {
+        setUnifiedProtocolError(report.errors.join('；') || '生成旧版 PDO 段失败');
+        return;
+      }
+      applyLoadedProject({ ...loadedProject, document: report.document });
+      setProtocolFlattenStatus(`已更新：${report.updated_sections.join('、')}`);
+      if (report.warnings.length > 0) {
+        setUnifiedProtocolError(report.warnings.join('；'));
+      }
+      void refreshUnifiedProtocol(report.document);
+    } catch (error) {
+      setUnifiedProtocolError(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -3506,6 +3530,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 >
                   写入三层模型
                 </button>
+                <button disabled={!loadedProject || isParsingUnifiedProtocol} onClick={() => void handleFlattenUnifiedProtocol()} type="button">
+                  生成旧版 PDO 段
+                </button>
               </div>
             </div>
             {unifiedProtocol ? (
@@ -3528,6 +3555,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                     <strong>{unifiedProtocol.private_protocol.frames.length}</strong>
                   </article>
                 </div>
+                {protocolFlattenStatus ? <p className="text-success">{protocolFlattenStatus}</p> : null}
                 {unifiedProtocol.validation.errors.length > 0 ? <p className="project-open-error">{unifiedProtocol.validation.errors.join('；')}</p> : null}
                 {unifiedProtocol.validation.warnings.length > 0 ? <p className="export-warning">{unifiedProtocol.validation.warnings.join('；')}</p> : null}
                 <section className="pdo-frame-section">
