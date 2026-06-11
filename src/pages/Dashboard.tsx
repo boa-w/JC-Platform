@@ -247,6 +247,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [selectedRealtimeKind, setSelectedRealtimeKind] = useState<'pdo_recv' | 'pdo_send'>('pdo_recv');
   const [selectedRealtimeFrameId, setSelectedRealtimeFrameId] = useState<number | null>(null);
   const [realtimeMode, setRealtimeMode] = useState<'simple' | 'advanced'>('simple');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedAdvancedFrameId, setSelectedAdvancedFrameId] = useState<number | null>(null);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [canTestFrames, setCanTestFrames] = useState<CanTestFrame[]>([]);
@@ -3127,9 +3128,14 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         ) : null}
 
         {activeModule.key === 'setting-data' ? (
-          <section className="legacy-data-page">
+          <section className={sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'}>
             <div className="legacy-data-sidebar">
-              <div className="legacy-data-sidebar-title">菜单</div>
+              <div className="legacy-data-sidebar-header">
+                <div className="legacy-data-sidebar-title">菜单</div>
+                <button className="legacy-sidebar-collapse-btn" onClick={() => setSidebarCollapsed((v) => !v)} type="button" title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'}>
+                  {sidebarCollapsed ? '▸' : '◂'}
+                </button>
+              </div>
               <div className="legacy-menu-list">
                 {settingMenus.map((menu) => (
                   <button
@@ -3273,12 +3279,13 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         ) : null}
 
         {activeModule.key === 'realtime-data' ? (
-          <section className="legacy-data-page">
+          <section className={sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'}>
             <div className="legacy-data-sidebar">
-              <div className="legacy-data-sidebar-title">菜单</div>
-              <div className="legacy-mode-tabs">
-                <button className={realtimeMode === 'simple' ? 'active' : ''} onClick={() => setRealtimeMode('simple')} type="button">简化配置</button>
-                <button className={realtimeMode === 'advanced' ? 'active' : ''} onClick={() => setRealtimeMode('advanced')} type="button">高级配置</button>
+              <div className="legacy-data-sidebar-header">
+                <div className="legacy-data-sidebar-title">菜单</div>
+                <button className="legacy-sidebar-collapse-btn" onClick={() => setSidebarCollapsed((v) => !v)} type="button" title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'}>
+                  {sidebarCollapsed ? '▸' : '◂'}
+                </button>
               </div>
               <div className="legacy-menu-list">
                 {(['pdo_recv', 'pdo_send'] as const).map((kind) => (
@@ -3324,7 +3331,13 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
             </div>
             <div className="legacy-data-content">
               <div className="legacy-data-header">
-                <strong>{selectedRealtimeKind === 'pdo_recv' ? '菜单->接收表' : '菜单->发送表'}（{realtimeMode === 'simple' ? '简化配置' : '高级配置'}）</strong>
+                <div className="legacy-data-header-left">
+                  <strong>{selectedRealtimeKind === 'pdo_recv' ? '菜单->接收表' : '菜单->发送表'}（{realtimeMode === 'simple' ? '简化配置' : '高级配置'}）</strong>
+                  <div className="legacy-mode-tabs-inline">
+                    <button className={realtimeMode === 'simple' ? 'active' : ''} onClick={() => setRealtimeMode('simple')} type="button">简化配置</button>
+                    <button className={realtimeMode === 'advanced' ? 'active' : ''} onClick={() => setRealtimeMode('advanced')} type="button">高级配置</button>
+                  </div>
+                </div>
                 <div className="legacy-data-actions">
                   <button onClick={() => realtimeMode === 'simple' ? addPdoFrame(selectedRealtimeKind) : addPdoAdvancedFrame(selectedRealtimeKind)} type="button">新增帧ID</button>
                   <button disabled={realtimeMode === 'simple' ? !activeRealtimeFrame : !activeAdvancedFrame} onClick={() => {
