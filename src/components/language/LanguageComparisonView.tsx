@@ -13,6 +13,8 @@ function getLabel(document: LanguageDocument, code: string): string {
 export function LanguageComparisonView({ document, onUpdate }: LanguageComparisonViewProps) {
   const [editingCell, setEditingCell] = useState<{ key: string; code: string } | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [editingKeyIndex, setEditingKeyIndex] = useState<number | null>(null);
+  const [keyDraft, setKeyDraft] = useState('');
 
   const translationKeys = document.list_inner.slice(document.list_code_language.length);
 
@@ -35,6 +37,36 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
       });
     }
     setEditingCell(null);
+  }
+
+  function startEditKey(index: number, currentKey: string) {
+    setEditingKeyIndex(index);
+    setKeyDraft(currentKey);
+  }
+
+  function commitKeyEdit() {
+    if (editingKeyIndex === null || !keyDraft.trim()) {
+      setEditingKeyIndex(null);
+      return;
+    }
+    const rowIndex = editingKeyIndex;
+    const oldKey = document.list_inner[rowIndex + document.list_code_language.length];
+    if (!oldKey || keyDraft === oldKey) {
+      setEditingKeyIndex(null);
+      return;
+    }
+    if (document.list_inner.includes(keyDraft.trim())) {
+      setEditingKeyIndex(null);
+      return;
+    }
+    const nextInner = [...document.list_inner];
+    nextInner[rowIndex + document.list_code_language.length] = keyDraft.trim();
+    const nextTranslate = { ...document.list_translate };
+    const oldTranslations = nextTranslate[oldKey];
+    delete nextTranslate[oldKey];
+    nextTranslate[keyDraft.trim()] = oldTranslations ?? {};
+    onUpdate({ ...document, list_inner: nextInner, list_translate: nextTranslate });
+    setEditingKeyIndex(null);
   }
 
   function handleRemoveKey(index: number) {
@@ -102,10 +134,31 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
             ) : null}
             {translationKeys.map((key, rowIndex) => {
               const actualIndex = rowIndex + document.list_code_language.length;
+              const isEditingKey = editingKeyIndex === rowIndex;
               return (
                 <tr key={`${key}-${rowIndex}`}>
                   <td className="lang-comparison-cell-key">
-                    <span className="lang-comparison-key-text">{key}</span>
+                    {isEditingKey ? (
+                      <input
+                        className="lang-comparison-key-input"
+                        value={keyDraft}
+                        onChange={(e) => setKeyDraft(e.target.value)}
+                        onBlur={commitKeyEdit}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitKeyEdit();
+                          if (e.key === 'Escape') setEditingKeyIndex(null);
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        className="lang-comparison-key-text"
+                        onClick={() => startEditKey(rowIndex, key)}
+                        title="点击编辑"
+                      >
+                        {key}
+                      </span>
+                    )}
                   </td>
                   {document.list_code_language.map((code) => {
                     const translations = (document.list_translate[key] as Record<string, string>) ?? {};
