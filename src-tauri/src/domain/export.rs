@@ -1264,6 +1264,8 @@ fn battery_formatter_kind(kind: &str) -> u8 {
         "bool_text" => 1,
         "hex" => 2,
         "packed_time_0p1h" => 3,
+        "linear_u8_wrap" => 4,
+        "packed_time_legacy_discharge_0p1h" => 5,
         _ => 0,
     }
 }
