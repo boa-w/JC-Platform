@@ -2722,6 +2722,12 @@ button {
   padding: 4px 10px;
 }
 
+.config-table button.danger,
+.structured-list button.danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
 .config-table button:not(.config-restore-button):hover,
 .structured-list button:not(.config-restore-button):hover {
   border-color: var(--color-danger);
@@ -2995,6 +3001,43 @@ button {
   gap: 4px;
   align-items: center;
   justify-content: flex-end;
+}
+
+.battery-frame-actions button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 11px;
+  transition: all 0.15s;
+}
+
+.battery-frame-actions button:hover {
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.battery-frame-actions button.danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: white;
+}
+
+.battery-frame-actions button.danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.config-table input[type="checkbox"] {
+  width: auto;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
 }
 
 [data-theme="dark"] .battery-config-row input,

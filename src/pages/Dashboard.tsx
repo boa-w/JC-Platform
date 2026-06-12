@@ -964,250 +964,6 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     }
   }
 
-  function generateAdvancedPdoTestData() {
-    setGeneratingTestKey('pdo-advanced');
-    try {
-      updatePdoAdvancedDocument({
-        pdo_global_param: [
-          { param_id: '001', name: '电机转速', def: '0', reserved: 0, type: 0, inner: -1 },
-          { param_id: '002', name: '电机温度', def: '25', reserved: 0, type: 0, inner: -1 },
-          { param_id: '003', name: '电池电压', def: '480', reserved: 0, type: 0, inner: -1 },
-          { param_id: '004', name: '电池SOC', def: '50', reserved: 0, type: 0, inner: -1 },
-          { param_id: '005', name: '车速', def: '0', reserved: 0, type: 0, inner: -1 },
-          { param_id: '006', name: '故障码', def: '0', reserved: 0, type: 0, inner: -1 },
-        ],
-        pdo_condition: [
-          { param_id: '006', process: 0, data: [{ param_id: '003' }, { param_id: '004' }] },
-        ],
-        pdo_recv: [
-          {
-            id: 0x281, type: 0, desc: '电机状态帧', data: [
-              { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '001' },
-              { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '002' },
-            ]
-          },
-          {
-            id: 0x282, type: 0, desc: '电池状态帧', data: [
-              { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '003' },
-              { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '004' },
-            ]
-          },
-        ],
-        pdo_send: [
-          {
-            id: 0x201, type: 0, desc: '控制帧', data: [
-              { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '005' },
-              { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '006' },
-            ]
-          },
-        ],
-      });
-    } finally {
-      setGeneratingTestKey(null);
-    }
-  }
-
-  function generateBatteryMonitorTestData() {
-    setGeneratingTestKey('battery-monitor');
-    try {
-      updateBatteryMonitorDocument({
-        enabled: true,
-        version: 1,
-        page_size: 4,
-        default_timeout_ticks: 200,
-        frames: [
-          { frame_key: 'bat_2f0', can_id: 0x2F0, type: 0, desc: '锂电基础信息', timeout_ticks: 200 },
-          { frame_key: 'bat_2f1', can_id: 0x2F1, type: 0, desc: '锂电状态信息', timeout_ticks: 200 },
-          { frame_key: 'bat_2f2', can_id: 0x2F2, type: 0, desc: '锂电单体信息', timeout_ticks: 200 },
-          { frame_key: 'bat_2f3', can_id: 0x2F3, type: 0, desc: '锂电时间信息', timeout_ticks: 200 },
-        ],
-        signals: [
-          { signal_key: 'battery_voltage', param_id: 'BATTERY_MONITOR_VOLTAGE', name: '电池总电压', inner: 17, type: 10, def: '0', frame_key: 'bat_2f0', pos: 0, len: 16, show_type: 0 },
-          { signal_key: 'battery_current', param_id: 'BATTERY_MONITOR_CURRENT', name: '电池总电流', inner: 22, type: 10, def: '0', frame_key: 'bat_2f0', pos: 16, len: 16, show_type: 0 },
-          { signal_key: 'battery_soc', param_id: 'BATTERY_MONITOR_SOC', name: '电池SOC', inner: -1, type: 0, def: '0', frame_key: 'bat_2f0', pos: 32, len: 8, show_type: 0 },
-          { signal_key: 'battery_capacity', param_id: 'BATTERY_MONITOR_CAPACITY', name: '电池容量', inner: 23, type: 0, def: '0', frame_key: 'bat_2f0', pos: 40, len: 8, show_type: 0 },
-          { signal_key: 'battery_error_info', param_id: 'BATTERY_MONITOR_ERROR_INFO', name: '故障信息', inner: 25, type: 10, def: '0', frame_key: 'bat_2f0', pos: 48, len: 16, show_type: 0 },
-          { signal_key: 'battery_heat_status', param_id: 'BATTERY_MONITOR_HEAT_STATUS', name: '电加热状态', inner: 24, type: 0, def: '0', frame_key: 'bat_2f1', pos: 56, len: 1, show_type: 1 },
-          { signal_key: 'cell_max_temp', param_id: 'BATTERY_MONITOR_CELL_MAX_TEMP', name: '单体最高温度', inner: 20, type: 0, def: '0', frame_key: 'bat_2f2', pos: 0, len: 8, show_type: 0 },
-          { signal_key: 'cell_min_temp', param_id: 'BATTERY_MONITOR_CELL_MIN_TEMP', name: '单体最低温度', inner: 21, type: 0, def: '0', frame_key: 'bat_2f2', pos: 8, len: 8, show_type: 0 },
-          { signal_key: 'cell_max_voltage', param_id: 'BATTERY_MONITOR_CELL_MAX_VOLTAGE', name: '单体最高电压', inner: 18, type: 10, def: '0', frame_key: 'bat_2f2', pos: 16, len: 16, show_type: 0 },
-          { signal_key: 'cell_min_voltage', param_id: 'BATTERY_MONITOR_CELL_MIN_VOLTAGE', name: '单体最低电压', inner: 19, type: 10, def: '0', frame_key: 'bat_2f2', pos: 32, len: 16, show_type: 0 },
-          { signal_key: 'battery_usage_time', param_id: 'BATTERY_MONITOR_USAGE_TIME', name: '电池使用时间', inner: 26, type: 20, def: '0', frame_key: 'bat_2f3', pos: 0, len: 24, show_type: 0 },
-          { signal_key: 'battery_discharge_time', param_id: 'BATTERY_MONITOR_DISCHARGE_TIME', name: '电池放电时间', inner: 27, type: 20, def: '0', frame_key: 'bat_2f3', pos: 24, len: 24, show_type: 0 },
-        ],
-        items: [
-          { item_key: 'battery_voltage', enabled: true, order: 0, signal_key: 'battery_voltage', name_key: '电池总电压', unit: 'V', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 10, decimals: 1, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
-          { item_key: 'battery_soc', enabled: true, order: 1, signal_key: 'battery_soc', name_key: 'SOC', unit: '%', formatter: { kind: 'linear', offset: 0, scale_num: 4, scale_den: 10, decimals: 0, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
-          { item_key: 'cell_max_voltage', enabled: true, order: 2, signal_key: 'cell_max_voltage', name_key: '单体最高电压', unit: 'V', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 1000, decimals: 1, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f2', empty_text: ' ' } },
-          { item_key: 'battery_capacity', enabled: true, order: 3, signal_key: 'battery_capacity', name_key: '电池容量', unit: 'AH', formatter: { kind: 'linear_u8_wrap', offset: 0, scale_num: 5, scale_den: 1, decimals: 0, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
-          { item_key: 'cell_min_voltage', enabled: true, order: 4, signal_key: 'cell_min_voltage', name_key: '单体最低电压', unit: 'V', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 1000, decimals: 1, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f2', empty_text: ' ' } },
-          { item_key: 'battery_heat_status', enabled: true, order: 5, signal_key: 'battery_heat_status', name_key: '电加热状态', unit: '', formatter: { kind: 'bool_text', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, display_base: 10, true_text: '开', false_text: '关' }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f1', empty_text: ' ' } },
-          { item_key: 'cell_max_temp', enabled: true, order: 6, signal_key: 'cell_max_temp', name_key: '单体最高温度', unit: '℃', formatter: { kind: 'linear', offset: -40, scale_num: 1, scale_den: 1, decimals: 0, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f2', empty_text: ' ' } },
-          { item_key: 'battery_error_info', enabled: true, order: 7, signal_key: 'battery_error_info', name_key: '故障信息', unit: '', formatter: { kind: 'linear_u8_wrap', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
-          { item_key: 'cell_min_temp', enabled: true, order: 8, signal_key: 'cell_min_temp', name_key: '单体最低温度', unit: '℃', formatter: { kind: 'linear', offset: -40, scale_num: 1, scale_den: 1, decimals: 0, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f2', empty_text: ' ' } },
-          { item_key: 'battery_usage_time', enabled: true, order: 9, signal_key: 'battery_usage_time', name_key: '电池使用时间', unit: 'H', formatter: { kind: 'packed_time_0p1h', offset: 0, scale_num: 1, scale_den: 1, decimals: 1, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f3', empty_text: ' ' } },
-          { item_key: 'battery_current', enabled: true, order: 10, signal_key: 'battery_current', name_key: '电池总电流', unit: 'A', formatter: { kind: 'linear', offset: -32000, scale_num: 1, scale_den: 10, decimals: 1, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f0', empty_text: ' ' } },
-          { item_key: 'battery_discharge_time', enabled: true, order: 11, signal_key: 'battery_discharge_time', name_key: '电池放电时间', unit: 'H', formatter: { kind: 'packed_time_legacy_discharge_0p1h', offset: 0, scale_num: 1, scale_den: 1, decimals: 1, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: 'bat_2f3', empty_text: ' ' } },
-        ],
-      });
-    } finally {
-      setGeneratingTestKey(null);
-    }
-  }
-
-  async function handleGenerateCanTest() {
-    if (!loadedProject) {
-      setCanTestStatus('请先打开 .jcpro 项目。');
-      return;
-    }
-    setIsGeneratingCanTest(true);
-    setCanTestStatus(null);
-    try {
-      const result = await generateCanTestData(loadedProject.document);
-      const frames = result.frames.map((f) => ({ ...f, cycleMs: canTestDefaultCycle }));
-      setCanTestFrames(frames);
-      setCanTestStatus(`已生成 ${result.frameCount} 个 CAN 帧`);
-    } catch (error) {
-      setCanTestStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsGeneratingCanTest(false);
-    }
-  }
-
-  function updateCanTestFrame(index: number, field: keyof CanTestFrame, value: number | string) {
-    setCanTestFrames((prev) => prev.map((f, i) => (i === index ? { ...f, [field]: value } : f)));
-  }
-
-  function computeHexFromSignals(signals: CanTestSignalValue[], dlc: number): string {
-    const bytes = new Uint8Array(dlc);
-    for (const sig of signals) {
-      let value = sig.rawValue >>> 0;
-      let bitPos = sig.pos;
-      let bitsRem = sig.len;
-      while (bitsRem > 0) {
-        const byteIdx = Math.floor(bitPos / 8);
-        if (byteIdx >= dlc) break;
-        const bitOff = bitPos % 8;
-        const bitsThis = Math.min(8 - bitOff, bitsRem);
-        bytes[byteIdx] |= (value & ((1 << bitsThis) - 1)) << bitOff;
-        value >>>= bitsThis;
-        bitPos += bitsThis;
-        bitsRem -= bitsThis;
-      }
-    }
-    return Array.from(bytes).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
-  }
-
-  function updateCanTestSignalDisplayValue(frameIndex: number, signalIndex: number, displayValue: number) {
-    setCanTestFrames((prev) => prev.map((frame, fi) => {
-      if (fi !== frameIndex) return frame;
-      const newSignals = frame.signals.map((sig, si) => {
-        if (si !== signalIndex) return sig;
-        const rawValue = Math.round((displayValue - sig.offset) * sig.scaleDen / sig.scaleNum);
-        return { ...sig, displayValue, rawValue: Math.max(0, rawValue) };
-      });
-      const newData = computeHexFromSignals(newSignals, frame.dlc);
-      return { ...frame, signals: newSignals, data: newData };
-    }));
-  }
-
-  function fillCanTestSignals(mode: 'min' | 'max' | 'random' | 'zero' | 'ff') {
-    setCanTestFrames((prev) => prev.map((frame) => {
-      const newSignals = frame.signals.map((sig) => {
-        let rawValue: number;
-        if (mode === 'zero' || mode === 'min') {
-          rawValue = 0;
-        } else if (mode === 'ff' || mode === 'max') {
-          rawValue = 0xFFFFFFFF >>> (32 - sig.len);
-        } else {
-          const maxRaw = 0xFFFFFFFF >>> (32 - sig.len);
-          rawValue = Math.floor(Math.random() * (maxRaw + 1));
-        }
-        const displayValue = rawValue * sig.scaleNum / sig.scaleDen + sig.offset;
-        return { ...sig, rawValue, displayValue };
-      });
-      const newData = computeHexFromSignals(newSignals, frame.dlc);
-      return { ...frame, signals: newSignals, data: newData };
-    }));
-    const labels: Record<string, string> = { zero: '全部清零', min: '填充最小值', max: '填充最大值', random: '填充随机值', ff: '全填 FF' };
-    setCanTestStatus(`已${labels[mode]}`);
-  }
-
-  async function handleExportCanTestTxt() {
-    if (!loadedProject || canTestFrames.length === 0) {
-      setCanTestStatus('请先生成测试数据。');
-      return;
-    }
-    const selected = await open({
-      filters: [{ name: '文本文件', extensions: ['txt'] }],
-    });
-    if (typeof selected !== 'string') return;
-
-    const lines: string[] = [
-      '# CAN Test Data',
-      `# Generated: ${new Date().toISOString()}`,
-      `# Source: ${loadedProject.summary.name || 'unknown'}`,
-      '# ---',
-      '# CAN_ID, TYPE, NAME, DLC, CYCLE_MS, DATA_HEX',
-    ];
-    for (const frame of canTestFrames) {
-      const idStr = `0x${frame.id.toString(16).toUpperCase()}`;
-      lines.push(`${idStr}, ${frame.frameType}, ${frame.name}, ${frame.dlc}, ${frame.cycleMs}, ${frame.data}`);
-      for (const sig of frame.signals) {
-        lines.push(`#   ${sig.name} = ${sig.displayValue} ${sig.unit} (raw=${sig.rawValue}, pos=${sig.pos}, len=${sig.len})`);
-      }
-    }
-
-    try {
-      await saveTextFile(selected, lines.join('\n'));
-      setCanTestStatus(`已导出：${selected}`);
-    } catch (error) {
-      setCanTestStatus(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleExportCanTestConfig() {
-    if (canTestFrames.length === 0) {
-      setCanTestStatus('请先生成测试数据。');
-      return;
-    }
-    const selected = await open({
-      filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }],
-    });
-    if (typeof selected !== 'string') return;
-
-    try {
-      await saveJsonFile(selected, {
-        version: 1,
-        defaultCycleMs: canTestDefaultCycle,
-        frames: canTestFrames,
-      });
-      setCanTestStatus(`已导出配置：${selected}`);
-    } catch (error) {
-      setCanTestStatus(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleImportCanTestConfig() {
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }],
-    });
-    if (typeof selected !== 'string') return;
-
-    try {
-      const config = await loadJsonFile(selected) as { version?: number; defaultCycleMs?: number; frames?: CanTestFrame[] };
-      if (!config.frames || !Array.isArray(config.frames)) {
-        setCanTestStatus('配置文件中没有有效的帧数据。');
-        return;
-      }
-      setCanTestFrames(config.frames);
-      if (config.defaultCycleMs) setCanTestDefaultCycle(config.defaultCycleMs);
-      setCanTestStatus(`已导入 ${config.frames.length} 个 CAN 帧`);
-    } catch (error) {
-      setCanTestStatus(error instanceof Error ? error.message : String(error));
-    }
-  }
   function updateLanguageDocument(next: LanguageDocument) {
     updateProjectDocument('language_info', next);
   }
@@ -3525,51 +3281,51 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   <article><span>写回段落</span><strong>battery_monitor_info</strong></article>
                 </div>
                 <div className="battery-config-row">
-                  <label>启用<select value={currentBatteryMonitorDocument.enabled ? 1 : 0} onChange={(event) => updateBatteryMonitorField('enabled', Number(event.target.value) === 1)}><option value={1}>启用</option><option value={0}>停用</option></select></label>
-                  <label>版本<input type="number" value={currentBatteryMonitorDocument.version ?? 1} onChange={(event) => updateBatteryMonitorField('version', Number(event.target.value))} /></label>
-                  <label>每页数量<input type="number" value={currentBatteryMonitorDocument.page_size ?? 4} onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))} /></label>
-                  <label>默认超时 tick<input type="number" value={currentBatteryMonitorDocument.default_timeout_ticks ?? 200} onChange={(event) => updateBatteryMonitorField('default_timeout_ticks', Number(event.target.value))} /></label>
+                  <label title="启用或停用锂电监控功能">启用<select value={currentBatteryMonitorDocument.enabled ? 1 : 0} onChange={(event) => updateBatteryMonitorField('enabled', Number(event.target.value) === 1)}><option value={1}>启用</option><option value={0}>停用</option></select></label>
+                  <label title="配置版本号，用于标识数据格式版本">版本<input type="number" value={currentBatteryMonitorDocument.version ?? 1} onChange={(event) => updateBatteryMonitorField('version', Number(event.target.value))} /></label>
+                  <label title="每页显示的锂电数据条数">每页数量<input type="number" value={currentBatteryMonitorDocument.page_size ?? 4} onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))} /></label>
+                  <label title="帧数据的默认超时时间（单位：tick），各帧可单独覆盖">默认超时 tick<input type="number" value={currentBatteryMonitorDocument.default_timeout_ticks ?? 200} onChange={(event) => updateBatteryMonitorField('default_timeout_ticks', Number(event.target.value))} /></label>
                 </div>
                 <section className="pdo-frame-section">
                   <div className="config-table-toolbar"><strong>锂电 CAN 帧（{currentBatteryMonitorDocument.frames.length}）</strong><button onClick={addBatteryFrame} type="button">新增帧</button></div>
                   {currentBatteryMonitorDocument.frames.map((frame, frameIndex) => (
                     <article className={isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? 'pdo-frame-card battery-frame-card config-entry-modified' : 'pdo-frame-card battery-frame-card'} key={`${frame.frame_key}-${frameIndex}`}>
                       <div className="battery-frame-grid">
-                        <label>帧 key<input value={frame.frame_key} onChange={(event) => updateBatteryFrame(frameIndex, 'frame_key', event.target.value)} /></label>
-                        <label>帧 ID<input inputMode="text" value={formatFrameId(frame.can_id)} onChange={(event) => updateBatteryFrameId(frameIndex, event.target.value)} /></label>
-                        <label>帧类型<select value={frame.type} onChange={(event) => updateBatteryFrame(frameIndex, 'type', Number(event.target.value))}><option value={0}>标准帧</option><option value={1}>扩展帧</option></select></label>
-                        <label>超时 tick<input type="number" value={frame.timeout_ticks ?? currentBatteryMonitorDocument.default_timeout_ticks} onChange={(event) => updateBatteryFrame(frameIndex, 'timeout_ticks', Number(event.target.value))} /></label>
-                        <label>描述<input value={frame.desc ?? ''} onChange={(event) => updateBatteryFrame(frameIndex, 'desc', event.target.value)} /></label>
+                        <label title="帧的唯一标识键名，用于信号和显示项引用">帧 key<input value={frame.frame_key} onChange={(event) => updateBatteryFrame(frameIndex, 'frame_key', event.target.value)} /></label>
+                        <label title="CAN 帧 ID，支持十进制或 0x 开头的十六进制格式">帧 ID<input inputMode="text" value={formatFrameId(frame.can_id)} onChange={(event) => updateBatteryFrameId(frameIndex, event.target.value)} /></label>
+                        <label title="标准帧使用 11 位 CAN ID，扩展帧使用 29 位 CAN ID">帧类型<select value={frame.type} onChange={(event) => updateBatteryFrame(frameIndex, 'type', Number(event.target.value))}><option value={0}>标准帧</option><option value={1}>扩展帧</option></select></label>
+                        <label title="该帧的超时时间（tick），留空则使用上方默认值">超时 tick<input type="number" value={frame.timeout_ticks ?? currentBatteryMonitorDocument.default_timeout_ticks} onChange={(event) => updateBatteryFrame(frameIndex, 'timeout_ticks', Number(event.target.value))} /></label>
+                        <label title="帧的描述说明">描述<input value={frame.desc ?? ''} onChange={(event) => updateBatteryFrame(frameIndex, 'desc', event.target.value)} /></label>
                       </div>
                       <div className="battery-frame-actions">
                         {isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'frames', frameIndex])} type="button">恢复帧</button> : null}
-                        <button onClick={() => removeBatteryFrame(frameIndex)} type="button">删除帧</button>
+                        <button className="danger" onClick={() => removeBatteryFrame(frameIndex)} type="button">删除帧</button>
                       </div>
                     </article>
                   ))}
                 </section>
                 <section className="pdo-frame-section">
                   <div className="config-table-toolbar"><strong>锂电信号（{currentBatteryMonitorDocument.signals.length}）</strong><button onClick={addBatterySignal} type="button">新增信号</button></div>
-                  <div className="config-table-frame"><table className="config-table"><thead><tr><th>key</th><th>参数ID</th><th>名称</th><th>内部变量</th><th>类型</th><th>帧</th><th>位置</th><th>长度</th><th>取数</th><th>操作</th></tr></thead><tbody>
+                  <div className="config-table-frame"><table className="config-table"><thead><tr><th title="信号的唯一标识键名">key</th><th title="信号对应的参数 ID，用于读写操作">参数ID</th><th title="信号的中文名称">名称</th><th title="关联的内部变量编号，-1 表示无关联，用于与底层硬件参数对应">内部变量</th><th title="数据类型：U8（无符号8位）/ U16（无符号16位）/ U32（无符号32位）/ I16（有符号16位）/ U32（时间打包）">类型</th><th title="信号所属的 CAN 帧">帧</th><th title="信号在帧数据中的起始 bit 位置">位置</th><th title="信号占用的 bit 长度">长度</th><th title="取数方式：按字节取出 / 按字节+位取出 / 按位取出">取数</th><th>操作</th></tr></thead><tbody>
                     {currentBatteryMonitorDocument.signals.map((signal, signalIndex) => (
                       <tr className={isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? 'config-entry-modified' : undefined} key={`${signal.signal_key}-${signalIndex}`}>
                         <td><input value={signal.signal_key} onChange={(event) => updateBatterySignal(signalIndex, 'signal_key', event.target.value)} /></td>
                         <td><input value={signal.param_id} onChange={(event) => updateBatterySignal(signalIndex, 'param_id', event.target.value)} /></td>
                         <td><input value={signal.name} onChange={(event) => updateBatterySignal(signalIndex, 'name', event.target.value)} /></td>
                         <td><input type="number" value={signal.inner} onChange={(event) => updateBatterySignal(signalIndex, 'inner', Number(event.target.value))} /></td>
-                        <td><input type="number" value={signal.type} onChange={(event) => updateBatterySignal(signalIndex, 'type', Number(event.target.value))} /></td>
+                        <td><select value={signal.type} onChange={(event) => updateBatterySignal(signalIndex, 'type', Number(event.target.value))}><option value={0}>U8（无符号8位）</option><option value={1}>U16（无符号16位）</option><option value={2}>U32（无符号32位）</option><option value={10}>I16（有符号16位）</option><option value={20}>U32（时间打包）</option></select></td>
                         <td><select value={signal.frame_key} onChange={(event) => updateBatterySignal(signalIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
                         <td><input type="number" value={signal.pos} onChange={(event) => updateBatterySignal(signalIndex, 'pos', Number(event.target.value))} /></td>
                         <td><input type="number" value={signal.len} onChange={(event) => updateBatterySignal(signalIndex, 'len', Number(event.target.value))} /></td>
-                        <td><input type="number" value={signal.show_type} onChange={(event) => updateBatterySignal(signalIndex, 'show_type', Number(event.target.value))} /></td>
-                        <td>{isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'signals', signalIndex])} type="button">恢复</button> : null}<button onClick={() => removeBatterySignal(signalIndex)} type="button">删除</button></td>
+                        <td><select value={signal.show_type} onChange={(event) => updateBatterySignal(signalIndex, 'show_type', Number(event.target.value))}><option value={0}>按字节</option><option value={1}>按字节+位</option><option value={2}>按位</option></select></td>
+                        <td>{isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'signals', signalIndex])} type="button">恢复</button> : null}<button className="danger" onClick={() => removeBatterySignal(signalIndex)} type="button">删除</button></td>
                       </tr>
                     ))}
                   </tbody></table></div>
                 </section>
                 <section className="pdo-frame-section">
                   <div className="config-table-toolbar"><strong>显示项（{currentBatteryMonitorDocument.items.length}）</strong><button onClick={addBatteryItem} type="button">新增显示项</button></div>
-                  <div className="config-table-frame"><table className="config-table"><thead><tr><th>启用</th><th>顺序</th><th>key</th><th>信号</th><th>名称key</th><th>单位</th><th>格式</th><th>偏移</th><th>缩放</th><th>小数</th><th>有效帧</th><th>操作</th></tr></thead><tbody>
+                  <div className="config-table-frame"><table className="config-table"><thead><tr><th title="是否在界面中显示该项">启用</th><th title="显示顺序，数值越小越靠前">顺序</th><th title="显示项的唯一标识键名">key</th><th title="关联的信号，选择后显示该信号的数据">信号</th><th title="国际化键名，用于多语言显示名称">名称key</th><th title="显示单位">单位</th><th title="数据格式化方式（线性/布尔文本/十六进制/时间等）">格式</th><th title="显示值的偏移量：显示值 = 原始值 × 缩放 + 偏移">偏移</th><th title="原始值与显示值的缩放比例：显示值 = 原始值 × 分子/分母 + 偏移">缩放</th><th title="保留的小数位数">小数</th><th title="关联的有效性判断帧，用于检测数据是否超时">有效帧</th><th>操作</th></tr></thead><tbody>
                     {currentBatteryMonitorDocument.items.map((item, itemIndex) => (
                       <tr className={isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? 'config-entry-modified' : undefined} key={`${item.item_key}-${itemIndex}`}>
                         <td><input checked={item.enabled} type="checkbox" onChange={(event) => updateBatteryItem(itemIndex, 'enabled', event.target.checked)} /></td>
@@ -3583,7 +3339,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                         <td><input type="number" value={item.formatter?.scale_num ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_num', Number(event.target.value))} />/<input type="number" value={item.formatter?.scale_den ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_den', Number(event.target.value))} /></td>
                         <td><input type="number" value={item.formatter?.decimals ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'decimals', Number(event.target.value))} /></td>
                         <td><select value={item.validity?.frame_key ?? ''} onChange={(event) => updateBatteryItemValidity(itemIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
-                        <td>{isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'items', itemIndex])} type="button">恢复</button> : null}<button onClick={() => removeBatteryItem(itemIndex)} type="button">删除</button></td>
+                        <td>{isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'items', itemIndex])} type="button">恢复</button> : null}<button className="danger" onClick={() => removeBatteryItem(itemIndex)} type="button">删除</button></td>
                       </tr>
                     ))}
                   </tbody></table></div>
