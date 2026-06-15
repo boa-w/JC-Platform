@@ -11,6 +11,9 @@ import {
   exportTableWorkbook,
   flattenUnifiedProtocolDocument,
   getLegacyTableSpec,
+  importDbc,
+  exportDbc,
+  generateDbcContent,
   importLanguageCsv,
   importLanguageWorkbook,
   importPdoSimpleCsv,
@@ -20,6 +23,7 @@ import {
   languageDocumentTable,
   loadJsonFile,
   loadProject,
+  loadTextFile,
   migrateProjectDocument,
   parsePdoAdvancedProject,
   parseProjectDocument,
@@ -41,6 +45,7 @@ import type {
   BackendHealth,
   BatteryMonitorFrame,
   BatteryMonitorInfo,
+  BatteryProtocol,
   BatteryMonitorItem,
   BatteryMonitorSignal,
   BinaryBuildReport,
@@ -84,7 +89,9 @@ import { LanguagePage } from '../components/language';
 import { featureModules } from '../data/modules';
 import { cloneJson, deepEqual, isPathModified, restorePath, type JsonPath } from '../utils/projectDirty';
 import { getTestData, testDataLabels, type TestDataType } from '../data/test-data';
+import { framesToCsv, csvToFrames, signalsToCsv, csvToSignals, itemsToCsv, csvToItems } from '../utils/batteryCsv';
 import { useCanTestData } from '../hooks/useCanTestData';
+import { useExportBatteryOptions } from '../stores/exportSettings';
 
 interface DashboardProps {
   activeModule: FeatureModule;
@@ -136,14 +143,15 @@ const modifiedSectionLabels: Record<string, string> = {
   pdo_recv: 'PDO 接收帧',
   pdo_send: 'PDO 发送帧',
   language_info: '多国语言',
-  battery_monitor_info: '锂电监控配置',
+  battery_protocol: '锂电协议',
+  battery_monitor_info: '锂电监控显示',
   signal_dictionary: '业务信号字典',
   private_protocol: '私有协议',
   protocol_mapping: '协议映射',
 };
 
 const trackedDocumentSections = Object.keys(modifiedSectionLabels);
-const refactorOnlySections = ['signal_dictionary', 'private_protocol', 'protocol_mapping', 'battery_monitor_info'] as const;
+const refactorOnlySections = ['signal_dictionary', 'private_protocol', 'protocol_mapping', 'battery_protocol', 'battery_monitor_info'] as const;
 type RefactorOnlySection = typeof refactorOnlySections[number];
 
 type SdoNodeField = keyof Pick<SdoNodeDocument,
@@ -236,6 +244,24 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [unifiedProtocolError, setUnifiedProtocolError] = useState<string | null>(null);
   const [isParsingUnifiedProtocol, setIsParsingUnifiedProtocol] = useState(false);
   const [protocolFlattenStatus, setProtocolFlattenStatus] = useState<string | null>(null);
+  const [privateProtocolImportStatus, setPrivateProtocolImportStatus] = useState<string | null>(null);
+  const [isImportingPrivateProtocol, setIsImportingPrivateProtocol] = useState(false);
+  const [privateProtocolExportStatus, setPrivateProtocolExportStatus] = useState<string | null>(null);
+  const [isExportingPrivateProtocol, setIsExportingPrivateProtocol] = useState(false);
+  const [batteryProtocolImportStatus, setBatteryProtocolImportStatus] = useState<string | null>(null);
+  const [batteryProtocolExportStatus, setBatteryProtocolExportStatus] = useState<string | null>(null);
+  const [isExportingBatteryProtocol, setIsExportingBatteryProtocol] = useState(false);
+  const [isImportingBatteryProtocol, setIsImportingBatteryProtocol] = useState(false);
+  const [batteryCsvStatus, setBatteryCsvStatus] = useState<string | null>(null);
+  const [isExportingBatteryCsv, setIsExportingBatteryCsv] = useState(false);
+  const [isImportingBatteryCsv, setIsImportingBatteryCsv] = useState(false);
+  const [batteryDbcStatus, setBatteryDbcStatus] = useState<string | null>(null);
+  const [isExportingBatteryDbc, setIsExportingBatteryDbc] = useState(false);
+  const [isImportingBatteryDbc, setIsImportingBatteryDbc] = useState(false);
+  const [batteryMonitorImportStatus, setBatteryMonitorImportStatus] = useState<string | null>(null);
+  const [isImportingBatteryMonitor, setIsImportingBatteryMonitor] = useState(false);
+  const [batteryMonitorExportStatus, setBatteryMonitorExportStatus] = useState<string | null>(null);
+  const [isExportingBatteryMonitor, setIsExportingBatteryMonitor] = useState(false);
   const [exportOutputDir, setExportOutputDir] = useState('jc-export');
   const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
   const [imageCopyReport, setImageCopyReport] = useState<UiImageCopyReport | null>(null);
@@ -254,6 +280,11 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
   const canTestData = useCanTestData();
+  const {
+    options: exportBatteryOptions,
+    updateOption: updateExportBatteryOption,
+    resetOptions: resetExportBatteryOptions,
+  } = useExportBatteryOptions();
   const [newLanguageCode, setNewLanguageCode] = useState('');
   const [newLanguageLabel, setNewLanguageLabel] = useState('');
   const [newLanguageInnerKey, setNewLanguageInnerKey] = useState('');
@@ -285,6 +316,22 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2));
     setConfigEditorError(null);
   }, [activeModule.key, loadedProject?.document]);
+
+  useEffect(() => {
+    if (!loadedProject) return;
+    const doc = loadedProject.document as Record<string, unknown>;
+    const defaults: Record<string, unknown> = {};
+    if (!doc.battery_protocol) {
+      defaults.battery_protocol = { default_timeout_ticks: 200, frames: [], signals: [] };
+    }
+    if (!doc.battery_monitor_info) {
+      defaults.battery_monitor_info = { enabled: true, page_size: 4, items: [] };
+    }
+    if (Object.keys(defaults).length > 0) {
+      const document = { ...doc, ...defaults };
+      acceptLoadedProject({ ...loadedProject, document }, projectPath);
+    }
+  }, [loadedProject]);
 
   useEffect(() => {
     if (loadedProject && (activeModule.key === 'signal-dictionary' || activeModule.key === 'private-protocol' || activeModule.key === 'protocol-mapping')) {
@@ -353,6 +400,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (jsonEditorKey === 'sdo') return document.sdo_info;
     if (jsonEditorKey === 'pdo-simple') return document.pdo_simple_send_recv;
     if (activeModule.key === 'language') return document.language_info;
+    if (activeModule.key === 'battery-protocol') return document.battery_protocol;
     if (activeModule.key === 'battery-monitor') return document.battery_monitor_info;
     if (activeModule.key === 'signal-dictionary') return document.signal_dictionary;
     if (activeModule.key === 'private-protocol') return document.private_protocol;
@@ -434,6 +482,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (jsonEditorKey === 'sdo') document = restorePath(document, baselineDocument, ['sdo_info']);
     if (jsonEditorKey === 'pdo-simple') document = restorePath(document, baselineDocument, ['pdo_simple_send_recv']);
     if (activeModule.key === 'language') document = restorePath(document, baselineDocument, ['language_info']);
+    if (activeModule.key === 'battery-protocol') document = restorePath(document, baselineDocument, ['battery_protocol']);
     if (activeModule.key === 'battery-monitor') document = restorePath(document, baselineDocument, ['battery_monitor_info']);
     if (activeModule.key === 'signal-dictionary') document = restorePath(document, baselineDocument, ['signal_dictionary']);
     if (activeModule.key === 'private-protocol') document = restorePath(document, baselineDocument, ['private_protocol']);
@@ -566,6 +615,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       signal_dictionary: source.signal_dictionary ?? { signals: [] },
       private_protocol: source.private_protocol ?? { enabled: false, frames: [] },
       protocol_mapping: source.protocol_mapping ?? [],
+      battery_protocol: source.battery_protocol ?? null,
       battery_monitor_info: source.battery_monitor_info ?? null,
     };
   }
@@ -732,6 +782,54 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     }));
   }
 
+  async function handleExportPrivateProtocol() {
+    setPrivateProtocolExportStatus(null);
+    if (!loadedProject) { setPrivateProtocolExportStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setPrivateProtocolExportStatus('系统保存对话框只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await save({
+      filters: [{ name: '私有协议配置', extensions: ['json'] }],
+    });
+    if (!selected) return;
+
+    setIsExportingPrivateProtocol(true);
+    try {
+      await saveJsonFile(selected, currentPrivateProtocol);
+      setPrivateProtocolExportStatus(`已导出：${selected}`);
+    } catch (error) {
+      setPrivateProtocolExportStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingPrivateProtocol(false);
+    }
+  }
+
+  async function handleImportPrivateProtocol() {
+    setPrivateProtocolImportStatus(null);
+    if (!loadedProject) { setPrivateProtocolImportStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setPrivateProtocolImportStatus('系统文件选择器只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: '私有协议配置', extensions: ['json'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    setIsImportingPrivateProtocol(true);
+    try {
+      const data = await loadJsonFile(selected) as { enabled: boolean; frames: PrivateFrame[] };
+      if (!data || typeof data.enabled !== 'boolean' || !Array.isArray(data.frames)) {
+        setPrivateProtocolImportStatus('无效的私有协议配置文件。');
+        return;
+      }
+      updatePrivateProtocolDocument(data);
+      setPrivateProtocolImportStatus(`已导入 ${data.frames.length} 个私有帧`);
+    } catch (error) {
+      setPrivateProtocolImportStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsImportingPrivateProtocol(false);
+    }
+  }
+
   function updateProtocolMappings(next: ProtocolMapping[]) {
     updateProjectDocument('protocol_mapping', next);
     refreshUnifiedProtocolFromDocument({ ...((loadedProject?.document as Record<string, unknown>) ?? {}), protocol_mapping: next });
@@ -812,6 +910,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       if (jsonEditorKey === 'sdo') document.sdo_info = parsed;
       if (jsonEditorKey === 'pdo-simple') document.pdo_simple_send_recv = parsed;
       if (activeModule.key === 'language') document.language_info = parsed;
+      if (activeModule.key === 'battery-protocol') document.battery_protocol = parsed;
       if (activeModule.key === 'battery-monitor') document.battery_monitor_info = parsed;
       if (activeModule.key === 'signal-dictionary') document.signal_dictionary = parsed;
       if (activeModule.key === 'private-protocol') document.private_protocol = parsed;
@@ -833,9 +932,39 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     return (loadedProject.document as Record<string, unknown>).language_info as LanguageDocument;
   }
 
-  function batteryMonitorDocument(): BatteryMonitorInfo | null {
-    if (!loadedProject) return null;
-    return (loadedProject.document as Record<string, unknown>).battery_monitor_info as BatteryMonitorInfo;
+  function batteryProtocolDocument(): BatteryProtocol {
+    if (!loadedProject) return { default_timeout_ticks: 200, frames: [], signals: [] };
+    const doc = loadedProject.document as Record<string, unknown>;
+    if (!doc.battery_protocol) {
+      return { default_timeout_ticks: 200, frames: [], signals: [] };
+    }
+    return doc.battery_protocol as BatteryProtocol;
+  }
+
+  async function updateBatteryProtocolDocument(next: BatteryProtocol) {
+    if (next.frames.length > 0 || next.signals.length > 0) {
+      try {
+        const dbc = await generateDbcContent(next.frames, next.signals);
+        updateProjectDocument('battery_protocol', { ...next, dbc_content: dbc });
+        return;
+      } catch { /* fall through */ }
+    }
+    updateProjectDocument('battery_protocol', next);
+  }
+
+  function updateBatteryProtocolField(field: keyof BatteryProtocol, value: unknown) {
+    const document = batteryProtocolDocument();
+    if (!document) return;
+    updateBatteryProtocolDocument({ ...document, [field]: value });
+  }
+
+  function batteryMonitorDocument(): BatteryMonitorInfo {
+    if (!loadedProject) return { enabled: true, page_size: 4, items: [] };
+    const doc = loadedProject.document as Record<string, unknown>;
+    if (!doc.battery_monitor_info) {
+      return { enabled: true, page_size: 4, items: [] };
+    }
+    return doc.battery_monitor_info as BatteryMonitorInfo;
   }
 
   function updateBatteryMonitorDocument(next: BatteryMonitorInfo) {
@@ -848,10 +977,22 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     updateBatteryMonitorDocument({ ...document, [field]: value });
   }
 
+  function currentBatteryFrames(): BatteryMonitorFrame[] {
+    return batteryProtocolDocument()?.frames ?? [];
+  }
+
+  function currentBatterySignals(): BatteryMonitorSignal[] {
+    return batteryProtocolDocument()?.signals ?? [];
+  }
+
+  function currentBatteryDefaultTimeout(): number {
+    return batteryProtocolDocument()?.default_timeout_ticks ?? 200;
+  }
+
   function updateBatteryFrame(index: number, field: keyof BatteryMonitorFrame, value: string | number) {
-    const document = batteryMonitorDocument();
+    const document = batteryProtocolDocument();
     if (!document) return;
-    updateBatteryMonitorDocument({
+    updateBatteryProtocolDocument({
       ...document,
       frames: document.frames.map((frame, currentIndex) => (currentIndex === index ? { ...frame, [field]: value } : frame)),
     });
@@ -863,44 +1004,57 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   }
 
   function addBatteryFrame() {
-    const document = batteryMonitorDocument();
+    const document = batteryProtocolDocument();
     if (!document) return;
     const index = document.frames.length;
-    updateBatteryMonitorDocument({
+    updateBatteryProtocolDocument({
       ...document,
       frames: [...document.frames, { frame_key: `bat_custom_${index + 1}`, can_id: 0, type: 0, desc: '新锂电帧', timeout_ticks: document.default_timeout_ticks ?? 200 }],
     });
   }
 
   function removeBatteryFrame(index: number) {
-    const document = batteryMonitorDocument();
+    const document = batteryProtocolDocument();
     if (!document) return;
-    updateBatteryMonitorDocument({ ...document, frames: document.frames.filter((_, currentIndex) => currentIndex !== index) });
+    const removedFrameKey = document.frames[index]?.frame_key;
+    const remainingFrames = document.frames.filter((_, currentIndex) => currentIndex !== index);
+    const firstFrameKey = remainingFrames[0]?.frame_key;
+    const signals = document.signals.map((signal) =>
+      signal.frame_key === removedFrameKey && firstFrameKey
+        ? { ...signal, frame_key: firstFrameKey }
+        : signal,
+    );
+    updateBatteryProtocolDocument({ ...document, frames: remainingFrames, signals });
   }
 
   function updateBatterySignal(index: number, field: keyof BatteryMonitorSignal, value: string | number) {
-    const document = batteryMonitorDocument();
+    const document = batteryProtocolDocument();
     if (!document) return;
-    updateBatteryMonitorDocument({
+    updateBatteryProtocolDocument({
       ...document,
       signals: document.signals.map((signal, currentIndex) => (currentIndex === index ? { ...signal, [field]: value } : signal)),
     });
   }
 
   function addBatterySignal() {
-    const document = batteryMonitorDocument();
+    const document = batteryProtocolDocument();
     if (!document) return;
     const index = document.signals.length;
-    updateBatteryMonitorDocument({
+    let frames = document.frames;
+    if (frames.length === 0) {
+      frames = [{ frame_key: 'bat_default', can_id: 0, type: 0, desc: '默认帧', timeout_ticks: document.default_timeout_ticks ?? 200 }];
+    }
+    updateBatteryProtocolDocument({
       ...document,
-      signals: [...document.signals, { signal_key: `battery_signal_${index + 1}`, param_id: `BATTERY_MONITOR_CUSTOM_${index + 1}`, name: '新锂电信号', inner: -1, type: 0, def: '0', frame_key: document.frames[0]?.frame_key ?? '', pos: 0, len: 8, show_type: 0, handle: 0, handle_param: '' }],
+      frames,
+      signals: [...document.signals, { signal_key: `battery_signal_${index + 1}`, param_id: `BATTERY_MONITOR_CUSTOM_${index + 1}`, name: '新锂电信号', inner: -1, type: 0, def: '0', frame_key: frames[0].frame_key, pos: 0, len: 8, show_type: 0, handle: 0, handle_param: '', factor: 1, offset: 0, min: 0, max: 0, unit: '', receiver: 'dbc_export', comment: '' }],
     });
   }
 
   function removeBatterySignal(index: number) {
-    const document = batteryMonitorDocument();
+    const document = batteryProtocolDocument();
     if (!document) return;
-    updateBatteryMonitorDocument({ ...document, signals: document.signals.filter((_, currentIndex) => currentIndex !== index) });
+    updateBatteryProtocolDocument({ ...document, signals: document.signals.filter((_, currentIndex) => currentIndex !== index) });
   }
 
   function updateBatteryItem(index: number, field: keyof BatteryMonitorItem, value: string | number | boolean) {
@@ -938,9 +1092,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     const document = batteryMonitorDocument();
     if (!document) return;
     const index = document.items.length;
+    const currentProtocol = batteryProtocolDocument();
     updateBatteryMonitorDocument({
       ...document,
-      items: [...document.items, { item_key: `battery_item_${index + 1}`, enabled: true, order: index, signal_key: document.signals[0]?.signal_key ?? '', name_key: '新锂电项', unit: '', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: document.frames[0]?.frame_key ?? '', empty_text: ' ' } }],
+      items: [...document.items, { item_key: `battery_item_${index + 1}`, enabled: true, order: index, signal_key: currentProtocol?.signals[0]?.signal_key ?? '', name_key: '新锂电项', unit: '', formatter: { kind: 'linear', offset: 0, scale_num: 1, scale_den: 1, decimals: 0, display_base: 10 }, validity: { mode: 'frame_timeout', frame_key: currentProtocol?.frames[0]?.frame_key ?? '', empty_text: ' ' } }],
     });
   }
 
@@ -948,6 +1103,326 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     const document = batteryMonitorDocument();
     if (!document) return;
     updateBatteryMonitorDocument({ ...document, items: document.items.filter((_, currentIndex) => currentIndex !== index) });
+  }
+
+  async function handleExportBatteryMonitor() {
+    setBatteryMonitorExportStatus(null);
+    if (!loadedProject) { setBatteryMonitorExportStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryMonitorExportStatus('系统保存对话框只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await save({
+      filters: [{ name: '锂电监控配置', extensions: ['json'] }],
+    });
+    if (!selected) return;
+
+    setIsExportingBatteryMonitor(true);
+    try {
+      await saveJsonFile(selected, batteryMonitorDocument());
+      setBatteryMonitorExportStatus(`已导出：${selected}`);
+    } catch (error) {
+      setBatteryMonitorExportStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingBatteryMonitor(false);
+    }
+  }
+
+  async function handleExportBatteryProtocol() {
+    setBatteryProtocolExportStatus(null);
+    if (!loadedProject) { setBatteryProtocolExportStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryProtocolExportStatus('系统保存对话框只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await save({
+      filters: [{ name: '锂电协议', extensions: ['json'] }],
+    });
+    if (!selected) return;
+
+    setIsExportingBatteryProtocol(true);
+    try {
+      await saveJsonFile(selected, batteryProtocolDocument());
+      setBatteryProtocolExportStatus(`已导出：${selected}`);
+    } catch (error) {
+      setBatteryProtocolExportStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingBatteryProtocol(false);
+    }
+  }
+
+  async function handleImportBatteryProtocol() {
+    setBatteryProtocolImportStatus(null);
+    if (!loadedProject) { setBatteryProtocolImportStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryProtocolImportStatus('系统文件选择器只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: '锂电协议', extensions: ['json'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    setIsImportingBatteryProtocol(true);
+    try {
+      const data = await loadJsonFile(selected) as BatteryProtocol;
+      if (!data || !Array.isArray(data.frames) || !Array.isArray(data.signals)) {
+        setBatteryProtocolImportStatus('无效的锂电协议配置文件。');
+        return;
+      }
+      updateBatteryProtocolDocument(data);
+      setBatteryProtocolImportStatus(`已导入 ${data.frames.length} 帧 / ${data.signals.length} 信号`);
+    } catch (error) {
+      setBatteryProtocolImportStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsImportingBatteryProtocol(false);
+    }
+  }
+
+  async function handleImportBatteryMonitor() {
+    setBatteryMonitorImportStatus(null);
+    if (!loadedProject) { setBatteryMonitorImportStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryMonitorImportStatus('系统文件选择器只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: '锂电监控配置', extensions: ['json'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    setIsImportingBatteryMonitor(true);
+    try {
+      const data = await loadJsonFile(selected) as BatteryMonitorInfo;
+      if (!data || !Array.isArray(data.items)) {
+        setBatteryMonitorImportStatus('无效的锂电监控显示配置文件。');
+        return;
+      }
+      updateBatteryMonitorDocument(data);
+      setBatteryMonitorImportStatus(`已导入 ${data.items.length} 显示项`);
+    } catch (error) {
+      setBatteryMonitorImportStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsImportingBatteryMonitor(false);
+    }
+  }
+
+  async function handleExportBatteryFramesCsv() {
+    setBatteryCsvStatus(null);
+    if (!loadedProject) { setBatteryCsvStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await save({
+      filters: [{ name: '帧 CSV', extensions: ['csv'] }],
+    });
+    if (!selected) return;
+
+    setIsExportingBatteryCsv(true);
+    try {
+      const csv = framesToCsv(currentBatteryProtocolDocument?.frames ?? []);
+      await saveTextFile(selected, '\uFEFF' + csv);
+      setBatteryCsvStatus(`帧 CSV 已导出：${selected}`);
+    } catch (error) {
+      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingBatteryCsv(false);
+    }
+  }
+
+  async function handleImportBatteryFramesCsv() {
+    setBatteryCsvStatus(null);
+    if (!loadedProject) { setBatteryCsvStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: '帧 CSV', extensions: ['csv'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    setIsImportingBatteryCsv(true);
+    try {
+      const text = await loadTextFile(selected);
+      const { frames, errors } = csvToFrames(text);
+      if (errors.length > 0) {
+        setBatteryCsvStatus(`导入帧 CSV 出错：${errors.join('；')}`);
+        return;
+      }
+      const document = batteryProtocolDocument();
+      if (!document) return;
+      updateBatteryProtocolDocument({ ...document, frames });
+      setBatteryCsvStatus(`已导入 ${frames.length} 帧`);
+    } catch (error) {
+      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsImportingBatteryCsv(false);
+    }
+  }
+
+  async function handleExportBatterySignalsCsv() {
+    setBatteryCsvStatus(null);
+    if (!loadedProject) { setBatteryCsvStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await save({
+      filters: [{ name: '信号 CSV', extensions: ['csv'] }],
+    });
+    if (!selected) return;
+
+    setIsExportingBatteryCsv(true);
+    try {
+      const csv = signalsToCsv(currentBatteryProtocolDocument?.signals ?? []);
+      await saveTextFile(selected, '\uFEFF' + csv);
+      setBatteryCsvStatus(`信号 CSV 已导出：${selected}`);
+    } catch (error) {
+      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingBatteryCsv(false);
+    }
+  }
+
+  async function handleImportBatterySignalsCsv() {
+    setBatteryCsvStatus(null);
+    if (!loadedProject) { setBatteryCsvStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: '信号 CSV', extensions: ['csv'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    setIsImportingBatteryCsv(true);
+    try {
+      const text = await loadTextFile(selected);
+      const { signals, errors } = csvToSignals(text);
+      if (errors.length > 0) {
+        setBatteryCsvStatus(`导入信号 CSV 出错：${errors.join('；')}`);
+        return;
+      }
+      const document = batteryProtocolDocument();
+      if (!document) return;
+      updateBatteryProtocolDocument({ ...document, signals });
+      setBatteryCsvStatus(`已导入 ${signals.length} 信号`);
+    } catch (error) {
+      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsImportingBatteryCsv(false);
+    }
+  }
+
+  async function handleExportBatteryItemsCsv() {
+    setBatteryCsvStatus(null);
+    if (!loadedProject) { setBatteryCsvStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await save({
+      filters: [{ name: '显示项 CSV', extensions: ['csv'] }],
+    });
+    if (!selected) return;
+
+    setIsExportingBatteryCsv(true);
+    try {
+      const csv = itemsToCsv(currentBatteryMonitorDocument?.items ?? []);
+      await saveTextFile(selected, '\uFEFF' + csv);
+      setBatteryCsvStatus(`显示项 CSV 已导出：${selected}`);
+    } catch (error) {
+      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingBatteryCsv(false);
+    }
+  }
+
+  async function handleImportBatteryItemsCsv() {
+    setBatteryCsvStatus(null);
+    if (!loadedProject) { setBatteryCsvStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: '显示项 CSV', extensions: ['csv'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    setIsImportingBatteryCsv(true);
+    try {
+      const text = await loadTextFile(selected);
+      const { items, errors } = csvToItems(text);
+      if (errors.length > 0) {
+        setBatteryCsvStatus(`导入显示项 CSV 出错：${errors.join('；')}`);
+        return;
+      }
+      const document = batteryMonitorDocument();
+      if (!document) return;
+      updateBatteryMonitorDocument({ ...document, items });
+      setBatteryCsvStatus(`已导入 ${items.length} 显示项`);
+    } catch (error) {
+      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsImportingBatteryCsv(false);
+    }
+  }
+
+  async function handleImportBatteryDbc() {
+    setBatteryDbcStatus(null);
+    if (!loadedProject) { setBatteryDbcStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryDbcStatus('系统文件选择器只能在 Tauri 桌面应用中使用。'); return; }
+
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: 'DBC 文件', extensions: ['dbc'] }],
+    });
+    if (typeof selected !== 'string') return;
+
+    setIsImportingBatteryDbc(true);
+    try {
+      const report = await importDbc(selected);
+      if (report.errors.length > 0) {
+        setBatteryDbcStatus(`导入 DBC 出错：${report.errors.join('；')}`);
+        return;
+      }
+      if (report.frames.length === 0) {
+        setBatteryDbcStatus('DBC 文件中未找到任何消息。');
+        return;
+      }
+      let rawDbc = '';
+      try {
+        rawDbc = await loadTextFile(selected);
+      } catch { /* non-critical */ }
+      const document = batteryProtocolDocument();
+      updateBatteryProtocolDocument({
+        ...document,
+        frames: report.frames,
+        signals: report.signals,
+        dbc_content: rawDbc || undefined,
+      });
+      setBatteryDbcStatus(`已导入 ${report.frames.length} 帧 / ${report.signals.length} 信号`);
+    } catch (error) {
+      setBatteryDbcStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsImportingBatteryDbc(false);
+    }
+  }
+
+  async function handleExportBatteryDbc() {
+    setBatteryDbcStatus(null);
+    if (!loadedProject) { setBatteryDbcStatus('请先打开 .jcpro 项目。'); return; }
+    if (!isTauriRuntime()) { setBatteryDbcStatus('系统保存对话框只能在 Tauri 桌面应用中使用。'); return; }
+
+    const document = batteryProtocolDocument();
+    if (document.frames.length === 0) {
+      setBatteryDbcStatus('没有帧可导出。');
+      return;
+    }
+
+    const selected = await save({
+      filters: [{ name: 'DBC 文件', extensions: ['dbc'] }],
+    });
+    if (!selected) return;
+
+    setIsExportingBatteryDbc(true);
+    try {
+      await exportDbc(selected, document.frames, document.signals);
+      setBatteryDbcStatus(`DBC 已导出：${selected}`);
+    } catch (error) {
+      setBatteryDbcStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingBatteryDbc(false);
+    }
   }
 
   function confirmGenerateTestData() {
@@ -959,6 +1434,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       if (data.pdoSimple) updatePdoSimpleDocument(data.pdoSimple);
       if (data.pdoAdvanced) updatePdoAdvancedDocument(data.pdoAdvanced);
       if (data.batteryMonitor) updateBatteryMonitorDocument(data.batteryMonitor);
+      if (data.batteryProtocol) updateBatteryProtocolDocument(data.batteryProtocol);
     } finally {
       setGeneratingTestKey(null);
     }
@@ -2403,7 +2879,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     setBinaryCompareReport(null);
 
     try {
-      const report = await buildProjectBinaryReport(loadedProject?.document ?? previewDocument);
+      const report = await buildProjectBinaryReport(loadedProject?.document ?? previewDocument, exportBatteryOptions);
       setBinaryReport(report);
       if (!report.valid) {
         setExportError(report.errors.join('；') || '二进制构建报告存在问题');
@@ -2432,6 +2908,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       const report = await compareProjectBinaryReport({
         document: loadedProject?.document ?? previewDocument,
         legacy_binary_path: selected,
+        export_options: exportBatteryOptions,
       });
       setBinaryCompareReport(report);
       setBinaryReport(report.build);
@@ -2467,6 +2944,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         project_path: loadedProject?.summary.path,
         output_dir: exportOutputDir,
         document: loadedProject?.document ?? previewDocument,
+        export_options: exportBatteryOptions,
       });
       setExportReport(report);
     } catch (error) {
@@ -2488,6 +2966,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const currentPdoSimpleDocument = pdoSimpleDocument();
   const currentPdoAdvancedDocument = pdoAdvancedDocument();
   const currentLanguageDocument = languageDocument();
+  const currentBatteryProtocolDocument = batteryProtocolDocument();
   const currentBatteryMonitorDocument = batteryMonitorDocument();
   const settingMenus = collectSettingMenus(currentSdoDocument);
   const activeSettingPath = selectedSettingPath ?? settingMenus[0]?.key ?? null;
@@ -2555,7 +3034,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <span className="action-bar-sep" />
               </>
             ) : null}
-            {(['realtime-data', 'battery-monitor'] as string[]).includes(activeModule.key) ? (
+            {(['realtime-data', 'battery-protocol', 'battery-monitor'] as string[]).includes(activeModule.key) ? (
               <button
                 className="action-bar-btn action-bar-btn--secondary"
                 disabled={!loadedProject || generatingTestKey !== null}
@@ -2563,6 +3042,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   if (!loadedProject) return;
                   const type: TestDataType = activeModule.key === 'realtime-data' && realtimeMode === 'simple' ? 'pdo-simple'
                     : activeModule.key === 'realtime-data' ? 'pdo-advanced'
+                    : activeModule.key === 'battery-protocol' ? 'battery-protocol'
                     : 'battery-monitor';
                   setConfirmGenerateType(type);
                 }}
@@ -2573,7 +3053,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 {generatingTestKey !== null ? '生成中...' : '生成测试数据'}
               </button>
             ) : null}
-            {(['setting-data', 'realtime-data', 'battery-monitor', 'language', 'signal-dictionary', 'private-protocol', 'protocol-mapping'] as string[]).includes(activeModule.key) ? (
+            {(['setting-data', 'realtime-data', 'battery-protocol', 'battery-monitor', 'language', 'signal-dictionary', 'private-protocol', 'protocol-mapping'] as string[]).includes(activeModule.key) ? (
               <>
                 <button
                   className={`action-bar-btn ${showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'}`}
@@ -3269,60 +3749,138 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
           </section>
         ) : null}
 
-        {activeModule.key === 'battery-monitor' ? (
+        {activeModule.key === 'battery-protocol' ? (
           <section className="table-spec-card">
-            <h2>锂电监控配置</h2>
-            {currentBatteryMonitorDocument ? (
+            <div className="private-protocol-header">
+              <div className="private-protocol-header-text">
+                <h2>锂电协议</h2>
+              </div>
+              <div className="sample-actions">
+                <button disabled={!loadedProject || isExportingBatteryProtocol} onClick={() => void handleExportBatteryProtocol()} type="button">
+                  {isExportingBatteryProtocol ? '导出中...' : '导出配置'}
+                </button>
+                <button disabled={!loadedProject || isImportingBatteryProtocol} onClick={() => void handleImportBatteryProtocol()} type="button">
+                  {isImportingBatteryProtocol ? '导入中...' : '导入配置'}
+                </button>
+                <span className="action-bar-sep" />
+                <button disabled={!loadedProject || isExportingBatteryCsv} onClick={() => void handleExportBatteryFramesCsv()} type="button">
+                  {isExportingBatteryCsv ? '导出中...' : '导出帧 CSV'}
+                </button>
+                <button disabled={!loadedProject || isImportingBatteryCsv} onClick={() => void handleImportBatteryFramesCsv()} type="button">
+                  {isImportingBatteryCsv ? '导入中...' : '导入帧 CSV'}
+                </button>
+                <button disabled={!loadedProject || isExportingBatteryCsv} onClick={() => void handleExportBatterySignalsCsv()} type="button">
+                  {isExportingBatteryCsv ? '导出中...' : '导出信号 CSV'}
+                </button>
+                <button disabled={!loadedProject || isImportingBatteryCsv} onClick={() => void handleImportBatterySignalsCsv()} type="button">
+                  {isImportingBatteryCsv ? '导入中...' : '导入信号 CSV'}
+                </button>
+                <span className="action-bar-sep" />
+                <button disabled={!loadedProject || isExportingBatteryDbc} onClick={() => void handleExportBatteryDbc()} type="button">
+                  {isExportingBatteryDbc ? '导出中...' : '导出 DBC'}
+                </button>
+                <button disabled={!loadedProject || isImportingBatteryDbc} onClick={() => void handleImportBatteryDbc()} type="button">
+                  {isImportingBatteryDbc ? '导入中...' : '导入 DBC'}
+                </button>
+              </div>
+            </div>
+            {batteryProtocolExportStatus ? <p className="config-helper-text">{batteryProtocolExportStatus}</p> : null}
+            {batteryProtocolImportStatus ? <p className="config-helper-text">{batteryProtocolImportStatus}</p> : null}
+            {batteryCsvStatus ? <p className="config-helper-text">{batteryCsvStatus}</p> : null}
+            {batteryDbcStatus ? <p className="config-helper-text">{batteryDbcStatus}</p> : null}
+            {loadedProject ? (
               <div className="pdo-simple-editor battery-monitor-editor">
                 <div className="config-summary-strip">
-                  <article><span>状态</span><strong>{currentBatteryMonitorDocument.enabled ? '启用' : '停用'}</strong></article>
-                  <article><span>帧 / 信号</span><strong>{currentBatteryMonitorDocument.frames.length} / {currentBatteryMonitorDocument.signals.length}</strong></article>
-                  <article><span>显示项</span><strong>{currentBatteryMonitorDocument.items.filter((item) => item.enabled).length} / {currentBatteryMonitorDocument.items.length}</strong></article>
-                  <article><span>写回段落</span><strong>battery_monitor_info</strong></article>
+                  <article><span>帧</span><strong>{currentBatteryProtocolDocument.frames.length}</strong></article>
+                  <article><span>信号</span><strong>{currentBatteryProtocolDocument.signals.length}</strong></article>
+                  <article><span>写回段落</span><strong>battery_protocol</strong></article>
                 </div>
                 <div className="battery-config-row">
-                  <label title="启用或停用锂电监控功能">启用<select value={currentBatteryMonitorDocument.enabled ? 1 : 0} onChange={(event) => updateBatteryMonitorField('enabled', Number(event.target.value) === 1)}><option value={1}>启用</option><option value={0}>停用</option></select></label>
-                  <label title="配置版本号，用于标识数据格式版本">版本<input type="number" value={currentBatteryMonitorDocument.version ?? 1} onChange={(event) => updateBatteryMonitorField('version', Number(event.target.value))} /></label>
-                  <label title="每页显示的锂电数据条数">每页数量<input type="number" value={currentBatteryMonitorDocument.page_size ?? 4} onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))} /></label>
-                  <label title="帧数据的默认超时时间（单位：tick），各帧可单独覆盖">默认超时 tick<input type="number" value={currentBatteryMonitorDocument.default_timeout_ticks ?? 200} onChange={(event) => updateBatteryMonitorField('default_timeout_ticks', Number(event.target.value))} /></label>
+                  <label title="帧数据的默认超时时间（单位：tick），各帧可单独覆盖">默认超时 tick<input type="number" value={currentBatteryProtocolDocument.default_timeout_ticks ?? 200} onChange={(event) => updateBatteryProtocolField('default_timeout_ticks', Number(event.target.value))} /></label>
                 </div>
                 <section className="pdo-frame-section">
-                  <div className="config-table-toolbar"><strong>锂电 CAN 帧（{currentBatteryMonitorDocument.frames.length}）</strong><button onClick={addBatteryFrame} type="button">新增帧</button></div>
-                  {currentBatteryMonitorDocument.frames.map((frame, frameIndex) => (
-                    <article className={isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? 'pdo-frame-card battery-frame-card config-entry-modified' : 'pdo-frame-card battery-frame-card'} key={`${frame.frame_key}-${frameIndex}`}>
+                  <div className="config-table-toolbar"><strong>锂电 CAN 帧（{currentBatteryProtocolDocument.frames.length}）</strong><button onClick={addBatteryFrame} type="button">新增帧</button></div>
+                  {currentBatteryProtocolDocument.frames.map((frame, frameIndex) => (
+                    <article className={isModifiedPath(['battery_protocol', 'frames', frameIndex]) ? 'pdo-frame-card battery-frame-card config-entry-modified' : 'pdo-frame-card battery-frame-card'} key={`${frame.frame_key}-${frameIndex}`}>
                       <div className="battery-frame-grid">
                         <label title="帧的唯一标识键名，用于信号和显示项引用">帧 key<input value={frame.frame_key} onChange={(event) => updateBatteryFrame(frameIndex, 'frame_key', event.target.value)} /></label>
                         <label title="CAN 帧 ID，支持十进制或 0x 开头的十六进制格式">帧 ID<input inputMode="text" value={formatFrameId(frame.can_id)} onChange={(event) => updateBatteryFrameId(frameIndex, event.target.value)} /></label>
                         <label title="标准帧使用 11 位 CAN ID，扩展帧使用 29 位 CAN ID">帧类型<select value={frame.type} onChange={(event) => updateBatteryFrame(frameIndex, 'type', Number(event.target.value))}><option value={0}>标准帧</option><option value={1}>扩展帧</option></select></label>
-                        <label title="该帧的超时时间（tick），留空则使用上方默认值">超时 tick<input type="number" value={frame.timeout_ticks ?? currentBatteryMonitorDocument.default_timeout_ticks} onChange={(event) => updateBatteryFrame(frameIndex, 'timeout_ticks', Number(event.target.value))} /></label>
+                        <label title="该帧的超时时间（tick），留空则使用上方默认值">超时 tick<input type="number" value={frame.timeout_ticks ?? currentBatteryProtocolDocument.default_timeout_ticks} onChange={(event) => updateBatteryFrame(frameIndex, 'timeout_ticks', Number(event.target.value))} /></label>
                         <label title="帧的描述说明">描述<input value={frame.desc ?? ''} onChange={(event) => updateBatteryFrame(frameIndex, 'desc', event.target.value)} /></label>
                       </div>
                       <div className="battery-frame-actions">
-                        {isModifiedPath(['battery_monitor_info', 'frames', frameIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'frames', frameIndex])} type="button">恢复帧</button> : null}
+                        {isModifiedPath(['battery_protocol', 'frames', frameIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_protocol', 'frames', frameIndex])} type="button">恢复帧</button> : null}
                         <button className="danger" onClick={() => removeBatteryFrame(frameIndex)} type="button">删除帧</button>
                       </div>
                     </article>
                   ))}
                 </section>
                 <section className="pdo-frame-section">
-                  <div className="config-table-toolbar"><strong>锂电信号（{currentBatteryMonitorDocument.signals.length}）</strong><button onClick={addBatterySignal} type="button">新增信号</button></div>
-                  <div className="config-table-frame"><table className="config-table"><thead><tr><th title="信号的唯一标识键名">key</th><th title="信号对应的参数 ID，用于读写操作">参数ID</th><th title="信号的中文名称">名称</th><th title="关联的内部变量编号，-1 表示无关联，用于与底层硬件参数对应">内部变量</th><th title="数据类型：U8（无符号8位）/ U16（无符号16位）/ U32（无符号32位）/ I16（有符号16位）/ U32（时间打包）">类型</th><th title="信号所属的 CAN 帧">帧</th><th title="信号在帧数据中的起始 bit 位置">位置</th><th title="信号占用的 bit 长度">长度</th><th title="取数方式：按字节取出 / 按字节+位取出 / 按位取出">取数</th><th>操作</th></tr></thead><tbody>
-                    {currentBatteryMonitorDocument.signals.map((signal, signalIndex) => (
-                      <tr className={isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? 'config-entry-modified' : undefined} key={`${signal.signal_key}-${signalIndex}`}>
+                  <div className="config-table-toolbar"><strong>锂电信号（{currentBatteryProtocolDocument.signals.length}）</strong><button onClick={addBatterySignal} type="button">新增信号</button></div>
+                  <div className="config-table-frame"><table className="config-table"><thead><tr><th title="信号的唯一标识键名">key</th><th title="信号的中文显示名称">名称</th><th title="信号在帧数据中的起始 bit 位置">起始位</th><th title="信号占用的 bit 长度">长度</th><th title="字节序：Intel(小端) / Motorola(大端)">字节序</th><th title="数据类型：U8（无符号8位）/ U16（无符号16位）/ U32（无符号32位）/ I16（有符号16位）/ U32（时间打包）">类型</th><th title="缩放系数：实际值 = 原始值 × 系数 + 偏移">系数</th><th title="偏移量：实际值 = 原始值 × 系数 + 偏移">偏移</th><th title="物理最小值">最小值</th><th title="物理最大值">最大值</th><th title="物理单位">单位</th><th title="DBC 接收节点">接收节点</th><th title="信号注释">注释</th><th title="信号所属的 CAN 帧">帧</th><th>操作</th></tr></thead><tbody>
+                    {currentBatteryProtocolDocument.signals.map((signal, signalIndex) => (
+                      <tr className={isModifiedPath(['battery_protocol', 'signals', signalIndex]) ? 'config-entry-modified' : undefined} key={`${signal.signal_key}-${signalIndex}`}>
                         <td><input value={signal.signal_key} onChange={(event) => updateBatterySignal(signalIndex, 'signal_key', event.target.value)} /></td>
-                        <td><input value={signal.param_id} onChange={(event) => updateBatterySignal(signalIndex, 'param_id', event.target.value)} /></td>
                         <td><input value={signal.name} onChange={(event) => updateBatterySignal(signalIndex, 'name', event.target.value)} /></td>
-                        <td><input type="number" value={signal.inner} onChange={(event) => updateBatterySignal(signalIndex, 'inner', Number(event.target.value))} /></td>
-                        <td><select value={signal.type} onChange={(event) => updateBatterySignal(signalIndex, 'type', Number(event.target.value))}><option value={0}>U8（无符号8位）</option><option value={1}>U16（无符号16位）</option><option value={2}>U32（无符号32位）</option><option value={10}>I16（有符号16位）</option><option value={20}>U32（时间打包）</option></select></td>
-                        <td><select value={signal.frame_key} onChange={(event) => updateBatterySignal(signalIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
                         <td><input type="number" value={signal.pos} onChange={(event) => updateBatterySignal(signalIndex, 'pos', Number(event.target.value))} /></td>
                         <td><input type="number" value={signal.len} onChange={(event) => updateBatterySignal(signalIndex, 'len', Number(event.target.value))} /></td>
-                        <td><select value={signal.show_type} onChange={(event) => updateBatterySignal(signalIndex, 'show_type', Number(event.target.value))}><option value={0}>按字节</option><option value={1}>按字节+位</option><option value={2}>按位</option></select></td>
-                        <td>{isModifiedPath(['battery_monitor_info', 'signals', signalIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'signals', signalIndex])} type="button">恢复</button> : null}<button className="danger" onClick={() => removeBatterySignal(signalIndex)} type="button">删除</button></td>
+                        <td><select value={signal.show_type} onChange={(event) => updateBatterySignal(signalIndex, 'show_type', Number(event.target.value))}><option value={0}>Intel(小端)</option><option value={1}>Motorola(大端)</option><option value={2}>按位</option></select></td>
+                        <td><select value={signal.type} onChange={(event) => updateBatterySignal(signalIndex, 'type', Number(event.target.value))}><option value={0}>U8（无符号8位）</option><option value={1}>U16（无符号16位）</option><option value={2}>U32（无符号32位）</option><option value={10}>I16（有符号16位）</option><option value={20}>U32（时间打包）</option></select></td>
+                        <td><input type="number" step="any" value={signal.factor ?? 1} onChange={(event) => updateBatterySignal(signalIndex, 'factor', Number(event.target.value))} /></td>
+                        <td><input type="number" step="any" value={signal.offset ?? 0} onChange={(event) => updateBatterySignal(signalIndex, 'offset', Number(event.target.value))} /></td>
+                        <td><input type="number" step="any" value={signal.min ?? 0} onChange={(event) => updateBatterySignal(signalIndex, 'min', Number(event.target.value))} /></td>
+                        <td><input type="number" step="any" value={signal.max ?? 0} onChange={(event) => updateBatterySignal(signalIndex, 'max', Number(event.target.value))} /></td>
+                        <td><input value={signal.unit ?? ''} onChange={(event) => updateBatterySignal(signalIndex, 'unit', event.target.value)} /></td>
+                        <td><input value={signal.receiver ?? 'dbc_export'} onChange={(event) => updateBatterySignal(signalIndex, 'receiver', event.target.value)} /></td>
+                        <td><input value={signal.comment ?? ''} onChange={(event) => updateBatterySignal(signalIndex, 'comment', event.target.value)} /></td>
+                        <td><select value={signal.frame_key} onChange={(event) => updateBatterySignal(signalIndex, 'frame_key', event.target.value)}>{currentBatteryProtocolDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
+                        <td>{isModifiedPath(['battery_protocol', 'signals', signalIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_protocol', 'signals', signalIndex])} type="button">恢复</button> : null}<button className="danger" onClick={() => removeBatterySignal(signalIndex)} type="button">删除</button></td>
                       </tr>
                     ))}
                   </tbody></table></div>
                 </section>
+              </div>
+            ) : <div className="empty-state"><div className="empty-state-icon">📂</div><p>请先在项目管理中打开 .jcpro 项目文件</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'battery-monitor' ? (
+          <section className="table-spec-card">
+            <div className="private-protocol-header">
+              <div className="private-protocol-header-text">
+                <h2>锂电监控显示配置</h2>
+              </div>
+              <div className="sample-actions">
+                <button disabled={!loadedProject || isExportingBatteryMonitor} onClick={() => void handleExportBatteryMonitor()} type="button">
+                  {isExportingBatteryMonitor ? '导出中...' : '导出配置'}
+                </button>
+                <button disabled={!loadedProject || isImportingBatteryMonitor} onClick={() => void handleImportBatteryMonitor()} type="button">
+                  {isImportingBatteryMonitor ? '导入中...' : '导入配置'}
+                </button>
+                <span className="action-bar-sep" />
+                <button disabled={!loadedProject || isExportingBatteryCsv} onClick={() => void handleExportBatteryItemsCsv()} type="button">
+                  {isExportingBatteryCsv ? '导出中...' : '导出显示项 CSV'}
+                </button>
+                <button disabled={!loadedProject || isImportingBatteryCsv} onClick={() => void handleImportBatteryItemsCsv()} type="button">
+                  {isImportingBatteryCsv ? '导入中...' : '导入显示项 CSV'}
+                </button>
+              </div>
+            </div>
+            {batteryMonitorExportStatus ? <p className="config-helper-text">{batteryMonitorExportStatus}</p> : null}
+            {batteryMonitorImportStatus ? <p className="config-helper-text">{batteryMonitorImportStatus}</p> : null}
+            {batteryCsvStatus ? <p className="config-helper-text">{batteryCsvStatus}</p> : null}
+            {loadedProject ? (
+              <div className="pdo-simple-editor battery-monitor-editor">
+                <div className="config-summary-strip">
+                  <article><span>状态</span><strong>{currentBatteryMonitorDocument.enabled ? '启用' : '停用'}</strong></article>
+                  <article><span>显示项</span><strong>{currentBatteryMonitorDocument.items.filter((item) => item.enabled).length} / {currentBatteryMonitorDocument.items.length}</strong></article>
+                  <article><span>写回段落</span><strong>battery_monitor_info</strong></article>
+                </div>
+                <div className="battery-config-row">
+                  <label title="启用或停用锂电监控功能">启用<select value={currentBatteryMonitorDocument.enabled ? 1 : 0} onChange={(event) => updateBatteryMonitorField('enabled', Number(event.target.value) === 1)}><option value={1}>启用</option><option value={0}>停用</option></select></label>
+                  <label title="每页显示的锂电数据条数">每页数量<input type="number" value={currentBatteryMonitorDocument.page_size ?? 4} onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))} /></label>
+                </div>
                 <section className="pdo-frame-section">
                   <div className="config-table-toolbar"><strong>显示项（{currentBatteryMonitorDocument.items.length}）</strong><button onClick={addBatteryItem} type="button">新增显示项</button></div>
                   <div className="config-table-frame"><table className="config-table"><thead><tr><th title="是否在界面中显示该项">启用</th><th title="显示顺序，数值越小越靠前">顺序</th><th title="显示项的唯一标识键名">key</th><th title="关联的信号，选择后显示该信号的数据">信号</th><th title="国际化键名，用于多语言显示名称">名称key</th><th title="显示单位">单位</th><th title="数据格式化方式（线性/布尔文本/十六进制/时间等）">格式</th><th title="显示值的偏移量：显示值 = 原始值 × 缩放 + 偏移">偏移</th><th title="原始值与显示值的缩放比例：显示值 = 原始值 × 分子/分母 + 偏移">缩放</th><th title="保留的小数位数">小数</th><th title="关联的有效性判断帧，用于检测数据是否超时">有效帧</th><th>操作</th></tr></thead><tbody>
@@ -3331,14 +3889,14 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                         <td><input checked={item.enabled} type="checkbox" onChange={(event) => updateBatteryItem(itemIndex, 'enabled', event.target.checked)} /></td>
                         <td><input type="number" value={item.order} onChange={(event) => updateBatteryItem(itemIndex, 'order', Number(event.target.value))} /></td>
                         <td><input value={item.item_key} onChange={(event) => updateBatteryItem(itemIndex, 'item_key', event.target.value)} /></td>
-                        <td><select value={item.signal_key} onChange={(event) => updateBatteryItem(itemIndex, 'signal_key', event.target.value)}>{currentBatteryMonitorDocument.signals.map((signal) => <option key={signal.signal_key} value={signal.signal_key}>{signal.signal_key}</option>)}</select></td>
+                        <td><select value={item.signal_key} onChange={(event) => updateBatteryItem(itemIndex, 'signal_key', event.target.value)}>{(currentBatteryProtocolDocument?.signals ?? []).map((signal) => <option key={signal.signal_key} value={signal.signal_key}>{signal.signal_key}</option>)}</select></td>
                         <td><input value={item.name_key} onChange={(event) => updateBatteryItem(itemIndex, 'name_key', event.target.value)} /></td>
                         <td><input value={item.unit} onChange={(event) => updateBatteryItem(itemIndex, 'unit', event.target.value)} /></td>
                         <td><select value={item.formatter?.kind ?? 'linear'} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'kind', event.target.value)}><option value="linear">线性</option><option value="bool_text">布尔文本</option><option value="hex">十六进制</option><option value="packed_time_0p1h">0.1H时间</option><option value="linear_u8_wrap">线性后uint8截断</option><option value="packed_time_legacy_discharge_0p1h">旧版放电时间</option></select></td>
                         <td><input type="number" value={item.formatter?.offset ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'offset', Number(event.target.value))} /></td>
                         <td><input type="number" value={item.formatter?.scale_num ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_num', Number(event.target.value))} />/<input type="number" value={item.formatter?.scale_den ?? 1} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'scale_den', Number(event.target.value))} /></td>
                         <td><input type="number" value={item.formatter?.decimals ?? 0} onChange={(event) => updateBatteryItemFormatter(itemIndex, 'decimals', Number(event.target.value))} /></td>
-                        <td><select value={item.validity?.frame_key ?? ''} onChange={(event) => updateBatteryItemValidity(itemIndex, 'frame_key', event.target.value)}>{currentBatteryMonitorDocument.frames.map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
+                        <td><select value={item.validity?.frame_key ?? ''} onChange={(event) => updateBatteryItemValidity(itemIndex, 'frame_key', event.target.value)}>{(currentBatteryProtocolDocument?.frames ?? []).map((frame) => <option key={frame.frame_key} value={frame.frame_key}>{frame.frame_key}</option>)}</select></td>
                         <td>{isModifiedPath(['battery_monitor_info', 'items', itemIndex]) ? <button className="config-restore-button" onClick={() => restoreModifiedPath(['battery_monitor_info', 'items', itemIndex])} type="button">恢复</button> : null}<button className="danger" onClick={() => removeBatteryItem(itemIndex)} type="button">删除</button></td>
                       </tr>
                     ))}
@@ -3614,9 +4172,17 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 >
                   从旧配置派生
                 </button>
+                <button disabled={!loadedProject || isExportingPrivateProtocol} onClick={() => void handleExportPrivateProtocol()} type="button">
+                  {isExportingPrivateProtocol ? '导出中...' : '导出配置'}
+                </button>
+                <button disabled={!loadedProject || isImportingPrivateProtocol} onClick={() => void handleImportPrivateProtocol()} type="button">
+                  {isImportingPrivateProtocol ? '导入中...' : '导入配置'}
+                </button>
               </div>
             </div>
             {unifiedProtocolError ? <p className="project-open-error">{unifiedProtocolError}</p> : null}
+            {privateProtocolExportStatus ? <p className="config-helper-text">{privateProtocolExportStatus}</p> : null}
+            {privateProtocolImportStatus ? <p className="config-helper-text">{privateProtocolImportStatus}</p> : null}
             {unifiedProtocol ? (
               <>
                 <div className="config-summary-strip">
@@ -3971,6 +4537,56 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 <span>项目路径</span>
                 <strong>{loadedProject?.summary.path ?? (projectPath || '—')}</strong>
               </article>
+            </div>
+            <strong className="section-label--muted">导出写入控制</strong>
+            <div className="settings-option-grid">
+              <div className="settings-option-grid__head">配置项</div>
+              <div className="settings-option-grid__head">写入 ConfigUpdate.json</div>
+              <div className="settings-option-grid__head">写入 pdo_sdo_data.bin</div>
+              <div className="settings-option-info">
+                <span>锂电协议</span>
+                <small>控制 battery_protocol 是否随完整导出写入配置文件或设备 bin。</small>
+              </div>
+              <label className="settings-check">
+                <input
+                  checked={exportBatteryOptions.battery_protocol.config}
+                  onChange={(event) => updateExportBatteryOption('battery_protocol', 'config', event.target.checked)}
+                  type="checkbox"
+                />
+                <span>配置文件</span>
+              </label>
+              <label className="settings-check">
+                <input
+                  checked={exportBatteryOptions.battery_protocol.bin}
+                  onChange={(event) => updateExportBatteryOption('battery_protocol', 'bin', event.target.checked)}
+                  type="checkbox"
+                />
+                <span>bin 文件</span>
+              </label>
+              <div className="settings-option-info">
+                <span>锂电协议监控</span>
+                <small>控制 battery_monitor_info 是否写入导出清单描述和 battery monitor 二进制段。</small>
+              </div>
+              <label className="settings-check">
+                <input
+                  checked={exportBatteryOptions.battery_monitor_info.config}
+                  onChange={(event) => updateExportBatteryOption('battery_monitor_info', 'config', event.target.checked)}
+                  type="checkbox"
+                />
+                <span>配置文件</span>
+              </label>
+              <label className="settings-check">
+                <input
+                  checked={exportBatteryOptions.battery_monitor_info.bin}
+                  onChange={(event) => updateExportBatteryOption('battery_monitor_info', 'bin', event.target.checked)}
+                  type="checkbox"
+                />
+                <span>bin 文件</span>
+              </label>
+            </div>
+            <div className="settings-option-footer">
+              <span>该设置影响项目导出、二进制报告和 bin 对比。</span>
+              <button type="button" onClick={resetExportBatteryOptions}>恢复默认</button>
             </div>
             <strong className="section-label--muted">外观</strong>
             <div className="theme-toggle-row">

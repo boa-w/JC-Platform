@@ -3491,6 +3491,81 @@ html {
   background: #b45309;
 }
 
+/* ── Settings Controls ── */
+
+.settings-option-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(150px, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-border-light);
+}
+
+.settings-option-grid__head,
+.settings-option-info,
+.settings-check {
+  background: var(--color-surface-alt);
+  padding: 10px 14px;
+}
+
+.settings-option-grid__head {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.settings-option-info {
+  display: grid;
+  gap: 2px;
+}
+
+.settings-option-info span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.settings-option-info small,
+.settings-option-footer {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.settings-check input {
+  accent-color: var(--color-primary);
+}
+
+.settings-option-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-option-footer button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.settings-option-footer button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 /* ── Theme Toggle ── */
 
 .theme-toggle-row {

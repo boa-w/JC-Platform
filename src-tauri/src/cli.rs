@@ -617,6 +617,7 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
                 project_path,
                 output_dir,
                 document: read_json_value(&document)?,
+                export_options: Default::default(),
             }),
             pretty,
         ),
@@ -629,6 +630,7 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
                 project_path,
                 output_dir,
                 document: read_json_value(&document)?,
+                export_options: Default::default(),
             }),
             pretty,
         ),
@@ -641,6 +643,7 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
                 project_path,
                 output_dir,
                 document: read_json_value(&document)?,
+                export_options: Default::default(),
             }),
             pretty,
         ),
@@ -653,7 +656,7 @@ fn run_binary(command: BinaryCommand, pretty: bool) -> Result<(), CliError> {
             document,
             write_bytes,
         } => {
-            let report = commands::build_project_binary_report(read_json_value(&document)?);
+            let report = commands::build_project_binary_report(read_json_value(&document)?, None);
             if let Some(path) = write_bytes {
                 fs::write(path, &report.bytes)?;
             }
@@ -666,6 +669,7 @@ fn run_binary(command: BinaryCommand, pretty: bool) -> Result<(), CliError> {
             &commands::compare_project_binary_report(BinaryCompareRequest {
                 document: read_json_value(&document)?,
                 legacy_binary_path,
+                export_options: Default::default(),
             }),
             pretty,
         ),

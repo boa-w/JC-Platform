@@ -5,9 +5,10 @@
 //! 命令函数本身不做业务校验，仅负责桥接前后端。
 
 use crate::domain::export::{
-    build_export_plan, build_project_binary, compare_project_binary, copy_ui_images,
+    build_export_plan, build_project_binary_with_options, compare_project_binary, copy_ui_images,
     export_project_package, BinaryBuildReport, BinaryCompareReport, BinaryCompareRequest,
-    ExportPlanReport, ExportPlanRequest, ProjectExportReport, UiImageCopyReport,
+    ExportBatteryOptions, ExportPlanReport, ExportPlanRequest, ProjectExportReport,
+    UiImageCopyReport,
 };
 use crate::domain::language::{
     language_document_to_table, parse_language_table, LanguageImportReport,
@@ -38,8 +39,11 @@ use crate::infrastructure::csv_excel::{
     LANGUAGE_REQUIRED_PREFIX_HEADERS, PDO_SIMPLE_HEADERS, SDO_HEADERS,
 };
 use crate::infrastructure::json_store;
+use can_dbc::{ByteOrder, Dbc, MessageId, NumericValue, ValueType};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// 后端健康检查响应。
@@ -427,8 +431,12 @@ pub fn compare_project_binary_report(request: BinaryCompareRequest) -> BinaryCom
 }
 
 #[tauri::command]
-pub fn build_project_binary_report(document: Value) -> BinaryBuildReport {
-    build_project_binary(&document)
+pub fn build_project_binary_report(
+    document: Value,
+    export_options: Option<ExportBatteryOptions>,
+) -> BinaryBuildReport {
+    let options = export_options.unwrap_or_default();
+    build_project_binary_with_options(&document, &options)
 }
 
 // ── CAN 测试数据构建 ──────────────────────────────────────────────
@@ -783,4 +791,357 @@ pub fn save_json_file(path: String, content: Value) -> Result<(), String> {
 pub fn load_json_file(path: String) -> Result<Value, String> {
     let content = std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败：{}", e))?;
     serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败：{}", e))
+}
+
+/// 从指定文件路径读取文本内容。
+#[tauri::command]
+pub fn load_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败：{}", e))
+}
+
+fn numeric_value_to_f64(val: &NumericValue) -> f64 {
+    match val {
+        NumericValue::Uint(v) => *v as f64,
+        NumericValue::Int(v) => *v as f64,
+        NumericValue::Double(v) => *v,
+    }
+}
+
+/// 从 DBC 文件导入帧和信号。
+#[tauri::command]
+pub fn import_dbc(path: String) -> Result<Value, String> {
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("读取 DBC 文件失败：{}", e))?;
+    let dbc = Dbc::try_from(content.as_str()).map_err(|e| format!("解析 DBC 失败：{}", e))?;
+
+    let mut frames: Vec<Value> = Vec::new();
+    let mut signals: Vec<Value> = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
+    let mut key_counts: BTreeMap<String, usize> = BTreeMap::new();
+
+    for msg in &dbc.messages {
+        let (can_id, frame_type) = match &msg.id {
+            MessageId::Standard(id) => (u32::from(*id), 0i64),
+            MessageId::Extended(id) => (*id, 1i64),
+        };
+
+        let base_key = if msg.name.is_empty() {
+            format!("dbc_msg_{:03X}", can_id)
+        } else {
+            msg.name
+                .replace(|c: char| !c.is_alphanumeric() && c != '_', "_")
+        };
+        let entry = key_counts.entry(base_key.clone()).or_insert(0);
+        *entry += 1;
+        let frame_key = if *entry > 1 {
+            format!("{}_{}", base_key, *entry - 1)
+        } else {
+            base_key
+        };
+
+        let desc = dbc
+            .message_comment(msg.id.clone())
+            .unwrap_or("")
+            .to_string();
+
+        frames.push(json!({
+            "frame_key": frame_key,
+            "can_id": can_id,
+            "type": frame_type,
+            "desc": desc,
+            "timeout_ticks": 200,
+        }));
+
+        for sig in &msg.signals {
+            let show_type = match &sig.byte_order {
+                ByteOrder::BigEndian => 1i64,
+                ByteOrder::LittleEndian => 0i64,
+            };
+
+            let sig_type = match &sig.value_type {
+                ValueType::Unsigned => {
+                    if sig.size <= 8 {
+                        0i64
+                    } else if sig.size <= 16 {
+                        1i64
+                    } else {
+                        2i64
+                    }
+                }
+                ValueType::Signed => 10i64,
+            };
+
+            let sig_name = if sig.name.is_empty() {
+                format!("sig_{}", signals.len() + 1)
+            } else {
+                sig.name
+                    .replace(|c: char| !c.is_alphanumeric() && c != '_', "_")
+            };
+
+            let comment = dbc
+                .signal_comment(msg.id.clone(), &sig.name)
+                .unwrap_or("")
+                .to_string();
+            let name = if comment.is_empty() {
+                sig.name.clone()
+            } else {
+                comment.clone()
+            };
+
+            signals.push(json!({
+                "signal_key": sig_name,
+                "param_id": format!("BATTERY_DBC_{}", sig.name.to_uppercase()),
+                "name": name,
+                "inner": -1i64,
+                "type": sig_type,
+                "def": "0",
+                "frame_key": frame_key.clone(),
+                "pos": sig.start_bit as i64,
+                "len": sig.size as i64,
+                "show_type": show_type,
+                "handle": 0,
+                "handle_param": "",
+                "factor": sig.factor,
+                "offset": sig.offset,
+                "min": numeric_value_to_f64(&sig.min),
+                "max": numeric_value_to_f64(&sig.max),
+                "unit": sig.unit.clone(),
+                "receiver": sig.receivers.join(","),
+                "comment": comment,
+            }));
+        }
+    }
+
+    if frames.is_empty() {
+        errors.push("DBC 文件中未找到任何消息".to_string());
+    }
+
+    Ok(json!({
+        "frames": frames,
+        "signals": signals,
+        "errors": errors,
+    }))
+}
+
+/// 导出帧和信号到 DBC 文件。
+#[tauri::command]
+pub fn export_dbc(path: String, frames: Vec<Value>, signals: Vec<Value>) -> Result<(), String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut all_receivers: Vec<String> = vec!["dbc_export".to_string()];
+
+    lines.push("VERSION \"\"\n\n".to_string());
+    lines.push(
+        "NS_ :\n\tNS_DESC_\n\tCM_\n\tBA_DEF_\n\tBA_\n\tVAL_\n\tCAT_DEF_\n\tCAT_\n\tFILTER\n\tBA_DEF_DEF_\n\tEV_DATA_\n\tENVVAR_DATA_\n\tSGTYPE_\n\tSGTYPE_VAL_\n\tBA_DEF_SGTYPE_\n\tBA_SGTYPE_\n\tSIG_VALTYPE_\n\tCOMTYPE_\n\tCM_DEF_\n\tCM_DEF_DEF_\n\n".to_string(),
+    );
+    lines.push("BS_:\n\n".to_string());
+
+    for sig in &signals {
+        let receiver = sig["receiver"].as_str().unwrap_or("");
+        if !receiver.is_empty() && !all_receivers.contains(&receiver.to_string()) {
+            all_receivers.push(receiver.to_string());
+        }
+    }
+    lines.push(format!("BU_: {}\n\n", all_receivers.join(" ")));
+
+    let mut comments: Vec<String> = Vec::new();
+
+    for frame_val in &frames {
+        let frame_key = frame_val["frame_key"].as_str().unwrap_or("unknown");
+        let can_id = frame_val["can_id"].as_u64().unwrap_or(0) as u32;
+
+        let mut signal_lines: Vec<String> = Vec::new();
+        let frame_signals: Vec<&Value> = signals
+            .iter()
+            .filter(|s| s["frame_key"].as_str() == Some(frame_key))
+            .collect();
+
+        for sig in &frame_signals {
+            let sig_name = sig["signal_key"].as_str().unwrap_or("unknown");
+            let pos = sig["pos"].as_u64().unwrap_or(0);
+            let len = sig["len"].as_u64().unwrap_or(8);
+            let show_type = sig["show_type"].as_u64().unwrap_or(0);
+            let sig_type = sig["type"].as_u64().unwrap_or(0);
+            let factor = sig["factor"].as_f64().unwrap_or(1.0);
+            let offset = sig["offset"].as_f64().unwrap_or(0.0);
+            let min_val = sig["min"].as_f64().unwrap_or(0.0);
+            let max_val = sig["max"].as_f64().unwrap_or(0.0);
+            let unit = sig["unit"].as_str().unwrap_or("");
+            let receiver = sig["receiver"].as_str().unwrap_or("dbc_export");
+
+            let byte_order = if show_type == 1 { "0" } else { "1" };
+            let value_sign = match sig_type {
+                10 => "-",
+                _ => "+",
+            };
+
+            signal_lines.push(format!(
+                " SG_ {} : {}|{}@{}{} ({},{}) [{}|{}] \"{}\"  {}",
+                sig_name,
+                pos,
+                len,
+                byte_order,
+                value_sign,
+                factor,
+                offset,
+                min_val,
+                max_val,
+                unit,
+                receiver,
+            ));
+        }
+
+        lines.push(format!(
+            "BO_ {} {}: 8 dbc_export\n{}\n",
+            can_id,
+            frame_key,
+            signal_lines.join("\n"),
+        ));
+    }
+
+    for frame_val in &frames {
+        let frame_key = frame_val["frame_key"].as_str().unwrap_or("unknown");
+        let can_id = frame_val["can_id"].as_u64().unwrap_or(0) as u32;
+        let desc = frame_val["desc"].as_str().unwrap_or("");
+
+        if !desc.is_empty() {
+            comments.push(format!("CM_ BO_ {} \"{}\";\n", can_id, desc));
+        }
+
+        for sig in &signals {
+            if sig["frame_key"].as_str() != Some(frame_key) {
+                continue;
+            }
+            let sig_name = sig["signal_key"].as_str().unwrap_or("unknown");
+            let comment = sig["comment"].as_str().unwrap_or("");
+            let name = sig["name"].as_str().unwrap_or("");
+            let sig_comment = if !comment.is_empty() {
+                comment.to_string()
+            } else if !name.is_empty() && name != sig_name {
+                name.to_string()
+            } else {
+                String::new()
+            };
+            if !sig_comment.is_empty() {
+                comments.push(format!(
+                    "CM_ SG_ {} {} \"{}\";\n",
+                    can_id, sig_name, sig_comment
+                ));
+            }
+        }
+    }
+
+    lines.extend(comments);
+    let dbc_content = lines.concat();
+    std::fs::write(&path, &dbc_content).map_err(|e| format!("写入 DBC 文件失败：{}", e))
+}
+
+/// 根据帧和信号生成 DBC 文本内容（不写文件）。
+#[tauri::command]
+pub fn generate_dbc_content(frames: Vec<Value>, signals: Vec<Value>) -> Result<String, String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut all_receivers: Vec<String> = vec!["dbc_export".to_string()];
+
+    lines.push("VERSION \"\"\n\n".to_string());
+    lines.push(
+        "NS_ :\n\tNS_DESC_\n\tCM_\n\tBA_DEF_\n\tBA_\n\tVAL_\n\tCAT_DEF_\n\tCAT_\n\tFILTER\n\tBA_DEF_DEF_\n\tEV_DATA_\n\tENVVAR_DATA_\n\tSGTYPE_\n\tSGTYPE_VAL_\n\tBA_DEF_SGTYPE_\n\tBA_SGTYPE_\n\tSIG_VALTYPE_\n\tCOMTYPE_\n\tCM_DEF_\n\tCM_DEF_DEF_\n\n".to_string(),
+    );
+    lines.push("BS_:\n\n".to_string());
+
+    for sig in &signals {
+        let receiver = sig["receiver"].as_str().unwrap_or("");
+        if !receiver.is_empty() && !all_receivers.contains(&receiver.to_string()) {
+            all_receivers.push(receiver.to_string());
+        }
+    }
+    lines.push(format!("BU_: {}\n\n", all_receivers.join(" ")));
+
+    let mut comments: Vec<String> = Vec::new();
+
+    for frame_val in &frames {
+        let frame_key = frame_val["frame_key"].as_str().unwrap_or("unknown");
+        let can_id = frame_val["can_id"].as_u64().unwrap_or(0) as u32;
+
+        let mut signal_lines: Vec<String> = Vec::new();
+        let frame_signals: Vec<&Value> = signals
+            .iter()
+            .filter(|s| s["frame_key"].as_str() == Some(frame_key))
+            .collect();
+
+        for sig in &frame_signals {
+            let sig_name = sig["signal_key"].as_str().unwrap_or("unknown");
+            let pos = sig["pos"].as_u64().unwrap_or(0);
+            let len = sig["len"].as_u64().unwrap_or(8);
+            let show_type = sig["show_type"].as_u64().unwrap_or(0);
+            let sig_type = sig["type"].as_u64().unwrap_or(0);
+            let factor = sig["factor"].as_f64().unwrap_or(1.0);
+            let offset = sig["offset"].as_f64().unwrap_or(0.0);
+            let min_val = sig["min"].as_f64().unwrap_or(0.0);
+            let max_val = sig["max"].as_f64().unwrap_or(0.0);
+            let unit = sig["unit"].as_str().unwrap_or("");
+            let receiver = sig["receiver"].as_str().unwrap_or("dbc_export");
+
+            let byte_order = if show_type == 1 { "0" } else { "1" };
+            let value_sign = match sig_type {
+                10 => "-",
+                _ => "+",
+            };
+
+            signal_lines.push(format!(
+                " SG_ {} : {}|{}@{}{} ({},{}) [{}|{}] \"{}\"  {}",
+                sig_name,
+                pos,
+                len,
+                byte_order,
+                value_sign,
+                factor,
+                offset,
+                min_val,
+                max_val,
+                unit,
+                receiver,
+            ));
+        }
+
+        lines.push(format!(
+            "BO_ {} {}: 8 dbc_export\n{}\n",
+            can_id,
+            frame_key,
+            signal_lines.join("\n"),
+        ));
+    }
+
+    for frame_val in &frames {
+        let frame_key = frame_val["frame_key"].as_str().unwrap_or("unknown");
+        let can_id = frame_val["can_id"].as_u64().unwrap_or(0) as u32;
+        let desc = frame_val["desc"].as_str().unwrap_or("");
+
+        if !desc.is_empty() {
+            comments.push(format!("CM_ BO_ {} \"{}\";\n", can_id, desc));
+        }
+
+        for sig in &signals {
+            if sig["frame_key"].as_str() != Some(frame_key) {
+                continue;
+            }
+            let sig_name = sig["signal_key"].as_str().unwrap_or("unknown");
+            let comment = sig["comment"].as_str().unwrap_or("");
+            let name = sig["name"].as_str().unwrap_or("");
+            let sig_comment = if !comment.is_empty() {
+                comment.to_string()
+            } else if !name.is_empty() && name != sig_name {
+                name.to_string()
+            } else {
+                String::new()
+            };
+            if !sig_comment.is_empty() {
+                comments.push(format!(
+                    "CM_ SG_ {} {} \"{}\";\n",
+                    can_id, sig_name, sig_comment
+                ));
+            }
+        }
+    }
+
+    lines.extend(comments);
+    Ok(lines.concat())
 }

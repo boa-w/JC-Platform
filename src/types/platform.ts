@@ -1,4 +1,4 @@
-export type NavigationKey = 'project' | 'setting-data' | 'realtime-data' | 'signal-dictionary' | 'private-protocol' | 'protocol-mapping' | 'ui' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
+export type NavigationKey = 'project' | 'setting-data' | 'realtime-data' | 'signal-dictionary' | 'private-protocol' | 'protocol-mapping' | 'ui' | 'battery-protocol' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
 
 export interface ProjectSummary {
   name: string;
@@ -67,6 +67,7 @@ export interface ProjectDocument {
   private_protocol: PrivateProtocolDocument;
   protocol_mapping: ProtocolMapping[];
   language_info: LanguageDocument;
+  battery_protocol: BatteryProtocol;
   battery_monitor_info: BatteryMonitorInfo;
 }
 
@@ -199,13 +200,17 @@ export interface ProtocolCompatibilityReport {
   warnings: string[];
 }
 
-export interface BatteryMonitorInfo {
-  enabled: boolean;
-  version: number;
-  page_size: number;
+export interface BatteryProtocol {
   default_timeout_ticks: number;
   frames: BatteryMonitorFrame[];
   signals: BatteryMonitorSignal[];
+  dbc_content?: string;
+  [key: string]: unknown;
+}
+
+export interface BatteryMonitorInfo {
+  enabled: boolean;
+  page_size: number;
   items: BatteryMonitorItem[];
   [key: string]: unknown;
 }
@@ -232,7 +237,20 @@ export interface BatteryMonitorSignal {
   show_type: number;
   handle?: number;
   handle_param?: string;
+  factor?: number;
+  offset?: number;
+  min?: number;
+  max?: number;
+  unit?: string;
+  receiver?: string;
+  comment?: string;
   [key: string]: unknown;
+}
+
+export interface DbcImportReport {
+  frames: BatteryMonitorFrame[];
+  signals: BatteryMonitorSignal[];
+  errors: string[];
 }
 
 export interface BatteryMonitorFormatter {
@@ -414,10 +432,21 @@ export interface ExportTableRequest {
   document: TableDocument;
 }
 
+export interface ExportTargetOptions {
+  config: boolean;
+  bin: boolean;
+}
+
+export interface ExportBatteryOptions {
+  battery_protocol: ExportTargetOptions;
+  battery_monitor_info: ExportTargetOptions;
+}
+
 export interface ExportPlanRequest {
   project_path?: string;
   output_dir: string;
   document: unknown;
+  export_options?: ExportBatteryOptions;
 }
 
 export interface BinaryBuildReport {
@@ -433,6 +462,7 @@ export interface BinaryBuildReport {
 export interface BinaryCompareRequest {
   document: unknown;
   legacy_binary_path: string;
+  export_options?: ExportBatteryOptions;
 }
 
 export interface BinaryCompareReport {

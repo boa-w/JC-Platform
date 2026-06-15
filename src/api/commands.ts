@@ -2,10 +2,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import type {
   BackendHealth,
+  BatteryMonitorFrame,
+  BatteryMonitorSignal,
   BinaryBuildReport,
   BinaryCompareReport,
   BinaryCompareRequest,
   CanTestGenerateResponse,
+  DbcImportReport,
+  ExportBatteryOptions,
   ExportPlanReport,
   ExportPlanRequest,
   ExportTableRequest,
@@ -239,8 +243,14 @@ export async function compareProjectBinaryReport(
   return invoke<BinaryCompareReport>('compare_project_binary_report', { request });
 }
 
-export async function buildProjectBinaryReport(document: unknown): Promise<BinaryBuildReport> {
-  return invoke<BinaryBuildReport>('build_project_binary_report', { document });
+export async function buildProjectBinaryReport(
+  document: unknown,
+  exportOptions?: ExportBatteryOptions,
+): Promise<BinaryBuildReport> {
+  return invoke<BinaryBuildReport>('build_project_binary_report', {
+    document,
+    export_options: exportOptions,
+  });
 }
 
 export async function revealItemInDir(path: string): Promise<void> {
@@ -261,4 +271,20 @@ export async function saveJsonFile(path: string, content: unknown): Promise<void
 
 export async function loadJsonFile(path: string): Promise<unknown> {
   return invoke<unknown>('load_json_file', { path });
+}
+
+export async function loadTextFile(path: string): Promise<string> {
+  return invoke<string>('load_text_file', { path });
+}
+
+export async function importDbc(path: string): Promise<DbcImportReport> {
+  return invoke<DbcImportReport>('import_dbc', { path });
+}
+
+export async function exportDbc(path: string, frames: BatteryMonitorFrame[], signals: BatteryMonitorSignal[]): Promise<void> {
+  return invoke<void>('export_dbc', { path, frames, signals });
+}
+
+export async function generateDbcContent(frames: BatteryMonitorFrame[], signals: BatteryMonitorSignal[]): Promise<string> {
+  return invoke<string>('generate_dbc_content', { frames, signals });
 }
