@@ -92,6 +92,7 @@ import { getTestData, testDataLabels, type TestDataType } from '../data/test-dat
 import { framesToCsv, csvToFrames, signalsToCsv, csvToSignals, itemsToCsv, csvToItems } from '../utils/batteryCsv';
 import { useCanTestData } from '../hooks/useCanTestData';
 import { useExportBatteryOptions } from '../stores/exportSettings';
+import { APP_VERSION } from '../constants/app';
 import {
   advancedConfigSections,
   configSectionForEditor,
@@ -133,7 +134,7 @@ const tableConfigTitles: Record<TableConfigKind, string> = {
   language: '多国语言',
 };
 
-const appVersion = '0.1.0';
+const appVersion = APP_VERSION;
 
 const recentProjectsStorageKey = 'jc-custom-platform.recentProjects';
 const maxRecentProjects = 8;
@@ -4875,41 +4876,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
           <section className="project-open-card">
             <div>
               <h2>软件设置</h2>
-              <p>查看当前软件版本、提交哈希、核心状态和项目运行信息。</p>
-            </div>
-            <strong className="section-label--muted">应用信息</strong>
-            <div className="project-open-report">
-              <article>
-                <span>软件名称</span>
-                <strong>{health?.app_name ?? '自定义开发平台'}</strong>
-              </article>
-              <article>
-                <span>前端版本</span>
-                <strong>{appVersion}</strong>
-              </article>
-              <article>
-                <span>核心版本</span>
-                <strong>{health?.version ?? '-'}</strong>
-              </article>
-              <article>
-                <span>提交哈希</span>
-                <strong>{health?.commit_hash ?? 'unknown'}</strong>
-              </article>
-              <article>
-                <span>核心状态</span>
-                <strong>{health?.core_status ?? 'loading'}</strong>
-              </article>
-            </div>
-            <strong className="section-label--muted">项目信息</strong>
-            <div className="project-open-report">
-              <article>
-                <span>当前项目</span>
-                <strong>{project?.name ?? '未打开项目'}</strong>
-              </article>
-              <article>
-                <span>项目路径</span>
-                <strong>{loadedProject?.summary.path ?? (projectPath || '—')}</strong>
-              </article>
+              <p>管理导出写入控制、外观主题等软件级偏好设置。</p>
             </div>
             <strong className="section-label--muted">导出写入控制</strong>
             <div className="settings-option-grid">

@@ -1,11 +1,15 @@
-import { useState } from 'react';
-import type { FeatureModule, ModuleLifecycle, NavigationKey } from '../types/platform';
-import { navGroups } from '../data/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { BackendHealth, FeatureModule, ModuleLifecycle, NavigationKey, ProjectSummary } from '../types/platform';
+import { findGroupForKey, navGroups } from '../data/navigation';
 
 interface SidebarProps {
   modules: FeatureModule[];
   activeKey: NavigationKey;
   onSelect: (key: NavigationKey) => void;
+  theme: 'light' | 'dark';
+  onToggleTheme: () => void;
+  health: BackendHealth | null;
+  project: ProjectSummary | null;
 }
 
 function lifecycleLabel(lifecycle?: ModuleLifecycle) {
@@ -15,69 +19,145 @@ function lifecycleLabel(lifecycle?: ModuleLifecycle) {
   return null;
 }
 
-export function Sidebar({ modules, activeKey, onSelect }: SidebarProps) {
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+export function Sidebar({ modules, activeKey, onSelect, theme, onToggleTheme, health, project }: SidebarProps) {
+  const groupOfActive = findGroupForKey(activeKey);
+  const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>(
+    groupOfActive?.label ?? navGroups[0].label,
+  );
+  const activeGroupLabel = groupOfActive?.label ?? selectedGroupLabel;
 
-  function toggleGroup(label: string) {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) {
-        next.delete(label);
-      } else {
-        next.add(label);
-      }
-      return next;
-    });
+  const [showPopup, setShowPopup] = useState(false);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+
+  const activeGroup = useMemo(
+    () => navGroups.find((group) => group.label === activeGroupLabel) ?? navGroups[0],
+    [activeGroupLabel],
+  );
+  const activeGroupModules = useMemo(
+    () => activeGroup.keys.map((key) => modules.find((module) => module.key === key)).filter(Boolean) as FeatureModule[],
+    [activeGroup, modules],
+  );
+
+  function selectGroup(label: string) {
+    const group = navGroups.find((item) => item.label === label);
+    if (!group) return;
+    setSelectedGroupLabel(label);
+    if (!group.keys.includes(activeKey)) {
+      onSelect(group.keys[0]);
+    }
   }
 
-  const isGroupCollapsed = (label: string) => collapsedGroups.has(label);
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+      setShowPopup(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showPopup) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showPopup, handleClickOutside]);
 
   return (
-    <header className="top-menu">
-      <div className="brand">
-        <span className="brand-mark">JC</span>
-        <strong>自定义开发平台</strong>
-      </div>
-      <nav className="nav-list" aria-label="功能菜单">
-        {navGroups.map((group, groupIndex) => {
-          const groupModules = modules.filter((module) => group.keys.includes(module.key));
-          const collapsed = isGroupCollapsed(group.label);
-          const hasActiveChild = groupModules.some((m) => m.key === activeKey);
+    <div className="activity-shell">
+      <div className="activity-bar">
+        {navGroups.map((group) => {
+          const isActive = group.label === activeGroupLabel;
           return (
-            <div className="nav-group" key={group.label}>
-              {groupIndex > 0 && <span className="nav-separator" />}
-              {groupModules.length > 1 ? (
-                <button
-                  className={`nav-group-toggle ${hasActiveChild ? 'has-active' : ''}`}
-                  type="button"
-                  onClick={() => toggleGroup(group.label)}
-                  title={collapsed ? `展开${group.label}` : `折叠${group.label}`}
-                >
-                  <span className="nav-group-arrow">{collapsed ? '▸' : '▾'}</span>
-                  <span>{group.label}</span>
-                </button>
-              ) : null}
-              {!collapsed &&
-                groupModules.map((module) => (
-                  <button
-                    className={module.key === activeKey ? 'nav-item active' : 'nav-item'}
-                    key={module.key}
-                    type="button"
-                    onClick={() => onSelect(module.key)}
-                    title={module.lifecycleReason ?? module.description}
-                  >
-                    <span>{module.title}</span>
-                    {lifecycleLabel(module.lifecycle) ? (
-                      <span className={`module-lifecycle-badge module-lifecycle-badge--${module.lifecycle}`}>
-                        {lifecycleLabel(module.lifecycle)}
-                      </span>
-                    ) : null}
-                  </button>
-                ))}
-            </div>
+            <button
+              className={isActive ? 'activity-icon active' : 'activity-icon'}
+              key={group.label}
+              type="button"
+              onClick={() => selectGroup(group.label)}
+              title={group.label}
+              aria-label={group.label}
+              aria-pressed={isActive}
+            >
+              <span className="activity-icon-glyph" aria-hidden="true">{group.icon}</span>
+            </button>
           );
         })}
+        <div className="activity-spacer" />
+        {/* 版本信息 */}
+        <button
+          className="activity-icon"
+          type="button"
+          onClick={() => setShowPopup((v) => !v)}
+          title="软件版本信息"
+          aria-label="软件版本信息"
+          aria-expanded={showPopup}
+        >
+          <span className="activity-icon-glyph" aria-hidden="true">ℹ</span>
+        </button>
+        {/* 主题切换 */}
+        <button
+          className="activity-icon"
+          type="button"
+          onClick={onToggleTheme}
+          title={theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'}
+          aria-label="切换主题"
+        >
+          <span className="activity-icon-glyph" aria-hidden="true">{theme === 'dark' ? '☀' : '🌙'}</span>
+        </button>
+      </div>
+
+      {showPopup ? (
+        <div className="version-popup" ref={popupRef}>
+          <div className="version-popup-header">
+            <span className="version-popup-title">版本信息</span>
+            <button className="version-popup-close" type="button" onClick={() => setShowPopup(false)} aria-label="关闭">✕</button>
+          </div>
+          <div className="version-popup-body">
+            <section>
+              <strong className="section-label--muted">应用信息</strong>
+              <div className="version-popup-grid">
+                <span>软件名称</span><strong>{health?.app_name ?? '自定义开发平台'}</strong>
+                <span>前端版本</span><strong>0.1.0</strong>
+                <span>核心版本</span><strong>{health?.version ?? '-'}</strong>
+                <span>提交哈希</span><strong>{health?.commit_hash ?? 'unknown'}</strong>
+                <span>核心状态</span><strong>{health?.core_status ?? 'loading'}</strong>
+              </div>
+            </section>
+            <section>
+              <strong className="section-label--muted">项目信息</strong>
+              <div className="version-popup-grid">
+                <span>当前项目</span><strong>{project?.name ?? '未打开项目'}</strong>
+                <span>项目路径</span><strong>{project?.path ?? '—'}</strong>
+              </div>
+            </section>
+          </div>
+        </div>
+      ) : null}
+
+      <nav className="activity-list" aria-label={`${activeGroup.label} 功能`}>
+        <div className="activity-list-header">
+          <span className="activity-list-title">{activeGroup.label}</span>
+          <span className="activity-list-count">{activeGroupModules.length}</span>
+        </div>
+        <div className="activity-list-items">
+          {activeGroupModules.map((module) => {
+            const label = lifecycleLabel(module.lifecycle);
+            return (
+              <button
+                className={module.key === activeKey ? 'activity-item active' : 'activity-item'}
+                key={module.key}
+                type="button"
+                onClick={() => onSelect(module.key)}
+                title={module.lifecycleReason ?? module.description}
+              >
+                <span className="activity-item-label">{module.title}</span>
+                {label ? (
+                  <span className={`module-lifecycle-badge module-lifecycle-badge--${module.lifecycle}`}>
+                    {label}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </nav>
-    </header>
+    </div>
   );
 }

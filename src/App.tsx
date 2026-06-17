@@ -27,7 +27,15 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar modules={featureModules} activeKey={activeKey} onSelect={setActiveKey} />
+      <Sidebar
+        modules={featureModules}
+        activeKey={activeKey}
+        onSelect={setActiveKey}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        health={health}
+        project={project}
+      />
       <Dashboard
         activeModule={activeModule}
         health={health}

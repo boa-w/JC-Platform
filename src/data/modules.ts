@@ -72,6 +72,6 @@ export const featureModules: FeatureModule[] = [
   {
     key: 'settings',
     title: '软件设置',
-    description: '查看软件版本、核心状态和运行环境信息。',
+    description: '管理导出写入控制、外观主题等软件级偏好设置。',
   },
 ];
