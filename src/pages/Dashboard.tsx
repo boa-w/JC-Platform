@@ -451,12 +451,18 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [pdoJumpTarget, setPdoJumpTarget] = useState<number | null>(null);
   const [selectedSettingPath, setSelectedSettingPath] = useState<string | null>(null);
   const [editingSettingPath, setEditingSettingPath] = useState<number[] | null>(null);
+  const settingDrawerCloseRef = useRef<HTMLButtonElement | null>(null);
+  const settingDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const [settingSearchQuery, setSettingSearchQuery] = useState('');
   const [settingColumnWidths, setSettingColumnWidths] = useState<Record<string, number>>(loadSettingColumnWidths);
   const [selectedRealtimeKind, setSelectedRealtimeKind] = useState<'pdo_recv' | 'pdo_send'>('pdo_recv');
   const [selectedRealtimeFrameId, setSelectedRealtimeFrameId] = useState<number | null>(null);
   const [realtimeMode, setRealtimeMode] = useState<'simple' | 'advanced'>('simple');
   const [selectedAdvancedFrameId, setSelectedAdvancedFrameId] = useState<number | null>(null);
+  const [advancedPdoDrawerOpen, setAdvancedPdoDrawerOpen] = useState(false);
+  const [advancedPdoDrawerTab, setAdvancedPdoDrawerTab] = useState<'global' | 'condition'>('global');
+  const advancedPdoDrawerCloseRef = useRef<HTMLButtonElement | null>(null);
+  const advancedPdoDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
@@ -530,6 +536,46 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     }
   }, [showJsonEditor]);
 
+  useEffect(() => {
+    const settingEditorDrawerOpen = Boolean(editingSettingPath && sdoNodeByNumberPath(sdoDocument(), editingSettingPath));
+    if (!advancedPdoDrawerOpen && !settingEditorDrawerOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (settingEditorDrawerOpen) {
+        closeSettingEditorDrawer();
+        return;
+      }
+      closeAdvancedPdoDrawer();
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    window.setTimeout(() => {
+      if (settingEditorDrawerOpen) {
+        settingDrawerCloseRef.current?.focus();
+        return;
+      }
+      advancedPdoDrawerCloseRef.current?.focus();
+    }, 0);
+
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [advancedPdoDrawerOpen, editingSettingPath, loadedProject?.document]);
+
+  useEffect(() => {
+    if (activeModule.key !== 'realtime-data' || realtimeMode !== 'advanced') {
+      setAdvancedPdoDrawerOpen(false);
+    }
+    if (activeModule.key !== 'setting-data') {
+      setEditingSettingPath(null);
+    }
+  }, [activeModule.key, realtimeMode]);
+
+  useEffect(() => {
+    if (editingSettingPath && !sdoNodeByNumberPath(sdoDocument(), editingSettingPath)) {
+      setEditingSettingPath(null);
+    }
+  }, [editingSettingPath, loadedProject?.document]);
+
   function parseUiPreview(document: unknown, path?: string) {
     if (path) {
       return parseUiResourcesWithProjectPath({ project_path: path, document });
@@ -559,6 +605,31 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   function updatePdoAdvancedFrameId(kind: 'pdo_recv' | 'pdo_send', frameIndex: number, value: string) {
     const nextId = parseFrameId(value);
     if (nextId !== null) updatePdoAdvancedFrame(kind, frameIndex, 'id', nextId);
+  }
+
+  function openAdvancedPdoDrawer(tab: 'global' | 'condition') {
+    advancedPdoDrawerReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setAdvancedPdoDrawerTab(tab);
+    setAdvancedPdoDrawerOpen(true);
+  }
+
+  function closeAdvancedPdoDrawer() {
+    setAdvancedPdoDrawerOpen(false);
+    window.setTimeout(() => advancedPdoDrawerReturnFocusRef.current?.focus(), 0);
+  }
+
+  function openSettingEditorDrawer(path: number[]) {
+    settingDrawerReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setEditingSettingPath(path);
+  }
+
+  function closeSettingEditorDrawer() {
+    setEditingSettingPath(null);
+    window.setTimeout(() => settingDrawerReturnFocusRef.current?.focus(), 0);
+  }
+
+  function isSameOrDescendantPath(path: number[], target: number[]) {
+    return target.length >= path.length && path.every((part, index) => target[index] === part);
   }
 
   function activeLegacyTableKind(): TableConfigKind | null {
@@ -2377,10 +2448,12 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (column.key === 'actions') {
       return (
         <>
-          <button onClick={() => setEditingSettingPath(row.path)} title="修改参数配置定义，不写入当前运行状态" type="button">编辑定义</button>
+          <button onClick={() => openSettingEditorDrawer(row.path)} title="修改参数配置定义，不写入当前运行状态" type="button">编辑定义</button>
           <button className="danger" onClick={() => {
             removeSdoNode(row.path);
-            setEditingSettingPath(null);
+            if (editingSettingPath && isSameOrDescendantPath(row.path, editingSettingPath)) {
+              setEditingSettingPath(null);
+            }
           }} type="button">删除</button>
         </>
       );
@@ -2450,7 +2523,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     updateSdoDocument(updateSdoNodeAtPath(document, parentPath, (node) => ({ ...node, children: [...(node.children ?? []), child] })));
     const nextPath = [...parentPath, nextIndex];
     setSelectedSettingPath(nextPath.join('/'));
-    setEditingSettingPath(nextPath);
+    openSettingEditorDrawer(nextPath);
   }
 
   function addSdoParameter(parentPath: number[]) {
@@ -2486,7 +2559,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       pre_handle_decimal_name: '',
     };
     updateSdoDocument(updateSdoNodeAtPath(document, parentPath, (node) => ({ ...node, children: [...(node.children ?? []), child] })));
-    setEditingSettingPath([...parentPath, nextIndex]);
+    openSettingEditorDrawer([...parentPath, nextIndex]);
   }
 
   function removeSdoNode(path: number[]) {
@@ -3360,6 +3433,120 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const currentPrivateProtocol = privateProtocolDocument();
   const currentProtocolMappings = protocolMappingsDocument();
 
+  function renderSettingEditorDrawer() {
+    if (!editingSettingPath || !editingSettingNode) return null;
+
+    const editorPath = sdoNodeDocumentPath(editingSettingPath);
+    const isMenu = editingSettingNode.type === 0;
+
+    return (
+      <div className="legacy-drawer-layer" role="presentation">
+        <button className="legacy-drawer-backdrop" aria-label="关闭设置数据编辑面板" onClick={closeSettingEditorDrawer} type="button" />
+        <aside className="legacy-drawer legacy-drawer--setting" role="dialog" aria-modal="true" aria-labelledby="setting-editor-drawer-title" aria-describedby="setting-editor-drawer-desc">
+          <div className="legacy-drawer-header">
+            <div>
+              <strong id="setting-editor-drawer-title">{isMenu ? '菜单编辑' : '参数编辑'}：{editingSettingNode.name || '未命名'}</strong>
+              <p id="setting-editor-drawer-desc">编辑设置数据定义，不写入设备当前运行状态。</p>
+            </div>
+            <button ref={settingDrawerCloseRef} aria-label="关闭设置数据编辑面板" onClick={closeSettingEditorDrawer} type="button">×</button>
+          </div>
+          <div className="legacy-drawer-body">
+            <section className="legacy-edit-panel legacy-edit-panel--drawer">
+              <div className="legacy-edit-panel-header">
+                <strong>{isMenu ? '菜单定义' : '参数定义'}</strong>
+                <div className="setting-editor-drawer-actions">
+                  {isModifiedPath(editorPath) ? (
+                    <button className="config-restore-button" onClick={() => restoreModifiedPath(editorPath)} type="button">恢复</button>
+                  ) : null}
+                </div>
+              </div>
+              <div className="legacy-edit-sections">
+                {visibleSettingEditorSections(editingSettingNode).map((section) => (
+                  <section className="legacy-edit-section" key={section.title}>
+                    <div className="legacy-edit-section-title">{section.title}</div>
+                    <div className="legacy-edit-grid legacy-edit-grid--sectioned">
+                      {section.fields.map((field) => renderSettingEditorField(field, editingSettingNode, editingSettingPath))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </section>
+          </div>
+        </aside>
+      </div>
+    );
+  }
+
+  function renderAdvancedGlobalParamsPanel() {
+    return (
+      <section className="legacy-edit-panel legacy-edit-panel--drawer">
+        <div className="legacy-edit-panel-header"><strong>全局变量</strong><button onClick={addPdoGlobalParam} type="button">新增</button></div>
+        <div className="legacy-drawer-table-frame">
+          <table className="legacy-data-table legacy-data-table--compact">
+            <thead><tr><th /><th>参数ID</th><th>名称</th><th>默认值</th><th>保留</th><th>类型</th><th>内部变量</th><th>操作</th></tr></thead>
+            <tbody>{currentPdoAdvancedDocument?.pdo_global_param.map((item, index) => (
+              <tr className={isModifiedPath(['pdo_global_param', index]) ? 'config-entry-modified' : undefined} key={`global-${index}`}>
+                <td>{index + 1}</td>
+                <td><input value={item.param_id} onChange={(event) => updatePdoGlobalParam(index, 'param_id', event.target.value)} /></td>
+                <td><input value={item.name} onChange={(event) => updatePdoGlobalParam(index, 'name', event.target.value)} /></td>
+                <td><input value={item.def} onChange={(event) => updatePdoGlobalParam(index, 'def', event.target.value)} /></td>
+                <td><input type="number" value={item.reserved} onChange={(event) => updatePdoGlobalParam(index, 'reserved', Number(event.target.value))} /></td>
+                <td><input type="number" value={item.type} onChange={(event) => updatePdoGlobalParam(index, 'type', Number(event.target.value))} /></td>
+                <td><input type="number" value={item.inner} onChange={(event) => updatePdoGlobalParam(index, 'inner', Number(event.target.value))} /></td>
+                <td><button className="danger" onClick={() => removePdoGlobalParam(index)} type="button">删除</button></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </section>
+    );
+  }
+
+  function renderAdvancedConditionsPanel() {
+    return (
+      <section className="legacy-edit-panel legacy-edit-panel--drawer">
+        <div className="legacy-edit-panel-header"><strong>条件表</strong><button onClick={addPdoCondition} type="button">新增</button></div>
+        {(currentPdoAdvancedDocument?.pdo_condition ?? []).map((condition, conditionIndex) => (
+          <div className="legacy-condition-row" key={`condition-${conditionIndex}`}>
+            <label>参数 ID<input value={condition.param_id} onChange={(event) => updatePdoCondition(conditionIndex, 'param_id', event.target.value)} /></label>
+            <label>处理方式<input type="number" value={condition.process} onChange={(event) => updatePdoCondition(conditionIndex, 'process', Number(event.target.value))} /></label>
+            <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">新增输入</button>
+            <button className="danger" onClick={() => removePdoCondition(conditionIndex)} type="button">删除条件</button>
+            {condition.data.map((input, inputIndex) => (
+              <label key={`condition-input-${conditionIndex}-${inputIndex}`}>输入参数<input value={input.param_id} onChange={(event) => updatePdoConditionInput(conditionIndex, inputIndex, event.target.value)} /><button className="danger" onClick={() => removePdoConditionInput(conditionIndex, inputIndex)} type="button">删除</button></label>
+            ))}
+          </div>
+        ))}
+      </section>
+    );
+  }
+
+  function renderAdvancedPdoDrawer() {
+    if (!advancedPdoDrawerOpen) return null;
+
+    return (
+      <div className="legacy-drawer-layer" role="presentation">
+        <button className="legacy-drawer-backdrop" aria-label="关闭高级配置编辑面板" onClick={closeAdvancedPdoDrawer} type="button" />
+        <aside className="legacy-drawer" role="dialog" aria-modal="true" aria-labelledby="advanced-pdo-drawer-title">
+          <div className="legacy-drawer-header">
+            <div>
+              <strong id="advanced-pdo-drawer-title">高级 CANopen 参数</strong>
+              <p>编辑全局变量和条件表，同时保留主区域的帧/协议上下文。</p>
+            </div>
+            <button ref={advancedPdoDrawerCloseRef} aria-label="关闭高级 CANopen 参数面板" onClick={closeAdvancedPdoDrawer} type="button">×</button>
+          </div>
+          <div className="legacy-drawer-tabs" role="tablist" aria-label="高级 CANopen 参数分类">
+            <button aria-selected={advancedPdoDrawerTab === 'global'} className={advancedPdoDrawerTab === 'global' ? 'active' : ''} onClick={() => setAdvancedPdoDrawerTab('global')} role="tab" type="button">全局变量</button>
+            <button aria-selected={advancedPdoDrawerTab === 'condition'} className={advancedPdoDrawerTab === 'condition' ? 'active' : ''} onClick={() => setAdvancedPdoDrawerTab('condition')} role="tab" type="button">条件表</button>
+          </div>
+          <div className="legacy-drawer-body">
+            {advancedPdoDrawerTab === 'global' ? renderAdvancedGlobalParamsPanel() : renderAdvancedConditionsPanel()}
+          </div>
+        </aside>
+      </div>
+    );
+  }
+
   return (
     <main className="workspace">
       {loadedProject ? (
@@ -3731,7 +3918,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
         ) : null}
 
         {activeModule.key === 'setting-data' ? (
-          <section className={sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'}>
+          <>
+            <section className={sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'}>
             <div className="legacy-data-sidebar">
               <div className="legacy-data-sidebar-header">
                 <div className="legacy-data-sidebar-title">菜单</div>
@@ -3788,7 +3976,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 </div>
                 <div className="legacy-data-actions">
                   <button disabled={!currentSdoDocument} onClick={() => addSdoMenu(activeSettingNode ? activeSettingPathNumbers : [])} type="button">新增菜单</button>
-                  <button disabled={!activeSettingNode} onClick={() => setEditingSettingPath(activeSettingPathNumbers)} type="button">修改菜单</button>
+                  <button disabled={!activeSettingNode} onClick={() => openSettingEditorDrawer(activeSettingPathNumbers)} type="button">修改菜单</button>
                   <button disabled={!activeSettingNode} onClick={() => addSdoParameter(activeSettingPathNumbers)} type="button">新增参数</button>
                   <button onClick={resetSettingColumnWidths} type="button">重置列宽</button>
                   <button
@@ -3810,29 +3998,6 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   <div className="setting-help-card">
                     此菜单包含只读开关监测项。0/1 表示设备上报的开关状态；本页可编辑名称、索引、位段、预处理等配置定义，不能直接写入当前状态。
                   </div>
-                ) : null}
-                {editingSettingPath && editingSettingNode ? (
-                  <section className="legacy-edit-panel">
-                    <div className="legacy-edit-panel-header">
-                      <strong>{editingSettingNode.type === 0 ? '菜单编辑' : '参数编辑'}：{editingSettingNode.name || '未命名'}</strong>
-                      <div>
-                        {isModifiedPath(sdoNodeDocumentPath(editingSettingPath)) ? (
-                          <button className="config-restore-button" onClick={() => restoreModifiedPath(sdoNodeDocumentPath(editingSettingPath))} type="button">恢复</button>
-                        ) : null}
-                        <button onClick={() => setEditingSettingPath(null)} type="button">关闭</button>
-                      </div>
-                    </div>
-                    <div className="legacy-edit-sections">
-                      {visibleSettingEditorSections(editingSettingNode).map((section) => (
-                        <section className="legacy-edit-section" key={section.title}>
-                          <div className="legacy-edit-section-title">{section.title}</div>
-                          <div className="legacy-edit-grid legacy-edit-grid--sectioned">
-                            {section.fields.map((field) => renderSettingEditorField(field, editingSettingNode, editingSettingPath))}
-                          </div>
-                        </section>
-                      ))}
-                    </div>
-                  </section>
                 ) : null}
                 {activeSettingNode && settingParameters.length > 0 ? (
                   <table className="legacy-data-table" style={{ minWidth: settingTableMinWidth() }}>
@@ -3875,7 +4040,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 )}
               </div>
             </div>
-          </section>
+            </section>
+            {renderSettingEditorDrawer()}
+          </>
         ) : null}
 
         {activeModule.key === 'realtime-data' ? (
@@ -3923,8 +4090,26 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 ))}
                 {realtimeMode === 'advanced' ? (
                   <>
-                    <button className="legacy-menu-item child" onClick={() => setSelectedAdvancedFrameId(null)} type="button">全局变量</button>
-                    <button className="legacy-menu-item child" onClick={() => setSelectedAdvancedFrameId(null)} type="button">条件表</button>
+                    <button
+                      className={advancedPdoDrawerOpen && advancedPdoDrawerTab === 'global' ? 'legacy-menu-item child active' : 'legacy-menu-item child'}
+                      onClick={() => {
+                        setSelectedAdvancedFrameId(null);
+                        openAdvancedPdoDrawer('global');
+                      }}
+                      type="button"
+                    >
+                      全局变量
+                    </button>
+                    <button
+                      className={advancedPdoDrawerOpen && advancedPdoDrawerTab === 'condition' ? 'legacy-menu-item child active' : 'legacy-menu-item child'}
+                      onClick={() => {
+                        setSelectedAdvancedFrameId(null);
+                        openAdvancedPdoDrawer('condition');
+                      }}
+                      type="button"
+                    >
+                      条件表
+                    </button>
                   </>
                 ) : null}
               </div>
@@ -3946,8 +4131,14 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   }} type="button">新增协议</button>
                   {realtimeMode === 'advanced' ? (
                     <>
-                      <button onClick={addPdoGlobalParam} type="button">新增全局变量</button>
-                      <button onClick={addPdoCondition} type="button">新增条件</button>
+                      <button onClick={() => {
+                        addPdoGlobalParam();
+                        openAdvancedPdoDrawer('global');
+                      }} type="button">新增全局变量</button>
+                      <button onClick={() => {
+                        addPdoCondition();
+                        openAdvancedPdoDrawer('condition');
+                      }} type="button">新增条件</button>
                     </>
                   ) : null}
                 </div>
@@ -4009,39 +4200,19 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                     </table>
                   ) : <div className="legacy-data-empty">请选择或新增 PDO 帧</div>
                 ) : (
-                  <div className="legacy-advanced-stack">
-                    <section className="legacy-edit-panel">
-                      <div className="legacy-edit-panel-header"><strong>全局变量</strong><button onClick={addPdoGlobalParam} type="button">新增</button></div>
-                      <table className="legacy-data-table legacy-data-table--compact">
-                        <thead><tr><th /><th>参数ID</th><th>名称</th><th>默认值</th><th>保留</th><th>类型</th><th>内部变量</th><th>操作</th></tr></thead>
-                        <tbody>{currentPdoAdvancedDocument?.pdo_global_param.map((item, index) => (
-                          <tr className={isModifiedPath(['pdo_global_param', index]) ? 'config-entry-modified' : undefined} key={`global-${index}`}>
-                            <td>{index + 1}</td>
-                            <td><input value={item.param_id} onChange={(event) => updatePdoGlobalParam(index, 'param_id', event.target.value)} /></td>
-                            <td><input value={item.name} onChange={(event) => updatePdoGlobalParam(index, 'name', event.target.value)} /></td>
-                            <td><input value={item.def} onChange={(event) => updatePdoGlobalParam(index, 'def', event.target.value)} /></td>
-                            <td><input type="number" value={item.reserved} onChange={(event) => updatePdoGlobalParam(index, 'reserved', Number(event.target.value))} /></td>
-                            <td><input type="number" value={item.type} onChange={(event) => updatePdoGlobalParam(index, 'type', Number(event.target.value))} /></td>
-                            <td><input type="number" value={item.inner} onChange={(event) => updatePdoGlobalParam(index, 'inner', Number(event.target.value))} /></td>
-                            <td><button className="danger" onClick={() => removePdoGlobalParam(index)} type="button">删除</button></td>
-                          </tr>
-                        ))}</tbody>
-                      </table>
-                    </section>
-                    <section className="legacy-edit-panel">
-                      <div className="legacy-edit-panel-header"><strong>条件表</strong><button onClick={addPdoCondition} type="button">新增</button></div>
-                      {(currentPdoAdvancedDocument?.pdo_condition ?? []).map((condition, conditionIndex) => (
-                        <div className="legacy-condition-row" key={`condition-${conditionIndex}`}>
-                          <label>参数 ID<input value={condition.param_id} onChange={(event) => updatePdoCondition(conditionIndex, 'param_id', event.target.value)} /></label>
-                          <label>处理方式<input type="number" value={condition.process} onChange={(event) => updatePdoCondition(conditionIndex, 'process', Number(event.target.value))} /></label>
-                          <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">新增输入</button>
-                          <button className="danger" onClick={() => removePdoCondition(conditionIndex)} type="button">删除条件</button>
-                          {condition.data.map((input, inputIndex) => (
-                            <label key={`condition-input-${conditionIndex}-${inputIndex}`}>输入参数<input value={input.param_id} onChange={(event) => updatePdoConditionInput(conditionIndex, inputIndex, event.target.value)} /><button className="danger" onClick={() => removePdoConditionInput(conditionIndex, inputIndex)} type="button">删除</button></label>
-                          ))}
-                        </div>
-                      ))}
-                    </section>
+                  <div className="legacy-advanced-main">
+                    <div className="legacy-advanced-toolbar">
+                      <div className="legacy-advanced-summary">
+                        <strong>高级配置</strong>
+                        <span>全局变量 {currentPdoAdvancedDocument?.pdo_global_param.length ?? 0} 项</span>
+                        <span>条件 {currentPdoAdvancedDocument?.pdo_condition.length ?? 0} 项</span>
+                        <span>{selectedAdvancedFrameId === null ? '当前：帧列表' : `当前：${formatFrameIdPadded(selectedAdvancedFrameId)} 协议`}</span>
+                      </div>
+                      <div className="legacy-advanced-actions">
+                        <button onClick={() => openAdvancedPdoDrawer('global')} type="button">管理全局变量</button>
+                        <button onClick={() => openAdvancedPdoDrawer('condition')} type="button">管理条件表</button>
+                      </div>
+                    </div>
                     {selectedAdvancedFrameId === null ? (
                       <table className="legacy-data-table">
                         <thead><tr><th /><th>帧ID</th><th>帧类型</th><th>帧描述</th><th>数据项</th><th>操作</th></tr></thead>
@@ -4077,6 +4248,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                         </tbody>
                       </table>
                     ) : <div className="legacy-data-empty">请选择或新增高级 PDO 帧</div>}
+                    {renderAdvancedPdoDrawer()}
                   </div>
                 )}
               </div>
