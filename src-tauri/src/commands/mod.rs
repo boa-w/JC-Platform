@@ -23,6 +23,7 @@ use crate::domain::project::{
     ProjectParseReport, ProjectSummary, ProjectValidationReport, SaveProjectAsReport,
     SaveProjectAsRequest, SaveProjectRequest,
 };
+use crate::domain::project_compat::sanitize_document_for_target;
 use crate::domain::protocol_manager::{
     build_unified_protocol_model, flatten_unified_protocol_to_legacy,
     migrate_project_to_unified_protocol, ProtocolCompatibilityReport, UnifiedProtocolModel,
@@ -207,23 +208,6 @@ fn load_project_from_document(path: String, document: Value) -> Result<LoadedPro
         validation,
         document,
     })
-}
-
-fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
-    if !path.to_lowercase().ends_with(".jcpro") {
-        return document;
-    }
-    if let Some(object) = document.as_object_mut() {
-        for section in [
-            "signal_dictionary",
-            "private_protocol",
-            "protocol_mapping",
-            "battery_monitor_info",
-        ] {
-            object.remove(section);
-        }
-    }
-    document
 }
 
 /// 解析项目文件路径：支持绝对路径、相对路径，以及在当前目录祖先中按文件名搜索。

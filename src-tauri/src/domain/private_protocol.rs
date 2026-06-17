@@ -2,6 +2,7 @@
 //!
 //! 私有协议只描述帧和载荷布局，不承载业务展示语义；业务语义通过 SignalId 引用。
 
+use crate::domain::protocol::battery_bridge::derive_battery_monitor_private_frames;
 use crate::domain::signal::SignalId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -95,84 +96,14 @@ pub fn derive_private_protocol_from_legacy(document: &Value) -> PrivateProtocolD
 }
 
 fn merge_battery_monitor_private_frames(document: &Value, protocol: &mut PrivateProtocolDocument) {
-    let Some(root) = document.get("battery_monitor_info") else {
-        return;
-    };
-    if !root
-        .get("enabled")
-        .and_then(Value::as_bool)
-        .unwrap_or(false)
-    {
-        return;
-    }
-    let Some(frames) = root.get("frames").and_then(Value::as_array) else {
-        return;
-    };
-    let signals = root
-        .get("signals")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-
-    for frame in frames {
-        let frame_key = object_string(frame, "frame_key");
-        if frame_key.is_empty() {
-            continue;
-        }
+    for frame in derive_battery_monitor_private_frames(document) {
         if protocol.frames.iter().any(|item| {
-            item.source == PrivateFrameSource::BatteryMonitor && item.frame_key == frame_key
+            item.source == PrivateFrameSource::BatteryMonitor && item.frame_key == frame.frame_key
         }) {
             continue;
         }
-        let payload = signals
-            .iter()
-            .filter(|signal| object_string(signal, "frame_key") == frame_key)
-            .filter_map(|signal| {
-                let signal_id = object_string(signal, "param_id");
-                if signal_id.is_empty() {
-                    return None;
-                }
-                Some(PrivatePayloadSignal {
-                    signal_id,
-                    bit_offset: object_u16(signal, "pos"),
-                    bit_length: object_u16(signal, "len"),
-                    byte_order: ByteOrder::LittleEndian,
-                })
-            })
-            .collect::<Vec<_>>();
-
-        protocol.frames.push(PrivateFrame {
-            frame_id: object_u32(frame, "can_id"),
-            frame_key,
-            name: object_string(frame, "desc"),
-            frame_type: match object_u32(frame, "type") {
-                1 => PrivateFrameType::CanExtended,
-                _ => PrivateFrameType::CanStandard,
-            },
-            cycle_ms: object_u16(frame, "timeout_ticks"),
-            checksum: ChecksumType::None,
-            byte_order: ByteOrder::LittleEndian,
-            payload,
-            source: PrivateFrameSource::BatteryMonitor,
-        });
+        protocol.frames.push(frame);
     }
-}
-
-fn object_string(value: &Value, key: &str) -> String {
-    value
-        .get(key)
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .trim()
-        .to_string()
-}
-
-fn object_u32(value: &Value, key: &str) -> u32 {
-    value.get(key).and_then(Value::as_u64).unwrap_or(0) as u32
-}
-
-fn object_u16(value: &Value, key: &str) -> u16 {
-    object_u32(value, key).min(u16::MAX as u32) as u16
 }
 
 #[cfg(test)]

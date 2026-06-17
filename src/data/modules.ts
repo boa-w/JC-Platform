@@ -25,11 +25,15 @@ export const featureModules: FeatureModule[] = [
     key: 'private-protocol',
     title: '私有协议',
     description: '负责自定义帧、周期、校验方式、字节序和载荷布局。',
+    lifecycle: 'experimental-deprecated',
+    lifecycleReason: '实验性历史扩展，仅保留兼容与迁移用途；后续协议主线聚焦 CANOpen。',
   },
   {
     key: 'protocol-mapping',
     title: '协议映射',
     description: '统一展示 CANopen、私有协议和业务 Signal 之间的映射与校验结果。',
+    lifecycle: 'experimental',
+    lifecycleReason: '多协议映射层仍在验证中，后续会随 CANOpen 主线重构继续收敛。',
   },
   {
     key: 'ui',
@@ -40,11 +44,15 @@ export const featureModules: FeatureModule[] = [
     key: 'battery-protocol',
     title: '锂电协议',
     description: '负责锂电监控 CAN 帧定义、信号布局、数据类型和超时策略。',
+    lifecycle: 'experimental-deprecated',
+    lifecycleReason: '锂电行业定制实验功能，后续建议迁移到通用 CANOpen/DBC 扩展机制。',
   },
   {
     key: 'battery-monitor',
     title: '锂电监控显示',
     description: '负责锂电显示项配置：信号选取、单位、格式、精度和有效性策略。',
+    lifecycle: 'experimental-deprecated',
+    lifecycleReason: '依赖锂电协议扩展，仅保留兼容用途，后续将与核心 CANOpen 配置解耦。',
   },
   {
     key: 'language',

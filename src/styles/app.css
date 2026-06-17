@@ -937,7 +937,7 @@ button {
   min-width: auto;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  gap: 4px;
   border: 0;
   border-radius: 0;
   padding: 0 8px;
@@ -972,6 +972,33 @@ button {
   height: 2px;
   background: var(--tb-accent);
   border-radius: 1px 1px 0 0;
+}
+
+.module-lifecycle-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(232, 171, 83, 0.38);
+  border-radius: 999px;
+  padding: 0 5px;
+  color: var(--tb-warning);
+  background: rgba(232, 171, 83, 0.12);
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.module-lifecycle-badge--experimental {
+  border-color: rgba(74, 144, 226, 0.35);
+  color: #4a90e2;
+  background: rgba(74, 144, 226, 0.12);
+}
+
+.module-lifecycle-badge--deprecated,
+.module-lifecycle-badge--experimental-deprecated {
+  border-color: rgba(232, 171, 83, 0.38);
+  color: var(--tb-warning);
+  background: rgba(232, 171, 83, 0.12);
 }
 
 /* ── Breadcrumb ── */

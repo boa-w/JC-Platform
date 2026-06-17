@@ -14,6 +14,8 @@ pub mod language;
 pub mod pdo;
 pub mod private_protocol;
 pub mod project;
+pub mod project_compat;
+pub mod protocol;
 pub mod protocol_manager;
 pub mod sdo;
 pub mod signal;

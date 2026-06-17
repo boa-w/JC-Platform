@@ -1,10 +1,17 @@
-import type { FeatureModule, NavigationKey } from '../types/platform';
+import type { FeatureModule, ModuleLifecycle, NavigationKey } from '../types/platform';
 import { findGroupForKey } from '../data/navigation';
 
 interface BreadcrumbProps {
   activeKey: NavigationKey;
   modules: FeatureModule[];
   onNavigate: (key: NavigationKey) => void;
+}
+
+function lifecycleLabel(lifecycle?: ModuleLifecycle) {
+  if (lifecycle === 'experimental-deprecated') return '实验性 / 待废弃';
+  if (lifecycle === 'experimental') return '实验性';
+  if (lifecycle === 'deprecated') return '废弃';
+  return null;
 }
 
 export function Breadcrumb({ activeKey, modules, onNavigate }: BreadcrumbProps) {
@@ -18,6 +25,11 @@ export function Breadcrumb({ activeKey, modules, onNavigate }: BreadcrumbProps) 
       <span className="breadcrumb-group">{group.label}</span>
       <span className="breadcrumb-sep">/</span>
       <span className="breadcrumb-current">{currentModule?.title ?? activeKey}</span>
+      {lifecycleLabel(currentModule?.lifecycle) ? (
+        <span className={`module-lifecycle-badge module-lifecycle-badge--${currentModule?.lifecycle}`} title={currentModule?.lifecycleReason}>
+          {lifecycleLabel(currentModule?.lifecycle)}
+        </span>
+      ) : null}
     </nav>
   );
 }

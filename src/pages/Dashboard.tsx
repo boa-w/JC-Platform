@@ -92,6 +92,18 @@ import { getTestData, testDataLabels, type TestDataType } from '../data/test-dat
 import { framesToCsv, csvToFrames, signalsToCsv, csvToSignals, itemsToCsv, csvToItems } from '../utils/batteryCsv';
 import { useCanTestData } from '../hooks/useCanTestData';
 import { useExportBatteryOptions } from '../stores/exportSettings';
+import {
+  advancedConfigSections,
+  configSectionForEditor,
+  jsonEditorKeyForModule,
+  legacyTableKindForModule,
+  modifiedSectionLabels,
+  refactorOnlySections,
+  restorePathsForEditor,
+  shouldRefreshUnifiedProtocol,
+  trackedDocumentSections,
+  type RefactorOnlySection,
+} from '../modules/documentSections';
 
 interface DashboardProps {
   activeModule: FeatureModule;
@@ -123,7 +135,6 @@ const tableConfigTitles: Record<TableConfigKind, string> = {
 
 const appVersion = '0.1.0';
 
-const advancedConfigSections = ['pdo_global_param', 'pdo_condition', 'pdo_recv', 'pdo_send'];
 const recentProjectsStorageKey = 'jc-custom-platform.recentProjects';
 const maxRecentProjects = 8;
 const languageCodePattern = /^[a-z][a-z0-9-]*$/i;
@@ -133,26 +144,6 @@ interface RecentProject {
   name?: string;
   openedAt: string;
 }
-
-const modifiedSectionLabels: Record<string, string> = {
-  ui_info: 'UI 资源',
-  sdo_info: 'SDO 参数',
-  pdo_simple_send_recv: 'PDO 简化配置',
-  pdo_global_param: 'PDO 全局变量',
-  pdo_condition: 'PDO 条件表',
-  pdo_recv: 'PDO 接收帧',
-  pdo_send: 'PDO 发送帧',
-  language_info: '多国语言',
-  battery_protocol: '锂电协议',
-  battery_monitor_info: '锂电监控显示',
-  signal_dictionary: '业务信号字典',
-  private_protocol: '私有协议',
-  protocol_mapping: '协议映射',
-};
-
-const trackedDocumentSections = Object.keys(modifiedSectionLabels);
-const refactorOnlySections = ['signal_dictionary', 'private_protocol', 'protocol_mapping', 'battery_protocol', 'battery_monitor_info'] as const;
-type RefactorOnlySection = typeof refactorOnlySections[number];
 
 type SdoNodeField = keyof Pick<SdoNodeDocument,
   'name' | 'type' | 'user_auth' | 'name_index' | 'control_protocol' | 'control_rw' | 'control_use_default' |
@@ -334,7 +325,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   }, [loadedProject]);
 
   useEffect(() => {
-    if (loadedProject && (activeModule.key === 'signal-dictionary' || activeModule.key === 'private-protocol' || activeModule.key === 'protocol-mapping')) {
+    if (loadedProject && shouldRefreshUnifiedProtocol(activeModule.key)) {
       void refreshUnifiedProtocol(loadedProject.document);
     }
   }, [activeModule.key, loadedProject?.document]);
@@ -381,36 +372,17 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   }
 
   function activeLegacyTableKind(): TableConfigKind | null {
-    if (activeModule.key === 'setting-data') return 'sdo';
-    if (activeModule.key === 'realtime-data') return 'pdoSimple';
-    if (activeModule.key === 'language') return 'language';
-    return null;
+    return legacyTableKindForModule(activeModule.key) as TableConfigKind | null;
   }
 
   function activeJsonEditorKey() {
-    if (activeModule.key === 'setting-data') return 'sdo';
-    if (activeModule.key === 'realtime-data') return realtimeMode === 'simple' ? 'pdo-simple' : 'pdo-advanced';
-    return activeModule.key;
+    return jsonEditorKeyForModule(activeModule.key, { realtimeMode });
   }
 
   function currentConfigSection() {
     if (!loadedProject) return null;
     const document = loadedProject.document as Record<string, unknown>;
-    const jsonEditorKey = activeJsonEditorKey();
-    if (jsonEditorKey === 'sdo') return document.sdo_info;
-    if (jsonEditorKey === 'pdo-simple') return document.pdo_simple_send_recv;
-    if (activeModule.key === 'language') return document.language_info;
-    if (activeModule.key === 'battery-protocol') return document.battery_protocol;
-    if (activeModule.key === 'battery-monitor') return document.battery_monitor_info;
-    if (activeModule.key === 'signal-dictionary') return document.signal_dictionary;
-    if (activeModule.key === 'private-protocol') return document.private_protocol;
-    if (activeModule.key === 'protocol-mapping') {
-      return document.protocol_mapping;
-    }
-    if (jsonEditorKey === 'pdo-advanced') {
-      return Object.fromEntries(advancedConfigSections.map((section) => [section, document[section]]));
-    }
-    return null;
+    return configSectionForEditor(document, activeModule.key, { realtimeMode });
   }
 
   function updateRecentProjects(nextProject: LoadedProject, fallbackPath?: string) {
@@ -478,21 +450,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   function restoreCurrentConfigSection() {
     if (!loadedProject || !baselineDocument) return;
     let document = loadedProject.document;
-    const jsonEditorKey = activeJsonEditorKey();
-    if (jsonEditorKey === 'sdo') document = restorePath(document, baselineDocument, ['sdo_info']);
-    if (jsonEditorKey === 'pdo-simple') document = restorePath(document, baselineDocument, ['pdo_simple_send_recv']);
-    if (activeModule.key === 'language') document = restorePath(document, baselineDocument, ['language_info']);
-    if (activeModule.key === 'battery-protocol') document = restorePath(document, baselineDocument, ['battery_protocol']);
-    if (activeModule.key === 'battery-monitor') document = restorePath(document, baselineDocument, ['battery_monitor_info']);
-    if (activeModule.key === 'signal-dictionary') document = restorePath(document, baselineDocument, ['signal_dictionary']);
-    if (activeModule.key === 'private-protocol') document = restorePath(document, baselineDocument, ['private_protocol']);
-    if (activeModule.key === 'protocol-mapping') {
-      document = restorePath(document, baselineDocument, ['protocol_mapping']);
-    }
-    if (jsonEditorKey === 'pdo-advanced') {
-      for (const section of advancedConfigSections) {
-        document = restorePath(document, baselineDocument, [section]);
-      }
+    for (const path of restorePathsForEditor(activeModule.key, { realtimeMode })) {
+      document = restorePath(document, baselineDocument, path as JsonPath);
     }
     applyLoadedProject({ ...loadedProject, document });
     setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2));

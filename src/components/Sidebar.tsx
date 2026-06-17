@@ -1,11 +1,18 @@
 import { useState } from 'react';
-import type { FeatureModule, NavigationKey } from '../types/platform';
+import type { FeatureModule, ModuleLifecycle, NavigationKey } from '../types/platform';
 import { navGroups } from '../data/navigation';
 
 interface SidebarProps {
   modules: FeatureModule[];
   activeKey: NavigationKey;
   onSelect: (key: NavigationKey) => void;
+}
+
+function lifecycleLabel(lifecycle?: ModuleLifecycle) {
+  if (lifecycle === 'experimental-deprecated') return '实验/废弃';
+  if (lifecycle === 'experimental') return '实验';
+  if (lifecycle === 'deprecated') return '废弃';
+  return null;
 }
 
 export function Sidebar({ modules, activeKey, onSelect }: SidebarProps) {
@@ -57,8 +64,14 @@ export function Sidebar({ modules, activeKey, onSelect }: SidebarProps) {
                     key={module.key}
                     type="button"
                     onClick={() => onSelect(module.key)}
+                    title={module.lifecycleReason ?? module.description}
                   >
                     <span>{module.title}</span>
+                    {lifecycleLabel(module.lifecycle) ? (
+                      <span className={`module-lifecycle-badge module-lifecycle-badge--${module.lifecycle}`}>
+                        {lifecycleLabel(module.lifecycle)}
+                      </span>
+                    ) : null}
                   </button>
                 ))}
             </div>

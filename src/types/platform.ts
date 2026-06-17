@@ -8,10 +8,14 @@ export interface ProjectSummary {
   updatedAt?: string;
 }
 
+export type ModuleLifecycle = 'stable' | 'experimental' | 'deprecated' | 'experimental-deprecated';
+
 export interface FeatureModule {
   key: NavigationKey;
   title: string;
   description: string;
+  lifecycle?: ModuleLifecycle;
+  lifecycleReason?: string;
 }
 
 export interface BackendHealth {

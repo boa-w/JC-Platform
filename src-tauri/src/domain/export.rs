@@ -2095,6 +2095,48 @@ mod tests {
     }
 
     #[test]
+    fn export_battery_options_default_keeps_legacy_export_behavior() {
+        let options = ExportBatteryOptions::default();
+
+        assert!(!options.battery_protocol.config);
+        assert!(!options.battery_protocol.bin);
+        assert!(options.battery_monitor_info.config);
+        assert!(options.battery_monitor_info.bin);
+    }
+
+    #[test]
+    fn export_plan_uses_stable_legacy_paths_and_data_description_target() {
+        let document = json!({
+            "device": { "resolution_w": 800, "resolution_h": 480 },
+            "ui_info": [],
+            "language_info": language_info_without_selected_languages(),
+            "battery_monitor_info": disabled_battery_monitor(),
+            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] }
+        });
+
+        let report = build_export_plan(ExportPlanRequest {
+            project_path: None,
+            output_dir: "out".to_string(),
+            document,
+            export_options: ExportBatteryOptions::default(),
+        });
+
+        assert_eq!(report.export_root, "out/jc_export");
+        assert_eq!(report.manifest_path, "out/jc_export/ConfigUpdate.json");
+        assert_eq!(report.binary_path, "out/jc_export/bin/pdo_sdo_data.bin");
+        assert_eq!(report.directories, vec!["out/jc_export/img", "out/jc_export/img/anim", "out/jc_export/bin"]);
+        assert_eq!(report.screen_src.pages[0].key, "page_01");
+        assert_eq!(report.screen_src.pages[1].key, "page_02");
+        assert_eq!(report.data_description.src, "bin/pdo_sdo_data");
+        assert_eq!(report.data_description.dest, "bin/data");
+    }
+
+    #[test]
     fn collect_language_entries_includes_language_name_prefix() {
         let document = json!({
             "language_info": {
