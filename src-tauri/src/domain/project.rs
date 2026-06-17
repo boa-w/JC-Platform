@@ -261,10 +261,14 @@ pub fn migrate_legacy_project_document(path: Option<String>, value: Value) -> Mi
     }
 }
 
-const BATTERY_MONITOR_FIXED_LANGUAGE_ENTRIES: [&str; 10] = [" ", "%", "A", "AH", "H", "V", "℃", "关", "加热中", "开"];
+const BATTERY_MONITOR_FIXED_LANGUAGE_ENTRIES: [&str; 10] =
+    [" ", "%", "A", "AH", "H", "V", "℃", "关", "加热中", "开"];
 
 fn normalize_language_info(document: &mut Map<String, Value>) {
-    let Some(language_info) = document.get_mut("language_info").and_then(Value::as_object_mut) else {
+    let Some(language_info) = document
+        .get_mut("language_info")
+        .and_then(Value::as_object_mut)
+    else {
         return;
     };
     let list_inner = language_info
@@ -290,14 +294,31 @@ fn migrate_battery_monitor_formatters(document: &mut Map<String, Value>) {
     };
 
     for item in items {
-        let item_key = item.get("item_key").and_then(Value::as_str).unwrap_or_default().to_string();
-        let signal_key = item.get("signal_key").and_then(Value::as_str).unwrap_or_default().to_string();
+        let item_key = item
+            .get("item_key")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
+        let signal_key = item
+            .get("signal_key")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string();
         let Some(formatter) = item.get_mut("formatter").and_then(Value::as_object_mut) else {
             continue;
         };
-        let kind = formatter.get("kind").and_then(Value::as_str).unwrap_or_default();
-        let scale_num = formatter.get("scale_num").and_then(Value::as_i64).unwrap_or(1);
-        let scale_den = formatter.get("scale_den").and_then(Value::as_i64).unwrap_or(1);
+        let kind = formatter
+            .get("kind")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let scale_num = formatter
+            .get("scale_num")
+            .and_then(Value::as_i64)
+            .unwrap_or(1);
+        let scale_den = formatter
+            .get("scale_den")
+            .and_then(Value::as_i64)
+            .unwrap_or(1);
 
         if item_key == "battery_capacity"
             && signal_key == "battery_capacity"
@@ -305,9 +326,18 @@ fn migrate_battery_monitor_formatters(document: &mut Map<String, Value>) {
             && scale_num == 5
             && scale_den == 1
         {
-            formatter.insert("kind".to_string(), Value::String("linear_u8_wrap".to_string()));
-        } else if item_key == "battery_error_info" && signal_key == "battery_error_info" && kind == "hex" {
-            formatter.insert("kind".to_string(), Value::String("linear_u8_wrap".to_string()));
+            formatter.insert(
+                "kind".to_string(),
+                Value::String("linear_u8_wrap".to_string()),
+            );
+        } else if item_key == "battery_error_info"
+            && signal_key == "battery_error_info"
+            && kind == "hex"
+        {
+            formatter.insert(
+                "kind".to_string(),
+                Value::String("linear_u8_wrap".to_string()),
+            );
             formatter.insert("display_base".to_string(), Value::from(10));
         } else if item_key == "battery_discharge_time"
             && signal_key == "battery_discharge_time"

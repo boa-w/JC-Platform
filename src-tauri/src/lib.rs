@@ -18,11 +18,12 @@ mod infrastructure;
 use commands::{
     add_ui_resource_option_document, backend_health, build_project_binary_report,
     build_project_export_plan, compare_project_binary_report, copy_ui_resource_images,
-    create_project, export_project_package_command, export_table_csv, export_table_workbook,
-    generate_can_test_data, import_language_csv, import_language_table, import_language_workbook,
-    flatten_unified_protocol_document, import_pdo_simple_csv, import_pdo_simple_table,
+    create_project, export_dbc, export_project_package_command, export_table_csv,
+    export_table_workbook, flatten_unified_protocol_document, generate_can_test_data,
+    generate_dbc_content, import_dbc, import_language_csv, import_language_table,
+    import_language_workbook, import_pdo_simple_csv, import_pdo_simple_table,
     import_pdo_simple_workbook, import_sdo_csv, import_sdo_table, import_sdo_workbook,
-    language_document_table, legacy_table_spec, load_json_file, load_project,
+    language_document_table, legacy_table_spec, load_json_file, load_project, load_text_file,
     migrate_project_document, migrate_project_file, migrate_unified_protocol_document,
     parse_pdo_advanced_file, parse_pdo_advanced_project, parse_project_document,
     parse_project_file, parse_ui_resource_file, parse_ui_resources,
@@ -90,7 +91,11 @@ pub fn run() {
             generate_can_test_data,
             save_text_file,
             save_json_file,
-            load_json_file
+            load_json_file,
+            load_text_file,
+            import_dbc,
+            export_dbc,
+            generate_dbc_content
         ])
         .run(tauri::generate_context!())
         .expect("failed to run jc custom platform tauri app");

@@ -217,7 +217,10 @@ pub fn flatten_unified_protocol_to_legacy(document: Value) -> ProtocolCompatibil
         Value::Object(map) => map,
         _ => Map::new(),
     };
-    map.insert("pdo_global_param".to_string(), Value::Array(pdo_global_param));
+    map.insert(
+        "pdo_global_param".to_string(),
+        Value::Array(pdo_global_param),
+    );
     map.insert(
         "pdo_recv".to_string(),
         Value::Array(legacy_pdo_frames(&model.canopen.pdo_recv)),
@@ -337,7 +340,9 @@ fn pdo_frames_from_mappings(
     order
         .into_iter()
         .map(|frame_id| {
-            let existing = legacy_frames.iter().find(|frame| frame.frame_id == frame_id);
+            let existing = legacy_frames
+                .iter()
+                .find(|frame| frame.frame_id == frame_id);
             CanOpenPdoFrame {
                 frame_id,
                 frame_type: existing.map(|frame| frame.frame_type).unwrap_or(0),
@@ -819,7 +824,10 @@ mod tests {
         let report = flatten_unified_protocol_to_legacy(document);
 
         assert!(report.valid, "{:?}", report.errors);
-        assert_eq!(report.updated_sections, vec!["pdo_global_param", "pdo_recv", "pdo_send"]);
+        assert_eq!(
+            report.updated_sections,
+            vec!["pdo_global_param", "pdo_recv", "pdo_send"]
+        );
         assert_eq!(report.document["pdo_global_param"][0]["param_id"], "A");
         assert_eq!(report.document["pdo_global_param"][0]["type"], 1);
         assert_eq!(report.document["pdo_recv"][0]["id"], 0x202);

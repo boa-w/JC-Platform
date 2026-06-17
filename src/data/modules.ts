@@ -37,9 +37,14 @@ export const featureModules: FeatureModule[] = [
     description: '负责设备分辨率画布、图标/动画资源、属性编辑、选项增删和资源导出路径维护。',
   },
   {
+    key: 'battery-protocol',
+    title: '锂电协议',
+    description: '负责锂电监控 CAN 帧定义、信号布局、数据类型和超时策略。',
+  },
+  {
     key: 'battery-monitor',
-    title: '锂电监控配置',
-    description: '负责锂电监控 CAN 帧、信号、显示项、单位、精度和超时策略。',
+    title: '锂电监控显示',
+    description: '负责锂电显示项配置：信号选取、单位、格式、精度和有效性策略。',
   },
   {
     key: 'language',

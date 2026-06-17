@@ -10,7 +10,7 @@ export const navGroups: NavGroup[] = [
   { label: '数据', keys: ['setting-data', 'realtime-data'] },
   {
     label: '协议',
-    keys: ['signal-dictionary', 'private-protocol', 'protocol-mapping'],
+    keys: ['signal-dictionary', 'private-protocol', 'protocol-mapping', 'battery-protocol'],
   },
   { label: '配置', keys: ['ui', 'battery-monitor', 'language'] },
   { label: '输出', keys: ['export', 'can-test-data', 'settings'] },
