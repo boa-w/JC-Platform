@@ -152,6 +152,193 @@ type SdoNodeField = keyof Pick<SdoNodeDocument,
   'pre_handle_offset' | 'pre_handle_decimal' | 'pre_handle_decimal_name'
 >;
 
+type SettingParameterColumnKey =
+  | 'index'
+  | 'name'
+  | 'auth'
+  | 'protocol'
+  | 'frameId'
+  | 'mainIndex'
+  | 'subIndex'
+  | 'access'
+  | 'maxValue'
+  | 'minValue'
+  | 'defaultValue'
+  | 'dataType'
+  | 'bitStart'
+  | 'bitLength'
+  | 'preprocess'
+  | 'scale'
+  | 'offset'
+  | 'decimals'
+  | 'actions';
+
+interface SettingParameterColumn {
+  key: SettingParameterColumnKey;
+  label: string;
+  defaultWidth: number;
+  minWidth: number;
+  align?: 'left' | 'center' | 'right';
+}
+
+type SettingEditorInputKind = 'text' | 'number' | 'select';
+
+type SettingEditorOption = {
+  value: number | string;
+  label: string;
+};
+
+type SettingEditorField = {
+  field: SdoNodeField;
+  label: string;
+  kind: SettingEditorInputKind;
+  defaultValue: string | number;
+  visibleFor?: 'all' | 'menu' | 'parameter';
+  options?: SettingEditorOption[];
+};
+
+type SettingEditorSection = {
+  title: string;
+  fields: SettingEditorField[];
+};
+
+const settingColumnWidthStorageKey = 'jc-custom-platform.settingData.columnWidths';
+const maxSettingColumnWidth = 480;
+
+const settingParameterColumns: SettingParameterColumn[] = [
+  { key: 'index', label: '', defaultWidth: 54, minWidth: 44, align: 'center' },
+  { key: 'name', label: '参数名称', defaultWidth: 180, minWidth: 120, align: 'left' },
+  { key: 'auth', label: '使用权限', defaultWidth: 96, minWidth: 76 },
+  { key: 'protocol', label: '协议类型', defaultWidth: 110, minWidth: 86 },
+  { key: 'frameId', label: '帧ID', defaultWidth: 90, minWidth: 72 },
+  { key: 'mainIndex', label: '主索引', defaultWidth: 90, minWidth: 72 },
+  { key: 'subIndex', label: '子索引', defaultWidth: 80, minWidth: 64 },
+  { key: 'access', label: '读写权限', defaultWidth: 96, minWidth: 76 },
+  { key: 'maxValue', label: '最大值', defaultWidth: 110, minWidth: 80 },
+  { key: 'minValue', label: '最小值', defaultWidth: 110, minWidth: 80 },
+  { key: 'defaultValue', label: '默认值', defaultWidth: 110, minWidth: 80 },
+  { key: 'dataType', label: '数据类型', defaultWidth: 130, minWidth: 90 },
+  { key: 'bitStart', label: 'bit开始位置', defaultWidth: 110, minWidth: 86 },
+  { key: 'bitLength', label: 'bit长度', defaultWidth: 100, minWidth: 76 },
+  { key: 'preprocess', label: '数据预处理', defaultWidth: 130, minWidth: 94 },
+  { key: 'scale', label: '缩放值', defaultWidth: 100, minWidth: 76 },
+  { key: 'offset', label: '偏移值', defaultWidth: 100, minWidth: 76 },
+  { key: 'decimals', label: '保留小数', defaultWidth: 100, minWidth: 76 },
+  { key: 'actions', label: '操作', defaultWidth: 120, minWidth: 100 },
+];
+
+const sdoTypeOptions: SettingEditorOption[] = [
+  { value: 0, label: '菜单' },
+  { value: 1, label: '参数' },
+];
+
+const sdoAuthOptions: SettingEditorOption[] = [
+  { value: 0, label: '普通用户' },
+  { value: 1, label: '普通用户' },
+  { value: 2, label: '管理员' },
+  { value: 3, label: '超级管理员' },
+];
+
+const sdoAccessOptions: SettingEditorOption[] = [
+  { value: 0, label: '只读' },
+  { value: 1, label: '读写' },
+  { value: 2, label: '只写' },
+];
+
+const sdoProtocolOptions: SettingEditorOption[] = [
+  { value: 0, label: 'CAN_OPEN' },
+];
+
+const sdoBooleanOptions: SettingEditorOption[] = [
+  { value: 0, label: '否' },
+  { value: 1, label: '是' },
+];
+
+const sdoPreHandleOptions: SettingEditorOption[] = [
+  { value: 0, label: '原始数据' },
+];
+
+const settingEditorSections: SettingEditorSection[] = [
+  {
+    title: '基础信息',
+    fields: [
+      { field: 'name', label: '名称', kind: 'text', defaultValue: '', visibleFor: 'all' },
+      { field: 'type', label: '类型', kind: 'select', defaultValue: 0, visibleFor: 'all', options: sdoTypeOptions },
+      { field: 'user_auth', label: '权限', kind: 'select', defaultValue: 0, visibleFor: 'all', options: sdoAuthOptions },
+      { field: 'name_index', label: '语言索引', kind: 'number', defaultValue: 0, visibleFor: 'all' },
+    ],
+  },
+  {
+    title: '通信索引',
+    fields: [
+      { field: 'control_protocol', label: '协议', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoProtocolOptions },
+      { field: 'control_rw', label: '读写', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoAccessOptions },
+      { field: 'fid', label: 'FID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
+      { field: 'mid', label: 'MID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
+      { field: 'sid', label: 'SID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
+    ],
+  },
+  {
+    title: '默认值与范围',
+    fields: [
+      { field: 'control_use_default', label: '使用默认值', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoBooleanOptions },
+      { field: 'control_use_min_max', label: '使用范围', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoBooleanOptions },
+      { field: 'data_default', label: '默认值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'data_min', label: '最小值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'data_max', label: '最大值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+    ],
+  },
+  {
+    title: '数据处理',
+    fields: [
+      { field: 'handle', label: '句柄', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
+      { field: 'handle_name', label: '句柄名', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'handle_param', label: '句柄参数', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'pre_handle', label: '预处理', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoPreHandleOptions },
+      { field: 'pre_handle_name', label: '预处理名', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'pre_handle_scale', label: '缩放', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'pre_handle_offset', label: '偏移', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'pre_handle_decimal', label: '小数位', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
+      { field: 'pre_handle_decimal_name', label: '小数位名', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+    ],
+  },
+];
+
+function clampSettingColumnWidth(value: number, column: SettingParameterColumn) {
+  return Math.max(column.minWidth, Math.min(maxSettingColumnWidth, value));
+}
+
+function loadSettingColumnWidths() {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = window.localStorage.getItem(settingColumnWidthStorageKey);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const next: Record<string, number> = {};
+    for (const column of settingParameterColumns) {
+      const value = (parsed as Record<string, unknown>)[column.key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        next[column.key] = clampSettingColumnWidth(value, column);
+      }
+    }
+    return next;
+  } catch {
+    return {};
+  }
+}
+
+function saveSettingColumnWidths(widths: Record<string, number>) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(settingColumnWidthStorageKey, JSON.stringify(widths));
+}
+
+function optionsWithCurrentValue(options: SettingEditorOption[], value: string | number) {
+  return options.some((option) => String(option.value) === String(value))
+    ? options
+    : [...options, { value, label: `当前值：${value}` }];
+}
+
 function loadRecentProjects() {
   if (typeof window === 'undefined') return [];
   try {
@@ -263,6 +450,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [pdoJumpTarget, setPdoJumpTarget] = useState<number | null>(null);
   const [selectedSettingPath, setSelectedSettingPath] = useState<string | null>(null);
   const [editingSettingPath, setEditingSettingPath] = useState<number[] | null>(null);
+  const [settingSearchQuery, setSettingSearchQuery] = useState('');
+  const [settingColumnWidths, setSettingColumnWidths] = useState<Record<string, number>>(loadSettingColumnWidths);
   const [selectedRealtimeKind, setSelectedRealtimeKind] = useState<'pdo_recv' | 'pdo_send'>('pdo_recv');
   const [selectedRealtimeFrameId, setSelectedRealtimeFrameId] = useState<number | null>(null);
   const [realtimeMode, setRealtimeMode] = useState<'simple' | 'advanced'>('simple');
@@ -1816,16 +2005,24 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
 
   interface SettingMenuRow {
     key: string;
+    path: number[];
     name: string;
+    pathNames: string[];
     level: number;
     auth: string;
     parameterCount: number;
+    directParameterCount: number;
+    hasMenuChildren: boolean;
+    isSearchMatch?: boolean;
+    hasSearchMatchInChildren?: boolean;
   }
 
   interface SettingParameterRow {
     index: number;
     path: number[];
     name: string;
+    menuPath: string;
+    pathNames: string[];
     auth: string;
     protocol: string;
     frameId: string;
@@ -1842,6 +2039,9 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     scale: string;
     offset: string;
     decimals: string;
+    isReadonly: boolean;
+    isBooleanMonitor: boolean;
+    usageHint: string;
   }
 
   function sdoAuthLabel(value?: number) {
@@ -1878,30 +2078,86 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     return (node.children ?? []).reduce((total, child) => total + countSdoParameters(child), 0);
   }
 
-  function collectSettingMenus(root: SdoNodeDocument | null): SettingMenuRow[] {
-    if (!root) return [];
-    const rows: SettingMenuRow[] = [];
-    (root.children ?? []).forEach((node, index) => {
-      if (node.type !== 0) return;
-      const key = `${index}`;
-      rows.push({
-        key,
-        name: node.name || `菜单${index + 1}`,
-        level: 0,
-        auth: sdoAuthLabel(node.user_auth),
-        parameterCount: countSdoParameters(node),
-      });
-      (node.children ?? []).forEach((child, childIndex) => {
-        if (child.type !== 0) return;
-        rows.push({
-          key: `${index}/${childIndex}`,
-          name: child.name || `子菜单${childIndex + 1}`,
-          level: 1,
-          auth: sdoAuthLabel(child.user_auth),
-          parameterCount: countSdoParameters(child),
-        });
-      });
+  function countSdoDirectParameters(node: SdoNodeDocument): number {
+    return (node.children ?? []).filter((child) => child.type === 1).length;
+  }
+
+  function normalizeSettingSearch(value: string) {
+    return value.trim().toLowerCase();
+  }
+
+  function sdoNodeName(node: SdoNodeDocument, fallback: string) {
+    return node.name?.trim() || fallback;
+  }
+
+  function formatSettingPath(pathNames: string[]) {
+    return pathNames.length > 0 ? pathNames.join(' -> ') : '菜单';
+  }
+
+  function isBooleanMonitorParameter(node: SdoNodeDocument) {
+    return String(node.data_min ?? '') === '0' && String(node.data_max ?? '') === '1';
+  }
+
+  function settingNodeSearchText(node: SdoNodeDocument, pathNames: string[]) {
+    return normalizeSettingSearch([
+      ...pathNames,
+      node.name,
+      sdoAuthLabel(node.user_auth),
+      sdoAccessLabel(node.control_rw),
+      sdoProtocolLabel(node.control_protocol),
+      node.handle_name,
+      formatHex(node.fid, 2),
+      formatHex(node.mid, 4),
+      node.sid,
+      node.data_default,
+      node.data_min,
+      node.data_max,
+    ].filter((item) => item !== undefined && item !== null).join(' '));
+  }
+
+  function settingNodeMatchesQuery(node: SdoNodeDocument, query: string, pathNames: string[]) {
+    if (!query) return true;
+    return settingNodeSearchText(node, pathNames).includes(query);
+  }
+
+  function settingMenuHasMatchedDescendant(node: SdoNodeDocument, query: string, pathNames: string[]): boolean {
+    if (!query) return true;
+    return (node.children ?? []).some((child, index) => {
+      const childName = sdoNodeName(child, child.type === 0 ? `菜单${index + 1}` : `参数${index + 1}`);
+      const childPathNames = child.type === 0 ? [...pathNames, childName] : pathNames;
+      return settingNodeMatchesQuery(child, query, childPathNames)
+        || settingMenuHasMatchedDescendant(child, query, childPathNames);
     });
+  }
+
+  function collectSettingMenus(root: SdoNodeDocument | null, rawQuery = ''): SettingMenuRow[] {
+    if (!root) return [];
+    const query = normalizeSettingSearch(rawQuery);
+    const rows: SettingMenuRow[] = [];
+    function visit(node: SdoNodeDocument, path: number[], level: number, parentNames: string[]) {
+      if (node.type !== 0) return;
+      const name = sdoNodeName(node, level === 0 ? `菜单${path[path.length - 1] + 1}` : `子菜单${path[path.length - 1] + 1}`);
+      const pathNames = [...parentNames, name];
+      const isSearchMatch = settingNodeMatchesQuery(node, query, pathNames);
+      const hasSearchMatchInChildren = settingMenuHasMatchedDescendant(node, query, pathNames);
+      if (!query || isSearchMatch || hasSearchMatchInChildren) {
+        rows.push({
+          key: path.join('/'),
+          path,
+          name,
+          pathNames,
+          level,
+          auth: sdoAuthLabel(node.user_auth),
+          parameterCount: countSdoParameters(node),
+          directParameterCount: countSdoDirectParameters(node),
+          hasMenuChildren: (node.children ?? []).some((child) => child.type === 0),
+          isSearchMatch,
+          hasSearchMatchInChildren,
+        });
+      }
+      (node.children ?? []).forEach((child, index) => visit(child, [...path, index], level + 1, pathNames));
+    }
+    (root.children ?? []).forEach((node, index) => visit(node, [index], 0, [root.name || '菜单']));
     return rows;
   }
 
@@ -1926,16 +2182,37 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     }, root);
   }
 
-  function collectSettingParameters(node: SdoNodeDocument | null, basePath: number[]): SettingParameterRow[] {
+  function settingPathNames(root: SdoNodeDocument | null, path: number[]) {
+    const names = root?.name ? [root.name] : ['菜单'];
+    let node = root;
+    for (const segment of path) {
+      node = node?.children?.[segment] ?? null;
+      if (!node) break;
+      names.push(sdoNodeName(node, node.type === 0 ? '菜单' : '参数'));
+    }
+    return names;
+  }
+
+  function collectSettingParameters(node: SdoNodeDocument | null, basePath: number[], basePathNames: string[] = [], rawQuery = ''): SettingParameterRow[] {
     if (!node) return [];
     const rows: SettingParameterRow[] = [];
-    function visit(current: SdoNodeDocument, path: number[]) {
+    const query = normalizeSettingSearch(rawQuery);
+    function visit(current: SdoNodeDocument, path: number[], pathNames: string[]) {
       if (current.type === 1) {
         const handle = parseHandleParam(current.handle_param);
-        rows.push({
+        const isReadonly = current.control_rw === 0 || current.control_rw === undefined;
+        const isBooleanMonitor = isBooleanMonitorParameter(current);
+        const usageHint = isReadonly && isBooleanMonitor
+          ? '只读监测项，0/1 表示开关状态；本页可编辑配置定义，不能直接写入运行状态。'
+          : isReadonly
+            ? '只读参数；本页可编辑配置定义，不能直接写入运行值。'
+            : '读写参数；可根据权限编辑配置定义。';
+        const row: SettingParameterRow = {
           index: rows.length + 1,
           path,
           name: current.name || '-',
+          menuPath: formatSettingPath(pathNames),
+          pathNames,
           auth: sdoAuthLabel(current.user_auth),
           protocol: sdoProtocolLabel(current.control_protocol),
           frameId: formatHex(current.fid, 2),
@@ -1952,12 +2229,34 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
           scale: current.pre_handle_scale ?? '',
           offset: current.pre_handle_offset ?? '',
           decimals: current.pre_handle_decimal_name ?? String(current.pre_handle_decimal ?? ''),
-        });
+          isReadonly,
+          isBooleanMonitor,
+          usageHint,
+        };
+        const searchText = normalizeSettingSearch([
+          row.name,
+          row.menuPath,
+          row.usageHint,
+          row.auth,
+          row.protocol,
+          row.frameId,
+          row.mainIndex,
+          row.subIndex,
+          row.access,
+          row.dataType,
+        ].join(' '));
+        if (!query || searchText.includes(query)) {
+          row.index = rows.length + 1;
+          rows.push(row);
+        }
         return;
       }
-      (current.children ?? []).forEach((child, index) => visit(child, [...path, index]));
+      const nextPathNames = current.type === 0
+        ? [...pathNames, sdoNodeName(current, `菜单${path[path.length - 1] + 1}`)]
+        : pathNames;
+      (current.children ?? []).forEach((child, index) => visit(child, [...path, index], nextPathNames));
     }
-    (node.children ?? []).forEach((child, index) => visit(child, [...basePath, index]));
+    (node.children ?? []).forEach((child, index) => visit(child, [...basePath, index], basePathNames));
     return rows;
   }
 
@@ -2024,6 +2323,120 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     if (!document) return;
 
     updateSdoDocument(updateSdoNodeAtPath(document, path, (node) => ({ ...node, [field]: value })));
+  }
+
+  function settingColumnWidth(column: SettingParameterColumn) {
+    return settingColumnWidths[column.key] ?? column.defaultWidth;
+  }
+
+  function settingTableMinWidth() {
+    return settingParameterColumns.reduce((total, column) => total + settingColumnWidth(column), 0);
+  }
+
+  function resetSettingColumnWidths() {
+    setSettingColumnWidths({});
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(settingColumnWidthStorageKey);
+    }
+  }
+
+  function handleSettingColumnResizeStart(event: React.MouseEvent, column: SettingParameterColumn) {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = settingColumnWidth(column);
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
+    let latestWidths = { ...settingColumnWidths };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    const handleMove = (moveEvent: MouseEvent) => {
+      const nextWidth = clampSettingColumnWidth(startWidth + moveEvent.clientX - startX, column);
+      setSettingColumnWidths((current) => {
+        const next = { ...current, [column.key]: nextWidth };
+        latestWidths = next;
+        return next;
+      });
+    };
+
+    const handleUp = () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
+      saveSettingColumnWidths(latestWidths);
+    };
+
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('mouseup', handleUp);
+  }
+
+  function renderSettingParameterCell(row: SettingParameterRow, column: SettingParameterColumn) {
+    if (column.key === 'actions') {
+      return (
+        <>
+          <button onClick={() => setEditingSettingPath(row.path)} title="修改参数配置定义，不写入当前运行状态" type="button">编辑定义</button>
+          <button className="danger" onClick={() => {
+            removeSdoNode(row.path);
+            setEditingSettingPath(null);
+          }} type="button">删除</button>
+        </>
+      );
+    }
+    if (column.key === 'access') {
+      return (
+        <span className={`setting-access-chip ${row.isReadonly ? 'setting-access-chip--readonly' : 'setting-access-chip--readwrite'}`} title={row.usageHint}>
+          {row.access}
+        </span>
+      );
+    }
+    const value = row[column.key];
+    return column.key === 'name' || column.key === 'dataType' || column.key === 'preprocess'
+      ? <span title={String(value)}>{value}</span>
+      : value;
+  }
+
+  function visibleSettingEditorSections(node: SdoNodeDocument) {
+    const nodeKind = node.type === 1 ? 'parameter' : 'menu';
+    return settingEditorSections
+      .map((section) => ({
+        ...section,
+        fields: section.fields.filter((field) => field.visibleFor === undefined || field.visibleFor === 'all' || field.visibleFor === nodeKind),
+      }))
+      .filter((section) => section.fields.length > 0);
+  }
+
+  function renderSettingEditorField(field: SettingEditorField, node: SdoNodeDocument, path: number[]) {
+    const rawValue = node[field.field];
+    const value = (rawValue ?? field.defaultValue) as string | number;
+    if (field.kind === 'select') {
+      const options = optionsWithCurrentValue(field.options ?? [], value);
+      return (
+        <label key={field.field}>
+          {field.label}
+          <select value={String(value)} onChange={(event) => updateSdoNode(path, field.field, typeof field.defaultValue === 'number' ? Number(event.target.value) : event.target.value)}>
+            {options.map((option) => (
+              <option key={`${field.field}-${option.value}`} value={String(option.value)}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+    if (field.kind === 'number') {
+      return (
+        <label key={field.field}>
+          {field.label}
+          <input type="number" value={value} onChange={(event) => updateSdoNode(path, field.field, Number(event.target.value))} />
+        </label>
+      );
+    }
+    return (
+      <label key={field.field}>
+        {field.label}
+        <input value={String(value)} onChange={(event) => updateSdoNode(path, field.field, event.target.value)} />
+      </label>
+    );
   }
 
   function addSdoMenu(parentPath: number[]) {
@@ -2927,11 +3340,15 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const currentLanguageDocument = languageDocument();
   const currentBatteryProtocolDocument = batteryProtocolDocument();
   const currentBatteryMonitorDocument = batteryMonitorDocument();
-  const settingMenus = collectSettingMenus(currentSdoDocument);
+  const settingMenus = collectSettingMenus(currentSdoDocument, settingSearchQuery);
   const activeSettingPath = selectedSettingPath ?? settingMenus[0]?.key ?? null;
   const activeSettingPathNumbers = pathStringToNumbers(activeSettingPath);
   const activeSettingNode = sdoNodeByPath(currentSdoDocument, activeSettingPath);
-  const settingParameters = collectSettingParameters(activeSettingNode, activeSettingPathNumbers);
+  const activeSettingPathNames = settingPathNames(currentSdoDocument, activeSettingPathNumbers);
+  const settingParameters = collectSettingParameters(activeSettingNode, activeSettingPathNumbers, activeSettingPathNames, settingSearchQuery);
+  const readonlySettingParameterCount = settingParameters.filter((row) => row.isReadonly).length;
+  const booleanMonitorParameterCount = settingParameters.filter((row) => row.isBooleanMonitor).length;
+  const hasBooleanMonitorParameters = booleanMonitorParameterCount > 0;
   const editingSettingNode = sdoNodeByNumberPath(currentSdoDocument, editingSettingPath);
   const activeRealtimeFrame = selectedRealtimeFrame();
   const activeRealtimeFrameIndex = selectedRealtimeFrameIndex();
@@ -3321,28 +3738,58 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                   {sidebarCollapsed ? '▸' : '◂'}
                 </button>
               </div>
+              {!sidebarCollapsed ? (
+                <div className="setting-menu-search">
+                  <input
+                    onChange={(event) => setSettingSearchQuery(event.target.value)}
+                    placeholder="搜索菜单或参数，例如：开关、座椅、前进"
+                    value={settingSearchQuery}
+                  />
+                  {settingSearchQuery ? <button onClick={() => setSettingSearchQuery('')} type="button">清空</button> : null}
+                </div>
+              ) : null}
               <div className="legacy-menu-list">
                 {settingMenus.map((menu) => (
                   <button
-                    className={menu.key === activeSettingPath ? 'legacy-menu-item active' : 'legacy-menu-item'}
+                    className={[menu.key === activeSettingPath ? 'legacy-menu-item active' : 'legacy-menu-item', menu.isSearchMatch ? 'setting-menu-match' : ''].filter(Boolean).join(' ')}
                     key={menu.key}
                     onClick={() => setSelectedSettingPath(menu.key)}
                     style={{ paddingLeft: `${16 + menu.level * 22}px` }}
+                    title={`${formatSettingPath(menu.pathNames)}｜参数 ${menu.parameterCount}`}
                     type="button"
                   >
-                    <span className="legacy-menu-arrow">{menu.level === 0 ? '▸' : ''}</span>
-                    <span>{menu.name}</span>
+                    <span className="legacy-menu-arrow">{menu.hasMenuChildren ? '▸' : ''}</span>
+                    <span className="setting-menu-label">
+                      <span className="setting-menu-main">{menu.name}</span>
+                      <span className={menu.parameterCount > 0 ? 'setting-menu-count' : 'setting-menu-count setting-menu-count--empty'}>{menu.parameterCount}</span>
+                    </span>
                   </button>
                 ))}
+                {settingMenus.length === 0 ? (
+                  <div className="setting-menu-empty">{settingSearchQuery ? '没有匹配的菜单或参数。可试试“开关”“座椅”“前进”“P/S”。' : '暂无可显示菜单'}</div>
+                ) : null}
               </div>
             </div>
             <div className="legacy-data-content">
               <div className="legacy-data-header">
-                <strong>{activeSettingNode ? `菜单->${activeSettingNode.name}` : '菜单'}</strong>
+                <div className="setting-data-heading">
+                  <div className="setting-breadcrumb">
+                    {activeSettingPathNames.map((name, index) => (
+                      <span className="setting-breadcrumb-segment" key={`${name}-${index}`}>{name}</span>
+                    ))}
+                  </div>
+                  <div className="setting-menu-summary">
+                    <strong>{activeSettingNode?.name ?? '菜单'}</strong>
+                    <span className="setting-summary-chip">{settingParameters.length} 个参数</span>
+                    <span className="setting-summary-chip">{readonlySettingParameterCount} 个只读</span>
+                    <span className="setting-summary-chip">{booleanMonitorParameterCount} 个 0/1 监测项</span>
+                  </div>
+                </div>
                 <div className="legacy-data-actions">
                   <button disabled={!currentSdoDocument} onClick={() => addSdoMenu(activeSettingNode ? activeSettingPathNumbers : [])} type="button">新增菜单</button>
                   <button disabled={!activeSettingNode} onClick={() => setEditingSettingPath(activeSettingPathNumbers)} type="button">修改菜单</button>
                   <button disabled={!activeSettingNode} onClick={() => addSdoParameter(activeSettingPathNumbers)} type="button">新增参数</button>
+                  <button onClick={resetSettingColumnWidths} type="button">重置列宽</button>
                   <button
                     className="danger"
                     disabled={!activeSettingNode}
@@ -3358,6 +3805,11 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 </div>
               </div>
               <div className="legacy-data-table-wrap">
+                {hasBooleanMonitorParameters ? (
+                  <div className="setting-help-card">
+                    此菜单包含只读开关监测项。0/1 表示设备上报的开关状态；本页可编辑名称、索引、位段、预处理等配置定义，不能直接写入当前状态。
+                  </div>
+                ) : null}
                 {editingSettingPath && editingSettingNode ? (
                   <section className="legacy-edit-panel">
                     <div className="legacy-edit-panel-header">
@@ -3369,94 +3821,56 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                         <button onClick={() => setEditingSettingPath(null)} type="button">关闭</button>
                       </div>
                     </div>
-                    <div className="legacy-edit-grid">
-                      <label>名称<input value={editingSettingNode.name ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'name', event.target.value)} /></label>
-                      <label>类型<select value={editingSettingNode.type ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'type', Number(event.target.value))}><option value={0}>菜单</option><option value={1}>参数</option></select></label>
-                      <label>权限<input type="number" value={editingSettingNode.user_auth ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'user_auth', Number(event.target.value))} /></label>
-                      <label>语言索引<input type="number" value={editingSettingNode.name_index ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'name_index', Number(event.target.value))} /></label>
-                      <label>协议<input type="number" value={editingSettingNode.control_protocol ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'control_protocol', Number(event.target.value))} /></label>
-                      <label>读写<input type="number" value={editingSettingNode.control_rw ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'control_rw', Number(event.target.value))} /></label>
-                      <label>使用默认值<input type="number" value={editingSettingNode.control_use_default ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'control_use_default', Number(event.target.value))} /></label>
-                      <label>使用范围<input type="number" value={editingSettingNode.control_use_min_max ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'control_use_min_max', Number(event.target.value))} /></label>
-                      <label>FID<input type="number" value={editingSettingNode.fid ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'fid', Number(event.target.value))} /></label>
-                      <label>MID<input type="number" value={editingSettingNode.mid ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'mid', Number(event.target.value))} /></label>
-                      <label>SID<input type="number" value={editingSettingNode.sid ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'sid', Number(event.target.value))} /></label>
-                      <label>句柄<input type="number" value={editingSettingNode.handle ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'handle', Number(event.target.value))} /></label>
-                      <label>句柄名<input value={editingSettingNode.handle_name ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'handle_name', event.target.value)} /></label>
-                      <label>句柄参数<input value={editingSettingNode.handle_param ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'handle_param', event.target.value)} /></label>
-                      <label>默认值<input value={editingSettingNode.data_default ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'data_default', event.target.value)} /></label>
-                      <label>最小值<input value={editingSettingNode.data_min ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'data_min', event.target.value)} /></label>
-                      <label>最大值<input value={editingSettingNode.data_max ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'data_max', event.target.value)} /></label>
-                      <label>预处理<input type="number" value={editingSettingNode.pre_handle ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle', Number(event.target.value))} /></label>
-                      <label>预处理名<input value={editingSettingNode.pre_handle_name ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_name', event.target.value)} /></label>
-                      <label>缩放<input value={editingSettingNode.pre_handle_scale ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_scale', event.target.value)} /></label>
-                      <label>偏移<input value={editingSettingNode.pre_handle_offset ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_offset', event.target.value)} /></label>
-                      <label>小数位<input type="number" value={editingSettingNode.pre_handle_decimal ?? 0} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_decimal', Number(event.target.value))} /></label>
-                      <label>小数位名<input value={editingSettingNode.pre_handle_decimal_name ?? ''} onChange={(event) => updateSdoNode(editingSettingPath, 'pre_handle_decimal_name', event.target.value)} /></label>
+                    <div className="legacy-edit-sections">
+                      {visibleSettingEditorSections(editingSettingNode).map((section) => (
+                        <section className="legacy-edit-section" key={section.title}>
+                          <div className="legacy-edit-section-title">{section.title}</div>
+                          <div className="legacy-edit-grid legacy-edit-grid--sectioned">
+                            {section.fields.map((field) => renderSettingEditorField(field, editingSettingNode, editingSettingPath))}
+                          </div>
+                        </section>
+                      ))}
                     </div>
                   </section>
                 ) : null}
                 {activeSettingNode && settingParameters.length > 0 ? (
-                  <table className="legacy-data-table">
+                  <table className="legacy-data-table" style={{ minWidth: settingTableMinWidth() }}>
+                    <colgroup>
+                      {settingParameterColumns.map((column) => (
+                        <col key={column.key} style={{ width: settingColumnWidth(column) }} />
+                      ))}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th />
-                        <th>参数名称</th>
-                        <th>使用权限</th>
-                        <th>协议类型</th>
-                        <th>帧ID</th>
-                        <th>主索引</th>
-                        <th>子索引</th>
-                        <th>读写权限</th>
-                        <th>最大值</th>
-                        <th>最小值</th>
-                        <th>默认值</th>
-                        <th>数据类型</th>
-                        <th>bit开始位置</th>
-                        <th>bit长度</th>
-                        <th>数据预处理</th>
-                        <th>缩放值</th>
-                        <th>偏移值</th>
-                        <th>保留小数</th>
-                        <th>操作</th>
+                        {settingParameterColumns.map((column) => (
+                          <th key={column.key} className={column.align ? `text-${column.align}` : undefined}>
+                            <span className="legacy-data-th-content">{column.label}</span>
+                            <span
+                              className="legacy-data-column-resizer"
+                              onMouseDown={(event) => handleSettingColumnResizeStart(event, column)}
+                            />
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {settingParameters.map((row) => (
-                        <tr key={`${row.index}-${row.name}-${row.mainIndex}-${row.subIndex}`}>
-                          <td>{row.index}</td>
-                          <td title={row.name}>{row.name}</td>
-                          <td>{row.auth}</td>
-                          <td>{row.protocol}</td>
-                          <td>{row.frameId}</td>
-                          <td>{row.mainIndex}</td>
-                          <td>{row.subIndex}</td>
-                          <td>{row.access}</td>
-                          <td>{row.maxValue}</td>
-                          <td>{row.minValue}</td>
-                          <td>{row.defaultValue}</td>
-                          <td>{row.dataType}</td>
-                          <td>{row.bitStart}</td>
-                          <td>{row.bitLength}</td>
-                          <td>{row.preprocess || '原始数据'}</td>
-                          <td>{row.scale}</td>
-                          <td>{row.offset}</td>
-                          <td>{row.decimals}</td>
-                          <td>
-                            <button onClick={() => setEditingSettingPath(row.path)} type="button">修改</button>
-                            <button className="danger" onClick={() => {
-                              removeSdoNode(row.path);
-                              setEditingSettingPath(null);
-                            }} type="button">删除</button>
-                          </td>
+                        <tr key={row.path.join('/')}>
+                          {settingParameterColumns.map((column) => (
+                            <td key={column.key} className={column.align ? `text-${column.align}` : undefined}>
+                              {renderSettingParameterCell(row, column)}
+                            </td>
+                          ))}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 ) : activeSettingNode ? (
-                  <div className="legacy-data-empty">当前菜单没有参数</div>
+                  <div className="legacy-data-empty">
+                    {settingSearchQuery ? '没有找到匹配的参数。可尝试搜索“开关”“座椅”“前进”“P/S”。' : '当前菜单下没有参数。请展开左侧其它菜单，或使用搜索查找具体参数。'}
+                  </div>
                 ) : (
-                  <div className="legacy-data-empty">请先在项目管理中打开 .jcpro 项目文件</div>
+                  <div className="legacy-data-empty">请先在项目管理中打开 .jcpro 项目文件，然后进入“设置数据”查看菜单和参数。</div>
                 )}
               </div>
             </div>
