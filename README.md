@@ -72,3 +72,12 @@ Rust 检查：
 cd src-tauri
 cargo check
 ```
+
+## CI 构建产物
+
+GitHub Actions 会构建 Windows 与 macOS 桌面应用：
+
+- Windows：上传 `.msi` / `.exe` 安装包。
+- macOS：上传 `.dmg` / `.app` 产物。
+
+macOS CI 产物当前未签名，首次打开可能受 Gatekeeper 限制；正式分发前需要 Developer ID 签名和 notarization。

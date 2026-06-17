@@ -2,12 +2,23 @@
 
 ## 环境要求
 
+通用要求：
+
 - Node.js 20+
 - npm 10+
 - Rust stable
 - Cargo
+
+Windows 构建：
+
 - Windows 10/11
 - WebView2 Runtime
+
+macOS 构建：
+
+- macOS
+- Xcode Command Line Tools
+- Rust target：`aarch64-apple-darwin`（Apple Silicon）
 
 ## 安装依赖
 
@@ -41,6 +52,21 @@ Rust 检查：
 cd src-tauri
 cargo check
 ```
+
+macOS Apple Silicon 本地构建：
+
+```bash
+rustup target add aarch64-apple-darwin
+npm ci
+npm run tauri:build -- --target aarch64-apple-darwin
+```
+
+GitHub Actions 当前会构建 Windows 与 macOS 产物：
+
+- Windows：`.msi` / `.exe`
+- macOS：`.dmg` / `.app`
+
+macOS CI 产物当前未签名，首次打开可能受 Gatekeeper 限制；正式分发前需要 Developer ID 签名和 notarization。
 
 ## 代码组织规则
 
