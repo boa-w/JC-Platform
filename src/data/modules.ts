@@ -36,6 +36,13 @@ export const featureModules: FeatureModule[] = [
     lifecycleReason: '多协议映射层仍在验证中，后续会随 CANOpen 主线重构继续收敛。',
   },
   {
+    key: 'canopen-export',
+    title: 'CANopen 导出',
+    description: '从旧项目配置生成 CANopen EDS、vendor 扩展、模型报告和 SDO/PDO 测试帧。',
+    lifecycle: 'experimental',
+    lifecycleReason: '基于旧固件协议做 CANopen 兼容转换，不改动设备侧协议。',
+  },
+  {
     key: 'ui',
     title: 'UI 资源编辑',
     description: '负责设备分辨率画布、图标/动画资源、属性编辑、选项增删和资源导出路径维护。',

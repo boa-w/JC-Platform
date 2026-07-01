@@ -267,10 +267,7 @@ fn append_sdo_parameter_row(
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_string(),
-        node.get("handle_name")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_string(),
+        sdo_data_type_label(node),
         bit_start,
         bit_length,
         node.get("pre_handle_name")
@@ -310,6 +307,32 @@ fn parse_handle_param(value: &str) -> (String, String) {
         format!("bit{}", start),
         format!("{}个bits", end.saturating_sub(start) + 1),
     )
+}
+
+fn sdo_data_type_label(node: &Value) -> String {
+    for key in ["handle_name", "data_type", "dataType"] {
+        if let Some(value) = node
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            return value.to_string();
+        }
+    }
+
+    let Some(handle) = node.get("handle").and_then(Value::as_i64) else {
+        return String::new();
+    };
+    let label = match handle {
+        0 => "u8",
+        2 | 3 => "u16",
+        4 | 7 => "u32",
+        6 => "string",
+        11 | 12 => "bit",
+        _ => return format!("handle={handle}"),
+    };
+    format!("{label}(handle={handle})")
 }
 
 fn validate_sdo_rows(rows: &[SdoTableRow], errors: &mut Vec<String>) {

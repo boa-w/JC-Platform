@@ -1,4 +1,4 @@
-export type NavigationKey = 'project' | 'setting-data' | 'realtime-data' | 'signal-dictionary' | 'private-protocol' | 'protocol-mapping' | 'ui' | 'battery-protocol' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
+export type NavigationKey = 'project' | 'setting-data' | 'realtime-data' | 'signal-dictionary' | 'private-protocol' | 'protocol-mapping' | 'canopen-export' | 'ui' | 'battery-protocol' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
 
 export interface ProjectSummary {
   name: string;
@@ -704,8 +704,12 @@ export interface CanTestSignalValue {
   scaleNum: number;
   scaleDen: number;
   offset: number;
+  minValue?: number | null;
+  maxValue?: number | null;
   rawValue: number;
   displayValue: number;
+  source?: string;
+  testRole?: string;
 }
 
 export interface CanTestFrame {
@@ -715,10 +719,76 @@ export interface CanTestFrame {
   dlc: number;
   cycleMs: number;
   data: string;
+  source?: string;
+  scenario?: string;
   signals: CanTestSignalValue[];
+}
+
+export interface CanTestSettingEntry {
+  name: string;
+  menuPath: string;
+  frameId: number;
+  index: number;
+  subindex: number;
+  access: string;
+  dataType: string;
+  pos: number;
+  len: number;
+  role: string;
+  value: string;
+  defaultValue?: string | null;
+  minValue?: string | null;
+  maxValue?: string | null;
+  scale?: string | null;
+  offset?: string | null;
+  source: string;
+}
+
+export type CanTestProfile = 'smoke' | 'boundary' | 'fault' | 'regression';
+
+export interface CanTestCase {
+  caseId: string;
+  title: string;
+  scenario: string;
+  description: string;
+  tags: string[];
+  frames: CanTestFrame[];
+  settingEntries: CanTestSettingEntry[];
+}
+
+export interface CanTestCoverage {
+  frameCount: number;
+  signalCount: number;
+  settingEntryCount: number;
+  caseCount: number;
+  generatedFrameCount: number;
+  generatedSettingEntryCount: number;
+  coveredScenarios: string[];
 }
 
 export interface CanTestGenerateResponse {
   frames: CanTestFrame[];
+  settingEntries: CanTestSettingEntry[];
   frameCount: number;
+  cases: CanTestCase[];
+  coverage: CanTestCoverage;
+  warnings: string[];
+}
+
+export interface CanopenNodeSummary {
+  nodeId: number;
+  name: string;
+  sdoRxCobId: number;
+  sdoTxCobId: number;
+  objectCount: number;
+  pdoCount: number;
+  bitfieldCount: number;
+}
+
+export interface CanopenConversionReport {
+  valid: boolean;
+  nodes: CanopenNodeSummary[];
+  files: string[];
+  warnings: string[];
+  model: unknown;
 }

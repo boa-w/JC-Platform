@@ -6,6 +6,7 @@ import {
   compareProjectBinaryReport,
   copyUiResourceImages,
   createProject,
+  exportCanopenPackage,
   exportProjectPackage,
   exportTableCsv,
   exportTableWorkbook,
@@ -50,6 +51,8 @@ import type {
   BatteryMonitorSignal,
   BinaryBuildReport,
   BinaryCompareReport,
+  CanopenConversionReport,
+  CanTestProfile,
   FeatureModule,
   LanguageDocument,
   LanguageImportReport,
@@ -467,6 +470,10 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
   const canTestData = useCanTestData();
+  const [canopenConversionReport, setCanopenConversionReport] = useState<CanopenConversionReport | null>(null);
+  const [canopenConvertStatus, setCanopenConvertStatus] = useState<string | null>(null);
+  const [canopenExportDir, setCanopenExportDir] = useState<string | null>(null);
+  const [isExportingCanopenPackage, setIsExportingCanopenPackage] = useState(false);
   const {
     options: exportBatteryOptions,
     updateOption: updateExportBatteryOption,
@@ -2128,6 +2135,39 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     return value === 0 || value === undefined ? 'CAN_OPEN' : String(value);
   }
 
+  function settingDataTypeLabel(node: SdoNodeDocument) {
+    const explicitType = [
+      node.handle_name,
+      typeof node.data_type === 'string' ? node.data_type : undefined,
+      typeof node.dataType === 'string' ? node.dataType : undefined,
+    ].find((item) => item?.trim());
+    if (explicitType) return explicitType.trim();
+
+    const handle = node.handle;
+    const label = (() => {
+      switch (handle) {
+        case 0:
+          return 'u8';
+        case 2:
+        case 3:
+          return 'u16';
+        case 4:
+        case 7:
+          return 'u32';
+        case 6:
+          return 'string';
+        case 11:
+        case 12:
+          return 'bit';
+        default:
+          return undefined;
+      }
+    })();
+
+    if (label) return `${label}(handle=${handle})`;
+    return typeof handle === 'number' ? `handle=${handle}` : '';
+  }
+
   function formatHex(value?: number, width = 0) {
     if (typeof value !== 'number') return '';
     return `0x${Math.max(0, value).toString(16).toUpperCase().padStart(width, '0')}`;
@@ -2177,7 +2217,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       sdoAuthLabel(node.user_auth),
       sdoAccessLabel(node.control_rw),
       sdoProtocolLabel(node.control_protocol),
-      node.handle_name,
+      settingDataTypeLabel(node),
       formatHex(node.fid, 2),
       formatHex(node.mid, 4),
       node.sid,
@@ -2294,7 +2334,7 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
           maxValue: current.data_max ?? '',
           minValue: current.data_min ?? '',
           defaultValue: current.data_default ?? '',
-          dataType: current.handle_name ?? '',
+          dataType: settingDataTypeLabel(current),
           bitStart: handle.bitStart,
           bitLength: handle.bitLength,
           preprocess: current.pre_handle_name ?? '原始数据',
@@ -3408,6 +3448,39 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     }
   }
 
+  async function handleExportCanopenPackage() {
+    setCanopenConvertStatus(null);
+    setCanopenConversionReport(null);
+    setCanopenExportDir(null);
+
+    if (!loadedProject) {
+      setCanopenConvertStatus('请先打开项目，再导出 CANopen 转换包。');
+      return;
+    }
+    if (!isTauriRuntime()) {
+      setCanopenConvertStatus('系统目录选择器只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+
+    const selected = await open({ directory: true, multiple: false });
+    if (typeof selected !== 'string') return;
+
+    setIsExportingCanopenPackage(true);
+    try {
+      const report = await exportCanopenPackage(selected, loadedProject.document);
+      const exportDir = `${selected}\\canopen_export`;
+      setCanopenConversionReport(report);
+      setCanopenExportDir(exportDir);
+      setCanopenConvertStatus(
+        `已导出 CANopen 转换包：${report.files.length} 个文件，${report.nodes.length} 个节点，${report.warnings.length} 条提示。`,
+      );
+    } catch (error) {
+      setCanopenConvertStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsExportingCanopenPackage(false);
+    }
+  }
+
   const currentSdoDocument = sdoDocument();
   const currentPdoSimpleDocument = pdoSimpleDocument();
   const currentPdoAdvancedDocument = pdoAdvancedDocument();
@@ -4463,22 +4536,100 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
               <div className="pdo-simple-editor">
                 <div className="config-summary-strip">
                   <article><span>已生成帧</span><strong>{canTestData.canTestFrames.length}</strong></article>
+                  <article><span>测试用例</span><strong>{canTestData.canTestCoverage?.caseCount ?? canTestData.canTestCases.length}</strong></article>
+                  <article><span>信号覆盖</span><strong>{canTestData.canTestCoverage?.signalCount ?? 0}</strong></article>
+                  <article><span>设置条目</span><strong>{canTestData.canTestCoverage?.settingEntryCount ?? canTestData.canTestSettingEntries.length}</strong></article>
                   <article><span>默认周期</span><strong>{canTestData.canTestDefaultCycle} ms</strong></article>
                 </div>
                 <div className="pdo-frame-grid">
+                  <label>生成模式
+                    <select value={canTestData.canTestProfile} onChange={(e) => canTestData.setCanTestProfile(e.target.value as CanTestProfile)}>
+                      <option value="smoke">快速冒烟</option>
+                      <option value="boundary">边界覆盖</option>
+                      <option value="fault">异常注入</option>
+                      <option value="regression">全量回归</option>
+                    </select>
+                  </label>
                   <label>默认周期(ms)<input type="number" value={canTestData.canTestDefaultCycle} onChange={(e) => canTestData.setCanTestDefaultCycle(Number(e.target.value))} /></label>
+                  {canTestData.canTestCases.length > 0 ? (
+                    <label>当前用例
+                      <select value={canTestData.selectedCanTestCaseIndex} onChange={(e) => canTestData.selectCanTestCase(Number(e.target.value))}>
+                        {canTestData.canTestCases.map((testCase, index) => (
+                          <option key={testCase.caseId} value={index}>{testCase.caseId} · {testCase.title}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                 </div>
                 <div className="config-table-toolbar" style={{ gap: 8 }}>
                   <button disabled={canTestData.isGeneratingCanTest} onClick={() => void canTestData.generate(loadedProject)} type="button">
                     {canTestData.isGeneratingCanTest ? '生成中...' : '⚡ 生成'}
                   </button>
-                  <button disabled={canTestData.canTestFrames.length === 0} onClick={() => void canTestData.exportTxt(loadedProject)} type="button">📤 导出 TXT</button>
+                  <button disabled={canTestData.canTestFrames.length === 0} onClick={() => void canTestData.exportTxt(loadedProject)} type="button">📤 导出纯帧 TXT</button>
+                  <button disabled={canTestData.canTestFrames.length === 0} onClick={() => void canTestData.exportCsv(loadedProject)} type="button">📤 导出 CSV</button>
                   <span className="action-bar-sep" />
                   <button onClick={() => void canTestData.importConfig()} type="button">📥 导入配置</button>
-                  <button disabled={canTestData.canTestFrames.length === 0} onClick={() => void canTestData.exportConfig()} type="button">📤 导出配置</button>
+                  <button disabled={canTestData.canTestFrames.length === 0} onClick={() => void canTestData.exportConfig()} type="button">📤 导出说明 JSON</button>
                 </div>
-                {canTestData.canTestFrames.length > 0 ? (
+                {canTestData.canTestCoverage ? (
+                  <div className="config-table-toolbar" style={{ gap: 8, marginTop: 6 }}>
+                    <span style={{ fontSize: '0.85em', opacity: 0.75 }}>
+                      场景：{canTestData.canTestCoverage.coveredScenarios.join(' / ') || '无'}
+                    </span>
+                    <span style={{ fontSize: '0.85em', opacity: 0.75 }}>
+                      帧次：{canTestData.canTestCoverage.generatedFrameCount}
+                    </span>
+                    <span style={{ fontSize: '0.85em', opacity: 0.75 }}>
+                      设置条目次：{canTestData.canTestCoverage.generatedSettingEntryCount}
+                    </span>
+                  </div>
+                ) : null}
+                {canTestData.canTestWarnings.length > 0 ? (
+                  <div className="project-open-error" style={{ marginTop: 8 }}>
+                    {canTestData.canTestWarnings.slice(0, 3).map((warning) => <p key={warning}>{warning}</p>)}
+                    {canTestData.canTestWarnings.length > 3 ? <p>还有 {canTestData.canTestWarnings.length - 3} 条警告，已写入导出配置。</p> : null}
+                  </div>
+                ) : null}
+                {canTestData.canTestFrames.length > 0 || canTestData.canTestSettingEntries.length > 0 ? (
                   <>
+                    {canTestData.canTestSettingEntries.length > 0 ? (
+                      <div className="config-table-frame" style={{ marginBottom: 10 }}>
+                        <table className="config-table">
+                          <thead>
+                            <tr>
+                              <th>设置项</th>
+                              <th>菜单路径</th>
+                              <th>帧ID</th>
+                              <th>主索引</th>
+                              <th>子索引</th>
+                              <th>权限</th>
+                              <th>类型</th>
+                              <th>位置</th>
+                              <th>角色</th>
+                              <th>测试值</th>
+                              <th>范围</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {canTestData.canTestSettingEntries.map((entry, entryIndex) => (
+                              <tr key={`${entry.index}-${entry.subindex}-${entry.role}-${entryIndex}`}>
+                                <td>{entry.name}</td>
+                                <td>{entry.menuPath || '-'}</td>
+                                <td><code>0x{entry.frameId.toString(16).toUpperCase()}</code></td>
+                                <td><code>0x{entry.index.toString(16).toUpperCase()}</code></td>
+                                <td>{entry.subindex}</td>
+                                <td>{entry.access}</td>
+                                <td>{entry.dataType}</td>
+                                <td>{entry.pos}/{entry.len}</td>
+                                <td>{entry.role}</td>
+                                <td>{entry.value}</td>
+                                <td>{entry.minValue ?? '-'} / {entry.maxValue ?? '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
                     <div className="config-table-toolbar" style={{ gap: 6, marginBottom: 6 }}>
                       <span style={{ fontSize: '0.85em', opacity: 0.7 }}>信号填充：</span>
                       <button onClick={() => canTestData.fillSignals('min')} type="button" title="所有信号填最小值 0">最小值</button>
@@ -4495,6 +4646,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                             <label>CAN ID<code style={{ fontSize: '1.1em' }}>0x{frame.id.toString(16).toUpperCase().padStart(3, '0')}</code></label>
                             <label>类型<span>{frame.frameType === 0 ? '标准帧' : '扩展帧'}</span></label>
                             <label>名称<input value={frame.name} onChange={(e) => canTestData.updateFrame(frameIndex, 'name', e.target.value)} /></label>
+                            <label>场景<span>{frame.scenario ?? 'manual'}</span></label>
+                            <label>来源<span>{frame.source ?? '-'}</span></label>
                             <label>DLC<span>{frame.dlc}</span></label>
                             <label>周期(ms)<input type="number" style={{ width: 80 }} value={frame.cycleMs} onChange={(e) => canTestData.updateFrame(frameIndex, 'cycleMs', Number(e.target.value))} /></label>
                             <label>HEX<code style={{ fontSize: '0.85em' }}>{frame.data}</code></label>
@@ -4512,6 +4665,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                                   <th>长度</th>
                                   <th>缩放</th>
                                   <th>偏移</th>
+                                  <th>范围</th>
+                                  <th>角色</th>
                                   <th>原始值</th>
                                 </tr>
                               </thead>
@@ -4533,6 +4688,8 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                                     <td>{sig.len}</td>
                                     <td>{sig.scaleNum}/{sig.scaleDen}</td>
                                     <td>{sig.offset}</td>
+                                    <td>{sig.minValue ?? '-'} / {sig.maxValue ?? '-'}</td>
+                                    <td>{sig.testRole ?? 'manual'}</td>
                                     <td><code>0x{sig.rawValue.toString(16).toUpperCase()}</code></td>
                                   </tr>
                                 ))}
@@ -5006,6 +5163,97 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
                 </section>
               </>
             ) : <div className="empty-state"><div className="empty-state-icon">MAP</div><p>请先打开项目并刷新协议拓扑。</p></div>}
+          </section>
+        ) : null}
+
+        {activeModule.key === 'canopen-export' ? (
+          <section className="project-open-card">
+            <div className="config-table-toolbar">
+              <div>
+                <h2>CANopen 导出</h2>
+                <p>基于「数据 / 设置数据」生成 SDO 对象，并只纳入能匹配 CANopen 默认 PDO 连接集的实时 PDO；无法归属到 Node-ID 的自定义实时帧会被排除。</p>
+              </div>
+              <div className="sample-actions">
+                <button disabled={!loadedProject || isExportingCanopenPackage} onClick={() => void handleExportCanopenPackage()} type="button">
+                  {isExportingCanopenPackage ? '导出中...' : '导出 CANopen 包'}
+                </button>
+                {canopenExportDir ? (
+                  <button onClick={() => void revealItemInDir(canopenExportDir)} type="button">打开 CANopen 目录</button>
+                ) : null}
+              </div>
+            </div>
+            {loadedProject ? (
+              <>
+                <div className="project-open-report">
+                  <article>
+                    <span>固件协议</span>
+                    <strong>保持不变</strong>
+                  </article>
+                  <article>
+                    <span>SDO 请求规则</span>
+                    <strong>0x600 + Node-ID</strong>
+                  </article>
+                  <article>
+                    <span>导出目录</span>
+                    <strong>{canopenExportDir ?? '尚未导出'}</strong>
+                  </article>
+                  <article>
+                    <span>输出文件</span>
+                    <strong>{canopenConversionReport?.files.length ?? 0}</strong>
+                  </article>
+                </div>
+                <div className="config-summary-strip" style={{ marginTop: 8 }}>
+                  <article><span>CANopen 节点</span><strong>{canopenConversionReport?.nodes.length ?? 0}</strong></article>
+                  <article><span>EDS 文件</span><strong>{canopenConversionReport?.nodes.length ?? 0}</strong></article>
+                  <article><span>PDO 数</span><strong>{canopenConversionReport?.nodes.reduce((total, node) => total + node.pdoCount, 0) ?? 0}</strong></article>
+                  <article><span>转换提示</span><strong>{canopenConversionReport?.warnings.length ?? 0}</strong></article>
+                </div>
+                {canopenConvertStatus ? (
+                  <p className={canopenConvertStatus.startsWith('已') ? 'text-success' : 'project-open-error'} style={{ marginTop: 8 }}>{canopenConvertStatus}</p>
+                ) : null}
+                {canopenConversionReport && canopenConversionReport.nodes.length > 0 ? (
+                  <section className="pdo-frame-section">
+                    <div className="config-table-toolbar">
+                      <strong>节点转换摘要</strong>
+                    </div>
+                    <div className="config-table-frame">
+                      <table className="config-table">
+                        <thead>
+                          <tr>
+                            <th>Node-ID</th>
+                            <th>SDO 请求 COB-ID</th>
+                            <th>SDO 响应 COB-ID</th>
+                            <th>对象数</th>
+                            <th>PDO 数</th>
+                            <th>位域扩展</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {canopenConversionReport.nodes.map((node) => (
+                            <tr key={node.nodeId}>
+                              <td>{node.nodeId}</td>
+                              <td><code>0x{node.sdoRxCobId.toString(16).toUpperCase()}</code></td>
+                              <td><code>0x{node.sdoTxCobId.toString(16).toUpperCase()}</code></td>
+                              <td>{node.objectCount}</td>
+                              <td>{node.pdoCount}</td>
+                              <td>{node.bitfieldCount}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                ) : (
+                  <div className="empty-state"><div className="empty-state-icon">EDS</div><p>点击「导出 CANopen 包」生成 EDS、model、vendor 扩展和 SDO/PDO 测试帧。</p></div>
+                )}
+                {canopenConversionReport && canopenConversionReport.warnings.length > 0 ? (
+                  <div className="project-open-error" style={{ marginTop: 8 }}>
+                    {canopenConversionReport.warnings.slice(0, 5).map((warning) => <p key={warning}>{warning}</p>)}
+                    {canopenConversionReport.warnings.length > 5 ? <p>还有 {canopenConversionReport.warnings.length - 5} 条提示，详见 conversion_report.json。</p> : null}
+                  </div>
+                ) : null}
+              </>
+            ) : <div className="empty-state"><div className="empty-state-icon">EDS</div><p>请先在项目管理中打开 .jcpro 项目文件。</p></div>}
           </section>
         ) : null}
 

@@ -7,6 +7,7 @@ import type {
   BinaryBuildReport,
   BinaryCompareReport,
   BinaryCompareRequest,
+  CanopenConversionReport,
   CanTestGenerateResponse,
   DbcImportReport,
   ExportBatteryOptions,
@@ -257,8 +258,16 @@ export async function revealItemInDir(path: string): Promise<void> {
   return openPath(path);
 }
 
-export async function generateCanTestData(document: unknown): Promise<CanTestGenerateResponse> {
-  return invoke<CanTestGenerateResponse>('generate_can_test_data', { document });
+export async function generateCanTestData(document: unknown, profile?: string): Promise<CanTestGenerateResponse> {
+  return invoke<CanTestGenerateResponse>('generate_can_test_data', { document, profile });
+}
+
+export async function analyzeCanopenConversion(document: unknown): Promise<CanopenConversionReport> {
+  return invoke<CanopenConversionReport>('analyze_canopen_conversion', { document });
+}
+
+export async function exportCanopenPackage(outputDir: string, document: unknown): Promise<CanopenConversionReport> {
+  return invoke<CanopenConversionReport>('export_canopen_package', { outputDir, document });
 }
 
 export async function saveTextFile(path: string, content: string): Promise<void> {
