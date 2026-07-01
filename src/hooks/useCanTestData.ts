@@ -1,7 +1,15 @@
-import { useState } from 'react';
-import { generateCanTestData, saveTextFile, saveJsonFile, loadJsonFile } from '../api/commands';
-import type { CanTestCase, CanTestCoverage, CanTestFrame, CanTestProfile, CanTestSettingEntry, CanTestSignalValue, LoadedProject } from '../types/platform';
 import { open } from '@tauri-apps/plugin-dialog';
+import { useState } from 'react';
+import { generateCanTestData, loadJsonFile, saveJsonFile, saveTextFile } from '../api/commands';
+import type {
+  CanTestCase,
+  CanTestCoverage,
+  CanTestFrame,
+  CanTestProfile,
+  CanTestSettingEntry,
+  CanTestSignalValue,
+  LoadedProject,
+} from '../types/platform';
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -66,14 +74,17 @@ export function useCanTestData() {
         settingEntries: normalizeSettingEntries(testCase.settingEntries),
       }));
       const frames = cases[0]?.frames ?? normalizeFrames(result.frames);
-      const settingEntries = cases[0]?.settingEntries ?? normalizeSettingEntries(result.settingEntries);
+      const settingEntries =
+        cases[0]?.settingEntries ?? normalizeSettingEntries(result.settingEntries);
       setCanTestCases(cases);
       setCanTestCoverage(result.coverage ?? null);
       setCanTestWarnings(result.warnings ?? []);
       setSelectedCanTestCaseIndex(0);
       setCanTestFrames(frames);
       setCanTestSettingEntries(settingEntries);
-      setCanTestStatus(`已生成 ${result.coverage?.caseCount ?? cases.length} 个测试用例，${result.coverage?.generatedFrameCount ?? result.frameCount} 帧次，${result.coverage?.generatedSettingEntryCount ?? settingEntries.length} 个设置条目`);
+      setCanTestStatus(
+        `已生成 ${result.coverage?.caseCount ?? cases.length} 个测试用例，${result.coverage?.generatedFrameCount ?? result.frameCount} 帧次，${result.coverage?.generatedSettingEntryCount ?? settingEntries.length} 个设置条目`,
+      );
     } catch (error) {
       setCanTestStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -87,8 +98,8 @@ export function useCanTestData() {
 
   function maxRawForLength(len: number) {
     if (len <= 0) return 0;
-    if (len >= 32) return 0xFFFFFFFF;
-    return (2 ** len) - 1;
+    if (len >= 32) return 0xffffffff;
+    return 2 ** len - 1;
   }
 
   function computeHexFromSignals(signals: CanTestSignalValue[], dlc: number): string {
@@ -108,20 +119,24 @@ export function useCanTestData() {
         bitsRem -= bitsThis;
       }
     }
-    return Array.from(bytes).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+    return Array.from(bytes)
+      .map((b) => b.toString(16).toUpperCase().padStart(2, '0'))
+      .join(' ');
   }
 
   function updateSignalDisplayValue(frameIndex: number, signalIndex: number, displayValue: number) {
-    setCanTestFrames((prev) => prev.map((frame, fi) => {
-      if (fi !== frameIndex) return frame;
-      const newSignals = frame.signals.map((sig, si) => {
-        if (si !== signalIndex) return sig;
-        const rawValue = Math.round((displayValue - sig.offset) * sig.scaleDen / sig.scaleNum);
-        return { ...sig, displayValue, rawValue: Math.max(0, rawValue) };
-      });
-      const newData = computeHexFromSignals(newSignals, frame.dlc);
-      return { ...frame, signals: newSignals, data: newData };
-    }));
+    setCanTestFrames((prev) =>
+      prev.map((frame, fi) => {
+        if (fi !== frameIndex) return frame;
+        const newSignals = frame.signals.map((sig, si) => {
+          if (si !== signalIndex) return sig;
+          const rawValue = Math.round(((displayValue - sig.offset) * sig.scaleDen) / sig.scaleNum);
+          return { ...sig, displayValue, rawValue: Math.max(0, rawValue) };
+        });
+        const newData = computeHexFromSignals(newSignals, frame.dlc);
+        return { ...frame, signals: newSignals, data: newData };
+      }),
+    );
   }
 
   function selectCanTestCase(index: number) {
@@ -134,31 +149,49 @@ export function useCanTestData() {
   }
 
   function fillSignals(mode: 'min' | 'max' | 'random' | 'zero' | 'ff') {
-    setCanTestFrames((prev) => prev.map((frame) => {
-      const newSignals = frame.signals.map((sig) => {
-        let rawValue: number;
-        if (mode === 'zero' || mode === 'min') {
-          rawValue = 0;
-        } else if (mode === 'ff' || mode === 'max') {
-          rawValue = maxRawForLength(sig.len);
-        } else {
-          const maxRaw = maxRawForLength(sig.len);
-          rawValue = Math.floor(Math.random() * (maxRaw + 1));
-        }
-        const displayValue = rawValue * sig.scaleNum / sig.scaleDen + sig.offset;
-        return { ...sig, rawValue, displayValue };
-      });
-      const newData = computeHexFromSignals(newSignals, frame.dlc);
-      return { ...frame, signals: newSignals, data: newData };
-    }));
-    const labels: Record<string, string> = { zero: '全部清零', min: '填充最小值', max: '填充最大值', random: '填充随机值', ff: '全填 FF' };
+    setCanTestFrames((prev) =>
+      prev.map((frame) => {
+        const newSignals = frame.signals.map((sig) => {
+          let rawValue: number;
+          if (mode === 'zero' || mode === 'min') {
+            rawValue = 0;
+          } else if (mode === 'ff' || mode === 'max') {
+            rawValue = maxRawForLength(sig.len);
+          } else {
+            const maxRaw = maxRawForLength(sig.len);
+            rawValue = Math.floor(Math.random() * (maxRaw + 1));
+          }
+          const displayValue = (rawValue * sig.scaleNum) / sig.scaleDen + sig.offset;
+          return { ...sig, rawValue, displayValue };
+        });
+        const newData = computeHexFromSignals(newSignals, frame.dlc);
+        return { ...frame, signals: newSignals, data: newData };
+      }),
+    );
+    const labels: Record<string, string> = {
+      zero: '全部清零',
+      min: '填充最小值',
+      max: '填充最大值',
+      random: '填充随机值',
+      ff: '全填 FF',
+    };
     setCanTestStatus(`已${labels[mode]}`);
   }
 
   function exportableCases() {
     return canTestCases.length > 0
       ? canTestCases
-      : [{ caseId: 'TC-MANUAL-001', title: '当前手动帧', scenario: 'manual', description: '', tags: [], frames: canTestFrames, settingEntries: canTestSettingEntries }];
+      : [
+          {
+            caseId: 'TC-MANUAL-001',
+            title: '当前手动帧',
+            scenario: 'manual',
+            description: '',
+            tags: [],
+            frames: canTestFrames,
+            settingEntries: canTestSettingEntries,
+          },
+        ];
   }
 
   function escapeCsvField(value: string | number) {
@@ -167,15 +200,17 @@ export function useCanTestData() {
   }
 
   function frameRows() {
-    return exportableCases().flatMap((testCase) => testCase.frames.map((frame) => ({
-      caseId: testCase.caseId,
-      canId: `0x${frame.id.toString(16).toUpperCase()}`,
-      type: frame.frameType,
-      name: frame.name,
-      dlc: frame.dlc,
-      cycleMs: frame.cycleMs,
-      dataHex: frame.data,
-    })));
+    return exportableCases().flatMap((testCase) =>
+      testCase.frames.map((frame) => ({
+        caseId: testCase.caseId,
+        canId: `0x${frame.id.toString(16).toUpperCase()}`,
+        type: frame.frameType,
+        name: frame.name,
+        dlc: frame.dlc,
+        cycleMs: frame.cycleMs,
+        dataHex: frame.data,
+      })),
+    );
   }
 
   async function exportTxt(loadedProject: LoadedProject | null) {
@@ -213,15 +248,11 @@ export function useCanTestData() {
 
     const lines = [
       'CASE_ID,CAN_ID,TYPE,NAME,DLC,CYCLE_MS,DATA_HEX',
-      ...frameRows().map((row) => [
-        row.caseId,
-        row.canId,
-        row.type,
-        row.name,
-        row.dlc,
-        row.cycleMs,
-        row.dataHex,
-      ].map(escapeCsvField).join(',')),
+      ...frameRows().map((row) =>
+        [row.caseId, row.canId, row.type, row.name, row.dlc, row.cycleMs, row.dataHex]
+          .map(escapeCsvField)
+          .join(','),
+      ),
     ];
 
     try {
@@ -267,7 +298,7 @@ export function useCanTestData() {
     if (typeof selected !== 'string') return;
 
     try {
-      const config = await loadJsonFile(selected) as {
+      const config = (await loadJsonFile(selected)) as {
         version?: number;
         profile?: CanTestProfile;
         defaultCycleMs?: number;
@@ -283,11 +314,13 @@ export function useCanTestData() {
       }
       setCanTestFrames(normalizeFrames(config.frames));
       setCanTestSettingEntries(normalizeSettingEntries(config.settingEntries));
-      setCanTestCases((config.cases ?? []).map((testCase) => ({
-        ...testCase,
-        frames: normalizeFrames(testCase.frames),
-        settingEntries: normalizeSettingEntries(testCase.settingEntries),
-      })));
+      setCanTestCases(
+        (config.cases ?? []).map((testCase) => ({
+          ...testCase,
+          frames: normalizeFrames(testCase.frames),
+          settingEntries: normalizeSettingEntries(testCase.settingEntries),
+        })),
+      );
       setCanTestCoverage(config.coverage ?? null);
       setCanTestWarnings(config.warnings ?? []);
       setSelectedCanTestCaseIndex(0);

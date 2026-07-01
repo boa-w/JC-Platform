@@ -1,4 +1,8 @@
-import type { BatteryMonitorFrame, BatteryMonitorSignal, BatteryMonitorItem } from '../types/platform';
+import type {
+  BatteryMonitorFrame,
+  BatteryMonitorItem,
+  BatteryMonitorSignal,
+} from '../types/platform';
 
 function escapeCsvField(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
@@ -45,7 +49,13 @@ function parseCsv(text: string): string[][] {
 export function framesToCsv(frames: BatteryMonitorFrame[]): string {
   const header = 'frame_key,can_id,type,desc,timeout_ticks';
   const rows = frames.map((f) =>
-    [f.frame_key, `0x${f.can_id.toString(16).toUpperCase().padStart(3, '0')}`, String(f.type), escapeCsvField(f.desc ?? ''), String(f.timeout_ticks ?? '')].join(','),
+    [
+      f.frame_key,
+      `0x${f.can_id.toString(16).toUpperCase().padStart(3, '0')}`,
+      String(f.type),
+      escapeCsvField(f.desc ?? ''),
+      String(f.timeout_ticks ?? ''),
+    ].join(','),
   );
   return [header, ...rows].join('\n');
 }
@@ -81,14 +91,28 @@ export function csvToFrames(text: string): { frames: BatteryMonitorFrame[]; erro
 }
 
 export function signalsToCsv(signals: BatteryMonitorSignal[]): string {
-  const header = 'signal_key,param_id,name,inner,type,def,frame_key,pos,len,show_type,handle,handle_param,factor,offset,min,max,unit,receiver,comment';
+  const header =
+    'signal_key,param_id,name,inner,type,def,frame_key,pos,len,show_type,handle,handle_param,factor,offset,min,max,unit,receiver,comment';
   const rows = signals.map((s) =>
     [
-      s.signal_key, s.param_id, escapeCsvField(s.name), String(s.inner), String(s.type),
-      s.def ?? '0', s.frame_key, String(s.pos), String(s.len), String(s.show_type),
-      String(s.handle ?? 0), escapeCsvField(s.handle_param ?? ''),
-      String(s.factor ?? 1), String(s.offset ?? 0), String(s.min ?? 0), String(s.max ?? 0),
-      escapeCsvField(s.unit ?? ''), escapeCsvField(s.receiver ?? 'dbc_export'),
+      s.signal_key,
+      s.param_id,
+      escapeCsvField(s.name),
+      String(s.inner),
+      String(s.type),
+      s.def ?? '0',
+      s.frame_key,
+      String(s.pos),
+      String(s.len),
+      String(s.show_type),
+      String(s.handle ?? 0),
+      escapeCsvField(s.handle_param ?? ''),
+      String(s.factor ?? 1),
+      String(s.offset ?? 0),
+      String(s.min ?? 0),
+      String(s.max ?? 0),
+      escapeCsvField(s.unit ?? ''),
+      escapeCsvField(s.receiver ?? 'dbc_export'),
       escapeCsvField(s.comment ?? ''),
     ].join(','),
   );
@@ -135,15 +159,23 @@ export function csvToSignals(text: string): { signals: BatteryMonitorSignal[]; e
 }
 
 export function itemsToCsv(items: BatteryMonitorItem[]): string {
-  const header = 'item_key,enabled,order,signal_key,name_key,unit,formatter_kind,offset,scale_num,scale_den,decimals,validity_mode,validity_frame_key,validity_empty_text';
+  const header =
+    'item_key,enabled,order,signal_key,name_key,unit,formatter_kind,offset,scale_num,scale_den,decimals,validity_mode,validity_frame_key,validity_empty_text';
   const rows = items.map((item) =>
     [
-      item.item_key, item.enabled ? '1' : '0', String(item.order), item.signal_key,
-      item.name_key, escapeCsvField(item.unit ?? ''),
-      item.formatter?.kind ?? 'linear', String(item.formatter?.offset ?? 0),
-      String(item.formatter?.scale_num ?? 1), String(item.formatter?.scale_den ?? 1),
+      item.item_key,
+      item.enabled ? '1' : '0',
+      String(item.order),
+      item.signal_key,
+      item.name_key,
+      escapeCsvField(item.unit ?? ''),
+      item.formatter?.kind ?? 'linear',
+      String(item.formatter?.offset ?? 0),
+      String(item.formatter?.scale_num ?? 1),
+      String(item.formatter?.scale_den ?? 1),
       String(item.formatter?.decimals ?? 0),
-      item.validity?.mode ?? 'frame_timeout', item.validity?.frame_key ?? '',
+      item.validity?.mode ?? 'frame_timeout',
+      item.validity?.frame_key ?? '',
       escapeCsvField(item.validity?.empty_text ?? ' '),
     ].join(','),
   );

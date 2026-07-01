@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { LanguageDocument } from '../../types/platform';
-import type { LanguageProgress } from './types';
 import { ConfirmDialog } from './ConfirmDialog';
+import type { LanguageProgress } from './types';
 
 interface LanguageSidebarProps {
   document: LanguageDocument;
@@ -34,7 +34,10 @@ const commonLanguages = [
   { code: 'sv', label: 'Svenska' },
 ];
 
-function computeProgress(document: LanguageDocument, code: string): { translated: number; total: number } {
+function computeProgress(
+  document: LanguageDocument,
+  code: string,
+): { translated: number; total: number } {
   const keys = document.list_inner.slice(document.list_code_language.length);
   let translated = 0;
   for (const key of keys) {
@@ -50,7 +53,14 @@ function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
 }
 
-export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, onAddLanguage, onUpdateLanguage, onRemoveLanguage }: LanguageSidebarProps) {
+export function LanguageSidebar({
+  document,
+  selectedLanguage,
+  onSelectLanguage,
+  onAddLanguage,
+  onUpdateLanguage,
+  onRemoveLanguage,
+}: LanguageSidebarProps) {
   const [newCode, setNewCode] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -66,7 +76,9 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
     return { code, label: getLabel(document, code), total, translated };
   });
 
-  const availableLanguages = commonLanguages.filter((l) => !document.list_code_language.includes(l.code));
+  const availableLanguages = commonLanguages.filter(
+    (l) => !document.list_code_language.includes(l.code),
+  );
 
   function handleAdd() {
     const code = newCode.trim().toLowerCase();
@@ -119,7 +131,12 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
     <aside className="lang-sidebar">
       <div className="lang-sidebar-header">
         <h3>语言</h3>
-        <button className="lang-btn lang-btn--icon" onClick={() => setShowAdd(!showAdd)} type="button" title="添加语言">
+        <button
+          className="lang-btn lang-btn--icon"
+          onClick={() => setShowAdd(!showAdd)}
+          type="button"
+          title="添加语言"
+        >
           {showAdd ? '×' : '+'}
         </button>
       </div>
@@ -157,7 +174,12 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
                 onChange={(e) => setNewLabel(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               />
-              <button className="lang-btn lang-btn--primary" disabled={!newCode.trim() || !newLabel.trim()} onClick={handleAdd} type="button">
+              <button
+                className="lang-btn lang-btn--primary"
+                disabled={!newCode.trim() || !newLabel.trim()}
+                onClick={handleAdd}
+                type="button"
+              >
                 添加
               </button>
             </div>
@@ -215,7 +237,10 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
                       {!isZh ? (
                         <button
                           className="lang-sidebar-action-btn"
-                          onClick={(e) => { e.stopPropagation(); startEditLang(lang.code); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditLang(lang.code);
+                          }}
                           type="button"
                           title="编辑语言"
                         >
@@ -225,7 +250,10 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
                       {!isZh ? (
                         <button
                           className="lang-sidebar-remove"
-                          onClick={(e) => { e.stopPropagation(); setConfirmDelete(lang.code); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDelete(lang.code);
+                          }}
                           type="button"
                           title="删除语言"
                         >
@@ -240,7 +268,9 @@ export function LanguageSidebar({ document, selectedLanguage, onSelectLanguage, 
                 <div className="lang-sidebar-progress-bar">
                   <div className="lang-sidebar-progress-fill" style={{ width: `${pct}%` }} />
                 </div>
-                <span className="lang-sidebar-progress-text">{lang.translated}/{lang.total}</span>
+                <span className="lang-sidebar-progress-text">
+                  {lang.translated}/{lang.total}
+                </span>
               </div>
             </button>
           );

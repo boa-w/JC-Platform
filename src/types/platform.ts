@@ -1,4 +1,18 @@
-export type NavigationKey = 'project' | 'setting-data' | 'realtime-data' | 'signal-dictionary' | 'private-protocol' | 'protocol-mapping' | 'canopen-export' | 'ui' | 'battery-protocol' | 'battery-monitor' | 'language' | 'export' | 'settings' | 'can-test-data';
+export type NavigationKey =
+  | 'project'
+  | 'setting-data'
+  | 'realtime-data'
+  | 'signal-dictionary'
+  | 'private-protocol'
+  | 'protocol-mapping'
+  | 'canopen-export'
+  | 'ui'
+  | 'battery-protocol'
+  | 'battery-monitor'
+  | 'language'
+  | 'export'
+  | 'settings'
+  | 'can-test-data';
 
 export interface ProjectSummary {
   name: string;
@@ -187,8 +201,20 @@ export interface ProtocolMapping {
 
 export type ProtocolMappingTarget =
   | { kind: 'can_open_sdo'; index: number; subindex: number }
-  | { kind: 'can_open_pdo'; direction: 'receive' | 'send'; frame_id: number; bit_offset: number; bit_length: number }
-  | { kind: 'private_frame'; frame_key: string; frame_id: number; bit_offset: number; bit_length: number };
+  | {
+      kind: 'can_open_pdo';
+      direction: 'receive' | 'send';
+      frame_id: number;
+      bit_offset: number;
+      bit_length: number;
+    }
+  | {
+      kind: 'private_frame';
+      frame_key: string;
+      frame_id: number;
+      bit_offset: number;
+      bit_length: number;
+    };
 
 export interface ProtocolValidationReport {
   valid: boolean;

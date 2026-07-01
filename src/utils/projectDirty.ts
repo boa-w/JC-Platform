@@ -33,7 +33,8 @@ export function getAtPath(root: unknown, path: JsonPath): unknown | Missing {
       if (!Array.isArray(current) || segment < 0 || segment >= current.length) return missing;
       current = current[segment];
     } else {
-      if (typeof current !== 'object' || !(segment in (current as Record<string, unknown>))) return missing;
+      if (typeof current !== 'object' || !(segment in (current as Record<string, unknown>)))
+        return missing;
       current = (current as Record<string, unknown>)[segment];
     }
   }
@@ -48,7 +49,10 @@ export function setAtPath(root: unknown, path: JsonPath, value: unknown): unknow
     next[segment] = setAtPath(next[segment], rest, value);
     return next;
   }
-  const next = root && typeof root === 'object' && !Array.isArray(root) ? { ...(root as Record<string, unknown>) } : {};
+  const next =
+    root && typeof root === 'object' && !Array.isArray(root)
+      ? { ...(root as Record<string, unknown>) }
+      : {};
   next[segment] = setAtPath(next[segment], rest, value);
   return next;
 }
@@ -76,12 +80,20 @@ export function deleteAtPath(root: unknown, path: JsonPath): unknown {
   return next;
 }
 
-export function isPathModified(currentDocument: unknown, baselineDocument: unknown | null, path: JsonPath): boolean {
+export function isPathModified(
+  currentDocument: unknown,
+  baselineDocument: unknown | null,
+  path: JsonPath,
+): boolean {
   if (!baselineDocument) return false;
   return !deepEqual(getAtPath(currentDocument, path), getAtPath(baselineDocument, path));
 }
 
-export function restorePath(currentDocument: unknown, baselineDocument: unknown, path: JsonPath): unknown {
+export function restorePath(
+  currentDocument: unknown,
+  baselineDocument: unknown,
+  path: JsonPath,
+): unknown {
   const baselineValue = getAtPath(baselineDocument, path);
   if (baselineValue === missing) {
     return deleteAtPath(currentDocument, path);

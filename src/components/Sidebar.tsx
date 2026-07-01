@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { BackendHealth, FeatureModule, ModuleLifecycle, NavigationKey, ProjectSummary } from '../types/platform';
 import { findGroupForKey, navGroups } from '../data/navigation';
+import type {
+  BackendHealth,
+  FeatureModule,
+  ModuleLifecycle,
+  NavigationKey,
+  ProjectSummary,
+} from '../types/platform';
 
 interface SidebarProps {
   modules: FeatureModule[];
@@ -19,7 +25,15 @@ function lifecycleLabel(lifecycle?: ModuleLifecycle) {
   return null;
 }
 
-export function Sidebar({ modules, activeKey, onSelect, theme, onToggleTheme, health, project }: SidebarProps) {
+export function Sidebar({
+  modules,
+  activeKey,
+  onSelect,
+  theme,
+  onToggleTheme,
+  health,
+  project,
+}: SidebarProps) {
   const groupOfActive = findGroupForKey(activeKey);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>(
     groupOfActive?.label ?? navGroups[0].label,
@@ -34,7 +48,10 @@ export function Sidebar({ modules, activeKey, onSelect, theme, onToggleTheme, he
     [activeGroupLabel],
   );
   const activeGroupModules = useMemo(
-    () => activeGroup.keys.map((key) => modules.find((module) => module.key === key)).filter(Boolean) as FeatureModule[],
+    () =>
+      activeGroup.keys
+        .map((key) => modules.find((module) => module.key === key))
+        .filter(Boolean) as FeatureModule[],
     [activeGroup, modules],
   );
 
@@ -75,7 +92,9 @@ export function Sidebar({ modules, activeKey, onSelect, theme, onToggleTheme, he
               aria-label={group.label}
               aria-pressed={isActive}
             >
-              <span className="activity-icon-glyph" aria-hidden="true">{group.icon}</span>
+              <span className="activity-icon-glyph" aria-hidden="true">
+                {group.icon}
+              </span>
             </button>
           );
         })}
@@ -89,7 +108,9 @@ export function Sidebar({ modules, activeKey, onSelect, theme, onToggleTheme, he
           aria-label="软件版本信息"
           aria-expanded={showPopup}
         >
-          <span className="activity-icon-glyph" aria-hidden="true">ℹ</span>
+          <span className="activity-icon-glyph" aria-hidden="true">
+            ℹ
+          </span>
         </button>
         {/* 主题切换 */}
         <button
@@ -99,7 +120,9 @@ export function Sidebar({ modules, activeKey, onSelect, theme, onToggleTheme, he
           title={theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'}
           aria-label="切换主题"
         >
-          <span className="activity-icon-glyph" aria-hidden="true">{theme === 'dark' ? '☀' : '🌙'}</span>
+          <span className="activity-icon-glyph" aria-hidden="true">
+            {theme === 'dark' ? '☀' : '🌙'}
+          </span>
         </button>
       </div>
 
@@ -107,24 +130,38 @@ export function Sidebar({ modules, activeKey, onSelect, theme, onToggleTheme, he
         <div className="version-popup" ref={popupRef}>
           <div className="version-popup-header">
             <span className="version-popup-title">版本信息</span>
-            <button className="version-popup-close" type="button" onClick={() => setShowPopup(false)} aria-label="关闭">✕</button>
+            <button
+              className="version-popup-close"
+              type="button"
+              onClick={() => setShowPopup(false)}
+              aria-label="关闭"
+            >
+              ✕
+            </button>
           </div>
           <div className="version-popup-body">
             <section>
               <strong className="section-label--muted">应用信息</strong>
               <div className="version-popup-grid">
-                <span>软件名称</span><strong>{health?.app_name ?? '自定义开发平台'}</strong>
-                <span>前端版本</span><strong>0.1.0</strong>
-                <span>核心版本</span><strong>{health?.version ?? '-'}</strong>
-                <span>提交哈希</span><strong>{health?.commit_hash ?? 'unknown'}</strong>
-                <span>核心状态</span><strong>{health?.core_status ?? 'loading'}</strong>
+                <span>软件名称</span>
+                <strong>{health?.app_name ?? '自定义开发平台'}</strong>
+                <span>前端版本</span>
+                <strong>0.1.0</strong>
+                <span>核心版本</span>
+                <strong>{health?.version ?? '-'}</strong>
+                <span>提交哈希</span>
+                <strong>{health?.commit_hash ?? 'unknown'}</strong>
+                <span>核心状态</span>
+                <strong>{health?.core_status ?? 'loading'}</strong>
               </div>
             </section>
             <section>
               <strong className="section-label--muted">项目信息</strong>
               <div className="version-popup-grid">
-                <span>当前项目</span><strong>{project?.name ?? '未打开项目'}</strong>
-                <span>项目路径</span><strong>{project?.path ?? '—'}</strong>
+                <span>当前项目</span>
+                <strong>{project?.name ?? '未打开项目'}</strong>
+                <span>项目路径</span>
+                <strong>{project?.path ?? '—'}</strong>
               </div>
             </section>
           </div>
@@ -149,7 +186,9 @@ export function Sidebar({ modules, activeKey, onSelect, theme, onToggleTheme, he
               >
                 <span className="activity-item-label">{module.title}</span>
                 {label ? (
-                  <span className={`module-lifecycle-badge module-lifecycle-badge--${module.lifecycle}`}>
+                  <span
+                    className={`module-lifecycle-badge module-lifecycle-badge--${module.lifecycle}`}
+                  >
                     {label}
                   </span>
                 ) : null}

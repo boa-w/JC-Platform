@@ -36,7 +36,10 @@ function normalizeExportBatteryOptions(value: unknown): ExportBatteryOptions {
       bin: boolOrDefault(protocol.bin, defaultExportBatteryOptions.battery_protocol.bin),
     },
     battery_monitor_info: {
-      config: boolOrDefault(monitor.config, defaultExportBatteryOptions.battery_monitor_info.config),
+      config: boolOrDefault(
+        monitor.config,
+        defaultExportBatteryOptions.battery_monitor_info.config,
+      ),
       bin: boolOrDefault(monitor.bin, defaultExportBatteryOptions.battery_monitor_info.bin),
     },
   };
@@ -60,7 +63,11 @@ export function useExportBatteryOptions() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(options));
   }, [options]);
 
-  function updateOption(section: ExportBatterySection, target: ExportBatteryTarget, value: boolean) {
+  function updateOption(
+    section: ExportBatterySection,
+    target: ExportBatteryTarget,
+    value: boolean,
+  ) {
     setOptions((current) => ({
       ...current,
       [section]: {

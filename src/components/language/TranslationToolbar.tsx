@@ -43,7 +43,13 @@ export function TranslationToolbar({
             onChange={(e) => onSearch(e.target.value)}
           />
           {searchQuery ? (
-            <button className="lang-toolbar-search-clear" onClick={() => onSearch('')} type="button">×</button>
+            <button
+              className="lang-toolbar-search-clear"
+              onClick={() => onSearch('')}
+              type="button"
+            >
+              ×
+            </button>
           ) : null}
         </div>
         <div className="lang-toolbar-filters">
@@ -66,7 +72,9 @@ export function TranslationToolbar({
         <span className="lang-toolbar-lang-pair">
           {sourceLanguage} → {targetLanguage ?? '—'}
         </span>
-        <button className="lang-btn lang-btn--ghost" onClick={onSyncKeys} type="button">同步配置键</button>
+        <button className="lang-btn lang-btn--ghost" onClick={onSyncKeys} type="button">
+          同步配置键
+        </button>
       </div>
     </div>
   );

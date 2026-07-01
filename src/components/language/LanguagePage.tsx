@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { LanguageDocument } from '../../types/platform';
-import type { FilterMode, TranslationRow } from './types';
-import { LanguageSidebar } from './LanguageSidebar';
-import { TranslationToolbar } from './TranslationToolbar';
-import { TranslationTable } from './TranslationTable';
 import { LanguageComparisonView } from './LanguageComparisonView';
+import { LanguageSidebar } from './LanguageSidebar';
+import { TranslationTable } from './TranslationTable';
+import { TranslationToolbar } from './TranslationToolbar';
+import type { FilterMode, TranslationRow } from './types';
 
 interface LanguagePageProps {
   document: LanguageDocument;
@@ -19,7 +19,10 @@ function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
 }
 
-function computeTranslationCount(document: LanguageDocument, code: string): { translated: number; total: number } {
+function computeTranslationCount(
+  document: LanguageDocument,
+  code: string,
+): { translated: number; total: number } {
   const keys = document.list_inner.slice(document.list_code_language.length);
   let translated = 0;
   for (const key of keys) {
@@ -31,14 +34,20 @@ function computeTranslationCount(document: LanguageDocument, code: string): { tr
   return { translated, total: keys.length };
 }
 
-function normalizeDocument(document: LanguageDocument, codes: string[], labels?: Record<string, string>): LanguageDocument {
+function normalizeDocument(
+  document: LanguageDocument,
+  codes: string[],
+  labels?: Record<string, string>,
+): LanguageDocument {
   const nextLabels = labels ?? document.language_labels ?? {};
   const nextTranslate: Record<string, unknown> = {};
   for (let i = 0; i < codes.length; i++) {
     const code = codes[i];
     const oldCode = document.list_code_language[i];
     if (oldCode && oldCode !== code) {
-      const oldTranslations = document.list_translate[oldCode] as Record<string, string> | undefined;
+      const oldTranslations = document.list_translate[oldCode] as
+        | Record<string, string>
+        | undefined;
       if (oldTranslations) {
         nextLabels[code] = nextLabels[code] ?? nextLabels[oldCode] ?? code;
         delete nextLabels[oldCode];
@@ -48,13 +57,18 @@ function normalizeDocument(document: LanguageDocument, codes: string[], labels?:
   for (const key of document.list_inner) {
     nextTranslate[key] = document.list_translate[key] ?? {};
   }
-  return { list_code_language: codes, list_inner: document.list_inner, list_translate: nextTranslate, language_labels: nextLabels };
+  return {
+    list_code_language: codes,
+    list_inner: document.list_inner,
+    list_translate: nextTranslate,
+    language_labels: nextLabels,
+  };
 }
 
 export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguagePageProps) {
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(() => {
     const codes = document.list_code_language;
-    return codes.length > 1 ? codes[1] : codes[0] ?? null;
+    return codes.length > 1 ? codes[1] : (codes[0] ?? null);
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
@@ -74,7 +88,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       const key = document.list_inner[i];
       const baselineKey = baseline.list_inner[i];
       const currentTranslations = (document.list_translate[key] as Record<string, string>) ?? {};
-      const baselineTranslations = (baseline.list_translate[baselineKey] as Record<string, string>) ?? {};
+      const baselineTranslations =
+        (baseline.list_translate[baselineKey] as Record<string, string>) ?? {};
       const currentValue = currentTranslations[selectedLanguage] ?? '';
       const baselineValue = baselineTranslations[selectedLanguage] ?? '';
       if (currentValue !== baselineValue) {
@@ -89,14 +104,15 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       key,
       index: i + document.list_code_language.length,
       isConfigKey: false,
-      translations: ((document.list_translate[key] as Record<string, string>) ?? {}),
+      translations: (document.list_translate[key] as Record<string, string>) ?? {},
     }));
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter((row) =>
-        row.key.toLowerCase().includes(q) ||
-        Object.values(row.translations).some((v) => String(v).toLowerCase().includes(q))
+      filtered = filtered.filter(
+        (row) =>
+          row.key.toLowerCase().includes(q) ||
+          Object.values(row.translations).some((v) => String(v).toLowerCase().includes(q)),
       );
     }
 
@@ -113,7 +129,14 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     }
 
     return filtered;
-  }, [translationKeys, document.list_code_language.length, document.list_translate, searchQuery, filterMode, selectedLanguage]);
+  }, [
+    translationKeys,
+    document.list_code_language.length,
+    document.list_translate,
+    searchQuery,
+    filterMode,
+    selectedLanguage,
+  ]);
 
   function handleAddLanguage(code: string, label: string) {
     if (document.list_code_language.includes(code)) return;
@@ -123,7 +146,13 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       nextTranslate[key] = { ...existing, [code]: '' };
     }
     const nextLabels = { ...(document.language_labels ?? {}), [code]: label };
-    onUpdate(normalizeDocument({ ...document, list_translate: nextTranslate, language_labels: nextLabels }, [...document.list_code_language, code], nextLabels));
+    onUpdate(
+      normalizeDocument(
+        { ...document, list_translate: nextTranslate, language_labels: nextLabels },
+        [...document.list_code_language, code],
+        nextLabels,
+      ),
+    );
   }
 
   function handleRemoveLanguage(code: string) {
@@ -131,13 +160,15 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     const nextCodes = document.list_code_language.filter((c) => c !== code);
     const nextLabels = { ...(document.language_labels ?? {}) };
     delete nextLabels[code];
-    onUpdate(normalizeDocument({ ...document, language_labels: nextLabels }, nextCodes, nextLabels));
+    onUpdate(
+      normalizeDocument({ ...document, language_labels: nextLabels }, nextCodes, nextLabels),
+    );
   }
 
   function handleUpdateLanguage(oldCode: string, newCode: string, newLabel: string) {
     if (oldCode === newCode && newLabel === getLabel(document, oldCode)) return;
     if (oldCode !== newCode && document.list_code_language.includes(newCode)) return;
-    const nextCodes = document.list_code_language.map((c) => c === oldCode ? newCode : c);
+    const nextCodes = document.list_code_language.map((c) => (c === oldCode ? newCode : c));
     const nextLabels = { ...(document.language_labels ?? {}) };
     if (oldCode !== newCode) {
       delete nextLabels[oldCode];
@@ -155,7 +186,13 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
         }
       }
     }
-    onUpdate(normalizeDocument({ ...document, list_translate: nextTranslate, language_labels: nextLabels }, nextCodes, nextLabels));
+    onUpdate(
+      normalizeDocument(
+        { ...document, list_translate: nextTranslate, language_labels: nextLabels },
+        nextCodes,
+        nextLabels,
+      ),
+    );
   }
 
   function handleUpdateValue(key: string, code: string, value: string) {
@@ -214,7 +251,9 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     );
   }
 
-  const { translated, total } = selectedLanguage ? computeTranslationCount(document, selectedLanguage) : { translated: 0, total: translationKeys.length };
+  const { translated, total } = selectedLanguage
+    ? computeTranslationCount(document, selectedLanguage)
+    : { translated: 0, total: translationKeys.length };
 
   return (
     <section className="lang-page">
@@ -254,7 +293,10 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               filteredCount={rows.length}
               onSearch={setSearchQuery}
               onFilter={setFilterMode}
-              onAddKey={(key) => { setNewKeyInput(key); handleAddKey(); }}
+              onAddKey={(key) => {
+                setNewKeyInput(key);
+                handleAddKey();
+              }}
               onSyncKeys={() => {}}
             />
             <TranslationTable
@@ -268,7 +310,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               onRemoveKey={handleRemoveKey}
               onRestoreKey={(key) => {
                 const original = document.list_translate[key];
-                if (original) onUpdate({ ...document, list_translate: { ...document.list_translate } });
+                if (original)
+                  onUpdate({ ...document, list_translate: { ...document.list_translate } });
               }}
             />
             <div className="lang-footer">
@@ -279,13 +322,21 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
                   onChange={(e) => setNewKeyInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddKey()}
                 />
-                <button className="lang-btn lang-btn--primary" disabled={!newKeyInput.trim()} onClick={handleAddKey} type="button">
+                <button
+                  className="lang-btn lang-btn--primary"
+                  disabled={!newKeyInput.trim()}
+                  onClick={handleAddKey}
+                  type="button"
+                >
                   添加键
                 </button>
               </div>
               <div className="lang-footer-progress">
                 {selectedLanguage ? (
-                  <span>{getLabel(document, selectedLanguage)}: {translated}/{total} 已翻译 ({total > 0 ? Math.round((translated / total) * 100) : 0}%)</span>
+                  <span>
+                    {getLabel(document, selectedLanguage)}: {translated}/{total} 已翻译 (
+                    {total > 0 ? Math.round((translated / total) * 100) : 0}%)
+                  </span>
                 ) : (
                   <span>请选择目标语言</span>
                 )}

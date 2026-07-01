@@ -1,5 +1,5 @@
-import type { FeatureModule, ModuleLifecycle, NavigationKey } from '../types/platform';
 import { findGroupForKey } from '../data/navigation';
+import type { FeatureModule, ModuleLifecycle, NavigationKey } from '../types/platform';
 
 interface BreadcrumbProps {
   activeKey: NavigationKey;
@@ -26,7 +26,10 @@ export function Breadcrumb({ activeKey, modules, onNavigate }: BreadcrumbProps) 
       <span className="breadcrumb-sep">/</span>
       <span className="breadcrumb-current">{currentModule?.title ?? activeKey}</span>
       {lifecycleLabel(currentModule?.lifecycle) ? (
-        <span className={`module-lifecycle-badge module-lifecycle-badge--${currentModule?.lifecycle}`} title={currentModule?.lifecycleReason}>
+        <span
+          className={`module-lifecycle-badge module-lifecycle-badge--${currentModule?.lifecycle}`}
+          title={currentModule?.lifecycleReason}
+        >
           {lifecycleLabel(currentModule?.lifecycle)}
         </span>
       ) : null}

@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
@@ -8,10 +8,7 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     watch: {
-      ignored: [
-        '**/src-tauri/target/**',
-        '**/target/**',
-      ],
+      ignored: ['**/src-tauri/target/**', '**/target/**'],
     },
   },
   envPrefix: ['VITE_', 'TAURI_'],

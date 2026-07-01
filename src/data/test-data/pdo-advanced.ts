@@ -14,24 +14,33 @@ export const pdoAdvancedTestData: PdoAdvancedDocument = {
   ],
   pdo_recv: [
     {
-      id: 0x281, type: 0, desc: '电机状态帧', data: [
+      id: 0x281,
+      type: 0,
+      desc: '电机状态帧',
+      data: [
         { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '001' },
         { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '002' },
-      ]
+      ],
     },
     {
-      id: 0x282, type: 0, desc: '电池状态帧', data: [
+      id: 0x282,
+      type: 0,
+      desc: '电池状态帧',
+      data: [
         { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '003' },
         { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '004' },
-      ]
+      ],
     },
   ],
   pdo_send: [
     {
-      id: 0x201, type: 0, desc: '控制帧', data: [
+      id: 0x201,
+      type: 0,
+      desc: '控制帧',
+      data: [
         { pos: 0, len: 16, show_type: 0, handle: 0, handle_param: '', param_id: '005' },
         { pos: 16, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: '006' },
-      ]
+      ],
     },
   ],
 };

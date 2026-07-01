@@ -12,7 +12,13 @@ export const navGroups: NavGroup[] = [
   {
     label: '协议',
     icon: '🔌',
-    keys: ['signal-dictionary', 'private-protocol', 'protocol-mapping', 'canopen-export', 'battery-protocol'],
+    keys: [
+      'signal-dictionary',
+      'private-protocol',
+      'protocol-mapping',
+      'canopen-export',
+      'battery-protocol',
+    ],
   },
   { label: '配置', icon: '⚙️', keys: ['ui', 'battery-monitor'] },
   { label: '多国语言', icon: '🌐', keys: ['language'] },

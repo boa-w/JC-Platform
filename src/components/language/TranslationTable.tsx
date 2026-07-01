@@ -63,17 +63,33 @@ export function TranslationTable({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td className="lang-table-empty" colSpan={targetLanguage && targetLanguage !== sourceLanguage ? 4 : 3}>
+              <td
+                className="lang-table-empty"
+                colSpan={targetLanguage && targetLanguage !== sourceLanguage ? 4 : 3}
+              >
                 暂无翻译条目
               </td>
             </tr>
           ) : null}
           {rows.map((row) => {
-            const sourceValue = String((document.list_translate[row.key] as Record<string, string> | undefined)?.[sourceLanguage] ?? '');
-            const targetValue = targetLanguage ? String((document.list_translate[row.key] as Record<string, string> | undefined)?.[targetLanguage] ?? '') : '';
+            const sourceValue = String(
+              (document.list_translate[row.key] as Record<string, string> | undefined)?.[
+                sourceLanguage
+              ] ?? '',
+            );
+            const targetValue = targetLanguage
+              ? String(
+                  (document.list_translate[row.key] as Record<string, string> | undefined)?.[
+                    targetLanguage
+                  ] ?? '',
+                )
+              : '';
             const isModified = modifiedKeys.has(row.key);
             return (
-              <tr className={isModified ? 'config-entry-modified' : undefined} key={`${row.key}-${row.index}`}>
+              <tr
+                className={isModified ? 'config-entry-modified' : undefined}
+                key={`${row.key}-${row.index}`}
+              >
                 <td className="lang-table-cell-key">
                   {editingKeyIndex === row.index ? (
                     <input
@@ -112,10 +128,24 @@ export function TranslationTable({
                 ) : null}
                 <td className="lang-table-cell-actions">
                   {isModified && !row.isConfigKey ? (
-                    <button className="lang-btn lang-btn--icon" onClick={() => onRestoreKey(row.key)} type="button" title="恢复">↩</button>
+                    <button
+                      className="lang-btn lang-btn--icon"
+                      onClick={() => onRestoreKey(row.key)}
+                      type="button"
+                      title="恢复"
+                    >
+                      ↩
+                    </button>
                   ) : null}
                   {!row.isConfigKey ? (
-                    <button className="lang-btn lang-btn--icon lang-btn--danger" onClick={() => onRemoveKey(row.index)} type="button" title="删除">×</button>
+                    <button
+                      className="lang-btn lang-btn--icon lang-btn--danger"
+                      onClick={() => onRemoveKey(row.index)}
+                      type="button"
+                      title="删除"
+                    >
+                      ×
+                    </button>
                   ) : null}
                 </td>
               </tr>

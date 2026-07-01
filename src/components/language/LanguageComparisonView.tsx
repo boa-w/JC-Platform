@@ -104,7 +104,9 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                 <div className="lang-comparison-stat-bar">
                   <div className="lang-comparison-stat-fill" style={{ width: `${pct}%` }} />
                 </div>
-                <span className="lang-comparison-stat-text">{stat.translated}/{stat.total}</span>
+                <span className="lang-comparison-stat-text">
+                  {stat.translated}/{stat.total}
+                </span>
               </div>
             );
           })}
@@ -127,7 +129,10 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
           <tbody>
             {translationKeys.length === 0 ? (
               <tr>
-                <td className="lang-comparison-empty" colSpan={document.list_code_language.length + 2}>
+                <td
+                  className="lang-comparison-empty"
+                  colSpan={document.list_code_language.length + 2}
+                >
                   暂无翻译条目
                 </td>
               </tr>
@@ -161,7 +166,8 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                     )}
                   </td>
                   {document.list_code_language.map((code) => {
-                    const translations = (document.list_translate[key] as Record<string, string>) ?? {};
+                    const translations =
+                      (document.list_translate[key] as Record<string, string>) ?? {};
                     const value = translations[code] ?? '';
                     const isEditing = editingCell?.key === key && editingCell?.code === code;
                     const isEmpty = !value || value.trim() === '';

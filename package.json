@@ -11,7 +11,10 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "cli": "cargo run --manifest-path src-tauri/Cargo.toml --bin jc-cli --",
-    "cli:build": "cargo build --manifest-path src-tauri/Cargo.toml --bin jc-cli --release"
+    "cli:build": "cargo build --manifest-path src-tauri/Cargo.toml --bin jc-cli --release",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write ."
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
@@ -21,6 +24,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.1",
     "@tauri-apps/cli": "^2.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

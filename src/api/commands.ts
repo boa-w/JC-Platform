@@ -34,8 +34,8 @@ import type {
   TableDocument,
   TableFileRequest,
   TableValidationReport,
-  UiResourceOptionAddRequest,
   UiImageCopyReport,
+  UiResourceOptionAddRequest,
   UiResourceOptionRemoveRequest,
   UiResourceParseReport,
   UiResourceParseRequest,
@@ -109,7 +109,9 @@ export async function parseProjectFile(path: string): Promise<ProjectParseReport
   return invoke<ProjectParseReport>('parse_project_file', { path });
 }
 
-export async function parseUnifiedProtocolProject(document: unknown): Promise<UnifiedProtocolModel> {
+export async function parseUnifiedProtocolProject(
+  document: unknown,
+): Promise<UnifiedProtocolModel> {
   return invoke<UnifiedProtocolModel>('parse_unified_protocol_project', { document });
 }
 
@@ -117,7 +119,9 @@ export async function migrateUnifiedProtocolDocument(document: unknown): Promise
   return invoke<unknown>('migrate_unified_protocol_document', { document });
 }
 
-export async function flattenUnifiedProtocolDocument(document: unknown): Promise<ProtocolCompatibilityReport> {
+export async function flattenUnifiedProtocolDocument(
+  document: unknown,
+): Promise<ProtocolCompatibilityReport> {
   return invoke<ProtocolCompatibilityReport>('flatten_unified_protocol_document', { document });
 }
 
@@ -125,7 +129,9 @@ export async function parseUiResources(document: unknown): Promise<UiResourcePar
   return invoke<UiResourceParseReport>('parse_ui_resources', { document });
 }
 
-export async function parseUiResourcesWithProjectPath(request: UiResourceParseRequest): Promise<UiResourceParseReport> {
+export async function parseUiResourcesWithProjectPath(
+  request: UiResourceParseRequest,
+): Promise<UiResourceParseReport> {
   return invoke<UiResourceParseReport>('parse_ui_resources_with_project_path', { request });
 }
 
@@ -174,7 +180,9 @@ export async function importSdoWorkbook(request: TableFileRequest): Promise<SdoI
   return invoke<SdoImportReport>('import_sdo_workbook', { request });
 }
 
-export async function importPdoSimpleTable(document: TableDocument): Promise<PdoSimpleImportReport> {
+export async function importPdoSimpleTable(
+  document: TableDocument,
+): Promise<PdoSimpleImportReport> {
   return invoke<PdoSimpleImportReport>('import_pdo_simple_table', { document });
 }
 
@@ -186,11 +194,15 @@ export async function parsePdoAdvancedFile(path: string): Promise<PdoAdvancedPar
   return invoke<PdoAdvancedParseReport>('parse_pdo_advanced_file', { path });
 }
 
-export async function importPdoSimpleCsv(request: TableFileRequest): Promise<PdoSimpleImportReport> {
+export async function importPdoSimpleCsv(
+  request: TableFileRequest,
+): Promise<PdoSimpleImportReport> {
   return invoke<PdoSimpleImportReport>('import_pdo_simple_csv', { request });
 }
 
-export async function importPdoSimpleWorkbook(request: TableFileRequest): Promise<PdoSimpleImportReport> {
+export async function importPdoSimpleWorkbook(
+  request: TableFileRequest,
+): Promise<PdoSimpleImportReport> {
   return invoke<PdoSimpleImportReport>('import_pdo_simple_workbook', { request });
 }
 
@@ -202,7 +214,9 @@ export async function importLanguageCsv(request: TableFileRequest): Promise<Lang
   return invoke<LanguageImportReport>('import_language_csv', { request });
 }
 
-export async function importLanguageWorkbook(request: TableFileRequest): Promise<LanguageImportReport> {
+export async function importLanguageWorkbook(
+  request: TableFileRequest,
+): Promise<LanguageImportReport> {
   return invoke<LanguageImportReport>('import_language_workbook', { request });
 }
 
@@ -226,11 +240,15 @@ export async function sdoDocumentTable(document: unknown): Promise<TableDocument
   return invoke<TableDocument>('sdo_document_table', { document });
 }
 
-export async function buildProjectExportPlan(request: ExportPlanRequest): Promise<ExportPlanReport> {
+export async function buildProjectExportPlan(
+  request: ExportPlanRequest,
+): Promise<ExportPlanReport> {
   return invoke<ExportPlanReport>('build_project_export_plan', { request });
 }
 
-export async function exportProjectPackage(request: ExportPlanRequest): Promise<ProjectExportReport> {
+export async function exportProjectPackage(
+  request: ExportPlanRequest,
+): Promise<ProjectExportReport> {
   return invoke<ProjectExportReport>('export_project_package_command', { request });
 }
 
@@ -258,15 +276,23 @@ export async function revealItemInDir(path: string): Promise<void> {
   return openPath(path);
 }
 
-export async function generateCanTestData(document: unknown, profile?: string): Promise<CanTestGenerateResponse> {
+export async function generateCanTestData(
+  document: unknown,
+  profile?: string,
+): Promise<CanTestGenerateResponse> {
   return invoke<CanTestGenerateResponse>('generate_can_test_data', { document, profile });
 }
 
-export async function analyzeCanopenConversion(document: unknown): Promise<CanopenConversionReport> {
+export async function analyzeCanopenConversion(
+  document: unknown,
+): Promise<CanopenConversionReport> {
   return invoke<CanopenConversionReport>('analyze_canopen_conversion', { document });
 }
 
-export async function exportCanopenPackage(outputDir: string, document: unknown): Promise<CanopenConversionReport> {
+export async function exportCanopenPackage(
+  outputDir: string,
+  document: unknown,
+): Promise<CanopenConversionReport> {
   return invoke<CanopenConversionReport>('export_canopen_package', { outputDir, document });
 }
 
@@ -290,10 +316,17 @@ export async function importDbc(path: string): Promise<DbcImportReport> {
   return invoke<DbcImportReport>('import_dbc', { path });
 }
 
-export async function exportDbc(path: string, frames: BatteryMonitorFrame[], signals: BatteryMonitorSignal[]): Promise<void> {
+export async function exportDbc(
+  path: string,
+  frames: BatteryMonitorFrame[],
+  signals: BatteryMonitorSignal[],
+): Promise<void> {
   return invoke<void>('export_dbc', { path, frames, signals });
 }
 
-export async function generateDbcContent(frames: BatteryMonitorFrame[], signals: BatteryMonitorSignal[]): Promise<string> {
+export async function generateDbcContent(
+  frames: BatteryMonitorFrame[],
+  signals: BatteryMonitorSignal[],
+): Promise<string> {
   return invoke<string>('generate_dbc_content', { frames, signals });
 }

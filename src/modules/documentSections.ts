@@ -21,11 +21,7 @@ export type DocumentSectionKey =
   | 'private_protocol'
   | 'protocol_mapping';
 
-export type JsonEditorKey =
-  | NavigationKey
-  | 'sdo'
-  | 'pdo-simple'
-  | 'pdo-advanced';
+export type JsonEditorKey = NavigationKey | 'sdo' | 'pdo-simple' | 'pdo-advanced';
 
 export const modifiedSectionLabels: Record<DocumentSectionKey, string> = {
   ui_info: 'UI 资源',
@@ -53,7 +49,7 @@ export const refactorOnlySections = [
   'battery_monitor_info',
 ] as const;
 
-export type RefactorOnlySection = typeof refactorOnlySections[number];
+export type RefactorOnlySection = (typeof refactorOnlySections)[number];
 
 export const advancedConfigSections = [
   'pdo_global_param',
@@ -81,9 +77,13 @@ export function legacyTableKindForModule(key: NavigationKey): LegacyTableKind | 
   return legacyTableByModule[key] ?? null;
 }
 
-export function jsonEditorKeyForModule(key: NavigationKey, context: JsonEditorContext): JsonEditorKey {
+export function jsonEditorKeyForModule(
+  key: NavigationKey,
+  context: JsonEditorContext,
+): JsonEditorKey {
   if (key === 'setting-data') return 'sdo';
-  if (key === 'realtime-data') return context.realtimeMode === 'simple' ? 'pdo-simple' : 'pdo-advanced';
+  if (key === 'realtime-data')
+    return context.realtimeMode === 'simple' ? 'pdo-simple' : 'pdo-advanced';
   return key;
 }
 
@@ -100,7 +100,9 @@ export function configSectionForEditor(
   if (jsonEditorKey === 'sdo') return document.sdo_info;
   if (jsonEditorKey === 'pdo-simple') return document.pdo_simple_send_recv;
   if (jsonEditorKey === 'pdo-advanced') {
-    return Object.fromEntries(advancedConfigSections.map((section) => [section, document[section]]));
+    return Object.fromEntries(
+      advancedConfigSections.map((section) => [section, document[section]]),
+    );
   }
   const section = documentSectionForModule(key);
   return section ? document[section] : null;
