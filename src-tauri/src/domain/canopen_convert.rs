@@ -58,8 +58,22 @@ struct PdoMappingSpec {
     name: String,
     bit_offset: u32,
     bit_length: u32,
+    show_type: u32,
     index: Option<u32>,
     subindex: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
+struct BitFieldSpec {
+    node_id: u32,
+    index: u32,
+    subindex: u32,
+    name: String,
+    menu_path: String,
+    handle: u32,
+    bit_index: u32,
+    off_value: String,
+    on_value: String,
 }
 
 fn object_u32(value: &Value, key: &str) -> Option<u32> {
@@ -274,6 +288,7 @@ fn collect_pdos(
                         name,
                         bit_offset: object_u32(&signal, "pos").unwrap_or(0),
                         bit_length: object_u32(&signal, "len").unwrap_or(0),
+                        show_type: object_u32(&signal, "show_type").unwrap_or(0),
                         index: resolved.map(|item| item.0),
                         subindex: resolved.map(|item| item.1),
                     });
@@ -295,6 +310,7 @@ fn collect_pdos(
 
 fn model_json(objects: &[ObjectSpec], pdos: &[PdoSpec], warnings: &[String]) -> Value {
     let mut nodes = BTreeMap::<u32, Vec<&ObjectSpec>>::new();
+    let bitfields = collect_bitfields(objects);
     for obj in objects {
         nodes.entry(obj.node_id).or_default().push(obj);
     }
@@ -315,6 +331,7 @@ fn model_json(objects: &[ObjectSpec], pdos: &[PdoSpec], warnings: &[String]) -> 
                             "name": m.name,
                             "bitOffset": m.bit_offset,
                             "bitLength": m.bit_length,
+                            "showType": m.show_type,
                             "index": m.index.map(|v| format!("0x{:04X}", v)),
                             "subindex": m.subindex,
                             "inferred": m.index.is_some(),
@@ -346,6 +363,16 @@ fn model_json(objects: &[ObjectSpec], pdos: &[PdoSpec], warnings: &[String]) -> 
                         "handle": obj.handle,
                         "handleParam": obj.handle_param,
                     }
+                })).collect::<Vec<_>>(),
+                "bitfields": bitfields.iter().filter(|field| field.node_id == *node_id).map(|field| json!({
+                    "index": format!("0x{:04X}", field.index),
+                    "subindex": field.subindex,
+                    "bitIndex": field.bit_index,
+                    "name": field.name,
+                    "offValue": field.off_value,
+                    "onValue": field.on_value,
+                    "handle": field.handle,
+                    "menuPath": field.menu_path,
                 })).collect::<Vec<_>>(),
                 "pdos": node_pdos,
             })
@@ -379,6 +406,329 @@ fn csv_cell(value: &str) -> String {
     } else {
         value.to_string()
     }
+}
+
+fn dbc_text(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace(['\r', '\n'], " ")
+        .trim()
+        .to_string()
+}
+
+fn dbc_identifier(value: &str, fallback: &str) -> String {
+    let mut output = String::new();
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            output.push(ch);
+        } else if !output.ends_with('_') {
+            output.push('_');
+        }
+    }
+    let output = output.trim_matches('_');
+    let mut output = if output.is_empty() {
+        fallback.to_string()
+    } else {
+        output.to_string()
+    };
+    if match output.chars().next() {
+        Some(ch) => ch.is_ascii_digit(),
+        None => true,
+    } {
+        output = format!("_{output}");
+    }
+    output.chars().take(96).collect()
+}
+
+fn parse_bitfield_param(value: &str) -> Option<(u32, String, String)> {
+    let parts = value.split("->").map(str::trim).collect::<Vec<_>>();
+    if parts.len() < 3 {
+        return None;
+    }
+    let bit_index = parts[0].parse::<u32>().ok()?;
+    Some((bit_index, parts[1].to_string(), parts[2].to_string()))
+}
+
+fn collect_bitfields(objects: &[ObjectSpec]) -> Vec<BitFieldSpec> {
+    let mut bitfields = objects
+        .iter()
+        .filter_map(|obj| {
+            if !matches!(obj.handle, 11 | 12) {
+                return None;
+            }
+            let (bit_index, off_value, on_value) = parse_bitfield_param(&obj.handle_param)?;
+            Some(BitFieldSpec {
+                node_id: obj.node_id,
+                index: obj.index,
+                subindex: obj.subindex,
+                name: obj.name.clone(),
+                menu_path: obj.menu_path.clone(),
+                handle: obj.handle,
+                bit_index,
+                off_value,
+                on_value,
+            })
+        })
+        .collect::<Vec<_>>();
+    bitfields.sort_by_key(|field| (field.node_id, field.index, field.subindex, field.bit_index));
+    bitfields
+}
+
+fn generate_bitfield_csv(bitfields: &[BitFieldSpec]) -> String {
+    let mut lines = vec![
+        "NODE_ID,INDEX,SUBINDEX,BIT_INDEX,NAME,OFF_VALUE,ON_VALUE,HANDLE,MENU_PATH".to_string(),
+    ];
+    for field in bitfields {
+        lines.push(format!(
+            "{},0x{:04X},{},{},{},{},{},{},{}",
+            field.node_id,
+            field.index,
+            field.subindex,
+            field.bit_index,
+            csv_cell(&field.name),
+            csv_cell(&field.off_value),
+            csv_cell(&field.on_value),
+            field.handle,
+            csv_cell(&field.menu_path),
+        ));
+    }
+    lines.join("\n")
+}
+
+fn bitfield_json(bitfields: &[BitFieldSpec]) -> Value {
+    json!({
+        "version": 1,
+        "scope": "sdo-bitfield-semantics",
+        "description": "Business bit semantics parsed from 数据/设置数据 handle_param. These bits are not injected into DBC unless a real PDO signal carries the corresponding bit position.",
+        "bitfields": bitfields.iter().map(|field| json!({
+            "nodeId": field.node_id,
+            "index": format!("0x{:04X}", field.index),
+            "subindex": field.subindex,
+            "bitIndex": field.bit_index,
+            "name": field.name,
+            "offValue": field.off_value,
+            "onValue": field.on_value,
+            "handle": field.handle,
+            "menuPath": field.menu_path,
+        })).collect::<Vec<_>>(),
+    })
+}
+
+fn generate_sdo_object_csv(objects: &[ObjectSpec]) -> String {
+    let mut lines = vec![
+        "NODE_ID,SDO_RX_COB_ID,SDO_TX_COB_ID,INDEX,SUBINDEX,NAME,ACCESS,DATA_TYPE,DEFAULT_VALUE,MIN_VALUE,MAX_VALUE,HANDLE,HANDLE_PARAM,MENU_PATH".to_string(),
+    ];
+    for obj in objects {
+        lines.push(format!(
+            "{},0x{:X},0x{:X},0x{:04X},{},{},{},{},{},{},{},{},{},{}",
+            obj.node_id,
+            0x600 + obj.node_id,
+            0x580 + obj.node_id,
+            obj.index,
+            obj.subindex,
+            csv_cell(&obj.name),
+            obj.access,
+            obj.data_type,
+            csv_cell(obj.default_value.as_deref().unwrap_or("")),
+            csv_cell(obj.min_value.as_deref().unwrap_or("")),
+            csv_cell(obj.max_value.as_deref().unwrap_or("")),
+            obj.handle,
+            csv_cell(&obj.handle_param),
+            csv_cell(&obj.menu_path),
+        ));
+    }
+    lines.join("\n")
+}
+
+fn sdo_object_json(objects: &[ObjectSpec]) -> Value {
+    json!({
+        "version": 1,
+        "scope": "sdo-object-dictionary-map",
+        "description": "Object dictionary entries addressable through SDO frames. DBC describes the generic SDO transport frames; this map provides object-level names, indexes and value constraints.",
+        "objects": objects.iter().map(|obj| json!({
+            "nodeId": obj.node_id,
+            "sdoRxCobId": format!("0x{:X}", 0x600 + obj.node_id),
+            "sdoTxCobId": format!("0x{:X}", 0x580 + obj.node_id),
+            "index": format!("0x{:04X}", obj.index),
+            "subindex": obj.subindex,
+            "name": obj.name,
+            "menuPath": obj.menu_path,
+            "access": obj.access,
+            "dataType": obj.data_type,
+            "defaultValue": obj.default_value,
+            "minValue": obj.min_value,
+            "maxValue": obj.max_value,
+            "handle": obj.handle,
+            "handleParam": obj.handle_param,
+        })).collect::<Vec<_>>(),
+    })
+}
+
+fn sdo_object_summary(objects: &[&ObjectSpec]) -> String {
+    let mut parts = Vec::new();
+    for obj in objects.iter().take(12) {
+        parts.push(format!("{}=0x{:04X}:{}", obj.name, obj.index, obj.subindex));
+    }
+    if objects.len() > 12 {
+        parts.push(format!("... {} more", objects.len() - 12));
+    }
+    parts.join("; ")
+}
+
+fn push_sdo_dbc_message(
+    lines: &mut Vec<String>,
+    comments: &mut Vec<String>,
+    values: &mut Vec<String>,
+    cob_id: u32,
+    frame_name: &str,
+    node_id: u32,
+    role: &str,
+    objects: &[&ObjectSpec],
+) {
+    lines.push(format!("BO_ {cob_id} {frame_name}: 8 Vector__XXX\n"));
+    lines.push(" SG_ SDO_Command : 0|8@1+ (1,0) [0|255] \"\" Vector__XXX\n".to_string());
+    lines.push(" SG_ SDO_Index : 8|16@1+ (1,0) [0|65535] \"\" Vector__XXX\n".to_string());
+    lines.push(" SG_ SDO_SubIndex : 24|8@1+ (1,0) [0|255] \"\" Vector__XXX\n".to_string());
+    lines.push(" SG_ SDO_DataU32 : 32|32@1+ (1,0) [0|4294967295] \"\" Vector__XXX\n\n".to_string());
+
+    comments.push(format!(
+        "CM_ BO_ {cob_id} \"CANopen SDO {role}; node_id={node_id}; objects={}; {}; see sdo_object_map.csv/json\";\n",
+        objects.len(),
+        dbc_text(&sdo_object_summary(objects))
+    ));
+    comments.push(format!(
+        "CM_ SG_ {cob_id} SDO_Index \"Object index in little-endian bytes 1..2; combine with SDO_SubIndex and sdo_object_map.csv/json.\";\n"
+    ));
+    comments.push(format!(
+        "CM_ SG_ {cob_id} SDO_SubIndex \"Object subindex; combine with SDO_Index and sdo_object_map.csv/json.\";\n"
+    ));
+    comments.push(format!(
+        "CM_ SG_ {cob_id} SDO_DataU32 \"Expedited SDO payload bytes 4..7, little-endian.\";\n"
+    ));
+    values.push(format!(
+        "VAL_ {cob_id} SDO_Command 35 \"Download4Req\" 43 \"Download2Req\" 47 \"Download1Req\" 64 \"UploadReq\" 67 \"Upload4Resp\" 75 \"Upload2Resp\" 79 \"Upload1Resp\" 96 \"DownloadResp\" 128 \"Abort\";\n"
+    ));
+}
+
+fn generate_canopen_protocol_dbc(objects: &[ObjectSpec], pdos: &[PdoSpec]) -> String {
+    let mut lines = Vec::new();
+    let mut comments = Vec::new();
+    let mut values = Vec::new();
+
+    lines.push("VERSION \"Generated CANopen Protocol DBC\"\n\n".to_string());
+    lines.push("NS_ :\n\tNS_DESC_\n\tCM_\n\tBA_DEF_\n\tBA_\n\tVAL_\n\tBA_DEF_DEF_\n\n".to_string());
+    lines.push("BS_:\n\n".to_string());
+    lines.push("BU_: Vector__XXX\n\n".to_string());
+
+    let mut objects_by_node = BTreeMap::<u32, Vec<&ObjectSpec>>::new();
+    for obj in objects {
+        objects_by_node.entry(obj.node_id).or_default().push(obj);
+    }
+    for (node_id, node_objects) in &objects_by_node {
+        push_sdo_dbc_message(
+            &mut lines,
+            &mut comments,
+            &mut values,
+            0x600 + node_id,
+            &format!("SDO_RX_Node{node_id}"),
+            *node_id,
+            "client_to_server",
+            node_objects,
+        );
+        push_sdo_dbc_message(
+            &mut lines,
+            &mut comments,
+            &mut values,
+            0x580 + node_id,
+            &format!("SDO_TX_Node{node_id}"),
+            *node_id,
+            "server_to_client",
+            node_objects,
+        );
+    }
+
+    for pdo in pdos {
+        let node_id = pdo.node_id.unwrap_or(0);
+        let pdo_prefix = match pdo.direction.as_str() {
+            "tpdo" => "TPDO",
+            "rpdo" => "RPDO",
+            _ => "PDO",
+        };
+        let number = pdo.pdo_number.unwrap_or(0);
+        let frame_name = dbc_identifier(
+            &format!("{pdo_prefix}{number}_Node{node_id}_{}", pdo.name),
+            &format!("PDO_0x{:X}", pdo.cob_id),
+        );
+        lines.push(format!(
+            "BO_ {} {}: 8 Vector__XXX\n",
+            pdo.cob_id, frame_name
+        ));
+
+        let mut used_names = BTreeSet::new();
+        for (index, mapping) in pdo.mappings.iter().enumerate() {
+            if mapping.bit_length == 0 {
+                continue;
+            }
+            let fallback = format!("SIG_{}", mapping.param_id);
+            let mut signal_name = dbc_identifier(&mapping.name, &fallback);
+            if signal_name == "_" || signal_name.is_empty() {
+                signal_name = dbc_identifier(&fallback, &format!("SIG_{:X}_{index}", pdo.cob_id));
+            }
+            let base_name = signal_name.clone();
+            let mut suffix = 2;
+            while used_names.contains(&signal_name) {
+                signal_name = format!("{base_name}_{suffix}");
+                suffix += 1;
+            }
+            used_names.insert(signal_name.clone());
+
+            let byte_order = if mapping.show_type == 1 { "0" } else { "1" };
+            let max_value = if mapping.bit_length >= 64 {
+                u64::MAX
+            } else {
+                (1_u64 << mapping.bit_length) - 1
+            };
+            lines.push(format!(
+                " SG_ {} : {}|{}@{}+ (1,0) [0|{}] \"\" Vector__XXX\n",
+                signal_name, mapping.bit_offset, mapping.bit_length, byte_order, max_value
+            ));
+
+            let object_ref = match (mapping.index, mapping.subindex) {
+                (Some(index), Some(subindex)) => format!(" object=0x{index:04X}:{subindex}"),
+                _ => " object=unresolved".to_string(),
+            };
+            comments.push(format!(
+                "CM_ SG_ {} {} \"{}; param_id={};{}\";\n",
+                pdo.cob_id,
+                signal_name,
+                dbc_text(&mapping.name),
+                dbc_text(&mapping.param_id),
+                object_ref
+            ));
+            if mapping.bit_length == 1 {
+                values.push(format!(
+                    "VAL_ {} {} 0 \"Off\" 1 \"On\";\n",
+                    pdo.cob_id, signal_name
+                ));
+            }
+        }
+        lines.push("\n".to_string());
+        comments.push(format!(
+            "CM_ BO_ {} \"{}; direction={}; pdo_number={}; node_id={}\";\n",
+            pdo.cob_id,
+            dbc_text(&pdo.name),
+            pdo.direction,
+            number,
+            node_id
+        ));
+    }
+
+    lines.push("\n".to_string());
+    lines.extend(comments);
+    lines.push("\n".to_string());
+    lines.extend(values);
+    lines.concat()
 }
 
 fn unique_objects<'a>(objects: &'a [&'a ObjectSpec]) -> Vec<&'a ObjectSpec> {
@@ -652,19 +1002,21 @@ fn generate_pdo_csv(pdos: &[PdoSpec]) -> String {
 }
 
 fn vendor_json(objects: &[ObjectSpec], pdos: &[PdoSpec], warnings: &[String]) -> Value {
+    let bitfields = collect_bitfields(objects);
     json!({
         "version": 1,
         "scope": "setting-data-and-canopen-pdo",
         "description": "Vendor extension for legacy setting-data fields and CANopen-compatible PDO details not fully expressible in EDS.",
-        "bitfields": objects.iter().filter(|obj| !obj.handle_param.is_empty()).map(|obj| json!({
-            "nodeId": obj.node_id,
-            "index": format!("0x{:04X}", obj.index),
-            "subindex": obj.subindex,
-            "name": obj.name,
-            "menuPath": obj.menu_path,
-            "handle": obj.handle,
-            "handleParam": obj.handle_param,
-            "access": obj.access,
+        "bitfields": bitfields.iter().map(|field| json!({
+            "nodeId": field.node_id,
+            "index": format!("0x{:04X}", field.index),
+            "subindex": field.subindex,
+            "bitIndex": field.bit_index,
+            "name": field.name,
+            "menuPath": field.menu_path,
+            "handle": field.handle,
+            "offValue": field.off_value,
+            "onValue": field.on_value,
         })).collect::<Vec<_>>(),
         "unresolvedPdoMappings": pdos.iter().flat_map(|pdo| pdo.mappings.iter().filter(|m| m.index.is_none()).map(move |mapping| json!({
             "cobId": format!("0x{:X}", pdo.cob_id),
@@ -682,6 +1034,7 @@ pub fn convert_canopen_document(document: &Value) -> CanopenConversionReport {
     let mut warnings = Vec::new();
     let objects = collect_sdo_objects(document, &mut warnings);
     let pdos = collect_pdos(document, &objects, &mut warnings);
+    let bitfields = collect_bitfields(&objects);
     let model = model_json(&objects, &pdos, &warnings);
     let node_ids = objects
         .iter()
@@ -700,9 +1053,9 @@ pub fn convert_canopen_document(document: &Value) -> CanopenConversionReport {
                 .iter()
                 .filter(|pdo| pdo.node_id == Some(node_id))
                 .count() as u32,
-            bitfield_count: objects
+            bitfield_count: bitfields
                 .iter()
-                .filter(|obj| obj.node_id == node_id && !obj.handle_param.is_empty())
+                .filter(|field| field.node_id == node_id)
                 .count() as u32,
         })
         .collect::<Vec<_>>();
@@ -723,6 +1076,7 @@ pub fn export_canopen_package(
     let mut warnings = Vec::new();
     let objects = collect_sdo_objects(document, &mut warnings);
     let pdos = collect_pdos(document, &objects, &mut warnings);
+    let bitfields = collect_bitfields(&objects);
     report.warnings = warnings;
     report.model = model_json(&objects, &pdos, &report.warnings);
     let root = Path::new(output_dir).join("canopen_export");
@@ -765,6 +1119,45 @@ pub fn export_canopen_package(
     )
     .map_err(|e| format!("写入 vendor 扩展失败：{}", e))?;
     files.push(vendor_path.to_string_lossy().to_string());
+
+    let protocol_dbc = generate_canopen_protocol_dbc(&objects, &pdos);
+    let dbc_path = root.join("canopen_protocol.dbc");
+    fs::write(&dbc_path, &protocol_dbc)
+        .map_err(|e| format!("写入 CANopen 协议 DBC 失败：{}", e))?;
+    files.push(dbc_path.to_string_lossy().to_string());
+
+    let legacy_dbc_path = root.join("canopen_pdo.dbc");
+    fs::write(&legacy_dbc_path, &protocol_dbc)
+        .map_err(|e| format!("写入 CANopen DBC 兼容文件失败：{}", e))?;
+    files.push(legacy_dbc_path.to_string_lossy().to_string());
+
+    let sdo_object_json_path = root.join("sdo_object_map.json");
+    fs::write(
+        &sdo_object_json_path,
+        serde_json::to_string_pretty(&sdo_object_json(&objects))
+            .map_err(|e| format!("序列化 SDO 对象映射失败：{}", e))?,
+    )
+    .map_err(|e| format!("写入 SDO 对象映射 JSON 失败：{}", e))?;
+    files.push(sdo_object_json_path.to_string_lossy().to_string());
+
+    let sdo_object_csv_path = root.join("sdo_object_map.csv");
+    fs::write(&sdo_object_csv_path, generate_sdo_object_csv(&objects))
+        .map_err(|e| format!("写入 SDO 对象映射 CSV 失败：{}", e))?;
+    files.push(sdo_object_csv_path.to_string_lossy().to_string());
+
+    let bitfield_json_path = root.join("bitfield_map.json");
+    fs::write(
+        &bitfield_json_path,
+        serde_json::to_string_pretty(&bitfield_json(&bitfields))
+            .map_err(|e| format!("序列化位域映射失败：{}", e))?,
+    )
+    .map_err(|e| format!("写入位域映射 JSON 失败：{}", e))?;
+    files.push(bitfield_json_path.to_string_lossy().to_string());
+
+    let bitfield_csv_path = root.join("bitfield_map.csv");
+    fs::write(&bitfield_csv_path, generate_bitfield_csv(&bitfields))
+        .map_err(|e| format!("写入位域映射 CSV 失败：{}", e))?;
+    files.push(bitfield_csv_path.to_string_lossy().to_string());
 
     let pdo_path = root.join("pdo_test_frames.csv");
     fs::write(&pdo_path, generate_pdo_csv(&pdos))
