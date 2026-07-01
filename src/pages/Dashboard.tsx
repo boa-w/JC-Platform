@@ -192,8 +192,17 @@ type SettingEditorOption = {
   label: string;
 };
 
+type SettingEditorVirtualField =
+  | 'data_type_label'
+  | 'bit_start'
+  | 'bit_length'
+  | 'preprocess_label'
+  | 'scale_value'
+  | 'offset_value'
+  | 'decimals_value';
+
 type SettingEditorField = {
-  field: SdoNodeField;
+  field: SdoNodeField | SettingEditorVirtualField;
   label: string;
   kind: SettingEditorInputKind;
   defaultValue: string | number;
@@ -258,8 +267,15 @@ const sdoBooleanOptions: SettingEditorOption[] = [
   { value: 1, label: '是' },
 ];
 
-const sdoPreHandleOptions: SettingEditorOption[] = [
-  { value: 0, label: '原始数据' },
+const sdoDataTypeOptions: SettingEditorOption[] = [
+  { value: 'u8:0', label: 'u8 (handle=0)' },
+  { value: 'u16:2', label: 'u16 (handle=2)' },
+  { value: 'u16:3', label: 'u16 (handle=3)' },
+  { value: 'u32:4', label: 'u32 (handle=4)' },
+  { value: 'u32:7', label: 'u32 (handle=7)' },
+  { value: 'string:6', label: 'string (handle=6)' },
+  { value: 'bit:11', label: 'bit (handle=11)' },
+  { value: 'bit:12', label: 'bit (handle=12)' },
 ];
 
 const settingEditorSections: SettingEditorSection[] = [
@@ -287,23 +303,21 @@ const settingEditorSections: SettingEditorSection[] = [
     fields: [
       { field: 'control_use_default', label: '使用默认值', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoBooleanOptions },
       { field: 'control_use_min_max', label: '使用范围', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoBooleanOptions },
-      { field: 'data_default', label: '默认值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'data_min', label: '最小值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
       { field: 'data_max', label: '最大值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'data_min', label: '最小值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'data_default', label: '默认值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
     ],
   },
   {
-    title: '数据处理',
+    title: '设置条目',
     fields: [
-      { field: 'handle', label: '句柄', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
-      { field: 'handle_name', label: '句柄名', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'handle_param', label: '句柄参数', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'pre_handle', label: '预处理', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoPreHandleOptions },
-      { field: 'pre_handle_name', label: '预处理名', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'pre_handle_scale', label: '缩放', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'pre_handle_offset', label: '偏移', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'pre_handle_decimal', label: '小数位', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
-      { field: 'pre_handle_decimal_name', label: '小数位名', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'data_type_label', label: '数据类型', kind: 'select', defaultValue: 'u8:0', visibleFor: 'parameter', options: sdoDataTypeOptions },
+      { field: 'bit_start', label: 'bit开始位置', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'bit_length', label: 'bit长度', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'preprocess_label', label: '数据预处理', kind: 'text', defaultValue: '原始数据', visibleFor: 'parameter' },
+      { field: 'scale_value', label: '缩放值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'offset_value', label: '偏移值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      { field: 'decimals_value', label: '保留小数', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
     ],
   },
 ];
@@ -2168,21 +2182,88 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     return typeof handle === 'number' ? `handle=${handle}` : '';
   }
 
+  function settingDataTypeBaseLabel(handle?: number) {
+    switch (handle) {
+      case 0:
+        return 'u8';
+      case 2:
+      case 3:
+        return 'u16';
+      case 4:
+      case 7:
+        return 'u32';
+      case 6:
+        return 'string';
+      case 11:
+      case 12:
+        return 'bit';
+      default:
+        return '';
+    }
+  }
+
+  function settingDataTypeSelectValue(node: SdoNodeDocument) {
+    if (typeof node.handle === 'number') {
+      const base = settingDataTypeBaseLabel(node.handle);
+      if (base) return `${base}:${node.handle}`;
+    }
+    const explicit = [node.handle_name, typeof node.data_type === 'string' ? node.data_type : undefined, typeof node.dataType === 'string' ? node.dataType : undefined]
+      .find((item) => item?.trim())
+      ?.trim();
+    return explicit || 'u8:0';
+  }
+
+  function parseSettingDataTypeSelection(value: string | number) {
+    const text = String(value);
+    const [label, handleText] = text.split(':');
+    const handle = Number.parseInt(handleText ?? '', 10);
+    return {
+      label: label.trim() || text.trim(),
+      handle: Number.isFinite(handle) ? handle : undefined,
+    };
+  }
+
   function formatHex(value?: number, width = 0) {
     if (typeof value !== 'number') return '';
     return `0x${Math.max(0, value).toString(16).toUpperCase().padStart(width, '0')}`;
   }
 
   function parseHandleParam(value?: string) {
-    const parts = (value ?? '').split('->').map((item) => Number.parseInt(item, 10));
-    if (parts.length < 2 || parts.some((item) => Number.isNaN(item))) {
+    const parsed = parseHandleParamParts(value);
+    if (!parsed) {
       return { bitStart: '', bitLength: '' };
+    }
+    return {
+      bitStart: `bit${parsed.start}`,
+      bitLength: `${parsed.length}个bits`,
+    };
+  }
+
+  function parseHandleParamParts(value?: string) {
+    const parts = (value ?? '').split('->').map((item) => Number.parseInt(item, 10));
+    if (parts.length < 2 || parts.slice(0, 2).some((item) => Number.isNaN(item))) {
+      return null;
     }
     const [start, end] = parts;
     return {
-      bitStart: `bit${start}`,
-      bitLength: `${Math.max(1, end - start + 1)}个bits`,
+      start,
+      length: Math.max(1, end - start + 1),
+      marker: Number.isNaN(parts[2]) ? 1 : parts[2],
     };
+  }
+
+  function parseSettingBitNumber(value: string | number, fallback: number) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+    const parsed = Number.parseInt(value.toLowerCase().replace('bit', '').replace('个bits', '').trim(), 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function formatHandleParamFromBitRange(current: string | undefined, nextStart: string | number | null, nextLength: string | number | null) {
+    const parsed = parseHandleParamParts(current) ?? { start: 0, length: 1, marker: 1 };
+    const start = Math.max(0, parseSettingBitNumber(nextStart ?? parsed.start, parsed.start));
+    const length = Math.max(1, parseSettingBitNumber(nextLength ?? parsed.length, parsed.length));
+    const end = start + length - 1;
+    return `${start}->${end}->${parsed.marker}`;
   }
 
   function countSdoParameters(node: SdoNodeDocument): number {
@@ -2437,6 +2518,66 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
     updateSdoDocument(updateSdoNodeAtPath(document, path, (node) => ({ ...node, [field]: value })));
   }
 
+  function settingEditorFieldValue(node: SdoNodeDocument, field: SettingEditorField) {
+    const bits = parseHandleParam(node.handle_param);
+    switch (field.field) {
+      case 'data_type_label':
+        return settingDataTypeSelectValue(node);
+      case 'bit_start':
+        return bits.bitStart || field.defaultValue;
+      case 'bit_length':
+        return bits.bitLength || field.defaultValue;
+      case 'preprocess_label':
+        return node.pre_handle_name ?? field.defaultValue;
+      case 'scale_value':
+        return node.pre_handle_scale ?? field.defaultValue;
+      case 'offset_value':
+        return node.pre_handle_offset ?? field.defaultValue;
+      case 'decimals_value':
+        return node.pre_handle_decimal_name ?? String(node.pre_handle_decimal ?? field.defaultValue);
+      default: {
+        const rawValue = node[field.field];
+        return (rawValue ?? field.defaultValue) as string | number;
+      }
+    }
+  }
+
+  function updateSettingEditorField(path: number[], field: SettingEditorField, value: string | number) {
+    const document = sdoDocument();
+    if (!document) return;
+
+    const nextNode = (current: SdoNodeDocument): SdoNodeDocument => {
+      switch (field.field) {
+        case 'data_type_label': {
+          const selection = parseSettingDataTypeSelection(value);
+          return {
+            ...current,
+            handle_name: selection.label,
+            ...(selection.handle === undefined ? {} : { handle: selection.handle }),
+          };
+        }
+        case 'bit_start':
+          return { ...current, handle_param: formatHandleParamFromBitRange(current.handle_param, value, null) };
+        case 'bit_length':
+          return { ...current, handle_param: formatHandleParamFromBitRange(current.handle_param, null, value) };
+        case 'preprocess_label':
+          return { ...current, pre_handle_name: String(value) };
+        case 'scale_value':
+          return { ...current, pre_handle_scale: String(value) };
+        case 'offset_value':
+          return { ...current, pre_handle_offset: String(value) };
+        case 'decimals_value': {
+          const decimals = parseSettingBitNumber(value, current.pre_handle_decimal ?? 0);
+          return { ...current, pre_handle_decimal_name: String(value), pre_handle_decimal: decimals };
+        }
+        default:
+          return { ...current, [field.field]: value };
+      }
+    };
+
+    updateSdoDocument(updateSdoNodeAtPath(document, path, (current) => nextNode(current)));
+  }
+
   function settingColumnWidth(column: SettingParameterColumn) {
     return settingColumnWidths[column.key] ?? column.defaultWidth;
   }
@@ -2522,14 +2663,13 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
   }
 
   function renderSettingEditorField(field: SettingEditorField, node: SdoNodeDocument, path: number[]) {
-    const rawValue = node[field.field];
-    const value = (rawValue ?? field.defaultValue) as string | number;
+    const value = settingEditorFieldValue(node, field);
     if (field.kind === 'select') {
       const options = optionsWithCurrentValue(field.options ?? [], value);
       return (
         <label key={field.field}>
           {field.label}
-          <select value={String(value)} onChange={(event) => updateSdoNode(path, field.field, typeof field.defaultValue === 'number' ? Number(event.target.value) : event.target.value)}>
+          <select value={String(value)} onChange={(event) => updateSettingEditorField(path, field, typeof field.defaultValue === 'number' ? Number(event.target.value) : event.target.value)}>
             {options.map((option) => (
               <option key={`${field.field}-${option.value}`} value={String(option.value)}>{option.label}</option>
             ))}
@@ -2541,14 +2681,14 @@ export function Dashboard({ activeModule, health, project, loadedProject, theme,
       return (
         <label key={field.field}>
           {field.label}
-          <input type="number" value={value} onChange={(event) => updateSdoNode(path, field.field, Number(event.target.value))} />
+          <input type="number" value={value} onChange={(event) => updateSettingEditorField(path, field, Number(event.target.value))} />
         </label>
       );
     }
     return (
       <label key={field.field}>
         {field.label}
-        <input value={String(value)} onChange={(event) => updateSdoNode(path, field.field, event.target.value)} />
+        <input value={String(value)} onChange={(event) => updateSettingEditorField(path, field, event.target.value)} />
       </label>
     );
   }

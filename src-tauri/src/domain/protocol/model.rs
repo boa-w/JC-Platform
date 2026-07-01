@@ -103,4 +103,3 @@ pub struct ProtocolCompatibilityReport {
     pub errors: Vec<String>,
     pub warnings: Vec<String>,
 }
-

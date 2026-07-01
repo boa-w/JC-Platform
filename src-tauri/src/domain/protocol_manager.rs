@@ -139,10 +139,22 @@ mod tests {
         let report = flatten_unified_protocol_to_legacy(document.clone());
 
         assert!(report.valid, "{:?}", report.errors);
-        assert_eq!(report.updated_sections, vec!["pdo_global_param", "pdo_recv", "pdo_send"]);
+        assert_eq!(
+            report.updated_sections,
+            vec!["pdo_global_param", "pdo_recv", "pdo_send"]
+        );
         assert_eq!(report.document["sdo_info"], document["sdo_info"]);
-        assert_eq!(report.document["pdo_simple_send_recv"], document["pdo_simple_send_recv"]);
-        assert_eq!(report.document["private_protocol"], document["private_protocol"]);
-        assert_eq!(report.document["battery_monitor_info"], document["battery_monitor_info"]);
+        assert_eq!(
+            report.document["pdo_simple_send_recv"],
+            document["pdo_simple_send_recv"]
+        );
+        assert_eq!(
+            report.document["private_protocol"],
+            document["private_protocol"]
+        );
+        assert_eq!(
+            report.document["battery_monitor_info"],
+            document["battery_monitor_info"]
+        );
     }
 }

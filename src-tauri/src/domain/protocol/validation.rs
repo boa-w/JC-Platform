@@ -114,4 +114,3 @@ fn mapping_target_family(target: &MappingTarget) -> &'static str {
         MappingTarget::PrivateFrame { .. } => "private_frame",
     }
 }
-

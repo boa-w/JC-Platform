@@ -1,6 +1,9 @@
 //! 协议映射解析与投影。
 
-use super::model::{CanOpenSdoObject, CanOpenPdoFrame, CanOpenPdoMapping, CanOpenTransport, MappingTarget, PdoMappingDirection, ProtocolMapping};
+use super::model::{
+    CanOpenPdoFrame, CanOpenPdoMapping, CanOpenSdoObject, CanOpenTransport, MappingTarget,
+    PdoMappingDirection, ProtocolMapping,
+};
 use crate::domain::private_protocol::PrivateProtocolDocument;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -139,7 +142,6 @@ fn legacy_show_type(
         .unwrap_or(0)
 }
 
-
 pub(crate) fn derive_mappings(
     canopen: &CanOpenTransport,
     private_protocol: &PrivateProtocolDocument,
@@ -182,4 +184,3 @@ pub(crate) fn derive_mappings(
     }
     mappings
 }
-

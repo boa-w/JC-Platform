@@ -2129,7 +2129,14 @@ mod tests {
         assert_eq!(report.export_root, "out/jc_export");
         assert_eq!(report.manifest_path, "out/jc_export/ConfigUpdate.json");
         assert_eq!(report.binary_path, "out/jc_export/bin/pdo_sdo_data.bin");
-        assert_eq!(report.directories, vec!["out/jc_export/img", "out/jc_export/img/anim", "out/jc_export/bin"]);
+        assert_eq!(
+            report.directories,
+            vec![
+                "out/jc_export/img",
+                "out/jc_export/img/anim",
+                "out/jc_export/bin"
+            ]
+        );
         assert_eq!(report.screen_src.pages[0].key, "page_01");
         assert_eq!(report.screen_src.pages[1].key, "page_02");
         assert_eq!(report.data_description.src, "bin/pdo_sdo_data");

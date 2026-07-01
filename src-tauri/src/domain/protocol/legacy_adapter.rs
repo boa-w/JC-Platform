@@ -4,10 +4,15 @@
 
 use super::canopen_projection::derive_canopen_transport;
 use super::mapping::{canopen_transport_from_mappings, derive_mappings, parse_explicit_mappings};
-use super::model::{CanOpenPdoFrame, CanOpenTransport, ProtocolCompatibilityReport, UnifiedProtocolModel};
+use super::model::{
+    CanOpenPdoFrame, CanOpenTransport, ProtocolCompatibilityReport, UnifiedProtocolModel,
+};
 use super::validation::validate_protocol_model;
 use crate::domain::private_protocol::derive_private_protocol_from_legacy;
-use crate::domain::signal::{derive_signal_dictionary_from_legacy, SignalDataType, SignalDefinition, SignalDictionary, SignalId};
+use crate::domain::signal::{
+    derive_signal_dictionary_from_legacy, SignalDataType, SignalDefinition, SignalDictionary,
+    SignalId,
+};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 

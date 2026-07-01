@@ -2,7 +2,10 @@
 //!
 //! 该桥接只服务旧项目兼容。CANOpen 主线后续可以选择不加载该扩展。
 
-use crate::domain::private_protocol::{ByteOrder, ChecksumType, PrivateFrame, PrivateFrameSource, PrivateFrameType, PrivatePayloadSignal};
+use crate::domain::private_protocol::{
+    ByteOrder, ChecksumType, PrivateFrame, PrivateFrameSource, PrivateFrameType,
+    PrivatePayloadSignal,
+};
 use serde_json::Value;
 
 pub(crate) fn derive_battery_monitor_private_frames(document: &Value) -> Vec<PrivateFrame> {

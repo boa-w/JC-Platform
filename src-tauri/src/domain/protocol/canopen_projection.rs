@@ -1,6 +1,8 @@
 //! CANOpen legacy 段到统一传输模型的投影。
 
-use super::model::{CanOpenPdoFrame, CanOpenPdoMapping, CanOpenSdoObject, CanOpenTransport, PdoMappingDirection};
+use super::model::{
+    CanOpenPdoFrame, CanOpenPdoMapping, CanOpenSdoObject, CanOpenTransport, PdoMappingDirection,
+};
 use crate::domain::signal::normalize_signal_id;
 use serde_json::Value;
 
@@ -134,7 +136,6 @@ fn collect_simple_pdo(document: &Value, transport: &mut CanOpenTransport) {
         }
     }
 }
-
 
 fn object_string(value: &Value, key: &str) -> String {
     value
