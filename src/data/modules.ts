@@ -62,6 +62,11 @@ export const featureModules: FeatureModule[] = [
     lifecycleReason: '依赖锂电协议扩展，仅保留兼容用途，后续将与核心 CANOpen 配置解耦。',
   },
   {
+    key: 'fault-code',
+    title: '故障代码',
+    description: '负责故障来源帧、故障码、等级和多语言文案绑定配置。',
+  },
+  {
     key: 'language',
     title: '多国语言',
     description: '负责自动收集翻译项、编辑多语言表、CSV/XLS 导入导出和导出语言资源。',

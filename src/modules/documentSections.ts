@@ -17,6 +17,7 @@ export type DocumentSectionKey =
   | 'language_info'
   | 'battery_protocol'
   | 'battery_monitor_info'
+  | 'fault_code_info'
   | 'signal_dictionary'
   | 'private_protocol'
   | 'protocol_mapping';
@@ -34,6 +35,7 @@ export const modifiedSectionLabels: Record<DocumentSectionKey, string> = {
   language_info: '多国语言',
   battery_protocol: '锂电协议',
   battery_monitor_info: '锂电监控显示',
+  fault_code_info: '故障代码',
   signal_dictionary: '业务信号字典',
   private_protocol: '私有协议',
   protocol_mapping: '协议映射',
@@ -47,6 +49,7 @@ export const refactorOnlySections = [
   'protocol_mapping',
   'battery_protocol',
   'battery_monitor_info',
+  'fault_code_info',
 ] as const;
 
 export type RefactorOnlySection = (typeof refactorOnlySections)[number];
@@ -68,6 +71,7 @@ const sectionByModule: Partial<Record<NavigationKey, DocumentSectionKey>> = {
   language: 'language_info',
   'battery-protocol': 'battery_protocol',
   'battery-monitor': 'battery_monitor_info',
+  'fault-code': 'fault_code_info',
   'signal-dictionary': 'signal_dictionary',
   'private-protocol': 'private_protocol',
   'protocol-mapping': 'protocol_mapping',

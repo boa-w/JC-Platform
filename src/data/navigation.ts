@@ -20,7 +20,7 @@ export const navGroups: NavGroup[] = [
       'battery-protocol',
     ],
   },
-  { label: '配置', icon: '⚙️', keys: ['ui', 'battery-monitor'] },
+  { label: '配置', icon: '⚙️', keys: ['ui', 'battery-monitor', 'fault-code'] },
   { label: '多国语言', icon: '🌐', keys: ['language'] },
   { label: '输出', icon: '📦', keys: ['export', 'can-test-data'] },
   { label: '系统', icon: '🖥️', keys: ['settings'] },

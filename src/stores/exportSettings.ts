@@ -12,6 +12,10 @@ export const defaultExportBatteryOptions: ExportBatteryOptions = {
     config: true,
     bin: true,
   },
+  fault_code_info: {
+    config: true,
+    bin: true,
+  },
 };
 
 type ExportBatterySection = keyof ExportBatteryOptions;
@@ -29,6 +33,7 @@ function normalizeExportBatteryOptions(value: unknown): ExportBatteryOptions {
   const root = isRecord(value) ? value : {};
   const protocol = isRecord(root.battery_protocol) ? root.battery_protocol : {};
   const monitor = isRecord(root.battery_monitor_info) ? root.battery_monitor_info : {};
+  const faultCode = isRecord(root.fault_code_info) ? root.fault_code_info : {};
 
   return {
     battery_protocol: {
@@ -41,6 +46,10 @@ function normalizeExportBatteryOptions(value: unknown): ExportBatteryOptions {
         defaultExportBatteryOptions.battery_monitor_info.config,
       ),
       bin: boolOrDefault(monitor.bin, defaultExportBatteryOptions.battery_monitor_info.bin),
+    },
+    fault_code_info: {
+      config: boolOrDefault(faultCode.config, defaultExportBatteryOptions.fault_code_info.config),
+      bin: boolOrDefault(faultCode.bin, defaultExportBatteryOptions.fault_code_info.bin),
     },
   };
 }

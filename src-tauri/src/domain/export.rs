@@ -10,7 +10,7 @@
 //! ```text
 //! [全局参数表] [全局参数索引表] [条件表达式表]
 //! [PDO 接收帧描述+数据] [PDO 发送帧描述+数据]
-//! [SDO 菜单树] [语言包 × N] [CRC16]
+//! [电池监控段] [故障码段] [SDO 菜单树] [语言包 × N] [CRC16]
 //! ```
 
 use crate::domain::pdo::{
@@ -43,6 +43,8 @@ pub struct ExportTargetOptions {
 pub struct ExportBatteryOptions {
     pub battery_protocol: ExportTargetOptions,
     pub battery_monitor_info: ExportTargetOptions,
+    #[serde(default = "default_enabled_export_target")]
+    pub fault_code_info: ExportTargetOptions,
 }
 
 impl Default for ExportBatteryOptions {
@@ -56,7 +58,15 @@ impl Default for ExportBatteryOptions {
                 config: true,
                 bin: true,
             },
+            fault_code_info: default_enabled_export_target(),
         }
+    }
+}
+
+fn default_enabled_export_target() -> ExportTargetOptions {
+    ExportTargetOptions {
+        config: true,
+        bin: true,
     }
 }
 
@@ -207,6 +217,10 @@ pub struct DataDescriptionPlan {
     pub battery_monitor_item_total: usize,
     pub battery_monitor_frame_total: usize,
     pub battery_monitor_version: usize,
+    pub fault_code_base_addr: isize,
+    pub fault_code_version: usize,
+    pub fault_source_total: usize,
+    pub fault_code_total: usize,
     pub sdo_base_addr: isize,
     pub language_addr: Vec<isize>,
     pub language_code: Vec<String>,
@@ -235,6 +249,10 @@ impl DataDescriptionPlan {
             battery_monitor_item_total: 0,
             battery_monitor_frame_total: 0,
             battery_monitor_version: 0,
+            fault_code_base_addr: -1,
+            fault_code_version: 0,
+            fault_source_total: 0,
+            fault_code_total: 0,
             sdo_base_addr: -1,
             language_addr: Vec::new(),
             language_code,
@@ -246,6 +264,14 @@ impl DataDescriptionPlan {
         self.battery_monitor_item_total = 0;
         self.battery_monitor_frame_total = 0;
         self.battery_monitor_version = 0;
+        self
+    }
+
+    fn without_fault_code(mut self) -> Self {
+        self.fault_code_base_addr = -1;
+        self.fault_code_version = 0;
+        self.fault_source_total = 0;
+        self.fault_code_total = 0;
         self
     }
 }
@@ -586,12 +612,14 @@ fn manifest_data_description(
     data_description: &DataDescriptionPlan,
     options: &ExportBatteryOptions,
 ) -> DataDescriptionPlan {
-    let description = data_description.clone();
-    if options.battery_monitor_info.config && options.battery_monitor_info.bin {
-        description
-    } else {
-        description.without_battery_monitor()
+    let mut description = data_description.clone();
+    if !(options.battery_monitor_info.config && options.battery_monitor_info.bin) {
+        description = description.without_battery_monitor();
     }
+    if !(options.fault_code_info.config && options.fault_code_info.bin) {
+        description = description.without_fault_code();
+    }
+    description
 }
 
 fn build_config_update_manifest(
@@ -1098,6 +1126,19 @@ fn build_binary_from_pdo(
         bytes.extend(battery_bytes);
     }
 
+    let fault_code_bytes = if options.fault_code_info.bin {
+        build_fault_code_bytes(source_document, bytes.len(), &language_entries, &mut warnings)
+    } else {
+        None
+    };
+    if let Some((fault_code_bytes, source_total, code_total, version)) = fault_code_bytes {
+        description.fault_code_base_addr = bytes.len() as isize;
+        description.fault_source_total = source_total;
+        description.fault_code_total = code_total;
+        description.fault_code_version = version;
+        bytes.extend(fault_code_bytes);
+    }
+
     description.sdo_base_addr = bytes.len() as isize;
     let sdo_bytes = build_sdo_bytes(
         source_document.get("sdo_info"),
@@ -1153,6 +1194,9 @@ fn collect_language_entries(document: &Value, options: &ExportBatteryOptions) ->
     if options.battery_monitor_info.bin {
         collect_battery_monitor_language_entries(document, &mut entries);
     }
+    if options.fault_code_info.bin {
+        collect_fault_code_language_entries(document, &mut entries);
+    }
     entries.push(String::new());
     entries
 }
@@ -1184,6 +1228,31 @@ fn collect_battery_monitor_language_entries(document: &Value, entries: &mut Vec<
         }
         if let Some(validity) = item.get("validity") {
             push_unique(entries, &object_string(validity, "empty_text"));
+        }
+    }
+}
+
+fn collect_fault_code_language_entries(document: &Value, entries: &mut Vec<String>) {
+    let Some(root) = document.get("fault_code_info") else {
+        return;
+    };
+    if !root
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+    {
+        return;
+    }
+    let Some(codes) = root.get("codes").and_then(Value::as_array) else {
+        return;
+    };
+    for code in codes {
+        if !code.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
+            continue;
+        }
+        let key = fault_code_language_key(code);
+        if !key.is_empty() {
+            push_unique(entries, &key);
         }
     }
 }
@@ -1344,6 +1413,165 @@ fn build_battery_monitor_bytes(
     }
 
     Some((bytes, items.len(), frames.len(), version))
+}
+
+fn build_fault_code_bytes(
+    document: &Value,
+    base_addr: usize,
+    language_entries: &[String],
+    warnings: &mut Vec<String>,
+) -> Option<(Vec<u8>, usize, usize, usize)> {
+    let root = document.get("fault_code_info")?;
+    if !root
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+    {
+        return None;
+    }
+
+    let sources = root
+        .get("sources")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut codes = root
+        .get("codes")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    codes.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
+
+    if sources.is_empty() || codes.is_empty() {
+        warnings.push("故障码配置已启用但来源规则或故障码为空，跳过 fault_code 段".to_string());
+        return None;
+    }
+
+    let version = object_i64(root, "version", 1).max(0) as usize;
+    let header_len = 20usize;
+    let source_record_len = 16usize;
+    let code_record_len = 8usize;
+    let source_table_addr = base_addr + header_len;
+    let code_table_addr = source_table_addr + sources.len() * source_record_len;
+    let invalid_table_addr = code_table_addr + codes.len() * code_record_len;
+    let mut bytes = Vec::new();
+    let mut source_bytes = Vec::new();
+    let mut code_bytes = Vec::new();
+    let mut invalid_bytes = Vec::new();
+
+    write_u16(&mut bytes, version as u16);
+    write_u16(&mut bytes, 0);
+    write_u16(&mut bytes, sources.len() as u16);
+    write_u16(&mut bytes, codes.len() as u16);
+    write_u32(&mut bytes, source_table_addr as u32);
+    write_u32(&mut bytes, code_table_addr as u32);
+    write_u32(&mut bytes, 0);
+
+    for source in &sources {
+        let invalid_codes = source
+            .get("invalid_codes")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_i64)
+                    .map(|item| item.clamp(0, u8::MAX as i64) as u8)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let invalid_addr = if invalid_codes.is_empty() {
+            0xffff_ffff
+        } else {
+            let addr = invalid_table_addr + invalid_bytes.len();
+            invalid_bytes.extend(invalid_codes.iter().copied());
+            addr as u32
+        };
+
+        write_u32(
+            &mut source_bytes,
+            object_i64(source, "can_id", 0).max(0) as u32,
+        );
+        write_u32(&mut source_bytes, invalid_addr);
+        write_u8(
+            &mut source_bytes,
+            object_i64(source, "frame_type", object_i64(source, "type", 0)).max(0) as u8,
+        );
+        write_u8(
+            &mut source_bytes,
+            object_i64(source, "source_id", 0).clamp(0, u8::MAX as i64) as u8,
+        );
+        write_u8(&mut source_bytes, fault_type_char(source, 0));
+        write_u8(
+            &mut source_bytes,
+            object_i64(source, "code_byte", object_i64(source, "code_offset", 2))
+                .clamp(0, 7) as u8,
+        );
+        write_u8(
+            &mut source_bytes,
+            object_i64(source, "clear_code", 0).clamp(0, u8::MAX as i64) as u8,
+        );
+        write_u8(
+            &mut source_bytes,
+            invalid_codes.len().min(u8::MAX as usize) as u8,
+        );
+        write_u16(&mut source_bytes, 0);
+    }
+
+    for code in &codes {
+        let language_key = fault_code_language_key(code);
+        write_u8(&mut code_bytes, fault_type_char(code, object_i64(code, "source_id", 0) as u8));
+        write_u8(
+            &mut code_bytes,
+            object_i64(code, "code", 0).clamp(0, u8::MAX as i64) as u8,
+        );
+        write_u16(
+            &mut code_bytes,
+            language_text_index(&language_key, language_entries),
+        );
+        write_u8(&mut code_bytes, fault_severity(&object_string(code, "severity")));
+        write_u8(&mut code_bytes, 0);
+        write_u16(&mut code_bytes, 0);
+    }
+
+    bytes.extend(source_bytes);
+    bytes.extend(code_bytes);
+    bytes.extend(invalid_bytes);
+    Some((bytes, sources.len(), codes.len(), version))
+}
+
+fn fault_code_language_key(value: &Value) -> String {
+    for key in ["message_key", "name_key", "name"] {
+        let item = object_string(value, key);
+        if !item.is_empty() {
+            return item;
+        }
+    }
+    String::new()
+}
+
+fn fault_type_char(value: &Value, source_id: u8) -> u8 {
+    let text = object_string(value, "type_char");
+    if let Some(byte) = text.as_bytes().first().copied() {
+        return byte;
+    }
+    match source_id {
+        1 => b'T',
+        2 => b'P',
+        3 => b'S',
+        4 => b'Z',
+        5 => b'L',
+        6 => b'V',
+        _ => 0,
+    }
+}
+
+fn fault_severity(value: &str) -> u8 {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "info" => 1,
+        "warning" | "warn" => 2,
+        "critical" | "fatal" => 4,
+        _ => 3,
+    }
 }
 
 fn battery_formatter_kind(kind: &str) -> u8 {
@@ -2102,6 +2330,77 @@ mod tests {
         assert!(!options.battery_protocol.bin);
         assert!(options.battery_monitor_info.config);
         assert!(options.battery_monitor_info.bin);
+        assert!(options.fault_code_info.config);
+        assert!(options.fault_code_info.bin);
+    }
+
+    #[test]
+    fn build_project_binary_packs_fault_code_section() {
+        let document = json!({
+            "language_info": {
+                "list_code_language": ["zh"],
+                "list_inner": [],
+                "list_translate": {
+                    "fault.traction.001": { "zh": "牵引故障1" }
+                }
+            },
+            "pdo_global_param": [
+                { "param_id": "A", "name": "A", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
+            ],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
+            "battery_monitor_info": disabled_battery_monitor(),
+            "fault_code_info": {
+                "enabled": true,
+                "version": 3,
+                "sources": [{
+                    "source_id": 1,
+                    "type_char": "T",
+                    "can_id": 648,
+                    "frame_type": 0,
+                    "code_byte": 2,
+                    "clear_code": 0,
+                    "invalid_codes": [1, 5]
+                }],
+                "codes": [{
+                    "type_char": "T",
+                    "code": 1,
+                    "message_key": "fault.traction.001",
+                    "severity": "warning"
+                }]
+            }
+        });
+
+        let report = build_project_binary(&document);
+
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(report.data_description.fault_code_version, 3);
+        assert_eq!(report.data_description.fault_source_total, 1);
+        assert_eq!(report.data_description.fault_code_total, 1);
+        assert!(report.data_description.fault_code_base_addr >= 0);
+
+        let base = report.data_description.fault_code_base_addr as usize;
+        let source_table_addr = u32::from_le_bytes(report.bytes[base + 8..base + 12].try_into().unwrap()) as usize;
+        let code_table_addr = u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
+
+        assert_eq!(u16::from_le_bytes(report.bytes[base..base + 2].try_into().unwrap()), 3);
+        assert_eq!(source_table_addr, base + 20);
+        assert_eq!(code_table_addr, base + 36);
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[source_table_addr..source_table_addr + 4].try_into().unwrap()),
+            648
+        );
+        assert_eq!(report.bytes[source_table_addr + 10], b'T');
+        assert_eq!(report.bytes[source_table_addr + 11], 2);
+        assert_eq!(report.bytes[code_table_addr], b'T');
+        assert_eq!(report.bytes[code_table_addr + 1], 1);
+        assert_eq!(
+            u16::from_le_bytes(report.bytes[code_table_addr + 2..code_table_addr + 4].try_into().unwrap()),
+            1
+        );
+        assert_eq!(report.bytes[code_table_addr + 4], 2);
     }
 
     #[test]

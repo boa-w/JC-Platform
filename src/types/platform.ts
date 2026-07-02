@@ -9,6 +9,7 @@ export type NavigationKey =
   | 'ui'
   | 'battery-protocol'
   | 'battery-monitor'
+  | 'fault-code'
   | 'language'
   | 'export'
   | 'settings'
@@ -87,6 +88,7 @@ export interface ProjectDocument {
   language_info: LanguageDocument;
   battery_protocol: BatteryProtocol;
   battery_monitor_info: BatteryMonitorInfo;
+  fault_code_info: FaultCodeInfo;
 }
 
 export interface UnifiedProtocolModel {
@@ -242,6 +244,39 @@ export interface BatteryMonitorInfo {
   enabled: boolean;
   page_size: number;
   items: BatteryMonitorItem[];
+  [key: string]: unknown;
+}
+
+export interface FaultCodeInfo {
+  enabled: boolean;
+  version?: number;
+  sources?: FaultCodeSource[];
+  codes?: FaultCodeItem[];
+  [key: string]: unknown;
+}
+
+export interface FaultCodeSource {
+  source_id: number;
+  type_char: string;
+  can_id: number;
+  frame_type?: number;
+  type?: number;
+  code_byte?: number;
+  code_offset?: number;
+  clear_code?: number;
+  invalid_codes?: number[];
+  [key: string]: unknown;
+}
+
+export interface FaultCodeItem {
+  type_char?: string;
+  source_id?: number;
+  code: number;
+  message_key?: string;
+  name_key?: string;
+  name?: string;
+  severity?: string;
+  enabled?: boolean;
   [key: string]: unknown;
 }
 
@@ -470,6 +505,7 @@ export interface ExportTargetOptions {
 export interface ExportBatteryOptions {
   battery_protocol: ExportTargetOptions;
   battery_monitor_info: ExportTargetOptions;
+  fault_code_info: ExportTargetOptions;
 }
 
 export interface ExportPlanRequest {
@@ -588,6 +624,10 @@ export interface DataDescriptionPlan {
   battery_monitor_item_total: number;
   battery_monitor_frame_total: number;
   battery_monitor_version: number;
+  fault_code_base_addr: number;
+  fault_code_version: number;
+  fault_source_total: number;
+  fault_code_total: number;
   sdo_base_addr: number;
   language_addr: number[];
   language_code: string[];

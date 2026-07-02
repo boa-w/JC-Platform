@@ -205,7 +205,8 @@ pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_
         "private_protocol": PrivateProtocolDocument::default(),
         "protocol_mapping": [],
         "language_info": default_language_info(),
-        "battery_monitor_info": default_battery_monitor_info()
+        "battery_monitor_info": default_battery_monitor_info(),
+        "fault_code_info": default_fault_code_info()
     })
 }
 
@@ -803,6 +804,7 @@ fn required_project_sections() -> &'static [&'static str] {
         "protocol_mapping",
         "language_info",
         "battery_monitor_info",
+        "fault_code_info",
     ]
 }
 
@@ -833,6 +835,7 @@ fn default_section_value(section: &str) -> Value {
         "protocol_mapping" => Value::Array(Vec::new()),
         "language_info" => default_language_info(),
         "battery_monitor_info" => default_battery_monitor_info(),
+        "fault_code_info" => default_fault_code_info(),
         _ => Value::Array(Vec::new()),
     }
 }
@@ -909,6 +912,34 @@ pub fn default_battery_monitor_info() -> Value {
     })
 }
 
+pub fn default_fault_code_info() -> Value {
+    json!({
+        "enabled": true,
+        "version": 1,
+        "sources": [
+            {
+                "source_id": 1,
+                "type_char": "T",
+                "can_id": 648,
+                "frame_type": 0,
+                "code_byte": 2,
+                "clear_code": 0,
+                "invalid_codes": [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222]
+            },
+            {
+                "source_id": 2,
+                "type_char": "P",
+                "can_id": 660,
+                "frame_type": 0,
+                "code_byte": 2,
+                "clear_code": 0,
+                "invalid_codes": [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222]
+            }
+        ],
+        "codes": []
+    })
+}
+
 /// 项目解析报告 —— 包含强类型解析结果和所有错误信息。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectParseReport {
@@ -952,6 +983,8 @@ pub struct ProjectDocument {
     pub language_info: LanguageDocument,
     #[serde(default = "default_battery_monitor_info")]
     pub battery_monitor_info: Value,
+    #[serde(default = "default_fault_code_info")]
+    pub fault_code_info: Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

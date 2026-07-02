@@ -46,6 +46,7 @@ import { LanguagePage } from '../components/language';
 import { BatteryMonitorPage, BatteryProtocolPage } from '../features/battery-legacy';
 import { CanTestDataPage } from '../features/can-test-data';
 import { CanopenExportPage } from '../features/canopen-export';
+import { FaultCodePage } from '../features/fault-code';
 import { SettingDataPage } from '../features/setting-data';
 import { UiCanvasPreview } from '../components/UiCanvasPreview';
 import { APP_VERSION } from '../constants/app';
@@ -387,6 +388,33 @@ export function Dashboard({
     }
     if (!doc.battery_monitor_info) {
       defaults.battery_monitor_info = { enabled: true, page_size: 4, items: [] };
+    }
+    if (!doc.fault_code_info) {
+      defaults.fault_code_info = {
+        enabled: true,
+        version: 1,
+        sources: [
+          {
+            source_id: 1,
+            type_char: 'T',
+            can_id: 648,
+            frame_type: 0,
+            code_byte: 2,
+            clear_code: 0,
+            invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
+          },
+          {
+            source_id: 2,
+            type_char: 'P',
+            can_id: 660,
+            frame_type: 0,
+            code_byte: 2,
+            clear_code: 0,
+            invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
+          },
+        ],
+        codes: [],
+      };
     }
     if (Object.keys(defaults).length > 0) {
       const document = { ...doc, ...defaults };
@@ -1066,6 +1094,7 @@ export function Dashboard({
       if (activeModule.key === 'language') document.language_info = parsed;
       if (activeModule.key === 'battery-protocol') document.battery_protocol = parsed;
       if (activeModule.key === 'battery-monitor') document.battery_monitor_info = parsed;
+      if (activeModule.key === 'fault-code') document.fault_code_info = parsed;
       if (activeModule.key === 'signal-dictionary') document.signal_dictionary = parsed;
       if (activeModule.key === 'private-protocol') document.private_protocol = parsed;
       if (activeModule.key === 'protocol-mapping') document.protocol_mapping = parsed;
@@ -3628,6 +3657,7 @@ export function Dashboard({
                 'realtime-data',
                 'battery-protocol',
                 'battery-monitor',
+                'fault-code',
                 'language',
                 'signal-dictionary',
                 'private-protocol',
@@ -4812,6 +4842,9 @@ export function Dashboard({
         {activeModule.key === 'battery-monitor' ? (
           <BatteryMonitorPage loadedProject={loadedProject} controller={batteryLegacyController} />
         ) : null}
+        {activeModule.key === 'fault-code' ? (
+          <FaultCodePage loadedProject={loadedProject} onUpdateSections={updateProjectSections} />
+        ) : null}
         {activeModule.key === 'can-test-data' ? (
           <CanTestDataPage loadedProject={loadedProject} canTestData={canTestData} />
         ) : null}
@@ -5973,6 +6006,30 @@ export function Dashboard({
                   checked={exportBatteryOptions.battery_monitor_info.bin}
                   onChange={(event) =>
                     updateExportBatteryOption('battery_monitor_info', 'bin', event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>bin 文件</span>
+              </label>
+              <div className="settings-option-info">
+                <span>故障码配置</span>
+                <small>控制 fault_code_info 是否写入导出清单描述和 fault code 二进制段。</small>
+              </div>
+              <label className="settings-check">
+                <input
+                  checked={exportBatteryOptions.fault_code_info.config}
+                  onChange={(event) =>
+                    updateExportBatteryOption('fault_code_info', 'config', event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span>配置文件</span>
+              </label>
+              <label className="settings-check">
+                <input
+                  checked={exportBatteryOptions.fault_code_info.bin}
+                  onChange={(event) =>
+                    updateExportBatteryOption('fault_code_info', 'bin', event.target.checked)
                   }
                   type="checkbox"
                 />

@@ -3476,6 +3476,79 @@ button {
   gap: 8px;
 }
 
+/* ── Fault Code Editor ── */
+
+.fault-code-page {
+  display: grid;
+  gap: 14px;
+}
+
+.fault-code-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.fault-code-meta {
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+}
+
+.fault-code-source-table {
+  min-width: 980px;
+}
+
+.fault-code-table {
+  min-width: 1040px;
+}
+
+.fault-code-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.fault-code-csv-status {
+  margin: 10px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.fault-code-duplicate-alert {
+  margin: 10px 0;
+  border: 1px solid rgba(185, 28, 28, 0.28);
+  border-radius: 6px;
+  background: rgba(254, 226, 226, 0.7);
+  color: #991b1b;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.fault-code-duplicate-row {
+  background: rgba(254, 226, 226, 0.42);
+}
+
+.fault-code-duplicate-hint {
+  display: block;
+  margin-top: 4px;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.fault-code-source-table td small {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.fault-code-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
 .battery-config-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
