@@ -252,7 +252,11 @@ export function TranslationTable({
                   )}
                 </td>
                 <td className="lang-table-cell-source">
-                  <span className="lang-table-text">{sourceValue}</span>
+                  <input
+                    className={`lang-table-input ${isModified ? 'modified' : ''}`}
+                    value={sourceValue}
+                    onChange={(e) => onUpdateValue(row.key, sourceLanguage, e.target.value)}
+                  />
                 </td>
                 {targetLanguage && targetLanguage !== sourceLanguage ? (
                   <td className="lang-table-cell-target">

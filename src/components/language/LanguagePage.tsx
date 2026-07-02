@@ -347,6 +347,12 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     for (const code of document.list_code_language) {
       translations[code] = '';
     }
+    if (document.list_code_language.includes('zh')) {
+      translations.zh = key;
+    }
+    if (document.list_code_language.includes(translateSourceLanguage)) {
+      translations[translateSourceLanguage] = translations[translateSourceLanguage] || key;
+    }
     onUpdate({
       ...document,
       list_inner: [...document.list_inner, key],
