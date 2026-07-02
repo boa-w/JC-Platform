@@ -4834,7 +4834,7 @@ html {
 }
 
 .lang-table-th-actions {
-  width: 60px;
+  width: 118px;
 }
 
 .lang-table td {
@@ -4942,6 +4942,7 @@ html {
 
 .lang-table-cell-actions {
   white-space: nowrap;
+  text-align: right;
 }
 
 .lang-footer {
@@ -5023,6 +5024,31 @@ html {
 .lang-btn--icon:hover {
   color: var(--color-text);
   background: var(--color-surface-alt);
+}
+
+.lang-btn--icon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lang-drag-handle {
+  cursor: grab;
+}
+
+.lang-drag-handle:active {
+  cursor: grabbing;
+}
+
+.lang-row-dragging td {
+  opacity: 0.55;
+}
+
+.lang-row-drop-before td {
+  box-shadow: inset 0 2px 0 var(--color-primary);
+}
+
+.lang-row-drop-after td {
+  box-shadow: inset 0 -2px 0 var(--color-primary);
 }
 
 .lang-btn--danger {
@@ -5218,7 +5244,7 @@ html {
 }
 
 .lang-comparison-th-actions {
-  width: 40px;
+  width: 118px;
 }
 
 .lang-comparison-table td {
@@ -5242,12 +5268,15 @@ html {
 }
 
 .lang-comparison-key-text {
+  border: 0;
+  background: transparent;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-text);
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 3px;
+  text-align: left;
   transition: background 0.1s;
 }
 
@@ -5285,11 +5314,16 @@ html {
 
 .lang-comparison-value {
   display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
   font-size: 13px;
   color: var(--color-text);
   padding: 4px 6px;
   border-radius: 3px;
   min-height: 24px;
+  text-align: left;
+  cursor: pointer;
 }
 
 .lang-comparison-input {

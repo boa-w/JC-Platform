@@ -320,6 +320,26 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     onUpdate({ ...document, list_inner: nextInner, list_translate: nextTranslate });
   }
 
+  function handleReorderKey(fromIndex: number, targetIndex: number, position: 'before' | 'after') {
+    const minIndex = document.list_code_language.length;
+    if (
+      fromIndex < minIndex ||
+      targetIndex < minIndex ||
+      fromIndex >= document.list_inner.length ||
+      targetIndex >= document.list_inner.length
+    ) {
+      return;
+    }
+    const nextInner = [...document.list_inner];
+    const [movedKey] = nextInner.splice(fromIndex, 1);
+    let insertIndex = position === 'after' ? targetIndex + 1 : targetIndex;
+    if (fromIndex < insertIndex) insertIndex -= 1;
+    insertIndex = Math.max(minIndex, Math.min(insertIndex, nextInner.length));
+    if (nextInner[insertIndex] === movedKey) return;
+    nextInner.splice(insertIndex, 0, movedKey);
+    onUpdate({ ...document, list_inner: nextInner });
+  }
+
   function handleAddKey() {
     const key = newKeyInput.trim();
     if (!key || document.list_inner.includes(key)) return;
@@ -524,6 +544,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               onUpdateValue={handleUpdateValue}
               onUpdateKey={handleUpdateKey}
               onRemoveKey={handleRemoveKey}
+              onReorderKey={handleReorderKey}
               onRestoreKey={(key) => {
                 const original = document.list_translate[key];
                 if (original)
