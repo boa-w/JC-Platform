@@ -19,7 +19,7 @@ interface TranslationTableProps {
   onUpdateValue: (key: string, code: string, value: string) => void;
   onUpdateKey: (index: number, oldKey: string, newKey: string) => void;
   onRemoveKey: (index: number) => void;
-  onReorderKey: (fromIndex: number, targetIndex: number, position: 'before' | 'after') => void;
+  onReorderKeys: (keys: string[], targetIndex: number, position: 'before' | 'after') => void;
   onRestoreKey: (key: string) => void;
   onToggleSelectedKey: (key: string, selected: boolean) => void;
   onToggleAllVisible: (selected: boolean) => void;
@@ -39,7 +39,7 @@ export function TranslationTable({
   onUpdateValue,
   onUpdateKey,
   onRemoveKey,
-  onReorderKey,
+  onReorderKeys,
   onRestoreKey,
   onToggleSelectedKey,
   onToggleAllVisible,
@@ -52,6 +52,7 @@ export function TranslationTable({
     position: 'before' | 'after';
   } | null>(null);
   const draggingIndexRef = useRef<number | null>(null);
+  const draggingKeysRef = useRef<string[]>([]);
   const dropTargetRef = useRef<{
     index: number;
     position: 'before' | 'after';
@@ -90,10 +91,15 @@ export function TranslationTable({
     [],
   );
 
-  function beginDrag(event: ReactPointerEvent<HTMLButtonElement>, index: number) {
+  function beginDrag(event: ReactPointerEvent<HTMLButtonElement>, row: TranslationRow) {
     event.preventDefault();
-    draggingIndexRef.current = index;
-    setDraggingIndex(index);
+    const selectedRows = rows.filter((item) => selectedKeys.has(item.key));
+    const draggingKeys = selectedKeys.has(row.key)
+      ? selectedRows.map((item) => item.key)
+      : [row.key];
+    draggingKeysRef.current = draggingKeys;
+    draggingIndexRef.current = row.index;
+    setDraggingIndex(row.index);
     updateDropTarget(null);
   }
 
@@ -120,6 +126,11 @@ export function TranslationTable({
         updateDropTarget(null);
         return;
       }
+      const targetKey = row.dataset.langRowKey;
+      if (targetKey && draggingKeysRef.current.includes(targetKey)) {
+        updateDropTarget(null);
+        return;
+      }
 
       const rect = row.getBoundingClientRect();
       const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
@@ -128,11 +139,13 @@ export function TranslationTable({
 
     function finishDrag() {
       const fromIndex = draggingIndexRef.current;
+      const draggingKeys = draggingKeysRef.current;
       const target = dropTargetRef.current;
-      if (fromIndex !== null && target && fromIndex !== target.index) {
-        onReorderKey(fromIndex, target.index, target.position);
+      if (fromIndex !== null && draggingKeys.length > 0 && target && fromIndex !== target.index) {
+        onReorderKeys(draggingKeys, target.index, target.position);
       }
       draggingIndexRef.current = null;
+      draggingKeysRef.current = [];
       setDraggingIndex(null);
       updateDropTarget(null);
     }
@@ -147,11 +160,23 @@ export function TranslationTable({
       pageDocument.removeEventListener('pointerup', finishDrag);
       pageDocument.removeEventListener('pointercancel', finishDrag);
     };
-  }, [draggingIndex, onReorderKey, updateDropTarget]);
+  }, [draggingIndex, onReorderKeys, updateDropTarget]);
 
   function cancelNativeDrag(event: DragEvent<HTMLButtonElement>) {
     const fromIndex = draggingIndexRef.current;
     if (fromIndex !== null) event.preventDefault();
+  }
+
+  function isDraggingRow(row: TranslationRow) {
+    return draggingKeysRef.current.includes(row.key) || draggingIndex === row.index;
+  }
+
+  function dragHandleTitle(row: TranslationRow) {
+    const selectedRows = rows.filter((item) => selectedKeys.has(item.key));
+    if (selectedKeys.has(row.key) && selectedRows.length > 1) {
+      return `拖动排序（${selectedRows.length} 条）`;
+    }
+    return '拖动排序';
   }
 
   return (
@@ -206,7 +231,7 @@ export function TranslationTable({
             const isSelected = selectedKeys.has(row.key);
             const rowClassName = [
               isModified ? 'config-entry-modified' : '',
-              draggingIndex === row.index ? 'lang-row-dragging' : '',
+              isDraggingRow(row) ? 'lang-row-dragging' : '',
               dropTarget?.index === row.index ? `lang-row-drop-${dropTarget.position}` : '',
             ]
               .filter(Boolean)
@@ -215,6 +240,7 @@ export function TranslationTable({
               <tr
                 className={rowClassName || undefined}
                 data-lang-row-index={row.index}
+                data-lang-row-key={row.key}
                 key={`${row.key}-${row.index}`}
               >
                 <td className="lang-table-cell-select">
@@ -283,9 +309,9 @@ export function TranslationTable({
                       aria-label={`拖动 ${row.key} 调整顺序`}
                       className="lang-btn lang-btn--icon lang-drag-handle"
                       onDragStart={cancelNativeDrag}
-                      onPointerDown={(event) => beginDrag(event, row.index)}
+                      onPointerDown={(event) => beginDrag(event, row)}
                       type="button"
-                      title="拖动排序"
+                      title={dragHandleTitle(row)}
                     >
                       ↕
                     </button>

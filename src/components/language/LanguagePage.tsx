@@ -320,24 +320,33 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     onUpdate({ ...document, list_inner: nextInner, list_translate: nextTranslate });
   }
 
-  function handleReorderKey(fromIndex: number, targetIndex: number, position: 'before' | 'after') {
+  function handleReorderKeys(keys: string[], targetIndex: number, position: 'before' | 'after') {
     const minIndex = document.list_code_language.length;
-    if (
-      fromIndex < minIndex ||
-      targetIndex < minIndex ||
-      fromIndex >= document.list_inner.length ||
-      targetIndex >= document.list_inner.length
-    ) {
+    if (keys.length === 0 || targetIndex < minIndex || targetIndex >= document.list_inner.length) {
       return;
     }
-    const nextInner = [...document.list_inner];
-    const [movedKey] = nextInner.splice(fromIndex, 1);
-    let insertIndex = position === 'after' ? targetIndex + 1 : targetIndex;
-    if (fromIndex < insertIndex) insertIndex -= 1;
-    insertIndex = Math.max(minIndex, Math.min(insertIndex, nextInner.length));
-    if (nextInner[insertIndex] === movedKey) return;
-    nextInner.splice(insertIndex, 0, movedKey);
-    onUpdate({ ...document, list_inner: nextInner });
+
+    const configKeys = document.list_inner.slice(0, minIndex);
+    const translationKeys = document.list_inner.slice(minIndex);
+    const movingKeySet = new Set(keys);
+    const targetKey = document.list_inner[targetIndex];
+    if (!targetKey || movingKeySet.has(targetKey)) return;
+
+    const movingKeys = translationKeys.filter((key) => movingKeySet.has(key));
+    if (movingKeys.length === 0) return;
+
+    const remainingKeys = translationKeys.filter((key) => !movingKeySet.has(key));
+    const remainingTargetIndex = remainingKeys.indexOf(targetKey);
+    if (remainingTargetIndex < 0) return;
+
+    const insertIndex = position === 'after' ? remainingTargetIndex + 1 : remainingTargetIndex;
+    const nextTranslationKeys = [
+      ...remainingKeys.slice(0, insertIndex),
+      ...movingKeys,
+      ...remainingKeys.slice(insertIndex),
+    ];
+
+    onUpdate({ ...document, list_inner: [...configKeys, ...nextTranslationKeys] });
   }
 
   function handleAddKey() {
@@ -550,7 +559,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               onUpdateValue={handleUpdateValue}
               onUpdateKey={handleUpdateKey}
               onRemoveKey={handleRemoveKey}
-              onReorderKey={handleReorderKey}
+              onReorderKeys={handleReorderKeys}
               onRestoreKey={(key) => {
                 const original = document.list_translate[key];
                 if (original)
