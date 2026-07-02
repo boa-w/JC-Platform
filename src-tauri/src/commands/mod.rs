@@ -29,6 +29,9 @@ use crate::domain::protocol_manager::{
     migrate_project_to_unified_protocol, ProtocolCompatibilityReport, UnifiedProtocolModel,
 };
 use crate::domain::sdo::{parse_sdo_table, sdo_document_to_table, SdoImportReport};
+use crate::domain::translation::{
+    translate_with_baidu, BaiduTranslateRequest, BaiduTranslateResponse,
+};
 use crate::domain::ui_resource::{
     add_ui_resource_option, parse_ui_info, remove_ui_resource_option, update_ui_resource,
     UiResourceOptionAddRequest, UiResourceOptionRemoveRequest, UiResourceParseReport,
@@ -382,6 +385,13 @@ pub fn export_table_workbook(request: ExportTableRequest) -> Result<(), String> 
 #[tauri::command]
 pub fn language_document_table(document: Value) -> TableDocument {
     language_document_to_table(&document)
+}
+
+#[tauri::command]
+pub async fn translate_baidu_text(
+    request: BaiduTranslateRequest,
+) -> Result<BaiduTranslateResponse, String> {
+    translate_with_baidu(request).await
 }
 
 #[tauri::command]

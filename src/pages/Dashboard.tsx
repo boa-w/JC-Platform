@@ -66,6 +66,7 @@ import {
   trackedDocumentSections,
 } from '../modules/documentSections';
 import { useExportBatteryOptions } from '../stores/exportSettings';
+import { useTranslationSettings } from '../stores/translationSettings';
 import type {
   BackendHealth,
   BatteryMonitorFrame,
@@ -341,6 +342,11 @@ export function Dashboard({
     updateOption: updateExportBatteryOption,
     resetOptions: resetExportBatteryOptions,
   } = useExportBatteryOptions();
+  const {
+    settings: translationSettings,
+    updateSetting: updateTranslationSetting,
+    resetSettings: resetTranslationSettings,
+  } = useTranslationSettings();
   const [newLanguageCode, setNewLanguageCode] = useState('');
   const [newLanguageLabel, setNewLanguageLabel] = useState('');
   const [newLanguageInnerKey, setNewLanguageInnerKey] = useState('');
@@ -6041,6 +6047,40 @@ export function Dashboard({
               <button type="button" onClick={resetExportBatteryOptions}>
                 恢复默认
               </button>
+            </div>
+            <strong className="section-label--muted">翻译服务</strong>
+            <div className="settings-service-panel">
+              <div className="settings-service-info">
+                <span>百度翻译</span>
+                <small>用于多国语言管理页的一键条目翻译。</small>
+              </div>
+              <label className="settings-field">
+                <span>App ID</span>
+                <input
+                  autoComplete="off"
+                  value={translationSettings.baiduAppId}
+                  onChange={(event) =>
+                    updateTranslationSetting('baiduAppId', event.target.value)
+                  }
+                />
+              </label>
+              <label className="settings-field">
+                <span>API Key</span>
+                <input
+                  autoComplete="new-password"
+                  type="password"
+                  value={translationSettings.baiduAppKey}
+                  onChange={(event) =>
+                    updateTranslationSetting('baiduAppKey', event.target.value)
+                  }
+                />
+              </label>
+              <div className="settings-option-footer settings-option-footer--compact">
+                <span>配置保存在本机软件设置中，不写入项目文件。</span>
+                <button type="button" onClick={resetTranslationSettings}>
+                  清空配置
+                </button>
+              </div>
             </div>
             <strong className="section-label--muted">外观</strong>
             <div className="theme-toggle-row">

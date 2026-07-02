@@ -29,8 +29,8 @@ use commands::{
     parse_project_document, parse_project_file, parse_ui_resource_file, parse_ui_resources,
     parse_ui_resources_with_project_path, parse_unified_protocol_project,
     pdo_simple_document_table, project_summary, remove_ui_resource_option_document, save_json_file,
-    save_project, save_project_as, save_text_file, sdo_document_table, update_ui_resource_document,
-    validate_project_document, validate_table_headers,
+    save_project, save_project_as, save_text_file, sdo_document_table, translate_baidu_text,
+    update_ui_resource_document, validate_project_document, validate_table_headers,
 };
 
 /// 构建并启动 Tauri 应用。
@@ -81,6 +81,7 @@ pub fn run() {
             export_table_csv,
             export_table_workbook,
             language_document_table,
+            translate_baidu_text,
             pdo_simple_document_table,
             sdo_document_table,
             build_project_export_plan,

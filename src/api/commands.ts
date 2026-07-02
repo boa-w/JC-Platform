@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { openPath } from '@tauri-apps/plugin-opener';
 import type {
   BackendHealth,
+  BaiduTranslateRequest,
+  BaiduTranslateResponse,
   BatteryMonitorFrame,
   BatteryMonitorSignal,
   BinaryBuildReport,
@@ -230,6 +232,12 @@ export async function exportTableWorkbook(request: ExportTableRequest): Promise<
 
 export async function languageDocumentTable(document: unknown): Promise<TableDocument> {
   return invoke<TableDocument>('language_document_table', { document });
+}
+
+export async function translateBaiduText(
+  request: BaiduTranslateRequest,
+): Promise<BaiduTranslateResponse> {
+  return invoke<BaiduTranslateResponse>('translate_baidu_text', { request });
 }
 
 export async function pdoSimpleDocumentTable(document: unknown): Promise<TableDocument> {

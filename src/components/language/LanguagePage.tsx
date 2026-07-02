@@ -1,7 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { translateBaiduText } from '../../api/commands';
+import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
 import { LanguageComparisonView } from './LanguageComparisonView';
 import { LanguageSidebar } from './LanguageSidebar';
+import { type TranslateScope, TranslationServicePanel } from './TranslationServicePanel';
 import { TranslationTable } from './TranslationTable';
 import { TranslationToolbar } from './TranslationToolbar';
 import type { FilterMode, TranslationRow } from './types';
@@ -15,6 +18,34 @@ interface LanguagePageProps {
 
 type ViewMode = 'editor' | 'comparison';
 
+const TRANSLATE_SCOPE_STORAGE_KEY = 'jc.language.translateScope';
+const TRANSLATE_OPTIONS_STORAGE_KEY = 'jc.language.translateOptions';
+const LEGACY_BAIDU_TRANSLATE_STORAGE_KEY = 'jc.language.baiduTranslateConfig';
+
+interface SavedTranslateOptions {
+  scope?: string;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+}
+
+function readSavedTranslateOptions(): SavedTranslateOptions {
+  if (typeof window === 'undefined') return {};
+  for (const key of [
+    TRANSLATE_OPTIONS_STORAGE_KEY,
+    TRANSLATE_SCOPE_STORAGE_KEY,
+    LEGACY_BAIDU_TRANSLATE_STORAGE_KEY,
+  ]) {
+    const saved = window.localStorage.getItem(key);
+    if (!saved) continue;
+    try {
+      return JSON.parse(saved) as SavedTranslateOptions;
+    } catch {
+      window.localStorage.removeItem(key);
+    }
+  }
+  return {};
+}
+
 function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
 }
@@ -27,7 +58,7 @@ function computeTranslationCount(
   let translated = 0;
   for (const key of keys) {
     const translations = document.list_translate[key] as Record<string, string> | undefined;
-    if (translations && translations[code] && translations[code].trim() !== '') {
+    if (translations?.[code] && translations[code].trim() !== '') {
       translated++;
     }
   }
@@ -66,16 +97,77 @@ function normalizeDocument(
 }
 
 export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguagePageProps) {
+  const langMainRef = useRef<HTMLDivElement | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(() => {
     const codes = document.list_code_language;
+    const savedTarget = readSavedTranslateOptions().targetLanguage;
+    if (savedTarget && codes.includes(savedTarget)) return savedTarget;
     return codes.length > 1 ? codes[1] : (codes[0] ?? null);
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [newKeyInput, setNewKeyInput] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('editor');
+  const [translateSourceLanguage, setTranslateSourceLanguage] = useState(() => {
+    const codes = document.list_code_language;
+    const savedSource = readSavedTranslateOptions().sourceLanguage;
+    return savedSource && codes.includes(savedSource) ? savedSource : (codes[0] ?? 'zh');
+  });
+  const [translateScope, setTranslateScope] = useState<TranslateScope>(() => {
+    const savedScope = readSavedTranslateOptions().scope;
+    return savedScope === 'filtered' || savedScope === 'empty' || savedScope === 'selected'
+      ? savedScope
+      : 'empty';
+  });
+  const [translateStatus, setTranslateStatus] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [selectedTranslationKeys, setSelectedTranslationKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const { settings: translationSettings } = useTranslationSettings();
 
-  const sourceLanguage = document.list_code_language[0] ?? 'zh';
+  const isBaiduTranslateConfigured =
+    translationSettings.baiduAppId.trim() !== '' && translationSettings.baiduAppKey.trim() !== '';
+  const languageOptions = useMemo(
+    () =>
+      document.list_code_language.map((code) => ({
+        code,
+        label: getLabel(document, code),
+      })),
+    [document],
+  );
+
+  useEffect(() => {
+    const codes = document.list_code_language;
+    if (codes.length === 0) {
+      setSelectedLanguage(null);
+      return;
+    }
+    setTranslateSourceLanguage((current) => (codes.includes(current) ? current : codes[0]));
+    setSelectedLanguage((current) => {
+      if (current && codes.includes(current)) return current;
+      return codes.find((code) => code !== translateSourceLanguage) ?? codes[0];
+    });
+  }, [document.list_code_language, translateSourceLanguage]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      TRANSLATE_OPTIONS_STORAGE_KEY,
+      JSON.stringify({
+        sourceLanguage: translateSourceLanguage,
+        targetLanguage: selectedLanguage,
+        scope: translateScope,
+      }),
+    );
+  }, [translateSourceLanguage, selectedLanguage, translateScope]);
+
+  useEffect(() => {
+    const availableKeys = new Set(document.list_inner.slice(document.list_code_language.length));
+    setSelectedTranslationKeys((current) => {
+      const next = new Set([...current].filter((key) => availableKeys.has(key)));
+      return next.size === current.size ? current : next;
+    });
+  }, [document.list_inner, document.list_code_language.length]);
 
   const translationKeys = useMemo(() => {
     return document.list_inner.slice(document.list_code_language.length);
@@ -126,6 +218,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
         const val = row.translations[selectedLanguage];
         return !val || String(val).trim() === '';
       });
+    } else if (filterMode === 'modified') {
+      filtered = filtered.filter((row) => modifiedKeys.has(row.key));
     }
 
     return filtered;
@@ -133,6 +227,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     translationKeys,
     document.list_code_language.length,
     document.list_translate,
+    modifiedKeys,
     searchQuery,
     filterMode,
     selectedLanguage,
@@ -240,6 +335,110 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     setNewKeyInput('');
   }
 
+  function handleToggleSelectedKey(key: string, selected: boolean) {
+    setSelectedTranslationKeys((current) => {
+      const next = new Set(current);
+      if (selected) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
+      return next;
+    });
+  }
+
+  function handleToggleAllVisible(selected: boolean) {
+    setSelectedTranslationKeys((current) => {
+      const next = new Set(current);
+      for (const row of rows) {
+        if (row.isConfigKey) continue;
+        if (selected) {
+          next.add(row.key);
+        } else {
+          next.delete(row.key);
+        }
+      }
+      return next;
+    });
+  }
+
+  async function handleTranslateRows() {
+    if (!selectedLanguage) {
+      setTranslateStatus('请选择目标语言');
+      return;
+    }
+    if (selectedLanguage === translateSourceLanguage) {
+      setTranslateStatus('目标语言需不同于源语言');
+      return;
+    }
+    if (!isBaiduTranslateConfigured) {
+      setTranslateStatus('请先在软件设置中配置百度翻译 App ID 和 API Key');
+      return;
+    }
+
+    const candidates = rows.filter((row) => {
+      if (translateScope === 'selected' && !selectedTranslationKeys.has(row.key)) return false;
+      const translations =
+        (document.list_translate[row.key] as Record<string, string> | undefined) ?? {};
+      const sourceValue = String(translations[translateSourceLanguage] ?? '').trim();
+      const targetValue = String(translations[selectedLanguage] ?? '').trim();
+      if (!sourceValue) return false;
+      return translateScope === 'filtered' || translateScope === 'selected' || !targetValue;
+    });
+
+    if (candidates.length === 0) {
+      setTranslateStatus(
+        translateScope === 'selected' ? '请选择需要翻译的条目' : '没有需要翻译的条目',
+      );
+      return;
+    }
+
+    setIsTranslating(true);
+    setTranslateStatus(`正在翻译 ${candidates.length} 条...`);
+    try {
+      const response = await translateBaiduText({
+        appId: translationSettings.baiduAppId.trim(),
+        appKey: translationSettings.baiduAppKey.trim(),
+        from: translateSourceLanguage,
+        to: selectedLanguage,
+        texts: candidates.map((row) => {
+          const translations =
+            (document.list_translate[row.key] as Record<string, string> | undefined) ?? {};
+          return String(translations[translateSourceLanguage] ?? '');
+        }),
+      });
+
+      const nextTranslate: Record<string, unknown> = { ...document.list_translate };
+      let updated = 0;
+      for (let index = 0; index < candidates.length; index++) {
+        const translated = response.translations[index] ?? '';
+        if (!translated.trim()) continue;
+        const row = candidates[index];
+        const translations = (nextTranslate[row.key] as Record<string, string> | undefined) ?? {};
+        nextTranslate[row.key] = { ...translations, [selectedLanguage]: translated };
+        updated++;
+      }
+
+      onUpdate({ ...document, list_translate: nextTranslate });
+      setTranslateStatus(`已翻译 ${updated} 条`);
+    } catch (error) {
+      setTranslateStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsTranslating(false);
+    }
+  }
+
+  function handleScrollToTop() {
+    const root = langMainRef.current;
+    root
+      ?.querySelectorAll<HTMLElement>('.lang-table-wrap, .lang-comparison-table-wrap')
+      .forEach((element) => {
+        element.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      });
+    root?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  }
+
   if (!loaded) {
     return (
       <section className="lang-page">
@@ -265,7 +464,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
         onUpdateLanguage={handleUpdateLanguage}
         onRemoveLanguage={handleRemoveLanguage}
       />
-      <div className="lang-main">
+      <div className="lang-main" ref={langMainRef}>
         <div className="lang-view-toggle">
           <button
             className={`lang-view-toggle-btn ${viewMode === 'editor' ? 'active' : ''}`}
@@ -287,7 +486,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
             <TranslationToolbar
               searchQuery={searchQuery}
               filterMode={filterMode}
-              sourceLanguage={sourceLanguage}
+              sourceLanguage={translateSourceLanguage}
               targetLanguage={selectedLanguage}
               totalKeys={translationKeys.length}
               filteredCount={rows.length}
@@ -299,12 +498,29 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               }}
               onSyncKeys={() => {}}
             />
+            <TranslationServicePanel
+              languages={languageOptions}
+              sourceLanguage={translateSourceLanguage}
+              targetLanguage={selectedLanguage}
+              scope={translateScope}
+              status={translateStatus}
+              isTranslating={isTranslating}
+              disabled={!selectedLanguage || selectedLanguage === translateSourceLanguage}
+              configured={isBaiduTranslateConfigured}
+              filteredCount={rows.length}
+              selectedCount={selectedTranslationKeys.size}
+              onSourceLanguageChange={setTranslateSourceLanguage}
+              onTargetLanguageChange={setSelectedLanguage}
+              onScopeChange={setTranslateScope}
+              onTranslate={handleTranslateRows}
+            />
             <TranslationTable
               document={document}
-              sourceLanguage={sourceLanguage}
+              sourceLanguage={translateSourceLanguage}
               targetLanguage={selectedLanguage}
               rows={rows}
               modifiedKeys={modifiedKeys}
+              selectedKeys={selectedTranslationKeys}
               onUpdateValue={handleUpdateValue}
               onUpdateKey={handleUpdateKey}
               onRemoveKey={handleRemoveKey}
@@ -313,6 +529,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
                 if (original)
                   onUpdate({ ...document, list_translate: { ...document.list_translate } });
               }}
+              onToggleSelectedKey={handleToggleSelectedKey}
+              onToggleAllVisible={handleToggleAllVisible}
             />
             <div className="lang-footer">
               <div className="lang-footer-add">
@@ -346,6 +564,15 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
         ) : (
           <LanguageComparisonView document={document} onUpdate={onUpdate} />
         )}
+        <button
+          aria-label="回到顶部"
+          className="lang-scroll-top"
+          onClick={handleScrollToTop}
+          title="回到顶部"
+          type="button"
+        >
+          ↑
+        </button>
       </div>
     </section>
   );

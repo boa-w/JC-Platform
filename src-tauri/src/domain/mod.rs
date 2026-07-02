@@ -23,4 +23,5 @@ pub mod protocol;
 pub mod protocol_manager;
 pub mod sdo;
 pub mod signal;
+pub mod translation;
 pub mod ui_resource;

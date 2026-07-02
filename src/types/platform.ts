@@ -442,6 +442,18 @@ export interface LanguageDocument {
   language_labels?: Record<string, string>;
 }
 
+export interface BaiduTranslateRequest {
+  appId: string;
+  appKey: string;
+  from: string;
+  to: string;
+  texts: string[];
+}
+
+export interface BaiduTranslateResponse {
+  translations: string[];
+}
+
 export interface NewProjectRequest {
   path: string;
   name: string;

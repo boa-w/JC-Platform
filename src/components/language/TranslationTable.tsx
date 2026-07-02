@@ -8,10 +8,13 @@ interface TranslationTableProps {
   targetLanguage: string | null;
   rows: TranslationRow[];
   modifiedKeys: Set<string>;
+  selectedKeys: Set<string>;
   onUpdateValue: (key: string, code: string, value: string) => void;
   onUpdateKey: (index: number, oldKey: string, newKey: string) => void;
   onRemoveKey: (index: number) => void;
   onRestoreKey: (key: string) => void;
+  onToggleSelectedKey: (key: string, selected: boolean) => void;
+  onToggleAllVisible: (selected: boolean) => void;
 }
 
 function getLabel(document: LanguageDocument, code: string): string {
@@ -24,10 +27,13 @@ export function TranslationTable({
   targetLanguage,
   rows,
   modifiedKeys,
+  selectedKeys,
   onUpdateValue,
   onUpdateKey,
   onRemoveKey,
   onRestoreKey,
+  onToggleSelectedKey,
+  onToggleAllVisible,
 }: TranslationTableProps) {
   const [editingKeyIndex, setEditingKeyIndex] = useState<number | null>(null);
   const [keyDraft, setKeyDraft] = useState('');
@@ -47,11 +53,27 @@ export function TranslationTable({
     setEditingKeyIndex(null);
   }
 
+  const selectableRows = rows.filter((row) => !row.isConfigKey);
+  const allVisibleSelected =
+    selectableRows.length > 0 && selectableRows.every((row) => selectedKeys.has(row.key));
+  const someVisibleSelected = selectableRows.some((row) => selectedKeys.has(row.key));
+
   return (
     <div className="lang-table-wrap">
       <table className="lang-table">
         <thead>
           <tr>
+            <th className="lang-table-th-select">
+              <input
+                aria-label="选择当前筛选条目"
+                checked={allVisibleSelected}
+                ref={(element) => {
+                  if (element) element.indeterminate = someVisibleSelected && !allVisibleSelected;
+                }}
+                onChange={(event) => onToggleAllVisible(event.target.checked)}
+                type="checkbox"
+              />
+            </th>
             <th className="lang-table-th-key">翻译键</th>
             <th className="lang-table-th-source">{getLabel(document, sourceLanguage)}</th>
             {targetLanguage && targetLanguage !== sourceLanguage ? (
@@ -65,7 +87,7 @@ export function TranslationTable({
             <tr>
               <td
                 className="lang-table-empty"
-                colSpan={targetLanguage && targetLanguage !== sourceLanguage ? 4 : 3}
+                colSpan={targetLanguage && targetLanguage !== sourceLanguage ? 5 : 4}
               >
                 暂无翻译条目
               </td>
@@ -85,11 +107,21 @@ export function TranslationTable({
                 )
               : '';
             const isModified = modifiedKeys.has(row.key);
+            const isSelected = selectedKeys.has(row.key);
             return (
               <tr
                 className={isModified ? 'config-entry-modified' : undefined}
                 key={`${row.key}-${row.index}`}
               >
+                <td className="lang-table-cell-select">
+                  <input
+                    aria-label={`选择 ${row.key}`}
+                    checked={isSelected}
+                    disabled={row.isConfigKey}
+                    onChange={(event) => onToggleSelectedKey(row.key, event.target.checked)}
+                    type="checkbox"
+                  />
+                </td>
                 <td className="lang-table-cell-key">
                   {editingKeyIndex === row.index ? (
                     <input
@@ -102,16 +134,17 @@ export function TranslationTable({
                         if (e.key === 'Enter') commitKeyEdit();
                         if (e.key === 'Escape') setEditingKeyIndex(null);
                       }}
-                      autoFocus
                     />
                   ) : (
-                    <span
+                    <button
                       className={`lang-table-key-text ${row.isConfigKey ? 'config' : ''}`}
+                      disabled={row.isConfigKey}
                       onClick={() => !row.isConfigKey && startEditKey(row.index, row.key)}
                       title={row.isConfigKey ? '配置键，不可编辑' : '点击编辑'}
+                      type="button"
                     >
                       {row.key}
-                    </span>
+                    </button>
                   )}
                 </td>
                 <td className="lang-table-cell-source">
