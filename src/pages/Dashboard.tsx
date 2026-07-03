@@ -313,6 +313,8 @@ export function Dashboard({
   const [batteryMonitorExportStatus, setBatteryMonitorExportStatus] = useState<string | null>(null);
   const [isExportingBatteryMonitor, setIsExportingBatteryMonitor] = useState(false);
   const [exportOutputDir, setExportOutputDir] = useState('jc-export');
+  const [exportManifestFilename, setExportManifestFilename] = useState('ConfigUpdate.json');
+  const [exportBinaryFilename, setExportBinaryFilename] = useState('pdo_sdo_data.bin');
   const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
   const [imageCopyReport, setImageCopyReport] = useState<UiImageCopyReport | null>(null);
   const [binaryReport, setBinaryReport] = useState<BinaryBuildReport | null>(null);
@@ -3279,6 +3281,8 @@ export function Dashboard({
         project_path: loadedProject?.summary.path,
         output_dir: exportOutputDir,
         document: loadedProject?.document ?? previewDocument,
+        manifest_filename: exportManifestFilename,
+        binary_filename: exportBinaryFilename,
         export_options: exportBatteryOptions,
       });
       setExportReport(report);
@@ -6150,6 +6154,24 @@ export function Dashboard({
                 {isExporting ? '导出中...' : '执行项目导出'}
               </button>
             </div>
+            <div className="export-filename-grid">
+              <label>
+                JSON 文件名
+                <input
+                  value={exportManifestFilename}
+                  onChange={(event) => setExportManifestFilename(event.target.value)}
+                  placeholder="ConfigUpdate.json"
+                />
+              </label>
+              <label>
+                Bin 文件名
+                <input
+                  value={exportBinaryFilename}
+                  onChange={(event) => setExportBinaryFilename(event.target.value)}
+                  placeholder="pdo_sdo_data.bin"
+                />
+              </label>
+            </div>
             {exportError ? <p className="export-error">{exportError}</p> : null}
             {exportReport ? (
               <section className="export-result-panel">
@@ -6173,11 +6195,11 @@ export function Dashboard({
                     <strong>{exportReport.export_root}</strong>
                   </article>
                   <article className="export-report__wide">
-                    <span>ConfigUpdate.json</span>
+                    <span>JSON 文件</span>
                     <strong>{exportReport.manifest_path}</strong>
                   </article>
                   <article className="export-report__wide">
-                    <span>pdo_sdo_data.bin</span>
+                    <span>Bin 文件</span>
                     <strong>{exportReport.binary_path}</strong>
                   </article>
                 </div>

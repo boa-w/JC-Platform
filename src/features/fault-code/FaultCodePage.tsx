@@ -123,6 +123,10 @@ function hexOrDecimal(value: number) {
   return `0x${value.toString(16).toUpperCase()}`;
 }
 
+function clampFaultCode(value: number) {
+  return Math.max(0, Math.min(255, Math.trunc(value)));
+}
+
 function parseCodeList(value: string) {
   return value
     .split(',')
@@ -141,6 +145,16 @@ function codeListText(values: number[] | undefined) {
 
 function sourceKeyFor(source: Pick<FaultCodeSource, 'source_key' | 'source_id'>) {
   return source.source_key || sourcePresets[source.source_id]?.key || `source_${source.source_id}`;
+}
+
+function sourceOptionLabel(source: FaultCodeSource) {
+  const name = source.name || sourceKeyFor(source);
+  const type = source.type_char || typeChars[source.source_id] || '-';
+  const canId =
+    typeof source.can_id === 'number' && Number.isFinite(source.can_id)
+      ? hexOrDecimal(source.can_id)
+      : '-';
+  return `${name} (${type}, ${canId})`;
 }
 
 function normalizeSource(source: FaultCodeSource): FaultCodeSource {
@@ -218,6 +232,16 @@ function messageKeyFor(
   return `fault.${sourceKey}.${String(item.code).padStart(3, '0')}`;
 }
 
+function isAutoMessageKey(
+  item: Pick<
+    FaultCodeItem,
+    'source_key' | 'type_char' | 'source_id' | 'code' | 'message_key' | 'name_key'
+  >,
+) {
+  const currentKey = item.message_key || item.name_key || '';
+  return !currentKey || currentKey === messageKeyFor(item);
+}
+
 function ensureLanguageEntry(
   language: LanguageDocument,
   key: string,
@@ -240,6 +264,36 @@ function ensureLanguageEntry(
     list_translate: {
       ...language.list_translate,
       [key]: nextValues,
+    },
+  };
+}
+
+function cloneLanguageEntry(
+  language: LanguageDocument,
+  fromKey: string,
+  toKey: string,
+  fallbackZh = '',
+): LanguageDocument {
+  if (!toKey.trim()) return language;
+  const listInner = language.list_inner.includes(toKey)
+    ? language.list_inner
+    : [...language.list_inner, toKey];
+  const sourceValues =
+    (language.list_translate[fromKey] as Record<string, string> | undefined) ?? {};
+  const existingValues =
+    (language.list_translate[toKey] as Record<string, string> | undefined) ?? {};
+  const nextValues = Object.fromEntries(
+    language.list_code_language.map((code) => [
+      code,
+      existingValues[code] ?? sourceValues[code] ?? (code === 'zh' ? fallbackZh : ''),
+    ]),
+  );
+  return {
+    ...language,
+    list_inner: listInner,
+    list_translate: {
+      ...language.list_translate,
+      [toKey]: nextValues,
     },
   };
 }
@@ -350,6 +404,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   const codes = faultCode.codes ?? [];
   const [i18nSearchByRow, setI18nSearchByRow] = useState<Record<number, string>>({});
   const [messageKeyDraftByRow, setMessageKeyDraftByRow] = useState<Record<number, string>>({});
+  const [cloneSourceByRow, setCloneSourceByRow] = useState<Record<number, string>>({});
   const [codeRowKeys, setCodeRowKeys] = useState(() => codes.map(createFaultCodeRowKey));
   const duplicateFaultCodes = buildDuplicateFaultCodeHints(sources, codes);
   const duplicateMessageKeys = buildDuplicateMessageKeyHints(codes, messageKeyDraftByRow);
@@ -442,6 +497,12 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     let nextLanguage = language;
     const nextCodes = codes.map((item, currentIndex) => {
       if (currentIndex !== index) return item;
+      const shouldRefreshAutoKey =
+        isAutoMessageKey(item) &&
+        (patch.source_id !== undefined ||
+          patch.source_key !== undefined ||
+          patch.type_char !== undefined ||
+          patch.code !== undefined);
       const next = { ...item, ...patch };
       if (patch.source_id !== undefined && patch.type_char === undefined) {
         const source = sources.find((candidate) => candidate.source_id === patch.source_id);
@@ -456,6 +517,9 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
         if (source) {
           Object.assign(next, codePatchForSource(source));
         }
+      }
+      if (shouldRefreshAutoKey) {
+        next.message_key = messageKeyFor(next);
       }
       if (!next.message_key) {
         next.message_key = messageKeyFor(next);
@@ -560,9 +624,67 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     updateFaultCode({ ...faultCode, codes: [...codes, { ...item, name: '新故障' }] }, nextLanguage);
   }
 
+  function cloneCodeToSource(index: number) {
+    const item = codes[index];
+    if (!item) return;
+
+    const currentSource = findSourceForCode(item, sources);
+    const currentSourceKey = currentSource ? sourceKeyFor(currentSource) : '';
+    const selectedSourceKey = cloneSourceByRow[index] || '';
+    const fallbackTargetSource = sources.find(
+      (source) => sourceKeyFor(source) !== currentSourceKey,
+    );
+    const targetSource =
+      sources.find((source) => sourceKeyFor(source) === selectedSourceKey) ?? fallbackTargetSource;
+    if (!targetSource) {
+      setCsvStatus('请先选择要复制到的故障来源');
+      return;
+    }
+    if (currentSource && sourceKeyFor(currentSource) === sourceKeyFor(targetSource)) {
+      setCsvStatus('目标来源不能与当前来源相同');
+      return;
+    }
+
+    const code = clampFaultCode(numberValue(item.code));
+    const targetCanId = targetSource.can_id;
+    const duplicatedInTarget = codes.some((candidate) => {
+      const source = findSourceForCode(candidate, sources);
+      return source?.can_id === targetCanId && clampFaultCode(numberValue(candidate.code)) === code;
+    });
+    if (duplicatedInTarget) {
+      setCsvStatus(`${sourceOptionLabel(targetSource)} 已存在故障码 ${code}`);
+      return;
+    }
+
+    const sourceKey = item.message_key || item.name_key || messageKeyFor(item);
+    const nextItem: FaultCodeItem = {
+      ...item,
+      ...codePatchForSource(targetSource),
+      code,
+    };
+    nextItem.message_key = messageKeyFor(nextItem);
+    const zhText = languageText(language, sourceKey) || item.name || '';
+    nextItem.name = zhText;
+    const nextLanguage = cloneLanguageEntry(language, sourceKey, nextItem.message_key, zhText);
+    const insertIndex = index + 1;
+    const nextCodes = [...codes.slice(0, insertIndex), nextItem, ...codes.slice(insertIndex)];
+
+    setI18nSearchByRow({});
+    setMessageKeyDraftByRow({});
+    setCloneSourceByRow({});
+    setCodeRowKeys((current) => [
+      ...current.slice(0, insertIndex),
+      createFaultCodeRowKey(),
+      ...current.slice(insertIndex),
+    ]);
+    updateFaultCode({ ...faultCode, codes: nextCodes }, nextLanguage);
+    setCsvStatus(`已将故障码 ${code} 复制到 ${sourceOptionLabel(targetSource)}`);
+  }
+
   function removeCode(index: number) {
     setI18nSearchByRow({});
     setMessageKeyDraftByRow({});
+    setCloneSourceByRow({});
     setCodeRowKeys((current) => current.filter((_, currentIndex) => currentIndex !== index));
     updateFaultCode({
       ...faultCode,
@@ -926,6 +1048,13 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   ...limitedI18nKeys,
                 ];
                 const isI18nResultLimited = filteredI18nKeys.length > limitedI18nKeys.length;
+                const cloneSourceOptions = sources.filter(
+                  (source) => sourceKeyFor(source) !== codeSourceKey,
+                );
+                const defaultCloneSource = cloneSourceOptions[0];
+                const selectedCloneSource =
+                  cloneSourceByRow[index] ??
+                  (defaultCloneSource ? sourceKeyFor(defaultCloneSource) : '');
                 return (
                   <tr
                     className={
@@ -947,7 +1076,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       >
                         {sources.map((source) => (
                           <option key={sourceKeyFor(source)} value={sourceKeyFor(source)}>
-                            {source.name || sourceKeyFor(source)}
+                            {sourceOptionLabel(source)}
                           </option>
                         ))}
                       </select>
@@ -969,7 +1098,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       />
                       {isDuplicate && duplicateCanId !== null ? (
                         <small className="fault-code-duplicate-hint">
-                          {hexOrDecimal(duplicateCanId)} 下已存在相同故障码
+                          {hexOrDecimal(duplicateCanId)} 来源下已存在相同故障码
                         </small>
                       ) : null}
                     </td>
@@ -1069,9 +1198,37 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       />
                     </td>
                     <td>
-                      <button className="danger" type="button" onClick={() => removeCode(index)}>
-                        删除
-                      </button>
+                      <div className="fault-code-row-actions">
+                        <select
+                          disabled={cloneSourceOptions.length === 0}
+                          value={selectedCloneSource}
+                          onChange={(event) =>
+                            setCloneSourceByRow((current) => ({
+                              ...current,
+                              [index]: event.target.value,
+                            }))
+                          }
+                        >
+                          {cloneSourceOptions.length === 0 ? (
+                            <option value="">无其他来源</option>
+                          ) : null}
+                          {cloneSourceOptions.map((source) => (
+                            <option key={sourceKeyFor(source)} value={sourceKeyFor(source)}>
+                              {sourceOptionLabel(source)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          disabled={cloneSourceOptions.length === 0}
+                          type="button"
+                          onClick={() => cloneCodeToSource(index)}
+                        >
+                          复制到来源
+                        </button>
+                        <button className="danger" type="button" onClick={() => removeCode(index)}>
+                          删除
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

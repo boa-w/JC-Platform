@@ -281,6 +281,10 @@ enum ExportCommand {
         document: String,
         #[arg(long = "output-dir")]
         output_dir: String,
+        #[arg(long = "manifest-filename")]
+        manifest_filename: Option<String>,
+        #[arg(long = "binary-filename")]
+        binary_filename: Option<String>,
         #[arg(long)]
         project_path: Option<String>,
     },
@@ -290,6 +294,10 @@ enum ExportCommand {
         document: String,
         #[arg(long = "output-dir")]
         output_dir: String,
+        #[arg(long = "manifest-filename")]
+        manifest_filename: Option<String>,
+        #[arg(long = "binary-filename")]
+        binary_filename: Option<String>,
         #[arg(long)]
         project_path: Option<String>,
     },
@@ -611,12 +619,16 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
         ExportCommand::Plan {
             document,
             output_dir,
+            manifest_filename,
+            binary_filename,
             project_path,
         } => print_json(
             &commands::build_project_export_plan(ExportPlanRequest {
                 project_path,
                 output_dir,
                 document: read_json_value(&document)?,
+                manifest_filename,
+                binary_filename,
                 export_options: Default::default(),
             }),
             pretty,
@@ -624,12 +636,16 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
         ExportCommand::Package {
             document,
             output_dir,
+            manifest_filename,
+            binary_filename,
             project_path,
         } => print_json(
             &commands::export_project_package_command(ExportPlanRequest {
                 project_path,
                 output_dir,
                 document: read_json_value(&document)?,
+                manifest_filename,
+                binary_filename,
                 export_options: Default::default(),
             }),
             pretty,
@@ -643,6 +659,8 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
                 project_path,
                 output_dir,
                 document: read_json_value(&document)?,
+                manifest_filename: None,
+                binary_filename: None,
                 export_options: Default::default(),
             }),
             pretty,

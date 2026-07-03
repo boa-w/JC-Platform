@@ -4,7 +4,13 @@ import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
 import { LanguageComparisonView } from './LanguageComparisonView';
 import { LanguageSidebar } from './LanguageSidebar';
-import { type TranslateScope, TranslationServicePanel } from './TranslationServicePanel';
+import {
+  type TranslateLogEntry,
+  type TranslateLogLevel,
+  type TranslateProgress,
+  type TranslateScope,
+  TranslationServicePanel,
+} from './TranslationServicePanel';
 import { TranslationTable } from './TranslationTable';
 import { TranslationToolbar } from './TranslationToolbar';
 import type { FilterMode, TranslationRow } from './types';
@@ -27,6 +33,14 @@ interface SavedTranslateOptions {
   sourceLanguage?: string;
   targetLanguage?: string;
 }
+
+const initialTranslateProgress: TranslateProgress = {
+  total: 0,
+  done: 0,
+  success: 0,
+  failed: 0,
+  currentKey: '',
+};
 
 function readSavedTranslateOptions(): SavedTranslateOptions {
   if (typeof window === 'undefined') return {};
@@ -113,6 +127,8 @@ function normalizeDocument(
 
 export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguagePageProps) {
   const langMainRef = useRef<HTMLDivElement | null>(null);
+  const cancelTranslateRef = useRef(false);
+  const translateLogIdRef = useRef(0);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(() => {
     const codes = document.list_code_language;
     const savedTarget = readSavedTranslateOptions().targetLanguage;
@@ -136,6 +152,10 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   });
   const [translateStatus, setTranslateStatus] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translateProgress, setTranslateProgress] =
+    useState<TranslateProgress>(initialTranslateProgress);
+  const [translateLogs, setTranslateLogs] = useState<TranslateLogEntry[]>([]);
+  const [showTranslateLogs, setShowTranslateLogs] = useState(false);
   const [selectedTranslationKeys, setSelectedTranslationKeys] = useState<Set<string>>(
     () => new Set(),
   );
@@ -417,6 +437,31 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     });
   }
 
+  function addTranslateLog(level: TranslateLogLevel, message: string, key?: string) {
+    translateLogIdRef.current += 1;
+    const time = new Date().toLocaleTimeString();
+    const entry: TranslateLogEntry = {
+      id: translateLogIdRef.current,
+      level,
+      message,
+      key,
+      time,
+    };
+    setTranslateLogs((current) => [entry, ...current].slice(0, 300));
+  }
+
+  function resetTranslateRun(total: number) {
+    cancelTranslateRef.current = false;
+    setTranslateProgress({ ...initialTranslateProgress, total });
+    setShowTranslateLogs(true);
+  }
+
+  function handleCancelTranslate() {
+    cancelTranslateRef.current = true;
+    setTranslateStatus('正在取消，等待当前条目完成...');
+    addTranslateLog('warning', '用户请求取消翻译');
+  }
+
   async function handleTranslateRows() {
     if (!selectedLanguage) {
       setTranslateStatus('请选择目标语言');
@@ -449,36 +494,85 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     }
 
     setIsTranslating(true);
-    setTranslateStatus(`正在翻译 ${candidates.length} 条...`);
+    resetTranslateRun(candidates.length);
+    setTranslateStatus(`正在翻译 0/${candidates.length} 条...`);
+    addTranslateLog(
+      'info',
+      `开始翻译 ${candidates.length} 条，${translateSourceLanguage} → ${selectedLanguage}`,
+    );
     try {
-      const response = await translateBaiduText({
-        appId: translationSettings.baiduAppId.trim(),
-        appKey: translationSettings.baiduAppKey.trim(),
-        from: translateSourceLanguage,
-        to: selectedLanguage,
-        texts: candidates.map((row) => {
-          const translations =
-            (document.list_translate[row.key] as Record<string, string> | undefined) ?? {};
-          return String(translations[translateSourceLanguage] ?? '');
-        }),
-      });
-
       const nextTranslate: Record<string, unknown> = { ...document.list_translate };
-      let updated = 0;
+      let success = 0;
+      let failed = 0;
+      let done = 0;
+
       for (let index = 0; index < candidates.length; index++) {
-        const translated = response.translations[index] ?? '';
-        if (!translated.trim()) continue;
+        if (cancelTranslateRef.current) {
+          addTranslateLog('warning', `已取消，剩余 ${candidates.length - index} 条未翻译`);
+          break;
+        }
+
         const row = candidates[index];
-        const translations = (nextTranslate[row.key] as Record<string, string> | undefined) ?? {};
-        nextTranslate[row.key] = { ...translations, [selectedLanguage]: translated };
-        updated++;
+        const sourceTranslations =
+          (document.list_translate[row.key] as Record<string, string> | undefined) ?? {};
+        const sourceText = String(sourceTranslations[translateSourceLanguage] ?? '');
+
+        setTranslateProgress((current) => ({ ...current, currentKey: row.key }));
+        setTranslateStatus(`正在翻译 ${index + 1}/${candidates.length}: ${row.key}`);
+
+        try {
+          const response = await translateBaiduText({
+            appId: translationSettings.baiduAppId.trim(),
+            appKey: translationSettings.baiduAppKey.trim(),
+            from: translateSourceLanguage,
+            to: selectedLanguage,
+            texts: [sourceText],
+          });
+
+          const translated = response.translations[0] ?? '';
+          if (!translated.trim()) {
+            addTranslateLog('warning', '返回空结果，未写入', row.key);
+            failed += 1;
+            done += 1;
+            setTranslateProgress((current) => ({ ...current, done, failed }));
+            continue;
+          }
+
+          const translations = (nextTranslate[row.key] as Record<string, string> | undefined) ?? {};
+          nextTranslate[row.key] = { ...translations, [selectedLanguage]: translated };
+          onUpdate({ ...document, list_translate: { ...nextTranslate } });
+          addTranslateLog('success', '翻译成功', row.key);
+          success += 1;
+          done += 1;
+          setTranslateProgress((current) => ({ ...current, done, success }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          addTranslateLog('error', message, row.key);
+          failed += 1;
+          done += 1;
+          setTranslateProgress((current) => ({ ...current, done, failed }));
+        }
       }
 
-      onUpdate({ ...document, list_translate: nextTranslate });
-      setTranslateStatus(`已翻译 ${updated} 条`);
+      const wasCancelled = cancelTranslateRef.current;
+      setTranslateProgress((current) => ({ ...current, currentKey: '' }));
+      setTranslateStatus(
+        wasCancelled
+          ? `已取消：成功 ${success} 条，失败 ${failed} 条`
+          : `翻译完成：成功 ${success} 条，失败 ${failed} 条`,
+      );
+      addTranslateLog(
+        wasCancelled ? 'warning' : 'info',
+        wasCancelled
+          ? `翻译取消：成功 ${success} 条，失败 ${failed} 条`
+          : `翻译完成：成功 ${success} 条，失败 ${failed} 条`,
+      );
     } catch (error) {
-      setTranslateStatus(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      setTranslateStatus(message);
+      addTranslateLog('error', message);
     } finally {
+      cancelTranslateRef.current = false;
       setIsTranslating(false);
     }
   }
@@ -564,10 +658,16 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               configured={isBaiduTranslateConfigured}
               filteredCount={rows.length}
               selectedCount={selectedTranslationKeys.size}
+              progress={translateProgress}
+              logs={translateLogs}
+              showLogs={showTranslateLogs}
               onSourceLanguageChange={setTranslateSourceLanguage}
               onTargetLanguageChange={setSelectedLanguage}
               onScopeChange={setTranslateScope}
               onTranslate={handleTranslateRows}
+              onCancelTranslate={handleCancelTranslate}
+              onToggleLogs={() => setShowTranslateLogs((current) => !current)}
+              onClearLogs={() => setTranslateLogs([])}
             />
             <TranslationTable
               document={document}

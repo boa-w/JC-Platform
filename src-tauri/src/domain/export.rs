@@ -77,6 +77,10 @@ pub struct ExportPlanRequest {
     pub output_dir: String,
     pub document: Value,
     #[serde(default)]
+    pub manifest_filename: Option<String>,
+    #[serde(default)]
+    pub binary_filename: Option<String>,
+    #[serde(default)]
     pub export_options: ExportBatteryOptions,
 }
 
@@ -281,6 +285,13 @@ impl DataDescriptionPlan {
 /// 分析 UI 资源和二进制数据，生成目录结构、文件路径和资源清单。
 pub fn build_export_plan(request: ExportPlanRequest) -> ExportPlanReport {
     let export_root = join_fs_path(&request.output_dir, "jc_export");
+    let manifest_filename = export_file_name(
+        request.manifest_filename.as_deref(),
+        "ConfigUpdate.json",
+        "json",
+    );
+    let binary_filename =
+        export_file_name(request.binary_filename.as_deref(), "pdo_sdo_data.bin", "bin");
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
     let ui_report = parse_ui_info(request.project_path.as_deref(), &request.document);
@@ -341,8 +352,8 @@ pub fn build_export_plan(request: ExportPlanRequest) -> ExportPlanReport {
             join_fs_path(&export_root, "img/anim"),
             join_fs_path(&export_root, "bin"),
         ],
-        manifest_path: join_fs_path(&export_root, "ConfigUpdate.json"),
-        binary_path: join_fs_path(&export_root, "bin/pdo_sdo_data.bin"),
+        manifest_path: join_fs_path(&export_root, &manifest_filename),
+        binary_path: join_fs_path(&join_fs_path(&export_root, "bin"), &binary_filename),
         screen_src: ScreenSourcePlan {
             update: true,
             num: pages.len(),
@@ -2387,10 +2398,32 @@ fn join_path(base: &str, child: &str) -> String {
 }
 
 fn join_fs_path(base: &str, child: &str) -> String {
-    PathBuf::from(base)
-        .join(child)
-        .to_string_lossy()
-        .into_owned()
+    let mut path = PathBuf::from(base);
+    for segment in child.split(['/', '\\']).filter(|segment| !segment.is_empty()) {
+        path.push(segment);
+    }
+    path.to_string_lossy().into_owned()
+}
+
+fn export_file_name(value: Option<&str>, default_name: &str, extension: &str) -> String {
+    let trimmed = value.map(str::trim).filter(|name| !name.is_empty());
+    let Some(raw_name) = trimmed else {
+        return default_name.to_string();
+    };
+    let file_name = std::path::Path::new(raw_name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or(default_name);
+    if file_name
+        .rsplit_once('.')
+        .is_some_and(|(_, existing_extension)| existing_extension.eq_ignore_ascii_case(extension))
+    {
+        file_name.to_string()
+    } else {
+        format!("{}.{}", strip_extension(file_name), extension)
+    }
 }
 
 #[cfg(test)]
@@ -2513,6 +2546,88 @@ mod tests {
     }
 
     #[test]
+    fn build_project_binary_keeps_same_fault_code_for_different_sources() {
+        let document = json!({
+            "language_info": {
+                "list_code_language": ["zh"],
+                "list_inner": [],
+                "list_translate": {
+                    "fault.traction.182": { "zh": "牵引 BMS 故障" },
+                    "fault.pump.182": { "zh": "油泵容量过低" }
+                }
+            },
+            "pdo_global_param": [
+                { "param_id": "A", "name": "A", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
+            ],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
+            "battery_monitor_info": disabled_battery_monitor(),
+            "fault_code_info": {
+                "enabled": true,
+                "version": 1,
+                "sources": [
+                    {
+                        "source_key": "traction",
+                        "source_id": 1,
+                        "type_char": "T",
+                        "can_id": 648,
+                        "frame_type": 0,
+                        "code_byte": 2,
+                        "clear_code": 0,
+                        "invalid_codes": []
+                    },
+                    {
+                        "source_key": "pump",
+                        "source_id": 2,
+                        "type_char": "P",
+                        "can_id": 660,
+                        "frame_type": 0,
+                        "code_byte": 2,
+                        "clear_code": 0,
+                        "invalid_codes": []
+                    }
+                ],
+                "codes": [
+                    {
+                        "source_key": "traction",
+                        "source_id": 1,
+                        "code": 182,
+                        "message_key": "fault.traction.182",
+                        "severity": "fault"
+                    },
+                    {
+                        "source_key": "pump",
+                        "source_id": 2,
+                        "code": 182,
+                        "message_key": "fault.pump.182",
+                        "severity": "fault"
+                    }
+                ]
+            }
+        });
+
+        let report = build_project_binary(&document);
+
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(report.data_description.fault_source_total, 2);
+        assert_eq!(report.data_description.fault_code_total, 2);
+
+        let base = report.data_description.fault_code_base_addr as usize;
+        let code_table_addr =
+            u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
+        let first = &report.bytes[code_table_addr..code_table_addr + 8];
+        let second = &report.bytes[code_table_addr + 8..code_table_addr + 16];
+
+        assert_eq!(first[0], b'T');
+        assert_eq!(first[1], 182);
+        assert_eq!(second[0], b'P');
+        assert_eq!(second[1], 182);
+        assert_ne!(&first[2..4], &second[2..4]);
+    }
+
+    #[test]
     fn export_plan_uses_stable_legacy_paths_and_data_description_target() {
         let document = json!({
             "device": { "resolution_w": 800, "resolution_h": 480 },
@@ -2531,6 +2646,8 @@ mod tests {
             project_path: None,
             output_dir: "out".to_string(),
             document,
+            manifest_filename: None,
+            binary_filename: None,
             export_options: ExportBatteryOptions::default(),
         });
 
@@ -2556,6 +2673,40 @@ mod tests {
         assert_eq!(report.screen_src.pages[1].key, "page_02");
         assert_eq!(report.data_description.src, "bin/pdo_sdo_data");
         assert_eq!(report.data_description.dest, "bin/data");
+    }
+
+    #[test]
+    fn export_plan_uses_custom_manifest_and_binary_file_names() {
+        let document = json!({
+            "device": { "resolution_w": 800, "resolution_h": 480 },
+            "ui_info": [],
+            "language_info": language_info_without_selected_languages(),
+            "battery_monitor_info": disabled_battery_monitor(),
+            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] }
+        });
+
+        let report = build_export_plan(ExportPlanRequest {
+            project_path: None,
+            output_dir: "out".to_string(),
+            document,
+            manifest_filename: Some("../release_config".to_string()),
+            binary_filename: Some("release_data".to_string()),
+            export_options: ExportBatteryOptions::default(),
+        });
+
+        assert_eq!(
+            report.manifest_path,
+            join_fs_path(&report.export_root, "release_config.json")
+        );
+        assert_eq!(
+            report.binary_path,
+            join_fs_path(&join_fs_path(&report.export_root, "bin"), "release_data.bin")
+        );
     }
 
     #[cfg(windows)]

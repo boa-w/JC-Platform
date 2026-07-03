@@ -102,6 +102,7 @@
 [data-theme="dark"] .project-open-form input,
 [data-theme="dark"] .project-create-grid input,
 [data-theme="dark"] .export-form input,
+[data-theme="dark"] .export-filename-grid input,
 [data-theme="dark"] .config-table-toolbar input,
 [data-theme="dark"] .lang-code-input,
 [data-theme="dark"] .lang-filter-input,
@@ -123,6 +124,7 @@
 [data-theme="dark"] .project-open-form input:focus,
 [data-theme="dark"] .project-create-grid input:focus,
 [data-theme="dark"] .export-form input:focus,
+[data-theme="dark"] .export-filename-grid input:focus,
 [data-theme="dark"] .config-table-toolbar input:focus,
 [data-theme="dark"] .lang-code-input:focus,
 [data-theme="dark"] .lang-filter-input:focus,
@@ -1248,13 +1250,20 @@ button {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
+.export-filename-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+}
+
 .project-create-grid {
   grid-template-columns: minmax(0, 1fr) 100px 100px auto;
 }
 
 .project-open-form label,
 .project-create-grid label,
-.export-form label {
+.export-form label,
+.export-filename-grid label {
   display: grid;
   gap: 4px;
   color: var(--color-text-secondary);
@@ -1264,7 +1273,8 @@ button {
 
 .project-open-form input,
 .project-create-grid input,
-.export-form input {
+.export-form input,
+.export-filename-grid input {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
@@ -1275,7 +1285,8 @@ button {
 
 .project-open-form input:focus,
 .project-create-grid input:focus,
-.export-form input:focus {
+.export-form input:focus,
+.export-filename-grid input:focus {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
@@ -2312,6 +2323,7 @@ button {
   }
 
   .export-form,
+  .export-filename-grid,
   .export-report--primary,
   .export-tool-grid {
     grid-template-columns: 1fr;
@@ -3600,7 +3612,7 @@ button {
 }
 
 .fault-code-table {
-  min-width: 1040px;
+  min-width: 1280px;
 }
 
 .fault-code-toolbar-actions {
@@ -3659,6 +3671,17 @@ button {
 .fault-code-i18n-meta {
   color: var(--color-text-muted);
   font-size: 11px;
+}
+
+.fault-code-row-actions {
+  display: grid;
+  min-width: 180px;
+  gap: 6px;
+}
+
+.fault-code-row-actions button,
+.fault-code-row-actions select {
+  width: 100%;
 }
 
 .fault-code-readonly-value {
@@ -4899,6 +4922,122 @@ html {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lang-translate-progress {
+  flex: 1 0 100%;
+  display: grid;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.lang-translate-progress-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.lang-translate-progress-header span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lang-translate-progress-bar {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-border-light);
+}
+
+.lang-translate-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  transition: width 0.2s ease;
+}
+
+.lang-translate-logbar {
+  flex: 1 0 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: -2px;
+}
+
+.lang-translate-log {
+  flex: 1 0 100%;
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.lang-translate-log-empty {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.lang-translate-log-entry {
+  display: grid;
+  grid-template-columns: auto minmax(80px, 160px) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.lang-translate-log-entry.no-key {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.lang-translate-log-entry.info {
+  border-left-color: var(--color-primary);
+}
+
+.lang-translate-log-entry.success {
+  border-left-color: var(--color-success);
+}
+
+.lang-translate-log-entry.warning {
+  border-left-color: var(--color-warning);
+}
+
+.lang-translate-log-entry.error {
+  border-left-color: var(--color-danger);
+}
+
+.lang-translate-log-time {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lang-translate-log-key {
+  overflow: hidden;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lang-translate-log-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .lang-scroll-top {

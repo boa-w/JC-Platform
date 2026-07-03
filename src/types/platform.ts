@@ -529,6 +529,8 @@ export interface ExportPlanRequest {
   project_path?: string;
   output_dir: string;
   document: unknown;
+  manifest_filename?: string;
+  binary_filename?: string;
   export_options?: ExportBatteryOptions;
 }
 
