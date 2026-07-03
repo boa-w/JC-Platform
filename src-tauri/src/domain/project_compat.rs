@@ -14,6 +14,8 @@ const REFACTOR_ONLY_SECTIONS: &[&str] = &[
     "battery_monitor_info",
 ];
 
+const LEGACY_CONFIG_VERSION: &str = "jc001";
+
 const LEGACY_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "config_version",
     "device",
@@ -38,6 +40,20 @@ const DEVICE_FIELD_ORDER: &[&str] = &[
     "screen size",
     "resolution_w",
     "resolution_h",
+];
+const UI_INFO_FIELD_ORDER: &[&str] = &["logo", "main"];
+const UI_MAIN_FIELD_ORDER: &[&str] = &["name", "item"];
+const UI_RESOURCE_FIELD_ORDER: &[&str] = &[
+    "name",
+    "x",
+    "y",
+    "w",
+    "h",
+    "handle",
+    "default_option",
+    "dest",
+    "isjpg",
+    "option",
 ];
 const PDO_SIMPLE_FIELD_ORDER: &[&str] = &["pdo_send", "pdo_recv"];
 const SDO_FIELD_ORDER: &[&str] = &["type", "user_auth", "name_index", "name", "children"];
@@ -83,8 +99,19 @@ pub fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
             object.remove(*section);
         }
     }
+    set_legacy_config_version(&mut document);
     update_project_update_time(&mut document, &current_legacy_timestamp());
     order_legacy_jcpro_document(document)
+}
+
+fn set_legacy_config_version(document: &mut Value) {
+    let Some(root) = document.as_object_mut() else {
+        return;
+    };
+    root.insert(
+        "config_version".to_string(),
+        Value::String(LEGACY_CONFIG_VERSION.to_string()),
+    );
 }
 
 fn current_legacy_timestamp() -> String {
@@ -112,6 +139,7 @@ fn update_project_update_time(document: &mut Value, timestamp: &str) {
 fn order_legacy_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "project", PROJECT_FIELD_ORDER);
     order_child_object(&mut document, "device", DEVICE_FIELD_ORDER);
+    order_ui_info(&mut document);
     order_child_object(
         &mut document,
         "pdo_simple_send_recv",
@@ -120,6 +148,29 @@ fn order_legacy_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
     order_fault_code_info(&mut document);
     order_object_value(document, LEGACY_JCPRO_TOP_LEVEL_ORDER)
+}
+
+fn order_ui_info(root: &mut Value) {
+    let Some(ui_info) = root.get_mut("ui_info") else {
+        return;
+    };
+
+    order_child_object(ui_info, "logo", UI_RESOURCE_FIELD_ORDER);
+
+    if let Some(items) = ui_info
+        .get_mut("main")
+        .and_then(|main| main.get_mut("item"))
+        .and_then(Value::as_object_mut)
+    {
+        for item in items.values_mut() {
+            let value = std::mem::take(item);
+            *item = order_object_value(value, UI_RESOURCE_FIELD_ORDER);
+        }
+    }
+
+    order_child_object(ui_info, "main", UI_MAIN_FIELD_ORDER);
+    let value = std::mem::take(ui_info);
+    *ui_info = order_object_value(value, UI_INFO_FIELD_ORDER);
 }
 
 fn order_child_object(root: &mut Value, key: &str, field_order: &[&str]) {
@@ -273,7 +324,36 @@ mod tests {
             },
             "device": { "resolution_h": 480, "resolution_w": 800, "meter_code": "D70T", "version": "1", "type": "meter" },
             "config_version": "1",
-            "ui_info": [],
+            "ui_info": {
+                "main": {
+                    "item": {
+                        "bg": {
+                            "option": ["image/bg.png"],
+                            "dest": "main/Bg",
+                            "default_option": 0,
+                            "handle": "show",
+                            "h": 480,
+                            "w": 800,
+                            "y": 0,
+                            "x": 0,
+                            "name": "背景"
+                        }
+                    },
+                    "name": "主界面"
+                },
+                "logo": {
+                    "option": ["image/logo/nuoli.jpg"],
+                    "isjpg": 1,
+                    "dest": "logo/CustomerLogo",
+                    "default_option": 1,
+                    "handle": "show",
+                    "h": 480,
+                    "w": 800,
+                    "y": 0,
+                    "x": 0,
+                    "name": "开机logo"
+                }
+            },
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
             "pdo_global_param": [],
             "pdo_condition": [],
@@ -283,6 +363,10 @@ mod tests {
 
         let sanitized = sanitize_document_for_target("demo.jcpro", document);
         let object = sanitized.as_object().unwrap();
+        assert_eq!(
+            sanitized.get("config_version").and_then(Value::as_str),
+            Some("jc001")
+        );
         assert_eq!(
             object
                 .keys()
@@ -338,6 +422,57 @@ mod tests {
                 "clear_code",
                 "invalid_codes",
                 "enabled",
+            ]
+        );
+
+        let ui_info = sanitized.get("ui_info").unwrap().as_object().unwrap();
+        assert_eq!(
+            ui_info.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["logo", "main"]
+        );
+
+        let logo = ui_info.get("logo").unwrap().as_object().unwrap();
+        assert_eq!(
+            logo.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "name",
+                "x",
+                "y",
+                "w",
+                "h",
+                "handle",
+                "default_option",
+                "dest",
+                "isjpg",
+                "option",
+            ]
+        );
+
+        let main = ui_info.get("main").unwrap().as_object().unwrap();
+        assert_eq!(
+            main.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["name", "item"]
+        );
+
+        let bg = main
+            .get("item")
+            .unwrap()
+            .get("bg")
+            .unwrap()
+            .as_object()
+            .unwrap();
+        assert_eq!(
+            bg.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "name",
+                "x",
+                "y",
+                "w",
+                "h",
+                "handle",
+                "default_option",
+                "dest",
+                "option",
             ]
         );
     }

@@ -33,6 +33,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
     position: 'before' | 'after';
   } | null>(null);
 
+  const visibleLanguageKeys = document.list_inner;
   const translationKeys = document.list_inner.slice(document.list_code_language.length);
 
   function handleStartEdit(key: string, code: string, currentValue: string) {
@@ -67,7 +68,11 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
       return;
     }
     const rowIndex = editingKeyIndex;
-    const oldKey = document.list_inner[rowIndex + document.list_code_language.length];
+    if (rowIndex < document.list_code_language.length) {
+      setEditingKeyIndex(null);
+      return;
+    }
+    const oldKey = document.list_inner[rowIndex];
     if (!oldKey || keyDraft === oldKey) {
       setEditingKeyIndex(null);
       return;
@@ -77,7 +82,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
       return;
     }
     const nextInner = [...document.list_inner];
-    nextInner[rowIndex + document.list_code_language.length] = keyDraft.trim();
+    nextInner[rowIndex] = keyDraft.trim();
     const nextTranslate = { ...document.list_translate };
     const oldTranslations = nextTranslate[oldKey];
     delete nextTranslate[oldKey];
@@ -87,6 +92,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
   }
 
   function handleRemoveKey(index: number) {
+    if (index < document.list_code_language.length) return;
     const key = document.list_inner[index];
     const nextInner = document.list_inner.filter((_, i) => i !== index);
     const nextTranslate = { ...document.list_translate };
@@ -156,7 +162,11 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
       }
 
       const targetIndex = Number(row.dataset.langRowIndex);
-      if (!Number.isFinite(targetIndex) || targetIndex === fromIndex) {
+      if (
+        !Number.isFinite(targetIndex) ||
+        targetIndex === fromIndex ||
+        targetIndex < document.list_code_language.length
+      ) {
         updateDropTarget(null);
         return;
       }
@@ -187,7 +197,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
       pageDocument.removeEventListener('pointerup', finishDrag);
       pageDocument.removeEventListener('pointercancel', finishDrag);
     };
-  }, [draggingIndex, handleReorderKey, updateDropTarget]);
+  }, [draggingIndex, handleReorderKey, updateDropTarget, document.list_code_language.length]);
 
   function cancelNativeDrag(event: DragEvent<HTMLButtonElement>) {
     const fromIndex = draggingIndexRef.current;
@@ -244,7 +254,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
             </tr>
           </thead>
           <tbody>
-            {translationKeys.length === 0 ? (
+            {visibleLanguageKeys.length === 0 ? (
               <tr>
                 <td
                   className="lang-comparison-empty"
@@ -254,9 +264,9 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                 </td>
               </tr>
             ) : null}
-            {translationKeys.map((key, rowIndex) => {
-              const actualIndex = rowIndex + document.list_code_language.length;
-              const isEditingKey = editingKeyIndex === rowIndex;
+            {visibleLanguageKeys.map((key, actualIndex) => {
+              const isConfigKey = actualIndex < document.list_code_language.length;
+              const isEditingKey = editingKeyIndex === actualIndex;
               const rowClassName = [
                 draggingIndex === actualIndex ? 'lang-row-dragging' : '',
                 dropTarget?.index === actualIndex ? `lang-row-drop-${dropTarget.position}` : '',
@@ -283,9 +293,10 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                       />
                     ) : (
                       <button
-                        className="lang-comparison-key-text"
-                        onClick={() => startEditKey(rowIndex, key)}
-                        title="点击编辑"
+                        className={`lang-comparison-key-text ${isConfigKey ? 'config' : ''}`}
+                        disabled={isConfigKey}
+                        onClick={() => !isConfigKey && startEditKey(actualIndex, key)}
+                        title={isConfigKey ? '语言名称配置键，不可编辑 key' : '点击编辑'}
                         type="button"
                       >
                         {key}
@@ -327,24 +338,28 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                     );
                   })}
                   <td className="lang-comparison-cell-actions">
-                    <button
-                      aria-label={`拖动 ${key} 调整顺序`}
-                      className="lang-btn lang-btn--icon lang-drag-handle"
-                      onDragStart={cancelNativeDrag}
-                      onPointerDown={(event) => beginDrag(event, actualIndex)}
-                      type="button"
-                      title="拖动排序"
-                    >
-                      ↕
-                    </button>
-                    <button
-                      className="lang-btn lang-btn--icon lang-btn--danger"
-                      onClick={() => handleRemoveKey(actualIndex)}
-                      type="button"
-                      title="删除"
-                    >
-                      ×
-                    </button>
+                    {!isConfigKey ? (
+                      <button
+                        aria-label={`拖动 ${key} 调整顺序`}
+                        className="lang-btn lang-btn--icon lang-drag-handle"
+                        onDragStart={cancelNativeDrag}
+                        onPointerDown={(event) => beginDrag(event, actualIndex)}
+                        type="button"
+                        title="拖动排序"
+                      >
+                        ↕
+                      </button>
+                    ) : null}
+                    {!isConfigKey ? (
+                      <button
+                        className="lang-btn lang-btn--icon lang-btn--danger"
+                        onClick={() => handleRemoveKey(actualIndex)}
+                        type="button"
+                        title="删除"
+                      >
+                        ×
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               );

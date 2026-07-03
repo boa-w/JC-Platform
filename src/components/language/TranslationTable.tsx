@@ -65,7 +65,7 @@ export function TranslationTable({
 
   function commitKeyEdit() {
     if (editingKeyIndex !== null && keyDraft.trim()) {
-      const row = rows[editingKeyIndex];
+      const row = rows.find((item) => item.index === editingKeyIndex);
       if (row && keyDraft !== row.key) {
         onUpdateKey(editingKeyIndex, row.key, keyDraft.trim());
       }

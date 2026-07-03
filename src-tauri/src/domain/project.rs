@@ -182,7 +182,7 @@ pub struct SaveProjectAsReport {
 /// 创建包含所有必要段落的新项目 JSON 文档。
 pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_h: u32) -> Value {
     json!({
-        "config_version": "0.1.0-tauri-refactor",
+        "config_version": "jc001",
         "device": {
             "resolution_w": resolution_w,
             "resolution_h": resolution_h

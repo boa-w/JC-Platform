@@ -173,10 +173,14 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     return document.list_inner.slice(document.list_code_language.length);
   }, [document.list_inner, document.list_code_language]);
 
+  const visibleLanguageKeys = useMemo(() => {
+    return document.list_inner;
+  }, [document.list_inner]);
+
   const modifiedKeys = useMemo(() => {
     const keys = new Set<string>();
     if (!baseline || !selectedLanguage) return keys;
-    for (let i = document.list_code_language.length; i < document.list_inner.length; i++) {
+    for (let i = 0; i < document.list_inner.length; i++) {
       const key = document.list_inner[i];
       const baselineKey = baseline.list_inner[i];
       const currentTranslations = (document.list_translate[key] as Record<string, string>) ?? {};
@@ -192,10 +196,10 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   }, [document, baseline, selectedLanguage]);
 
   const rows: TranslationRow[] = useMemo(() => {
-    let filtered = translationKeys.map((key, i) => ({
+    let filtered = visibleLanguageKeys.map((key, i) => ({
       key,
-      index: i + document.list_code_language.length,
-      isConfigKey: false,
+      index: i,
+      isConfigKey: i < document.list_code_language.length,
       translations: (document.list_translate[key] as Record<string, string>) ?? {},
     }));
 
@@ -224,7 +228,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
 
     return filtered;
   }, [
-    translationKeys,
+    visibleLanguageKeys,
     document.list_code_language.length,
     document.list_translate,
     modifiedKeys,
@@ -523,7 +527,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               filterMode={filterMode}
               sourceLanguage={translateSourceLanguage}
               targetLanguage={selectedLanguage}
-              totalKeys={translationKeys.length}
+              totalKeys={visibleLanguageKeys.length}
               filteredCount={rows.length}
               onSearch={setSearchQuery}
               onFilter={setFilterMode}

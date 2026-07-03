@@ -5422,6 +5422,17 @@ html {
   background: var(--color-primary-light);
 }
 
+.lang-comparison-key-text.config,
+.lang-comparison-key-text:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.lang-comparison-key-text.config:hover,
+.lang-comparison-key-text:disabled:hover {
+  background: transparent;
+}
+
 .lang-comparison-key-input {
   width: 100%;
   border: 1px solid var(--color-primary);

@@ -92,6 +92,7 @@ pub fn load_project(path: String) -> Result<LoadedProject, String> {
 pub fn create_project(request: NewProjectRequest) -> Result<LoadedProject, String> {
     let document =
         create_legacy_project_document(&request.name, request.resolution_w, request.resolution_h);
+    let document = sanitize_document_for_target(&request.path, document);
     json_store::write_json(&request.path, &document).map_err(|error| error.to_string())?;
     load_project_from_document(request.path, document)
 }
@@ -126,7 +127,8 @@ pub fn migrate_project_document(document: Value) -> MigratedProject {
 #[tauri::command]
 pub fn migrate_project_file(path: String) -> Result<MigratedProject, String> {
     let document = json_store::read_json::<Value>(&path).map_err(|error| error.to_string())?;
-    let migrated = migrate_legacy_project_document(Some(path.clone()), document);
+    let mut migrated = migrate_legacy_project_document(Some(path.clone()), document);
+    migrated.document = sanitize_document_for_target(&path, migrated.document);
     json_store::write_json(&path, &migrated.document).map_err(|error| error.to_string())?;
     Ok(migrated)
 }
