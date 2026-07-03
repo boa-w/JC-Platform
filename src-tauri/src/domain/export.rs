@@ -22,7 +22,7 @@ use crate::infrastructure::file_system::{copy_file, ensure_dir};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::{fs, path::PathBuf};
 
 /// 导出包摘要。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -280,7 +280,7 @@ impl DataDescriptionPlan {
 ///
 /// 分析 UI 资源和二进制数据，生成目录结构、文件路径和资源清单。
 pub fn build_export_plan(request: ExportPlanRequest) -> ExportPlanReport {
-    let export_root = join_path(&request.output_dir, "jc_export");
+    let export_root = join_fs_path(&request.output_dir, "jc_export");
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
     let ui_report = parse_ui_info(request.project_path.as_deref(), &request.document);
@@ -337,12 +337,12 @@ pub fn build_export_plan(request: ExportPlanRequest) -> ExportPlanReport {
         valid: errors.is_empty(),
         export_root: export_root.clone(),
         directories: vec![
-            join_path(&export_root, "img"),
-            join_path(&export_root, "img/anim"),
-            join_path(&export_root, "bin"),
+            join_fs_path(&export_root, "img"),
+            join_fs_path(&export_root, "img/anim"),
+            join_fs_path(&export_root, "bin"),
         ],
-        manifest_path: join_path(&export_root, "ConfigUpdate.json"),
-        binary_path: join_path(&export_root, "bin/pdo_sdo_data.bin"),
+        manifest_path: join_fs_path(&export_root, "ConfigUpdate.json"),
+        binary_path: join_fs_path(&export_root, "bin/pdo_sdo_data.bin"),
         screen_src: ScreenSourcePlan {
             update: true,
             num: pages.len(),
@@ -446,7 +446,7 @@ pub fn export_project_package(request: ExportPlanRequest) -> ProjectExportReport
 }
 
 pub fn copy_ui_images(request: ExportPlanRequest) -> UiImageCopyReport {
-    let export_root = join_path(&request.output_dir, "jc_export");
+    let export_root = join_fs_path(&request.output_dir, "jc_export");
     let mut errors = Vec::new();
     if let Err(error) = prepare_image_directories(&export_root) {
         errors.push(error);
@@ -462,10 +462,10 @@ pub fn copy_ui_images(request: ExportPlanRequest) -> UiImageCopyReport {
 }
 
 fn copy_ui_images_without_clean(request: ExportPlanRequest) -> UiImageCopyReport {
-    let export_root = join_path(&request.output_dir, "jc_export");
+    let export_root = join_fs_path(&request.output_dir, "jc_export");
     let directories = vec![
-        join_path(&export_root, "img"),
-        join_path(&export_root, "img/anim"),
+        join_fs_path(&export_root, "img"),
+        join_fs_path(&export_root, "img/anim"),
     ];
     let ui_report = parse_ui_info(request.project_path.as_deref(), &request.document);
     let mut errors = ui_report.errors;
@@ -702,13 +702,13 @@ fn prepare_export_directories(export_root: &str) -> Result<(), String> {
     ensure_dir(export_root)
         .map_err(|error| format!("创建导出根目录失败 {}：{}", export_root, error))?;
     prepare_image_directories(export_root)?;
-    prepare_clean_directory(&join_path(export_root, "bin"), "bin")
+    prepare_clean_directory(&join_fs_path(export_root, "bin"), "bin")
 }
 
 fn prepare_image_directories(export_root: &str) -> Result<(), String> {
-    let image_dir = join_path(export_root, "img");
+    let image_dir = join_fs_path(export_root, "img");
     prepare_clean_directory(&image_dir, "img")?;
-    ensure_dir(join_path(&image_dir, "anim"))
+    ensure_dir(join_fs_path(&image_dir, "anim"))
         .map_err(|error| format!("创建导出目录失败 {}/anim：{}", image_dir, error))
 }
 
@@ -2050,7 +2050,7 @@ fn copy_resource_images(
     let entries = legacy_export_entries_for_resource(resource, warnings, errors);
     for entry in entries {
         for (source, relative_destination) in entry.source_files {
-            let destination = join_path(export_root, &relative_destination);
+            let destination = join_fs_path(export_root, &relative_destination);
             copy_one_image(&source, &destination, copied_files, errors);
         }
     }
@@ -2297,6 +2297,10 @@ fn join_path(base: &str, child: &str) -> String {
     )
 }
 
+fn join_fs_path(base: &str, child: &str) -> String {
+    PathBuf::from(base).join(child).to_string_lossy().into_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2425,21 +2429,37 @@ mod tests {
             export_options: ExportBatteryOptions::default(),
         });
 
-        assert_eq!(report.export_root, "out/jc_export");
-        assert_eq!(report.manifest_path, "out/jc_export/ConfigUpdate.json");
-        assert_eq!(report.binary_path, "out/jc_export/bin/pdo_sdo_data.bin");
+        let export_root = join_fs_path("out", "jc_export");
+        assert_eq!(report.export_root, export_root);
+        assert_eq!(
+            report.manifest_path,
+            join_fs_path(&report.export_root, "ConfigUpdate.json")
+        );
+        assert_eq!(
+            report.binary_path,
+            join_fs_path(&report.export_root, "bin/pdo_sdo_data.bin")
+        );
         assert_eq!(
             report.directories,
             vec![
-                "out/jc_export/img",
-                "out/jc_export/img/anim",
-                "out/jc_export/bin"
+                join_fs_path(&report.export_root, "img"),
+                join_fs_path(&report.export_root, "img/anim"),
+                join_fs_path(&report.export_root, "bin")
             ]
         );
         assert_eq!(report.screen_src.pages[0].key, "page_01");
         assert_eq!(report.screen_src.pages[1].key, "page_02");
         assert_eq!(report.data_description.src, "bin/pdo_sdo_data");
         assert_eq!(report.data_description.dest, "bin/data");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn fs_path_join_preserves_windows_separators_for_absolute_paths() {
+        assert_eq!(
+            join_fs_path(r"C:\Users\JCSH\Downloads\111", "jc_export"),
+            r"C:\Users\JCSH\Downloads\111\jc_export"
+        );
     }
 
     #[test]

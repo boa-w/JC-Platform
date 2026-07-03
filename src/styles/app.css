@@ -1218,6 +1218,17 @@ button {
   font-size: 13px;
 }
 
+.export-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.export-header > div {
+  min-width: 0;
+}
+
 .ui-preview-copy h2 {
   margin: 4px 0 8px;
 }
@@ -1323,6 +1334,63 @@ button {
 .sample-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.export-result-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: var(--color-surface);
+}
+
+.export-result-header,
+.export-tools-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.export-result-header strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.export-result-header span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.export-result-header button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.export-result-header button:hover {
+  border-color: var(--color-primary-border);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.export-tools-section {
+  display: grid;
+  gap: 10px;
+}
+
+.export-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 12px;
 }
 
 .project-open-form button:disabled,
@@ -1600,8 +1668,13 @@ button {
 .project-open-report,
 .export-report {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
+  min-width: 0;
+}
+
+.export-report--primary {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
 }
 
 .project-open-report article,
@@ -1612,6 +1685,11 @@ button {
   border-radius: var(--radius-md);
   padding: 10px 12px;
   background: var(--color-surface-alt);
+  min-width: 0;
+}
+
+.export-report__wide {
+  grid-column: 1 / -1;
 }
 
 .project-open-report span,
@@ -1638,6 +1716,17 @@ button {
 .export-warning {
   color: var(--color-warning) !important;
   font-size: 13px;
+}
+
+.export-message {
+  max-height: 132px;
+  overflow: auto;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--color-surface-alt);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 /* ── UI Editor ── */
@@ -2213,6 +2302,18 @@ button {
 @media (max-width: 860px) {
   .ui-editor-grid,
   .ui-resource-side-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .export-header,
+  .export-tools-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .export-form,
+  .export-report--primary,
+  .export-tool-grid {
     grid-template-columns: 1fr;
   }
 }
