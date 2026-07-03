@@ -16,9 +16,10 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 calamine = "0.26"
 can-dbc = { version = "9", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 md5 = "0.7"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 tauri = { version = "2", features = ["protocol-asset"] }

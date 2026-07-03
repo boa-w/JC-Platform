@@ -49,7 +49,6 @@ export const refactorOnlySections = [
   'protocol_mapping',
   'battery_protocol',
   'battery_monitor_info',
-  'fault_code_info',
 ] as const;
 
 export type RefactorOnlySection = (typeof refactorOnlySections)[number];
@@ -71,7 +70,6 @@ const sectionByModule: Partial<Record<NavigationKey, DocumentSectionKey>> = {
   language: 'language_info',
   'battery-protocol': 'battery_protocol',
   'battery-monitor': 'battery_monitor_info',
-  'fault-code': 'fault_code_info',
   'signal-dictionary': 'signal_dictionary',
   'private-protocol': 'private_protocol',
   'protocol-mapping': 'protocol_mapping',

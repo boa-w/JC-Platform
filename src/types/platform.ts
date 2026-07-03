@@ -248,6 +248,7 @@ export interface BatteryMonitorInfo {
 }
 
 export interface FaultCodeInfo {
+  schema_version?: number;
   enabled: boolean;
   version?: number;
   sources?: FaultCodeSource[];
@@ -256,8 +257,10 @@ export interface FaultCodeInfo {
 }
 
 export interface FaultCodeSource {
+  source_key?: string;
   source_id: number;
   type_char: string;
+  name?: string;
   can_id: number;
   frame_type?: number;
   type?: number;
@@ -265,10 +268,12 @@ export interface FaultCodeSource {
   code_offset?: number;
   clear_code?: number;
   invalid_codes?: number[];
+  enabled?: boolean;
   [key: string]: unknown;
 }
 
 export interface FaultCodeItem {
+  source_key?: string;
   type_char?: string;
   source_id?: number;
   code: number;

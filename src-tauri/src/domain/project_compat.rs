@@ -4,13 +4,66 @@
 //! 一份规则。注意：前端当前还把 `battery_protocol` 视为 sidecar/refactor-only；为保持
 //! 既有保存和导出行为不变，后端暂不在 `.jcpro` 写回时剥离该段。
 
-use serde_json::Value;
+use chrono::Local;
+use serde_json::{Map, Value};
 
 const REFACTOR_ONLY_SECTIONS: &[&str] = &[
     "signal_dictionary",
     "private_protocol",
     "protocol_mapping",
     "battery_monitor_info",
+];
+
+const LEGACY_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
+    "config_version",
+    "device",
+    "project",
+    "ui_info",
+    "language_info",
+    "fault_code_info",
+    "pdo_simple_send_recv",
+    "pdo_global_param",
+    "pdo_condition",
+    "pdo_recv",
+    "pdo_send",
+    "sdo_info",
+    "history_ui",
+];
+
+const PROJECT_FIELD_ORDER: &[&str] = &["name", "create_time", "update_time", "from", "base_path"];
+const DEVICE_FIELD_ORDER: &[&str] = &[
+    "type",
+    "version",
+    "meter_code",
+    "screen size",
+    "resolution_w",
+    "resolution_h",
+];
+const PDO_SIMPLE_FIELD_ORDER: &[&str] = &["pdo_send", "pdo_recv"];
+const SDO_FIELD_ORDER: &[&str] = &["type", "user_auth", "name_index", "name", "children"];
+const FAULT_CODE_INFO_FIELD_ORDER: &[&str] =
+    &["schema_version", "enabled", "version", "sources", "codes"];
+const FAULT_CODE_SOURCE_FIELD_ORDER: &[&str] = &[
+    "source_key",
+    "source_id",
+    "name",
+    "type_char",
+    "can_id",
+    "frame_type",
+    "code_byte",
+    "clear_code",
+    "invalid_codes",
+    "enabled",
+];
+const FAULT_CODE_ITEM_FIELD_ORDER: &[&str] = &[
+    "source_key",
+    "source_id",
+    "type_char",
+    "code",
+    "severity",
+    "message_key",
+    "name",
+    "enabled",
 ];
 
 pub fn is_legacy_jcpro_path(path: &str) -> bool {
@@ -30,7 +83,97 @@ pub fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
             object.remove(*section);
         }
     }
-    document
+    update_project_update_time(&mut document, &current_legacy_timestamp());
+    order_legacy_jcpro_document(document)
+}
+
+fn current_legacy_timestamp() -> String {
+    Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+fn update_project_update_time(document: &mut Value, timestamp: &str) {
+    let Some(root) = document.as_object_mut() else {
+        return;
+    };
+    let project = root
+        .entry("project".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !project.is_object() {
+        *project = Value::Object(Map::new());
+    }
+    if let Some(project) = project.as_object_mut() {
+        project.insert(
+            "update_time".to_string(),
+            Value::String(timestamp.to_string()),
+        );
+    }
+}
+
+fn order_legacy_jcpro_document(mut document: Value) -> Value {
+    order_child_object(&mut document, "project", PROJECT_FIELD_ORDER);
+    order_child_object(&mut document, "device", DEVICE_FIELD_ORDER);
+    order_child_object(
+        &mut document,
+        "pdo_simple_send_recv",
+        PDO_SIMPLE_FIELD_ORDER,
+    );
+    order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
+    order_fault_code_info(&mut document);
+    order_object_value(document, LEGACY_JCPRO_TOP_LEVEL_ORDER)
+}
+
+fn order_child_object(root: &mut Value, key: &str, field_order: &[&str]) {
+    let Some(child) = root.get_mut(key) else {
+        return;
+    };
+    let value = std::mem::take(child);
+    *child = order_object_value(value, field_order);
+}
+
+fn order_fault_code_info(root: &mut Value) {
+    let Some(fault_code_info) = root.get_mut("fault_code_info") else {
+        return;
+    };
+
+    if let Some(sources) = fault_code_info
+        .get_mut("sources")
+        .and_then(Value::as_array_mut)
+    {
+        for source in sources {
+            let value = std::mem::take(source);
+            *source = order_object_value(value, FAULT_CODE_SOURCE_FIELD_ORDER);
+        }
+    }
+
+    if let Some(codes) = fault_code_info
+        .get_mut("codes")
+        .and_then(Value::as_array_mut)
+    {
+        for code in codes {
+            let value = std::mem::take(code);
+            *code = order_object_value(value, FAULT_CODE_ITEM_FIELD_ORDER);
+        }
+    }
+
+    let value = std::mem::take(fault_code_info);
+    *fault_code_info = order_object_value(value, FAULT_CODE_INFO_FIELD_ORDER);
+}
+
+fn order_object_value(value: Value, field_order: &[&str]) -> Value {
+    let Value::Object(mut object) = value else {
+        return value;
+    };
+
+    let mut ordered = Map::new();
+    for key in field_order {
+        if let Some(value) = object.remove(*key) {
+            ordered.insert((*key).to_string(), value);
+        }
+    }
+    for (key, value) in object {
+        ordered.insert(key, value);
+    }
+    Value::Object(ordered)
 }
 
 #[cfg(test)]
@@ -46,6 +189,7 @@ mod tests {
             "protocol_mapping": [],
             "battery_monitor_info": {},
             "battery_protocol": { "frames": [] },
+            "fault_code_info": { "sources": [], "codes": [] },
             "pdo_recv": []
         });
 
@@ -56,6 +200,7 @@ mod tests {
         assert!(sanitized.get("protocol_mapping").is_none());
         assert!(sanitized.get("battery_monitor_info").is_none());
         assert!(sanitized.get("battery_protocol").is_some());
+        assert!(sanitized.get("fault_code_info").is_some());
         assert!(sanitized.get("pdo_recv").is_some());
     }
 
@@ -66,5 +211,134 @@ mod tests {
 
         assert!(sanitized.get("signal_dictionary").is_some());
         assert!(sanitized.get("private_protocol").is_some());
+    }
+
+    #[test]
+    fn update_project_update_time_replaces_legacy_timestamp() {
+        let mut document = json!({
+            "project": {
+                "name": "demo",
+                "update_time": "2026-06-11 10:50:40"
+            }
+        });
+
+        update_project_update_time(&mut document, "2026-07-03 12:34:56");
+
+        assert_eq!(
+            document
+                .get("project")
+                .and_then(|project| project.get("update_time"))
+                .and_then(Value::as_str),
+            Some("2026-07-03 12:34:56")
+        );
+    }
+
+    #[test]
+    fn sanitize_jcpro_orders_sections_like_legacy_generator() {
+        let document = json!({
+            "sdo_info": { "children": [], "name": "", "name_index": 0, "type": 0, "user_auth": 0 },
+            "project": { "base_path": "", "from": "", "update_time": "", "create_time": "", "name": "demo" },
+            "pdo_recv": [],
+            "language_info": { "list_translate": {}, "list_inner": [], "list_code_language": [] },
+            "fault_code_info": {
+                "codes": [
+                    {
+                        "enabled": true,
+                        "name": "故障",
+                        "message_key": "fault.traction.001",
+                        "severity": "fault",
+                        "code": 1,
+                        "type_char": "T",
+                        "source_id": 1,
+                        "source_key": "traction"
+                    }
+                ],
+                "sources": [
+                    {
+                        "enabled": true,
+                        "invalid_codes": [],
+                        "clear_code": 0,
+                        "code_byte": 2,
+                        "frame_type": 0,
+                        "can_id": 648,
+                        "type_char": "T",
+                        "name": "牵引",
+                        "source_id": 1,
+                        "source_key": "traction"
+                    }
+                ],
+                "version": 1,
+                "enabled": true,
+                "schema_version": 1
+            },
+            "device": { "resolution_h": 480, "resolution_w": 800, "meter_code": "D70T", "version": "1", "type": "meter" },
+            "config_version": "1",
+            "ui_info": [],
+            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_send": [],
+            "history_ui": []
+        });
+
+        let sanitized = sanitize_document_for_target("demo.jcpro", document);
+        let object = sanitized.as_object().unwrap();
+        assert_eq!(
+            object
+                .keys()
+                .take(13)
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec![
+                "config_version",
+                "device",
+                "project",
+                "ui_info",
+                "language_info",
+                "fault_code_info",
+                "pdo_simple_send_recv",
+                "pdo_global_param",
+                "pdo_condition",
+                "pdo_recv",
+                "pdo_send",
+                "sdo_info",
+                "history_ui",
+            ]
+        );
+
+        let fault = sanitized
+            .get("fault_code_info")
+            .unwrap()
+            .as_object()
+            .unwrap();
+        assert_eq!(
+            fault.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["schema_version", "enabled", "version", "sources", "codes"]
+        );
+
+        let source = fault
+            .get("sources")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .first()
+            .unwrap()
+            .as_object()
+            .unwrap();
+        assert_eq!(
+            source.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "source_key",
+                "source_id",
+                "name",
+                "type_char",
+                "can_id",
+                "frame_type",
+                "code_byte",
+                "clear_code",
+                "invalid_codes",
+                "enabled",
+            ]
+        );
     }
 }

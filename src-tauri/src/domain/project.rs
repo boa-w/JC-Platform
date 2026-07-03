@@ -183,6 +183,10 @@ pub struct SaveProjectAsReport {
 pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_h: u32) -> Value {
     json!({
         "config_version": "0.1.0-tauri-refactor",
+        "device": {
+            "resolution_w": resolution_w,
+            "resolution_h": resolution_h
+        },
         "project": {
             "name": name,
             "from": "tauri-refactor",
@@ -190,11 +194,9 @@ pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_
             "create_time": "",
             "update_time": ""
         },
-        "device": {
-            "resolution_w": resolution_w,
-            "resolution_h": resolution_h
-        },
         "ui_info": [],
+        "language_info": default_language_info(),
+        "fault_code_info": default_fault_code_info(),
         "pdo_simple_send_recv": default_pdo_simple(),
         "pdo_global_param": [],
         "pdo_condition": [],
@@ -204,9 +206,7 @@ pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_
         "signal_dictionary": SignalDictionary::default(),
         "private_protocol": PrivateProtocolDocument::default(),
         "protocol_mapping": [],
-        "language_info": default_language_info(),
         "battery_monitor_info": default_battery_monitor_info(),
-        "fault_code_info": default_fault_code_info()
     })
 }
 
@@ -415,7 +415,10 @@ fn sanitize_document_for_target(target_path: &Path, mut document: Value) -> Valu
             object.remove(section);
         }
     }
-    document
+    crate::domain::project_compat::sanitize_document_for_target(
+        &target_path.to_string_lossy(),
+        document,
+    )
 }
 
 struct SaveAsResourceContext {
@@ -914,26 +917,33 @@ pub fn default_battery_monitor_info() -> Value {
 
 pub fn default_fault_code_info() -> Value {
     json!({
+        "schema_version": 1,
         "enabled": true,
         "version": 1,
         "sources": [
             {
+                "source_key": "traction",
                 "source_id": 1,
                 "type_char": "T",
+                "name": "牵引",
                 "can_id": 648,
                 "frame_type": 0,
                 "code_byte": 2,
                 "clear_code": 0,
-                "invalid_codes": [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222]
+                "invalid_codes": [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
+                "enabled": true
             },
             {
+                "source_key": "pump",
                 "source_id": 2,
                 "type_char": "P",
+                "name": "油泵",
                 "can_id": 660,
                 "frame_type": 0,
                 "code_byte": 2,
                 "clear_code": 0,
-                "invalid_codes": [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222]
+                "invalid_codes": [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
+                "enabled": true
             }
         ],
         "codes": []

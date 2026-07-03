@@ -59,7 +59,6 @@ import {
   jsonEditorKeyForModule,
   legacyTableKindForModule,
   modifiedSectionLabels,
-  type RefactorOnlySection,
   refactorOnlySections,
   restorePathsForEditor,
   shouldRefreshUnifiedProtocol,
@@ -381,6 +380,10 @@ export function Dashboard({
   }, [activeModule.key, realtimeMode, pdoJumpTarget]);
 
   useEffect(() => {
+    if (activeModule.key === 'fault-code') {
+      setShowJsonEditor(false);
+      return;
+    }
     setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2));
     setConfigEditorError(null);
   }, [activeModule.key, loadedProject?.document]);
@@ -397,26 +400,33 @@ export function Dashboard({
     }
     if (!doc.fault_code_info) {
       defaults.fault_code_info = {
+        schema_version: 1,
         enabled: true,
         version: 1,
         sources: [
           {
+            source_key: 'traction',
             source_id: 1,
             type_char: 'T',
+            name: '牵引',
             can_id: 648,
             frame_type: 0,
             code_byte: 2,
             clear_code: 0,
             invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
+            enabled: true,
           },
           {
+            source_key: 'pump',
             source_id: 2,
             type_char: 'P',
+            name: '油泵',
             can_id: 660,
             frame_type: 0,
             code_byte: 2,
             clear_code: 0,
             invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
+            enabled: true,
           },
         ],
         codes: [],
@@ -1100,7 +1110,6 @@ export function Dashboard({
       if (activeModule.key === 'language') document.language_info = parsed;
       if (activeModule.key === 'battery-protocol') document.battery_protocol = parsed;
       if (activeModule.key === 'battery-monitor') document.battery_monitor_info = parsed;
-      if (activeModule.key === 'fault-code') document.fault_code_info = parsed;
       if (activeModule.key === 'signal-dictionary') document.signal_dictionary = parsed;
       if (activeModule.key === 'private-protocol') document.private_protocol = parsed;
       if (activeModule.key === 'protocol-mapping') document.protocol_mapping = parsed;
@@ -3663,7 +3672,6 @@ export function Dashboard({
                 'realtime-data',
                 'battery-protocol',
                 'battery-monitor',
-                'fault-code',
                 'language',
                 'signal-dictionary',
                 'private-protocol',

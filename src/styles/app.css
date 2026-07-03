@@ -3592,11 +3592,11 @@ button {
 }
 
 .fault-code-meta {
-  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
 }
 
 .fault-code-source-table {
-  min-width: 980px;
+  min-width: 1320px;
 }
 
 .fault-code-table {
@@ -3636,6 +3636,43 @@ button {
   color: #b91c1c;
   font-size: 11px;
   font-weight: 600;
+}
+
+.fault-code-i18n-cell {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.fault-code-i18n-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.fault-code-i18n-search-row button {
+  min-width: 48px;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.fault-code-i18n-meta {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.fault-code-readonly-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  font-weight: 700;
 }
 
 .fault-code-source-table td small {

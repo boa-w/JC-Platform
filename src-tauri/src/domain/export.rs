@@ -1127,7 +1127,12 @@ fn build_binary_from_pdo(
     }
 
     let fault_code_bytes = if options.fault_code_info.bin {
-        build_fault_code_bytes(source_document, bytes.len(), &language_entries, &mut warnings)
+        build_fault_code_bytes(
+            source_document,
+            bytes.len(),
+            &language_entries,
+            &mut warnings,
+        )
     } else {
         None
     };
@@ -1236,11 +1241,7 @@ fn collect_fault_code_language_entries(document: &Value, entries: &mut Vec<Strin
     let Some(root) = document.get("fault_code_info") else {
         return;
     };
-    if !root
-        .get("enabled")
-        .and_then(Value::as_bool)
-        .unwrap_or(true)
-    {
+    if !root.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
         return;
     }
     let Some(codes) = root.get("codes").and_then(Value::as_array) else {
@@ -1422,25 +1423,69 @@ fn build_fault_code_bytes(
     warnings: &mut Vec<String>,
 ) -> Option<(Vec<u8>, usize, usize, usize)> {
     let root = document.get("fault_code_info")?;
-    if !root
-        .get("enabled")
-        .and_then(Value::as_bool)
-        .unwrap_or(true)
-    {
+    if !root.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
         return None;
     }
 
-    let sources = root
+    let mut sources = root
         .get("sources")
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
+    sources.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
     let mut codes = root
         .get("codes")
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
     codes.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
+
+    let source_by_key = sources
+        .iter()
+        .filter_map(|source| {
+            let key = fault_source_key(source);
+            if key.is_empty() {
+                None
+            } else {
+                Some((key, source))
+            }
+        })
+        .collect::<HashMap<_, _>>();
+    let source_by_id = sources
+        .iter()
+        .filter_map(|source| {
+            let source_id = object_i64(source, "source_id", 0);
+            if source_id <= 0 {
+                None
+            } else {
+                Some((source_id, source))
+            }
+        })
+        .collect::<HashMap<_, _>>();
+    codes.retain(|code| {
+        let source_key = object_string(code, "source_key");
+        if !source_key.is_empty() {
+            if source_by_key.contains_key(&source_key) {
+                return true;
+            }
+            warnings.push(format!(
+                "故障码 {} 引用的来源 {} 不存在或已禁用，已跳过",
+                object_i64(code, "code", 0),
+                source_key
+            ));
+            return false;
+        }
+        let source_id = object_i64(code, "source_id", 0);
+        if source_id > 0 && !source_by_id.contains_key(&source_id) {
+            warnings.push(format!(
+                "故障码 {} 引用的来源 ID {} 不存在或已禁用，已跳过",
+                object_i64(code, "code", 0),
+                source_id
+            ));
+            return false;
+        }
+        true
+    });
 
     if sources.is_empty() || codes.is_empty() {
         warnings.push("故障码配置已启用但来源规则或故障码为空，跳过 fault_code 段".to_string());
@@ -1503,8 +1548,7 @@ fn build_fault_code_bytes(
         write_u8(&mut source_bytes, fault_type_char(source, 0));
         write_u8(
             &mut source_bytes,
-            object_i64(source, "code_byte", object_i64(source, "code_offset", 2))
-                .clamp(0, 7) as u8,
+            object_i64(source, "code_byte", object_i64(source, "code_offset", 2)).clamp(0, 7) as u8,
         );
         write_u8(
             &mut source_bytes,
@@ -1519,7 +1563,10 @@ fn build_fault_code_bytes(
 
     for code in &codes {
         let language_key = fault_code_language_key(code);
-        write_u8(&mut code_bytes, fault_type_char(code, object_i64(code, "source_id", 0) as u8));
+        write_u8(
+            &mut code_bytes,
+            fault_code_type_char(code, &source_by_key, &source_by_id),
+        );
         write_u8(
             &mut code_bytes,
             object_i64(code, "code", 0).clamp(0, u8::MAX as i64) as u8,
@@ -1528,7 +1575,10 @@ fn build_fault_code_bytes(
             &mut code_bytes,
             language_text_index(&language_key, language_entries),
         );
-        write_u8(&mut code_bytes, fault_severity(&object_string(code, "severity")));
+        write_u8(
+            &mut code_bytes,
+            fault_severity(&object_string(code, "severity")),
+        );
         write_u8(&mut code_bytes, 0);
         write_u16(&mut code_bytes, 0);
     }
@@ -1539,6 +1589,18 @@ fn build_fault_code_bytes(
     Some((bytes, sources.len(), codes.len(), version))
 }
 
+fn fault_source_key(value: &Value) -> String {
+    let key = object_string(value, "source_key");
+    if !key.is_empty() {
+        return key;
+    }
+    let source_id = object_i64(value, "source_id", 0);
+    if source_id > 0 {
+        return format!("source_{source_id}");
+    }
+    String::new()
+}
+
 fn fault_code_language_key(value: &Value) -> String {
     for key in ["message_key", "name_key", "name"] {
         let item = object_string(value, key);
@@ -1547,6 +1609,33 @@ fn fault_code_language_key(value: &Value) -> String {
         }
     }
     String::new()
+}
+
+fn fault_code_type_char(
+    value: &Value,
+    source_by_key: &HashMap<String, &Value>,
+    source_by_id: &HashMap<i64, &Value>,
+) -> u8 {
+    let text = object_string(value, "type_char");
+    if let Some(byte) = text.as_bytes().first().copied() {
+        return byte;
+    }
+
+    let source_key = object_string(value, "source_key");
+    if !source_key.is_empty() {
+        if let Some(source) = source_by_key.get(&source_key) {
+            return fault_type_char(source, object_i64(source, "source_id", 0) as u8);
+        }
+    }
+
+    let source_id = object_i64(value, "source_id", 0);
+    if source_id > 0 {
+        if let Some(source) = source_by_id.get(&source_id) {
+            return fault_type_char(source, source_id as u8);
+        }
+    }
+
+    fault_type_char(value, source_id as u8)
 }
 
 fn fault_type_char(value: &Value, source_id: u8) -> u8 {
@@ -2298,7 +2387,10 @@ fn join_path(base: &str, child: &str) -> String {
 }
 
 fn join_fs_path(base: &str, child: &str) -> String {
-    PathBuf::from(base).join(child).to_string_lossy().into_owned()
+    PathBuf::from(base)
+        .join(child)
+        .to_string_lossy()
+        .into_owned()
 }
 
 #[cfg(test)]
@@ -2386,14 +2478,23 @@ mod tests {
         assert!(report.data_description.fault_code_base_addr >= 0);
 
         let base = report.data_description.fault_code_base_addr as usize;
-        let source_table_addr = u32::from_le_bytes(report.bytes[base + 8..base + 12].try_into().unwrap()) as usize;
-        let code_table_addr = u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
+        let source_table_addr =
+            u32::from_le_bytes(report.bytes[base + 8..base + 12].try_into().unwrap()) as usize;
+        let code_table_addr =
+            u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
 
-        assert_eq!(u16::from_le_bytes(report.bytes[base..base + 2].try_into().unwrap()), 3);
+        assert_eq!(
+            u16::from_le_bytes(report.bytes[base..base + 2].try_into().unwrap()),
+            3
+        );
         assert_eq!(source_table_addr, base + 20);
         assert_eq!(code_table_addr, base + 36);
         assert_eq!(
-            u32::from_le_bytes(report.bytes[source_table_addr..source_table_addr + 4].try_into().unwrap()),
+            u32::from_le_bytes(
+                report.bytes[source_table_addr..source_table_addr + 4]
+                    .try_into()
+                    .unwrap()
+            ),
             648
         );
         assert_eq!(report.bytes[source_table_addr + 10], b'T');
@@ -2401,7 +2502,11 @@ mod tests {
         assert_eq!(report.bytes[code_table_addr], b'T');
         assert_eq!(report.bytes[code_table_addr + 1], 1);
         assert_eq!(
-            u16::from_le_bytes(report.bytes[code_table_addr + 2..code_table_addr + 4].try_into().unwrap()),
+            u16::from_le_bytes(
+                report.bytes[code_table_addr + 2..code_table_addr + 4]
+                    .try_into()
+                    .unwrap()
+            ),
             1
         );
         assert_eq!(report.bytes[code_table_addr + 4], 2);

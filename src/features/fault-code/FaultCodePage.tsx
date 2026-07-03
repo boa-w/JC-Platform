@@ -1,5 +1,5 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { loadTextFile, saveTextFile } from '../../api/commands';
 import type {
   FaultCodeInfo,
@@ -29,6 +29,15 @@ const sourceLabels: Record<number, string> = {
   6: 'V VCU',
 };
 
+const sourcePresets: Record<number, { key: string; name: string; type: string }> = {
+  1: { key: 'traction', name: '牵引', type: 'T' },
+  2: { key: 'pump', name: '油泵', type: 'P' },
+  3: { key: 'steering', name: '转向', type: 'S' },
+  4: { key: 'power_steering', name: '助力转向', type: 'Z' },
+  5: { key: 'lithium_battery', name: '锂电池', type: 'L' },
+  6: { key: 'vcu', name: 'VCU', type: 'V' },
+};
+
 const typeChars: Record<number, string> = {
   1: 'T',
   2: 'P',
@@ -45,30 +54,51 @@ const severityOptions = [
   { value: 'critical', label: '严重' },
 ];
 
+const maxVisibleI18nOptions = 80;
+
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+let faultCodeRowKeySeed = 0;
+
+function createFaultCodeRowKey() {
+  faultCodeRowKeySeed += 1;
+  return `fault-code-row-${faultCodeRowKeySeed}`;
+}
+
+function fallbackFaultCodeRowKey(item: FaultCodeItem) {
+  return `fault-code-${item.source_key ?? item.source_id ?? 'source'}-${item.type_char ?? 'type'}-${
+    item.code ?? 'code'
+  }-${item.severity ?? 'severity'}`;
+}
 
 function defaultFaultCodeInfo(): FaultCodeInfo {
   return {
+    schema_version: 1,
     enabled: true,
     version: 1,
     sources: [
       {
+        source_key: 'traction',
         source_id: 1,
         type_char: 'T',
+        name: '牵引',
         can_id: 648,
         frame_type: 0,
         code_byte: 2,
         clear_code: 0,
         invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
+        enabled: true,
       },
       {
+        source_key: 'pump',
         source_id: 2,
         type_char: 'P',
+        name: '油泵',
         can_id: 660,
         frame_type: 0,
         code_byte: 2,
         clear_code: 0,
         invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
+        enabled: true,
       },
     ],
     codes: [],
@@ -109,20 +139,83 @@ function codeListText(values: number[] | undefined) {
   return (values ?? []).join(', ');
 }
 
-function normalizeFaultDocument(value: unknown): FaultCodeInfo {
-  const root = typeof value === 'object' && value !== null ? (value as Partial<FaultCodeInfo>) : {};
-  const fallback = defaultFaultCodeInfo();
+function sourceKeyFor(source: Pick<FaultCodeSource, 'source_key' | 'source_id'>) {
+  return source.source_key || sourcePresets[source.source_id]?.key || `source_${source.source_id}`;
+}
+
+function normalizeSource(source: FaultCodeSource): FaultCodeSource {
+  const preset = sourcePresets[source.source_id];
   return {
-    enabled: root.enabled ?? fallback.enabled,
-    version: root.version ?? fallback.version,
-    sources: Array.isArray(root.sources) ? root.sources : fallback.sources,
-    codes: Array.isArray(root.codes) ? root.codes : fallback.codes,
+    ...source,
+    source_key: source.source_key || preset?.key || `source_${source.source_id}`,
+    type_char: source.type_char || preset?.type || typeChars[source.source_id] || 'X',
+    name:
+      source.name ||
+      preset?.name ||
+      sourceLabels[source.source_id] ||
+      source.source_key ||
+      '故障来源',
+    enabled: source.enabled ?? true,
   };
 }
 
-function messageKeyFor(item: Pick<FaultCodeItem, 'type_char' | 'source_id' | 'code'>) {
-  const type = item.type_char || typeChars[item.source_id ?? 0] || 'X';
-  return `fault.${type.toLowerCase()}.${String(item.code).padStart(3, '0')}`;
+function findSourceForCode(item: FaultCodeItem, sources: FaultCodeSource[]) {
+  if (item.source_key) {
+    const byKey = sources.find((source) => sourceKeyFor(source) === item.source_key);
+    if (byKey) return byKey;
+  }
+  if (item.source_id !== undefined) {
+    const byId = sources.find((source) => source.source_id === item.source_id);
+    if (byId) return byId;
+  }
+  return sources[0];
+}
+
+function codePatchForSource(source: FaultCodeSource): Partial<FaultCodeItem> {
+  return {
+    source_key: sourceKeyFor(source),
+    source_id: source.source_id,
+    type_char: source.type_char,
+  };
+}
+
+function normalizeCode(item: FaultCodeItem, sources: FaultCodeSource[]): FaultCodeItem {
+  const source = findSourceForCode(item, sources);
+  return {
+    ...item,
+    source_key: item.source_key || (source ? sourceKeyFor(source) : undefined),
+    source_id: item.source_id ?? source?.source_id,
+    type_char: source?.type_char || item.type_char,
+    enabled: item.enabled ?? true,
+  };
+}
+
+function normalizeFaultDocument(value: unknown): FaultCodeInfo {
+  const root = typeof value === 'object' && value !== null ? (value as Partial<FaultCodeInfo>) : {};
+  const fallback = defaultFaultCodeInfo();
+  const sources = (Array.isArray(root.sources) ? root.sources : (fallback.sources ?? [])).map(
+    normalizeSource,
+  );
+  return {
+    schema_version: root.schema_version ?? fallback.schema_version,
+    enabled: root.enabled ?? fallback.enabled,
+    version: root.version ?? fallback.version,
+    sources,
+    codes: (Array.isArray(root.codes) ? root.codes : (fallback.codes ?? [])).map((item) =>
+      normalizeCode(item, sources),
+    ),
+  };
+}
+
+function messageKeyFor(
+  item: Pick<FaultCodeItem, 'source_key' | 'type_char' | 'source_id' | 'code'>,
+) {
+  const sourceKey =
+    item.source_key ||
+    sourcePresets[item.source_id ?? 0]?.key ||
+    item.type_char?.toLowerCase() ||
+    'unknown';
+  return `fault.${sourceKey}.${String(item.code).padStart(3, '0')}`;
 }
 
 function ensureLanguageEntry(
@@ -155,9 +248,36 @@ function languageText(language: LanguageDocument, key: string) {
   return (language.list_translate[key] as Record<string, string> | undefined)?.zh ?? '';
 }
 
+function languageEntryKeys(language: LanguageDocument) {
+  return language.list_inner
+    .slice(language.list_code_language.length)
+    .filter((key) => typeof key === 'string' && key.trim().length > 0);
+}
+
+function languageOptionLabel(language: LanguageDocument, key: string) {
+  const zhText = languageText(language, key);
+  return zhText ? `${key} - ${zhText}` : key;
+}
+
+function languageSearchText(language: LanguageDocument, key: string) {
+  const values = language.list_translate[key];
+  const translations =
+    values && typeof values === 'object'
+      ? Object.values(values as Record<string, unknown>)
+          .filter((value): value is string => typeof value === 'string')
+          .join(' ')
+      : '';
+  return `${key} ${translations}`.toLowerCase();
+}
+
+function filterLanguageEntryKeys(language: LanguageDocument, keys: string[], query: string) {
+  const keyword = query.trim().toLowerCase();
+  if (!keyword) return keys;
+  return keys.filter((key) => languageSearchText(language, key).includes(keyword));
+}
+
 function sourceCanIdForCode(item: FaultCodeItem, sources: FaultCodeSource[]): number | null {
-  const sourceId = item.source_id ?? 1;
-  const source = sources.find((candidate) => candidate.source_id === sourceId);
+  const source = findSourceForCode(item, sources);
   return typeof source?.can_id === 'number' && Number.isFinite(source.can_id)
     ? source.can_id
     : null;
@@ -190,6 +310,35 @@ function buildDuplicateFaultCodeHints(sources: FaultCodeSource[], codes: FaultCo
   return { duplicateIndexes, messages };
 }
 
+function buildDuplicateMessageKeyHints(codes: FaultCodeItem[], drafts: Record<number, string>) {
+  const groups = new Map<string, { key: string; indexes: number[] }>();
+
+  codes.forEach((item, index) => {
+    const messageKey = (
+      drafts[index] ??
+      item.message_key ??
+      item.name_key ??
+      messageKeyFor(item)
+    ).trim();
+    if (!messageKey) return;
+    const normalizedKey = messageKey.toLowerCase();
+    const group = groups.get(normalizedKey) ?? { key: messageKey, indexes: [] };
+    group.indexes.push(index);
+    groups.set(normalizedKey, group);
+  });
+
+  const duplicateIndexes = new Set<number>();
+  const messages: string[] = [];
+
+  for (const group of groups.values()) {
+    if (group.indexes.length <= 1) continue;
+    for (const index of group.indexes) duplicateIndexes.add(index);
+    messages.push(`文案 Key "${group.key}" 重复 ${group.indexes.length} 次`);
+  }
+
+  return { duplicateIndexes, messages };
+}
+
 export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePageProps) {
   const [csvStatus, setCsvStatus] = useState<string | null>(null);
   const [isCsvBusy, setIsCsvBusy] = useState(false);
@@ -199,11 +348,27 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     (document.language_info as LanguageDocument | undefined) ?? defaultLanguageDocument();
   const sources = faultCode.sources ?? [];
   const codes = faultCode.codes ?? [];
+  const [i18nSearchByRow, setI18nSearchByRow] = useState<Record<number, string>>({});
+  const [messageKeyDraftByRow, setMessageKeyDraftByRow] = useState<Record<number, string>>({});
+  const [codeRowKeys, setCodeRowKeys] = useState(() => codes.map(createFaultCodeRowKey));
   const duplicateFaultCodes = buildDuplicateFaultCodeHints(sources, codes);
+  const duplicateMessageKeys = buildDuplicateMessageKeyHints(codes, messageKeyDraftByRow);
+  const i18nKeys = languageEntryKeys(language);
+
+  useEffect(() => {
+    setCodeRowKeys((current) => {
+      if (current.length === codes.length) return current;
+      if (current.length > codes.length) return current.slice(0, codes.length);
+      return [
+        ...current,
+        ...Array.from({ length: codes.length - current.length }, createFaultCodeRowKey),
+      ];
+    });
+  }, [codes.length]);
 
   function updateFaultCode(next: FaultCodeInfo, nextLanguage = language) {
     onUpdateSections({
-      fault_code_info: next,
+      fault_code_info: { ...next, schema_version: next.schema_version ?? 1 },
       language_info: nextLanguage,
     });
   }
@@ -213,31 +378,54 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   }
 
   function updateSource(index: number, patch: Partial<FaultCodeSource>) {
+    const oldSource = sources[index];
+    const oldSourceKey = oldSource ? sourceKeyFor(oldSource) : '';
     const nextSources = sources.map((source, currentIndex) => {
       if (currentIndex !== index) return source;
       const next = { ...source, ...patch };
       if (patch.source_id !== undefined && patch.type_char === undefined) {
-        next.type_char = typeChars[patch.source_id] ?? next.type_char;
+        const preset = sourcePresets[patch.source_id];
+        next.type_char = preset?.type ?? typeChars[patch.source_id] ?? next.type_char;
+        next.source_key = preset?.key ?? next.source_key;
+        next.name = preset?.name ?? next.name;
       }
-      return next;
+      return normalizeSource(next);
     });
-    updateFaultCode({ ...faultCode, sources: nextSources });
+    const nextSource = nextSources[index];
+    const nextCodes =
+      nextSource && oldSourceKey
+        ? codes.map((code) =>
+            code.source_key === oldSourceKey ||
+            (!code.source_key && oldSource && code.source_id === oldSource.source_id)
+              ? { ...code, ...codePatchForSource(nextSource) }
+              : code,
+          )
+        : codes;
+    updateFaultCode({ ...faultCode, sources: nextSources, codes: nextCodes });
   }
 
   function addSource() {
-    const sourceId = 1;
+    const usedIds = new Set(sources.map((source) => source.source_id));
+    const sourceId =
+      Object.keys(sourcePresets)
+        .map(Number)
+        .find((id) => !usedIds.has(id)) ?? sources.length + 1;
+    const preset = sourcePresets[sourceId];
     updateFaultCode({
       ...faultCode,
       sources: [
         ...sources,
         {
+          source_key: preset?.key ?? `source_${sourceId}`,
           source_id: sourceId,
-          type_char: typeChars[sourceId],
+          type_char: preset?.type ?? typeChars[sourceId] ?? 'X',
+          name: preset?.name ?? '新来源',
           can_id: 0,
           frame_type: 0,
           code_byte: 2,
           clear_code: 0,
           invalid_codes: [],
+          enabled: true,
         },
       ],
     });
@@ -256,7 +444,18 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       if (currentIndex !== index) return item;
       const next = { ...item, ...patch };
       if (patch.source_id !== undefined && patch.type_char === undefined) {
-        next.type_char = typeChars[patch.source_id] ?? next.type_char;
+        const source = sources.find((candidate) => candidate.source_id === patch.source_id);
+        if (source) {
+          Object.assign(next, codePatchForSource(source));
+        } else {
+          next.type_char = typeChars[patch.source_id] ?? next.type_char;
+        }
+      }
+      if (patch.source_key !== undefined && patch.type_char === undefined) {
+        const source = sources.find((candidate) => sourceKeyFor(candidate) === patch.source_key);
+        if (source) {
+          Object.assign(next, codePatchForSource(source));
+        }
       }
       if (!next.message_key) {
         next.message_key = messageKeyFor(next);
@@ -264,7 +463,10 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       nextLanguage = ensureLanguageEntry(nextLanguage, next.message_key, next.name ?? '');
       return next;
     });
-    updateFaultCode({ ...faultCode, codes: nextCodes }, nextLanguage);
+    updateFaultCode(
+      { ...faultCode, codes: nextCodes.map((item) => normalizeCode(item, sources)) },
+      nextLanguage,
+    );
   }
 
   function updateCodeText(index: number, text: string) {
@@ -286,6 +488,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     onUpdateSections({
       fault_code_info: {
         ...faultCode,
+        schema_version: faultCode.schema_version ?? 1,
         codes: codes.map((code, currentIndex) =>
           currentIndex === index ? { ...code, message_key: key, name: text } : code,
         ),
@@ -294,21 +497,73 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     });
   }
 
+  function bindCodeMessageKey(index: number, key: string) {
+    const item = codes[index];
+    if (!item || !key) return;
+
+    const zhText = languageText(language, key);
+    setI18nSearchByRow((current) => ({ ...current, [index]: '' }));
+    setMessageKeyDraftByRow((current) => ({ ...current, [index]: key }));
+    updateFaultCode({
+      ...faultCode,
+      codes: codes.map((code, currentIndex) =>
+        currentIndex === index ? { ...code, message_key: key, name: zhText || code.name } : code,
+      ),
+    });
+  }
+
+  function commitMessageKeyDraft(index: number) {
+    const item = codes[index];
+    if (!item) return;
+
+    const currentKey = item.message_key || item.name_key || messageKeyFor(item);
+    const nextKey = (messageKeyDraftByRow[index] ?? currentKey).trim();
+    if (!nextKey || nextKey === currentKey) {
+      setMessageKeyDraftByRow((current) => {
+        const next = { ...current };
+        delete next[index];
+        return next;
+      });
+      return;
+    }
+
+    updateCode(index, { message_key: nextKey });
+    setMessageKeyDraftByRow((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+  }
+
+  function cancelMessageKeyDraft(index: number) {
+    setMessageKeyDraftByRow((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+  }
+
   function addCode() {
-    const sourceId = sources[0]?.source_id ?? 1;
+    const source = sources.find((item) => item.enabled ?? true) ?? sources[0];
+    const sourceId = source?.source_id ?? 1;
     const item: FaultCodeItem = {
+      source_key: source ? sourceKeyFor(source) : sourcePresets[sourceId]?.key,
       source_id: sourceId,
-      type_char: typeChars[sourceId] ?? sources[0]?.type_char ?? 'T',
+      type_char: source?.type_char ?? typeChars[sourceId] ?? 'T',
       code: 1,
       severity: 'fault',
       enabled: true,
     };
     item.message_key = messageKeyFor(item);
     const nextLanguage = ensureLanguageEntry(language, item.message_key, '新故障');
+    setCodeRowKeys((current) => [...current, createFaultCodeRowKey()]);
     updateFaultCode({ ...faultCode, codes: [...codes, { ...item, name: '新故障' }] }, nextLanguage);
   }
 
   function removeCode(index: number) {
+    setI18nSearchByRow({});
+    setMessageKeyDraftByRow({});
+    setCodeRowKeys((current) => current.filter((_, currentIndex) => currentIndex !== index));
     updateFaultCode({
       ...faultCode,
       codes: codes.filter((_, currentIndex) => currentIndex !== index),
@@ -357,7 +612,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
         setCsvStatus(`导入来源规则 CSV 出错：${errors.join('；')}`);
         return;
       }
-      updateFaultCode({ ...faultCode, sources: nextSources });
+      updateFaultCode({ ...faultCode, sources: nextSources.map(normalizeSource) });
       setCsvStatus(`已导入 ${nextSources.length} 条来源规则`);
     } catch (error) {
       setCsvStatus(error instanceof Error ? error.message : String(error));
@@ -408,7 +663,10 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
         setCsvStatus(`导入故障码 CSV 出错：${errors.join('；')}`);
         return;
       }
-      updateFaultCode({ ...faultCode, codes: nextCodes }, nextLanguage);
+      updateFaultCode(
+        { ...faultCode, codes: nextCodes.map((item) => normalizeCode(item, sources)) },
+        nextLanguage,
+      );
       setCsvStatus(`已导入 ${nextCodes.length} 条故障码，并同步多语言文案`);
     } catch (error) {
       setCsvStatus(error instanceof Error ? error.message : String(error));
@@ -447,7 +705,11 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
         </div>
         <div className="structured-list fault-code-meta">
           <label>
-            版本
+            结构版本
+            <input readOnly value={faultCode.schema_version ?? 1} />
+          </label>
+          <label>
+            二进制版本
             <input
               min={1}
               type="number"
@@ -486,7 +748,10 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
           <table className="config-table fault-code-source-table">
             <thead>
               <tr>
-                <th>来源</th>
+                <th>启用</th>
+                <th>来源 Key</th>
+                <th>名称</th>
+                <th>来源 ID</th>
                 <th>类型</th>
                 <th>CAN ID</th>
                 <th>帧类型</th>
@@ -498,20 +763,37 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
             </thead>
             <tbody>
               {sources.map((source, index) => (
-                <tr key={`${source.source_id}-${source.type_char}-${source.can_id}`}>
+                <tr key={`${sourceKeyFor(source)}-${source.source_id}-${source.can_id}`}>
                   <td>
-                    <select
+                    <input
+                      checked={source.enabled ?? true}
+                      type="checkbox"
+                      onChange={(event) => updateSource(index, { enabled: event.target.checked })}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={sourceKeyFor(source)}
+                      onChange={(event) =>
+                        updateSource(index, { source_key: event.target.value.trim() })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={source.name ?? ''}
+                      onChange={(event) => updateSource(index, { name: event.target.value })}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      min={1}
+                      type="number"
                       value={source.source_id}
                       onChange={(event) =>
-                        updateSource(index, { source_id: numberValue(event.target.value) })
+                        updateSource(index, { source_id: numberValue(event.target.value, 1) })
                       }
-                    >
-                      {Object.entries(sourceLabels).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </td>
                   <td>
                     <input
@@ -601,9 +883,9 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
             </button>
           </div>
         </div>
-        {duplicateFaultCodes.messages.length > 0 ? (
+        {duplicateFaultCodes.messages.length > 0 || duplicateMessageKeys.messages.length > 0 ? (
           <div className="fault-code-duplicate-alert">
-            {duplicateFaultCodes.messages.join('；')}
+            {[...duplicateFaultCodes.messages, ...duplicateMessageKeys.messages].join('；')}
           </div>
         ) : null}
         <div className="config-table-frame">
@@ -623,12 +905,33 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
             <tbody>
               {codes.map((item, index) => {
                 const key = item.message_key || item.name_key || messageKeyFor(item);
+                const codeSource = findSourceForCode(item, sources);
+                const codeSourceKey = codeSource ? sourceKeyFor(codeSource) : '';
+                const codeTypeChar = codeSource?.type_char ?? item.type_char ?? '';
                 const duplicateCanId = sourceCanIdForCode(item, sources);
                 const isDuplicate = duplicateFaultCodes.duplicateIndexes.has(index);
+                const isDuplicateMessageKey = duplicateMessageKeys.duplicateIndexes.has(index);
+                const selectedI18nKey = i18nKeys.includes(key) ? key : '';
+                const i18nSearchText = i18nSearchByRow[index] ?? '';
+                const filteredI18nKeys = filterLanguageEntryKeys(
+                  language,
+                  i18nKeys,
+                  i18nSearchText,
+                );
+                const limitedI18nKeys = filteredI18nKeys.slice(0, maxVisibleI18nOptions);
+                const visibleI18nKeys = [
+                  ...(selectedI18nKey && !limitedI18nKeys.includes(selectedI18nKey)
+                    ? [selectedI18nKey]
+                    : []),
+                  ...limitedI18nKeys,
+                ];
+                const isI18nResultLimited = filteredI18nKeys.length > limitedI18nKeys.length;
                 return (
                   <tr
-                    className={isDuplicate ? 'fault-code-duplicate-row' : undefined}
-                    key={key || `${item.type_char ?? item.source_id}-${item.code}`}
+                    className={
+                      isDuplicate || isDuplicateMessageKey ? 'fault-code-duplicate-row' : undefined
+                    }
+                    key={codeRowKeys[index] ?? fallbackFaultCodeRowKey(item)}
                   >
                     <td>
                       <input
@@ -639,28 +942,20 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                     </td>
                     <td>
                       <select
-                        value={item.source_id ?? 1}
-                        onChange={(event) =>
-                          updateCode(index, { source_id: numberValue(event.target.value) })
-                        }
+                        value={item.source_key ?? codeSourceKey}
+                        onChange={(event) => updateCode(index, { source_key: event.target.value })}
                       >
-                        {Object.entries(sourceLabels).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
+                        {sources.map((source) => (
+                          <option key={sourceKeyFor(source)} value={sourceKeyFor(source)}>
+                            {source.name || sourceKeyFor(source)}
                           </option>
                         ))}
                       </select>
                     </td>
                     <td>
-                      <input
-                        maxLength={1}
-                        value={item.type_char ?? typeChars[item.source_id ?? 0] ?? ''}
-                        onChange={(event) =>
-                          updateCode(index, {
-                            type_char: event.target.value.slice(0, 1).toUpperCase(),
-                          })
-                        }
-                      />
+                      <span className="fault-code-readonly-value" title="类型由来源规则决定">
+                        {codeTypeChar || '-'}
+                      </span>
                     </td>
                     <td>
                       <input
@@ -691,10 +986,81 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       </select>
                     </td>
                     <td>
-                      <input
-                        value={key}
-                        onChange={(event) => updateCode(index, { message_key: event.target.value })}
-                      />
+                      <div className="fault-code-i18n-cell">
+                        <div className="fault-code-i18n-search-row">
+                          <input
+                            disabled={i18nKeys.length === 0}
+                            placeholder="搜索 i18n key / 文案"
+                            type="search"
+                            value={i18nSearchText}
+                            onChange={(event) =>
+                              setI18nSearchByRow((current) => ({
+                                ...current,
+                                [index]: event.target.value,
+                              }))
+                            }
+                          />
+                          {i18nSearchText ? (
+                            <button
+                              title="清空搜索"
+                              type="button"
+                              onClick={() =>
+                                setI18nSearchByRow((current) => ({ ...current, [index]: '' }))
+                              }
+                            >
+                              清空
+                            </button>
+                          ) : null}
+                        </div>
+                        <select
+                          disabled={i18nKeys.length === 0}
+                          value={selectedI18nKey}
+                          onChange={(event) => bindCodeMessageKey(index, event.target.value)}
+                        >
+                          <option value="">
+                            {i18nKeys.length === 0
+                              ? '暂无可绑定 i18n'
+                              : filteredI18nKeys.length === 0
+                                ? '无匹配 i18n'
+                                : '选择已有 i18n'}
+                          </option>
+                          {visibleI18nKeys.map((entryKey) => (
+                            <option key={entryKey} value={entryKey}>
+                              {languageOptionLabel(language, entryKey)}
+                            </option>
+                          ))}
+                        </select>
+                        <small className="fault-code-i18n-meta">
+                          {i18nKeys.length === 0
+                            ? '请先在语言表中添加条目'
+                            : `${filteredI18nKeys.length}/${i18nKeys.length} 个匹配${
+                                isI18nResultLimited ? `，仅显示前 ${maxVisibleI18nOptions} 个` : ''
+                              }`}
+                        </small>
+                        <input
+                          value={messageKeyDraftByRow[index] ?? key}
+                          onBlur={() => commitMessageKeyDraft(index)}
+                          onChange={(event) =>
+                            setMessageKeyDraftByRow((current) => ({
+                              ...current,
+                              [index]: event.target.value,
+                            }))
+                          }
+                          onKeyDown={(event) => {
+                            if (event.nativeEvent.isComposing) return;
+                            if (event.key === 'Enter') {
+                              event.currentTarget.blur();
+                            }
+                            if (event.key === 'Escape') {
+                              cancelMessageKeyDraft(index);
+                              event.currentTarget.blur();
+                            }
+                          }}
+                        />
+                        {isDuplicateMessageKey ? (
+                          <small className="fault-code-duplicate-hint">已存在相同文案 Key</small>
+                        ) : null}
+                      </div>
                     </td>
                     <td>
                       <input

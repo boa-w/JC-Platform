@@ -9,6 +9,15 @@ const typeChars: Record<number, string> = {
   6: 'V',
 };
 
+const sourcePresets: Record<number, { key: string; name: string; type: string }> = {
+  1: { key: 'traction', name: '牵引', type: 'T' },
+  2: { key: 'pump', name: '油泵', type: 'P' },
+  3: { key: 'steering', name: '转向', type: 'S' },
+  4: { key: 'power_steering', name: '助力转向', type: 'Z' },
+  5: { key: 'lithium_battery', name: '锂电池', type: 'L' },
+  6: { key: 'vcu', name: 'VCU', type: 'V' },
+};
+
 function escapeCsvField(value: string): string {
   if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -81,9 +90,19 @@ function parseCodeList(value: string | undefined): number[] {
     .filter((item, index, items) => items.indexOf(item) === index);
 }
 
-function messageKeyFor(item: Pick<FaultCodeItem, 'type_char' | 'source_id' | 'code'>): string {
-  const type = item.type_char || typeChars[item.source_id ?? 0] || 'X';
-  return `fault.${type.toLowerCase()}.${String(item.code).padStart(3, '0')}`;
+function sourceKeyFor(source: Pick<FaultCodeSource, 'source_key' | 'source_id'>): string {
+  return source.source_key || sourcePresets[source.source_id]?.key || `source_${source.source_id}`;
+}
+
+function messageKeyFor(
+  item: Pick<FaultCodeItem, 'source_key' | 'type_char' | 'source_id' | 'code'>,
+): string {
+  const sourceKey =
+    item.source_key ||
+    sourcePresets[item.source_id ?? 0]?.key ||
+    item.type_char?.toLowerCase() ||
+    'unknown';
+  return `fault.${sourceKey}.${String(item.code).padStart(3, '0')}`;
 }
 
 function languageText(language: LanguageDocument, key: string, code: string): string {
@@ -114,10 +133,14 @@ function ensureLanguageEntry(
 }
 
 export function faultSourcesToCsv(sources: FaultCodeSource[]): string {
-  const header = 'source_id,type_char,can_id,frame_type,code_byte,clear_code,invalid_codes';
+  const header =
+    'source_key,enabled,source_id,name,type_char,can_id,frame_type,code_byte,clear_code,invalid_codes';
   const rows = sources.map((source) =>
     [
+      sourceKeyFor(source),
+      (source.enabled ?? true) ? '1' : '0',
       String(source.source_id),
+      escapeCsvField(source.name ?? ''),
       source.type_char ?? '',
       `0x${source.can_id.toString(16).toUpperCase()}`,
       String(source.frame_type ?? source.type ?? 0),
@@ -137,8 +160,8 @@ export function csvToFaultSources(text: string): {
   const errors: string[] = [];
   const sources: FaultCodeSource[] = [];
   const header = rows[0];
-  if (header?.[0] !== 'source_id') {
-    return { sources: [], errors: ['CSV 首列必须为 source_id'] };
+  if (header?.[0] !== 'source_key' && header?.[0] !== 'source_id') {
+    return { sources: [], errors: ['CSV 首列必须为 source_key 或 source_id'] };
   }
 
   const indexByName = Object.fromEntries(header.map((name, index) => [name, index]));
@@ -146,6 +169,7 @@ export function csvToFaultSources(text: string): {
     const row = rows[i];
     const sourceId = parseNumber(row[indexByName.source_id]);
     const canId = parseNumber(row[indexByName.can_id], -1);
+    const preset = sourcePresets[sourceId];
     if (sourceId <= 0) {
       errors.push(`第 ${i + 1} 行来源 ID 无效`);
       continue;
@@ -155,9 +179,15 @@ export function csvToFaultSources(text: string): {
       continue;
     }
     sources.push({
+      source_key: row[indexByName.source_key] || preset?.key || `source_${sourceId}`,
+      enabled: parseBoolean(row[indexByName.enabled]),
       source_id: sourceId,
+      name: row[indexByName.name] || preset?.name || '',
       type_char:
-        row[indexByName.type_char]?.slice(0, 1).toUpperCase() || typeChars[sourceId] || 'X',
+        row[indexByName.type_char]?.slice(0, 1).toUpperCase() ||
+        preset?.type ||
+        typeChars[sourceId] ||
+        'X',
       can_id: canId,
       frame_type: parseNumber(row[indexByName.frame_type]),
       code_byte: Math.max(0, Math.min(7, parseNumber(row[indexByName.code_byte], 2))),
@@ -172,6 +202,7 @@ export function faultCodesToCsv(codes: FaultCodeItem[], language: LanguageDocume
   const languageHeaders = language.list_code_language.map((code) => `text_${code}`);
   const header = [
     'enabled',
+    'source_key',
     'source_id',
     'type_char',
     'code',
@@ -184,6 +215,7 @@ export function faultCodesToCsv(codes: FaultCodeItem[], language: LanguageDocume
     const key = item.message_key || item.name_key || messageKeyFor(item);
     return [
       (item.enabled ?? true) ? '1' : '0',
+      item.source_key ?? '',
       String(item.source_id ?? ''),
       item.type_char ?? typeChars[item.source_id ?? 0] ?? '',
       String(item.code),
@@ -232,6 +264,7 @@ export function csvToFaultCodes(
     const sourceId = parseNumber(row[indexByName.source_id]);
     const item: FaultCodeItem = {
       enabled: parseBoolean(row[indexByName.enabled]),
+      source_key: row[indexByName.source_key] || undefined,
       source_id: sourceId || undefined,
       type_char:
         row[indexByName.type_char]?.slice(0, 1).toUpperCase() || typeChars[sourceId] || 'X',
