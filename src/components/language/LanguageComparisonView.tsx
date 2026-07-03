@@ -17,6 +17,11 @@ function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
 }
 
+function externalTranslationKeys(document: LanguageDocument) {
+  const indexedKeys = new Set(document.list_inner);
+  return Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
+}
+
 export function LanguageComparisonView({ document, onUpdate }: LanguageComparisonViewProps) {
   const [editingCell, setEditingCell] = useState<{ key: string; code: string } | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -33,8 +38,11 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
     position: 'before' | 'after';
   } | null>(null);
 
-  const visibleLanguageKeys = document.list_inner;
-  const translationKeys = document.list_inner.slice(document.list_code_language.length);
+  const visibleLanguageKeys = [...document.list_inner, ...externalTranslationKeys(document)];
+  const translationKeys = [
+    ...document.list_inner.slice(document.list_code_language.length),
+    ...externalTranslationKeys(document),
+  ];
 
   function handleStartEdit(key: string, code: string, currentValue: string) {
     setEditingCell({ key, code });
@@ -68,7 +76,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
       return;
     }
     const rowIndex = editingKeyIndex;
-    if (rowIndex < document.list_code_language.length) {
+    if (rowIndex < document.list_code_language.length || rowIndex >= document.list_inner.length) {
       setEditingKeyIndex(null);
       return;
     }
@@ -92,7 +100,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
   }
 
   function handleRemoveKey(index: number) {
-    if (index < document.list_code_language.length) return;
+    if (index < document.list_code_language.length || index >= document.list_inner.length) return;
     const key = document.list_inner[index];
     const nextInner = document.list_inner.filter((_, i) => i !== index);
     const nextTranslate = { ...document.list_translate };
@@ -165,7 +173,8 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
       if (
         !Number.isFinite(targetIndex) ||
         targetIndex === fromIndex ||
-        targetIndex < document.list_code_language.length
+        targetIndex < document.list_code_language.length ||
+        targetIndex >= document.list_inner.length
       ) {
         updateDropTarget(null);
         return;
@@ -197,7 +206,13 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
       pageDocument.removeEventListener('pointerup', finishDrag);
       pageDocument.removeEventListener('pointercancel', finishDrag);
     };
-  }, [draggingIndex, handleReorderKey, updateDropTarget, document.list_code_language.length]);
+  }, [
+    draggingIndex,
+    handleReorderKey,
+    updateDropTarget,
+    document.list_code_language.length,
+    document.list_inner.length,
+  ]);
 
   function cancelNativeDrag(event: DragEvent<HTMLButtonElement>) {
     const fromIndex = draggingIndexRef.current;
@@ -243,6 +258,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
         <table className="lang-comparison-table">
           <thead>
             <tr>
+              <th className="lang-comparison-th-index">序号</th>
               <th className="lang-comparison-th-key">翻译键</th>
               {document.list_code_language.map((code) => (
                 <th className="lang-comparison-th-lang" key={code}>
@@ -258,7 +274,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
               <tr>
                 <td
                   className="lang-comparison-empty"
-                  colSpan={document.list_code_language.length + 2}
+                  colSpan={document.list_code_language.length + 3}
                 >
                   暂无翻译条目
                 </td>
@@ -266,6 +282,8 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
             ) : null}
             {visibleLanguageKeys.map((key, actualIndex) => {
               const isConfigKey = actualIndex < document.list_code_language.length;
+              const isExternalKey = actualIndex >= document.list_inner.length;
+              const isReadonlyKey = isConfigKey || isExternalKey;
               const isEditingKey = editingKeyIndex === actualIndex;
               const rowClassName = [
                 draggingIndex === actualIndex ? 'lang-row-dragging' : '',
@@ -279,6 +297,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                   data-lang-row-index={actualIndex}
                   key={key}
                 >
+                  <td className="lang-comparison-cell-index">{actualIndex + 1}</td>
                   <td className="lang-comparison-cell-key">
                     {isEditingKey ? (
                       <input
@@ -293,13 +312,20 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                       />
                     ) : (
                       <button
-                        className={`lang-comparison-key-text ${isConfigKey ? 'config' : ''}`}
-                        disabled={isConfigKey}
-                        onClick={() => !isConfigKey && startEditKey(actualIndex, key)}
-                        title={isConfigKey ? '语言名称配置键，不可编辑 key' : '点击编辑'}
+                        className={`lang-comparison-key-text ${isReadonlyKey ? 'config' : ''}`}
+                        disabled={isReadonlyKey}
+                        onClick={() => !isReadonlyKey && startEditKey(actualIndex, key)}
+                        title={
+                          isExternalKey
+                            ? '外部引用键，不写入 list_inner'
+                            : isConfigKey
+                              ? '语言名称配置键，不可编辑 key'
+                              : '点击编辑'
+                        }
                         type="button"
                       >
                         {key}
+                        {isExternalKey ? <span className="lang-key-badge">引用</span> : null}
                       </button>
                     )}
                   </td>
@@ -338,7 +364,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                     );
                   })}
                   <td className="lang-comparison-cell-actions">
-                    {!isConfigKey ? (
+                    {!isReadonlyKey ? (
                       <button
                         aria-label={`拖动 ${key} 调整顺序`}
                         className="lang-btn lang-btn--icon lang-drag-handle"
@@ -350,7 +376,7 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
                         ↕
                       </button>
                     ) : null}
-                    {!isConfigKey ? (
+                    {!isReadonlyKey ? (
                       <button
                         className="lang-btn lang-btn--icon lang-btn--danger"
                         onClick={() => handleRemoveKey(actualIndex)}

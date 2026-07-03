@@ -38,15 +38,27 @@ function computeProgress(
   document: LanguageDocument,
   code: string,
 ): { translated: number; total: number } {
-  const keys = document.list_inner.slice(document.list_code_language.length);
+  const keys = visibleTranslationKeys(document);
   let translated = 0;
   for (const key of keys) {
     const translations = document.list_translate[key] as Record<string, string> | undefined;
-    if (translations && translations[code] && translations[code].trim() !== '') {
+    if (translations?.[code] && translations[code].trim() !== '') {
       translated++;
     }
   }
   return { translated, total: keys.length };
+}
+
+function externalTranslationKeys(document: LanguageDocument) {
+  const indexedKeys = new Set(document.list_inner);
+  return Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
+}
+
+function visibleTranslationKeys(document: LanguageDocument) {
+  return [
+    ...document.list_inner.slice(document.list_code_language.length),
+    ...externalTranslationKeys(document),
+  ];
 }
 
 function getLabel(document: LanguageDocument, code: string): string {
@@ -69,7 +81,7 @@ export function LanguageSidebar({
   const [editCode, setEditCode] = useState('');
   const [editLabel, setEditLabel] = useState('');
 
-  const totalKeys = document.list_inner.length - document.list_code_language.length;
+  const totalKeys = visibleTranslationKeys(document).length;
 
   const progressList: LanguageProgress[] = document.list_code_language.map((code) => {
     const { translated, total } = computeProgress(document, code);

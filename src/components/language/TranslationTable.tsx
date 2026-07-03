@@ -195,6 +195,7 @@ export function TranslationTable({
                 type="checkbox"
               />
             </th>
+            <th className="lang-table-th-index">序号</th>
             <th className="lang-table-th-key">翻译键</th>
             <th className="lang-table-th-source">{getLabel(document, sourceLanguage)}</th>
             {targetLanguage && targetLanguage !== sourceLanguage ? (
@@ -208,7 +209,7 @@ export function TranslationTable({
             <tr>
               <td
                 className="lang-table-empty"
-                colSpan={targetLanguage && targetLanguage !== sourceLanguage ? 5 : 4}
+                colSpan={targetLanguage && targetLanguage !== sourceLanguage ? 6 : 5}
               >
                 暂无翻译条目
               </td>
@@ -229,6 +230,7 @@ export function TranslationTable({
               : '';
             const isModified = modifiedKeys.has(row.key);
             const isSelected = selectedKeys.has(row.key);
+            const isReadonlyKey = row.isConfigKey || row.isExternalKey;
             const rowClassName = [
               isModified ? 'config-entry-modified' : '',
               isDraggingRow(row) ? 'lang-row-dragging' : '',
@@ -252,11 +254,12 @@ export function TranslationTable({
                     type="checkbox"
                   />
                 </td>
+                <td className="lang-table-cell-index">{row.index + 1}</td>
                 <td className="lang-table-cell-key">
                   {editingKeyIndex === row.index ? (
                     <input
                       className="lang-table-key-input editing"
-                      disabled={row.isConfigKey}
+                      disabled={isReadonlyKey}
                       value={keyDraft}
                       onChange={(e) => setKeyDraft(e.target.value)}
                       onBlur={commitKeyEdit}
@@ -267,13 +270,20 @@ export function TranslationTable({
                     />
                   ) : (
                     <button
-                      className={`lang-table-key-text ${row.isConfigKey ? 'config' : ''}`}
-                      disabled={row.isConfigKey}
-                      onClick={() => !row.isConfigKey && startEditKey(row.index, row.key)}
-                      title={row.isConfigKey ? '配置键，不可编辑' : '点击编辑'}
+                      className={`lang-table-key-text ${isReadonlyKey ? 'config' : ''}`}
+                      disabled={isReadonlyKey}
+                      onClick={() => !isReadonlyKey && startEditKey(row.index, row.key)}
+                      title={
+                        row.isExternalKey
+                          ? '外部引用键，不写入 list_inner'
+                          : row.isConfigKey
+                            ? '配置键，不可编辑'
+                            : '点击编辑'
+                      }
                       type="button"
                     >
                       {row.key}
+                      {row.isExternalKey ? <span className="lang-key-badge">引用</span> : null}
                     </button>
                   )}
                 </td>
@@ -294,7 +304,7 @@ export function TranslationTable({
                   </td>
                 ) : null}
                 <td className="lang-table-cell-actions">
-                  {isModified && !row.isConfigKey ? (
+                  {isModified && !isReadonlyKey ? (
                     <button
                       className="lang-btn lang-btn--icon"
                       onClick={() => onRestoreKey(row.key)}
@@ -304,7 +314,7 @@ export function TranslationTable({
                       ↩
                     </button>
                   ) : null}
-                  {!row.isConfigKey ? (
+                  {!isReadonlyKey ? (
                     <button
                       aria-label={`拖动 ${row.key} 调整顺序`}
                       className="lang-btn lang-btn--icon lang-drag-handle"
@@ -316,7 +326,7 @@ export function TranslationTable({
                       ↕
                     </button>
                   ) : null}
-                  {!row.isConfigKey ? (
+                  {!isReadonlyKey ? (
                     <button
                       className="lang-btn lang-btn--icon lang-btn--danger"
                       onClick={() => onRemoveKey(row.index)}

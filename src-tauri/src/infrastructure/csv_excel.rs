@@ -301,14 +301,22 @@ pub fn validate_headers(actual: &[String], expected: &[&str]) -> TableValidation
     }
 }
 
-/// 校验多语言表头：前两列固定，后续列需包含 `_` 分隔的语言代码。
+/// 校验多语言表头：前两列固定，或使用新版 `序号、类型、auto` 前缀；后续列需包含 `_` 分隔的语言代码。
 pub fn validate_language_headers(actual: &[String]) -> TableValidationReport {
     let mut errors = Vec::new();
-    if actual.len() < 3 {
-        errors.push("多语言表至少需要 3 列：序号、auto、一个语言列".to_string());
+    let has_type_column = actual.get(1).map(String::as_str) == Some("类型");
+    let prefix_headers: &[&str] = if has_type_column {
+        &["序号", "类型", "auto"]
+    } else {
+        LANGUAGE_REQUIRED_PREFIX_HEADERS
+    };
+    let min_columns = prefix_headers.len() + 1;
+
+    if actual.len() < min_columns {
+        errors.push("多语言表至少需要包含：序号、auto、一个语言列".to_string());
     }
 
-    for (index, expected_header) in LANGUAGE_REQUIRED_PREFIX_HEADERS.iter().enumerate() {
+    for (index, expected_header) in prefix_headers.iter().enumerate() {
         let actual_header = actual.get(index).map(String::as_str).unwrap_or("");
         if actual_header != *expected_header {
             errors.push(format!(
@@ -320,7 +328,7 @@ pub fn validate_language_headers(actual: &[String]) -> TableValidationReport {
         }
     }
 
-    for header in actual.iter().skip(2) {
+    for header in actual.iter().skip(prefix_headers.len()) {
         if !header.contains('_') {
             errors.push(format!(
                 "语言列表头 `{}` 缺少语言代码后缀，例如 中文_zh",
@@ -333,6 +341,7 @@ pub fn validate_language_headers(actual: &[String]) -> TableValidationReport {
         valid: errors.is_empty(),
         expected_headers: vec![
             "序号".to_string(),
+            "类型".to_string(),
             "auto".to_string(),
             "中文_zh".to_string(),
         ],

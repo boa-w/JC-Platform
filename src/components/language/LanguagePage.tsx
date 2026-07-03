@@ -54,7 +54,7 @@ function computeTranslationCount(
   document: LanguageDocument,
   code: string,
 ): { translated: number; total: number } {
-  const keys = document.list_inner.slice(document.list_code_language.length);
+  const keys = visibleTranslationKeys(document);
   let translated = 0;
   for (const key of keys) {
     const translations = document.list_translate[key] as Record<string, string> | undefined;
@@ -63,6 +63,18 @@ function computeTranslationCount(
     }
   }
   return { translated, total: keys.length };
+}
+
+function externalTranslationKeys(document: LanguageDocument) {
+  const indexedKeys = new Set(document.list_inner);
+  return Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
+}
+
+function visibleTranslationKeys(document: LanguageDocument) {
+  return [
+    ...document.list_inner.slice(document.list_code_language.length),
+    ...externalTranslationKeys(document),
+  ];
 }
 
 function normalizeDocument(
@@ -86,6 +98,9 @@ function normalizeDocument(
     }
   }
   for (const key of document.list_inner) {
+    nextTranslate[key] = document.list_translate[key] ?? {};
+  }
+  for (const key of externalTranslationKeys(document)) {
     nextTranslate[key] = document.list_translate[key] ?? {};
   }
   return {
@@ -162,30 +177,27 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   }, [translateSourceLanguage, selectedLanguage, translateScope]);
 
   useEffect(() => {
-    const availableKeys = new Set(document.list_inner.slice(document.list_code_language.length));
+    const availableKeys = new Set(visibleTranslationKeys(document));
     setSelectedTranslationKeys((current) => {
       const next = new Set([...current].filter((key) => availableKeys.has(key)));
       return next.size === current.size ? current : next;
     });
-  }, [document.list_inner, document.list_code_language.length]);
+  }, [document]);
 
   const translationKeys = useMemo(() => {
-    return document.list_inner.slice(document.list_code_language.length);
-  }, [document.list_inner, document.list_code_language]);
+    return visibleTranslationKeys(document);
+  }, [document]);
 
   const visibleLanguageKeys = useMemo(() => {
-    return document.list_inner;
-  }, [document.list_inner]);
+    return [...document.list_inner, ...externalTranslationKeys(document)];
+  }, [document]);
 
   const modifiedKeys = useMemo(() => {
     const keys = new Set<string>();
     if (!baseline || !selectedLanguage) return keys;
-    for (let i = 0; i < document.list_inner.length; i++) {
-      const key = document.list_inner[i];
-      const baselineKey = baseline.list_inner[i];
+    for (const key of visibleLanguageKeys) {
       const currentTranslations = (document.list_translate[key] as Record<string, string>) ?? {};
-      const baselineTranslations =
-        (baseline.list_translate[baselineKey] as Record<string, string>) ?? {};
+      const baselineTranslations = (baseline.list_translate[key] as Record<string, string>) ?? {};
       const currentValue = currentTranslations[selectedLanguage] ?? '';
       const baselineValue = baselineTranslations[selectedLanguage] ?? '';
       if (currentValue !== baselineValue) {
@@ -193,13 +205,14 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       }
     }
     return keys;
-  }, [document, baseline, selectedLanguage]);
+  }, [document, baseline, selectedLanguage, visibleLanguageKeys]);
 
   const rows: TranslationRow[] = useMemo(() => {
     let filtered = visibleLanguageKeys.map((key, i) => ({
       key,
       index: i,
       isConfigKey: i < document.list_code_language.length,
+      isExternalKey: i >= document.list_inner.length,
       translations: (document.list_translate[key] as Record<string, string>) ?? {},
     }));
 
@@ -230,6 +243,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   }, [
     visibleLanguageKeys,
     document.list_code_language.length,
+    document.list_inner.length,
     document.list_translate,
     modifiedKeys,
     searchQuery,
@@ -240,7 +254,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   function handleAddLanguage(code: string, label: string) {
     if (document.list_code_language.includes(code)) return;
     const nextTranslate: Record<string, unknown> = { ...document.list_translate };
-    for (const key of document.list_inner) {
+    for (const key of visibleLanguageKeys) {
       const existing = (nextTranslate[key] as Record<string, string>) ?? {};
       nextTranslate[key] = { ...existing, [code]: '' };
     }
@@ -275,7 +289,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     nextLabels[newCode] = newLabel;
     const nextTranslate = { ...document.list_translate };
     if (oldCode !== newCode) {
-      for (const key of document.list_inner) {
+      for (const key of visibleLanguageKeys) {
         const translations = (nextTranslate[key] as Record<string, string>) ?? {};
         if (oldCode in translations) {
           const value = translations[oldCode];
@@ -306,7 +320,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   }
 
   function handleUpdateKey(index: number, _oldKey: string, newKey: string) {
-    if (document.list_inner.includes(newKey)) return;
+    if (document.list_inner.includes(newKey) || document.list_translate[newKey] !== undefined)
+      return;
     const nextInner = [...document.list_inner];
     nextInner[index] = newKey;
     const nextTranslate = { ...document.list_translate };
@@ -355,7 +370,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
 
   function handleAddKey() {
     const key = newKeyInput.trim();
-    if (!key || document.list_inner.includes(key)) return;
+    if (!key || document.list_inner.includes(key) || document.list_translate[key] !== undefined)
+      return;
     const translations: Record<string, string> = {};
     for (const code of document.list_code_language) {
       translations[code] = '';

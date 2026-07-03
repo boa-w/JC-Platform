@@ -19,5 +19,6 @@ export interface TranslationRow {
   key: string;
   index: number;
   isConfigKey: boolean;
+  isExternalKey?: boolean;
   translations: Record<string, string>;
 }

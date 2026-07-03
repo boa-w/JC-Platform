@@ -4963,6 +4963,12 @@ html {
   min-width: 42px;
 }
 
+.lang-table-th-index {
+  width: 58px;
+  min-width: 58px;
+  text-align: center !important;
+}
+
 .lang-table-th-source {
   width: 200px;
 }
@@ -4999,6 +5005,14 @@ html {
   text-align: center;
 }
 
+.lang-table-cell-index {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .lang-table-cell-select input,
 .lang-table-th-select input {
   accent-color: var(--color-primary);
@@ -5032,6 +5046,19 @@ html {
 .lang-table-key-text:disabled {
   color: var(--color-text-muted);
   cursor: default;
+}
+
+.lang-key-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .lang-table-key-input {
@@ -5354,6 +5381,15 @@ html {
   z-index: 1;
 }
 
+.lang-comparison-th-index {
+  width: 58px;
+  min-width: 58px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center !important;
+}
+
 .lang-comparison-th-key {
   width: 160px;
   min-width: 120px;
@@ -5403,6 +5439,14 @@ html {
 
 .lang-comparison-cell-key {
   max-width: 180px;
+}
+
+.lang-comparison-cell-index {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .lang-comparison-key-text {
