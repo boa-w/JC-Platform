@@ -1519,50 +1519,36 @@ button {
 }
 
 /* Recent projects */
-.project-recent-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+.project-recent-row {
+  display: flex;
   gap: 6px;
+  align-items: center;
 }
 
-.project-recent-item {
-  display: grid;
-  gap: 2px;
+.project-recent-select {
+  flex: 1;
+  min-width: 0;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--color-text);
   background: var(--color-surface);
   cursor: pointer;
-  text-align: left;
-  transition: all 0.12s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
-.project-recent-item:hover:not(:disabled) {
-  border-color: var(--color-primary-border);
-  background: var(--color-primary-light);
+.project-recent-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
-.project-recent-item:disabled {
+.project-recent-select:disabled {
   cursor: not-allowed;
   opacity: 0.5;
-}
-
-.project-recent-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.project-recent-path {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
 }
 
 /* Create project form */
@@ -3618,8 +3604,60 @@ button {
 .fault-code-toolbar-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.fault-code-source-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 8px 0 10px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.fault-code-source-filter:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.fault-code-source-filter select {
+  min-width: 240px;
+  border: 0;
+  padding: 5px 26px 5px 6px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fault-code-source-filter select:focus {
+  outline: none;
+}
+
+[data-theme="dark"] .fault-code-source-filter {
+  background: #3c3c3c;
+  border-color: #3e3e3e;
+  color: #d4d4d4;
+}
+
+[data-theme="dark"] .fault-code-source-filter:focus-within {
+  border-color: var(--color-primary);
+  background: #3c3c3c;
+}
+
+[data-theme="dark"] .fault-code-source-filter select {
+  color: #d4d4d4;
 }
 
 .fault-code-csv-status {
@@ -3648,6 +3686,13 @@ button {
   color: #b91c1c;
   font-size: 11px;
   font-weight: 600;
+}
+
+.fault-code-empty-filter {
+  padding: 14px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-align: center;
 }
 
 .fault-code-i18n-cell {
@@ -3708,6 +3753,23 @@ button {
 .fault-code-table input[type="checkbox"] {
   width: 18px;
   height: 18px;
+}
+
+@media (max-width: 760px) {
+  .fault-code-toolbar-actions {
+    align-items: stretch;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .fault-code-source-filter {
+    width: 100%;
+  }
+
+  .fault-code-source-filter select {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .battery-config-row {

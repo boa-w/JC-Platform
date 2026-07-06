@@ -405,10 +405,28 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   const [i18nSearchByRow, setI18nSearchByRow] = useState<Record<number, string>>({});
   const [messageKeyDraftByRow, setMessageKeyDraftByRow] = useState<Record<number, string>>({});
   const [cloneSourceByRow, setCloneSourceByRow] = useState<Record<number, string>>({});
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [codeRowKeys, setCodeRowKeys] = useState(() => codes.map(createFaultCodeRowKey));
   const duplicateFaultCodes = buildDuplicateFaultCodeHints(sources, codes);
   const duplicateMessageKeys = buildDuplicateMessageKeyHints(codes, messageKeyDraftByRow);
   const i18nKeys = languageEntryKeys(language);
+  const sourceFilterKeys = new Set(sources.map(sourceKeyFor));
+  const effectiveSourceFilter = sourceFilterKeys.has(sourceFilter) ? sourceFilter : 'all';
+  const codeCountBySource = codes.reduce((counts, item) => {
+    const source = findSourceForCode(item, sources);
+    const key = source ? sourceKeyFor(source) : item.source_key || '';
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
+  const visibleCodeRows = codes
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => {
+      if (effectiveSourceFilter === 'all') return true;
+      const source = findSourceForCode(item, sources);
+      return source
+        ? sourceKeyFor(source) === effectiveSourceFilter
+        : item.source_key === effectiveSourceFilter;
+    });
 
   useEffect(() => {
     setCodeRowKeys((current) => {
@@ -994,6 +1012,23 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
         <div className="config-table-toolbar">
           <strong>故障码</strong>
           <div className="fault-code-toolbar-actions">
+            <label className="fault-code-source-filter">
+              来源
+              <select
+                value={effectiveSourceFilter}
+                onChange={(event) => setSourceFilter(event.target.value)}
+              >
+                <option value="all">全部来源 ({codes.length})</option>
+                {sources.map((source) => {
+                  const key = sourceKeyFor(source);
+                  return (
+                    <option key={key} value={key}>
+                      {sourceOptionLabel(source)} ({codeCountBySource.get(key) ?? 0})
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
             <button type="button" onClick={addCode}>
               新增故障码
             </button>
@@ -1025,7 +1060,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               </tr>
             </thead>
             <tbody>
-              {codes.map((item, index) => {
+              {visibleCodeRows.map(({ item, index }) => {
                 const key = item.message_key || item.name_key || messageKeyFor(item);
                 const codeSource = findSourceForCode(item, sources);
                 const codeSourceKey = codeSource ? sourceKeyFor(codeSource) : '';
@@ -1233,6 +1268,13 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </tr>
                 );
               })}
+              {visibleCodeRows.length === 0 ? (
+                <tr>
+                  <td colSpan={8}>
+                    <div className="fault-code-empty-filter">当前来源下没有故障码</div>
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

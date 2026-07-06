@@ -721,6 +721,10 @@ export function Dashboard({
     (refactorOnlySections as readonly string[]).includes(section),
   );
   const effectiveProjectValid = compatibleMissingSections.length === 0;
+  const currentProjectPath = loadedProject?.summary.path ?? projectPath;
+  const selectedRecentProjectPath = recentProjects.some((item) => item.path === projectPath)
+    ? projectPath
+    : '';
 
   function updateProjectDocument(section: string, value: unknown) {
     if (!loadedProject) return;
@@ -2631,6 +2635,18 @@ export function Dashboard({
     }
   }
 
+  async function handleReloadProject() {
+    const reloadPath = loadedProject?.summary.path ?? projectPath;
+    if (reloadPath.trim() === '') return;
+    if (
+      hasUnsavedChanges &&
+      !window.confirm('当前项目存在未保存修改，重新加载会丢弃这些修改。确定继续吗？')
+    ) {
+      return;
+    }
+    await handleOpenProject(reloadPath);
+  }
+
   async function handleSelectProjectFile() {
     setOpenError(null);
 
@@ -3913,6 +3929,14 @@ export function Dashboard({
                 >
                   打开
                 </button>
+                <button
+                  className="project-open-btn project-open-btn--secondary"
+                  type="button"
+                  onClick={() => void handleReloadProject()}
+                  disabled={isOpening || currentProjectPath.trim() === ''}
+                >
+                  重新加载
+                </button>
               </div>
               {openError ? <p className="project-open-error">{openError}</p> : null}
             </div>
@@ -3931,19 +3955,39 @@ export function Dashboard({
                     清空
                   </button>
                 </div>
-                <div className="project-recent-list">
-                  {recentProjects.map((item) => (
-                    <button
-                      className="project-recent-item"
-                      key={item.path}
-                      disabled={isOpening}
-                      onClick={() => void handleOpenProject(item.path)}
-                      type="button"
-                    >
-                      <span className="project-recent-name">{item.name || '未命名'}</span>
-                      <span className="project-recent-path">{item.path}</span>
-                    </button>
-                  ))}
+                <div className="project-recent-row">
+                  <select
+                    className="project-recent-select"
+                    value={selectedRecentProjectPath}
+                    onChange={(event) => setProjectPath(event.target.value)}
+                    disabled={isOpening}
+                    title={selectedRecentProjectPath || '选择最近项目'}
+                  >
+                    <option value="" disabled>
+                      选择最近项目
+                    </option>
+                    {recentProjects.map((item) => (
+                      <option key={item.path} value={item.path}>
+                        {(item.name || '未命名') + ' - ' + item.path}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="project-open-btn project-open-btn--secondary"
+                    type="button"
+                    onClick={() => void handleOpenProject(selectedRecentProjectPath)}
+                    disabled={isOpening || selectedRecentProjectPath === ''}
+                  >
+                    打开历史
+                  </button>
+                  <button
+                    className="project-open-btn project-open-btn--secondary"
+                    type="button"
+                    onClick={() => removeRecentProject(selectedRecentProjectPath)}
+                    disabled={isOpening || selectedRecentProjectPath === ''}
+                  >
+                    移除
+                  </button>
                 </div>
               </div>
             ) : null}
