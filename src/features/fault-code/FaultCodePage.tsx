@@ -54,6 +54,8 @@ const severityOptions = [
   { value: 'critical', label: '严重' },
 ];
 
+type BatchCopyI18nMode = 'independent' | 'shared';
+
 const maxVisibleI18nOptions = 80;
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -416,6 +418,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   const [sourceFilter, setSourceFilter] = useState('all');
   const [batchSourceKey, setBatchSourceKey] = useState('');
   const [batchTargetSourceKey, setBatchTargetSourceKey] = useState('');
+  const [batchCopyI18nMode, setBatchCopyI18nMode] = useState<BatchCopyI18nMode>('independent');
   const [codeRowKeys, setCodeRowKeys] = useState(() => codes.map(createFaultCodeRowKey));
   const duplicateFaultCodes = buildDuplicateFaultCodeHints(sources, codes);
   const duplicateMessageKeys = buildDuplicateMessageKeyHints(codes, messageKeyDraftByRow);
@@ -720,15 +723,18 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       const sourceMessageKey = item.message_key || item.name_key || messageKeyFor(item);
       const targetPatch = codePatchForSource(target);
       const targetMessageKey = messageKeyFor({ ...item, ...targetPatch, code });
+      const messageKey = batchCopyI18nMode === 'shared' ? sourceMessageKey : targetMessageKey;
       const nextItem: FaultCodeItem = {
         ...item,
         ...targetPatch,
         code,
-        message_key: targetMessageKey,
+        message_key: messageKey,
       };
       const zhText = languageText(nextLanguage, sourceMessageKey) || item.name || '';
       nextItem.name = zhText;
-      nextLanguage = cloneLanguageEntry(nextLanguage, sourceMessageKey, targetMessageKey, zhText);
+      if (batchCopyI18nMode === 'independent') {
+        nextLanguage = cloneLanguageEntry(nextLanguage, sourceMessageKey, targetMessageKey, zhText);
+      }
       newCodes.push(normalizeCode(nextItem, sources));
     }
 
@@ -741,8 +747,8 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     updateFaultCode({ ...faultCode, codes: [...codes, ...newCodes] }, nextLanguage);
     setCsvStatus(
       `已从 ${sourceOptionLabel(source)} 复制 ${newCodes.length} 条到 ${sourceOptionLabel(target)}${
-        skipped > 0 ? `，跳过 ${skipped} 条重复故障码` : ''
-      }`,
+        batchCopyI18nMode === 'shared' ? '，复用原翻译 Key' : '，已创建独立翻译 Key'
+      }${skipped > 0 ? `，跳过 ${skipped} 条重复故障码` : ''}`,
     );
   }
 
@@ -1222,6 +1228,23 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                 : `${sourceLabelForKey(sources, effectiveSourceFilter)} ${visibleCodeRows.length} 条`}
             </strong>
           </div>
+          <fieldset className="fault-code-batch-mode">
+            <legend>翻译 Key</legend>
+            <button
+              className={batchCopyI18nMode === 'independent' ? 'active' : undefined}
+              type="button"
+              onClick={() => setBatchCopyI18nMode('independent')}
+            >
+              创建独立翻译 Key
+            </button>
+            <button
+              className={batchCopyI18nMode === 'shared' ? 'active' : undefined}
+              type="button"
+              onClick={() => setBatchCopyI18nMode('shared')}
+            >
+              复用原翻译 Key
+            </button>
+          </fieldset>
           <div className="fault-code-batch-actions">
             <button
               disabled={visibleCodeRows.length === 0}
