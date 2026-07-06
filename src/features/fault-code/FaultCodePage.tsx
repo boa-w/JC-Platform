@@ -157,6 +157,11 @@ function sourceOptionLabel(source: FaultCodeSource) {
   return `${name} (${type}, ${canId})`;
 }
 
+function sourceLabelForKey(sources: FaultCodeSource[], key: string) {
+  const source = sources.find((item) => sourceKeyFor(item) === key);
+  return source ? sourceOptionLabel(source) : key || '未选择来源';
+}
+
 function normalizeSource(source: FaultCodeSource): FaultCodeSource {
   const preset = sourcePresets[source.source_id];
   return {
@@ -409,6 +414,8 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   const [messageKeyDraftByRow, setMessageKeyDraftByRow] = useState<Record<number, string>>({});
   const [cloneSourceByRow, setCloneSourceByRow] = useState<Record<number, string>>({});
   const [sourceFilter, setSourceFilter] = useState('all');
+  const [batchSourceKey, setBatchSourceKey] = useState('');
+  const [batchTargetSourceKey, setBatchTargetSourceKey] = useState('');
   const [codeRowKeys, setCodeRowKeys] = useState(() => codes.map(createFaultCodeRowKey));
   const duplicateFaultCodes = buildDuplicateFaultCodeHints(sources, codes);
   const duplicateMessageKeys = buildDuplicateMessageKeyHints(codes, messageKeyDraftByRow);
@@ -441,6 +448,21 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       ];
     });
   }, [codes.length]);
+
+  useEffect(() => {
+    const firstSourceKey = sources[0] ? sourceKeyFor(sources[0]) : '';
+    const secondSourceKey = sources[1] ? sourceKeyFor(sources[1]) : firstSourceKey;
+    setBatchSourceKey((current) =>
+      current && sources.some((source) => sourceKeyFor(source) === current)
+        ? current
+        : firstSourceKey,
+    );
+    setBatchTargetSourceKey((current) =>
+      current && sources.some((source) => sourceKeyFor(source) === current)
+        ? current
+        : secondSourceKey,
+    );
+  }, [sources]);
 
   function updateFaultCode(next: FaultCodeInfo, nextLanguage = language) {
     onUpdateSections({
@@ -643,6 +665,151 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     const nextLanguage = ensureLanguageEntry(language, item.message_key, '新故障');
     setCodeRowKeys((current) => [...current, createFaultCodeRowKey()]);
     updateFaultCode({ ...faultCode, codes: [...codes, { ...item, name: '新故障' }] }, nextLanguage);
+  }
+
+  function codeBelongsToSourceKey(item: FaultCodeItem, sourceKey: string) {
+    const source = findSourceForCode(item, sources);
+    return source ? sourceKeyFor(source) === sourceKey : item.source_key === sourceKey;
+  }
+
+  function visibleCodeIndexes() {
+    if (effectiveSourceFilter === 'all') return codes.map((_, index) => index);
+    return codes
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => codeBelongsToSourceKey(item, effectiveSourceFilter))
+      .map(({ index }) => index);
+  }
+
+  function clearFaultCodeRowDrafts() {
+    setI18nSearchByRow({});
+    setMessageKeyDraftByRow({});
+    setCloneSourceByRow({});
+  }
+
+  function batchCopySourceToTarget() {
+    const source = sources.find((item) => sourceKeyFor(item) === batchSourceKey);
+    const target = sources.find((item) => sourceKeyFor(item) === batchTargetSourceKey);
+    if (!source || !target) {
+      setCsvStatus('请选择要复制的来源和目标来源');
+      return;
+    }
+    if (sourceKeyFor(source) === sourceKeyFor(target)) {
+      setCsvStatus('批量复制的来源和目标来源不能相同');
+      return;
+    }
+
+    let nextLanguage = language;
+    let skipped = 0;
+    const sourceCodes = codes.filter((item) => codeBelongsToSourceKey(item, sourceKeyFor(source)));
+    const newCodes: FaultCodeItem[] = [];
+
+    for (const item of sourceCodes) {
+      const code = clampFaultCode(numberValue(item.code));
+      const existsInTarget = codes.some((candidate) => {
+        const candidateSource = findSourceForCode(candidate, sources);
+        return (
+          candidateSource?.can_id === target.can_id &&
+          clampFaultCode(numberValue(candidate.code)) === code
+        );
+      });
+      if (existsInTarget) {
+        skipped += 1;
+        continue;
+      }
+
+      const sourceMessageKey = item.message_key || item.name_key || messageKeyFor(item);
+      const targetPatch = codePatchForSource(target);
+      const targetMessageKey = messageKeyFor({ ...item, ...targetPatch, code });
+      const nextItem: FaultCodeItem = {
+        ...item,
+        ...targetPatch,
+        code,
+        message_key: targetMessageKey,
+      };
+      const zhText = languageText(nextLanguage, sourceMessageKey) || item.name || '';
+      nextItem.name = zhText;
+      nextLanguage = cloneLanguageEntry(nextLanguage, sourceMessageKey, targetMessageKey, zhText);
+      newCodes.push(normalizeCode(nextItem, sources));
+    }
+
+    if (newCodes.length === 0) {
+      setCsvStatus(`没有可复制的故障码，已跳过 ${skipped} 条目标来源已存在的故障码`);
+      return;
+    }
+
+    clearFaultCodeRowDrafts();
+    updateFaultCode({ ...faultCode, codes: [...codes, ...newCodes] }, nextLanguage);
+    setCsvStatus(
+      `已从 ${sourceOptionLabel(source)} 复制 ${newCodes.length} 条到 ${sourceOptionLabel(target)}${
+        skipped > 0 ? `，跳过 ${skipped} 条重复故障码` : ''
+      }`,
+    );
+  }
+
+  function batchEnsureVisibleKeys() {
+    const indexes = new Set(visibleCodeIndexes());
+    if (indexes.size === 0) {
+      setCsvStatus('当前筛选范围内没有故障码可补齐');
+      return;
+    }
+
+    let nextLanguage = language;
+    let changed = 0;
+    const nextCodes = codes.map((item, index) => {
+      if (!indexes.has(index)) return item;
+      const source = findSourceForCode(item, sources);
+      const next = normalizeCode(
+        source ? { ...item, ...codePatchForSource(source) } : item,
+        sources,
+      );
+      const nextKey = next.message_key || next.name_key || messageKeyFor(next);
+      const hadKey = Boolean(next.message_key);
+      next.message_key = nextKey;
+      nextLanguage = ensureLanguageEntry(nextLanguage, nextKey, next.name ?? '');
+      if (!hadKey || next.type_char !== item.type_char || next.source_key !== item.source_key) {
+        changed += 1;
+      }
+      return next;
+    });
+
+    clearFaultCodeRowDrafts();
+    updateFaultCode({ ...faultCode, codes: nextCodes }, nextLanguage);
+    setCsvStatus(
+      `已补齐当前筛选范围 ${indexes.size} 条故障码的来源参数、文案 Key 和 i18n 条目${
+        changed > 0 ? `，其中 ${changed} 条发生字段更新` : ''
+      }`,
+    );
+  }
+
+  function batchSetVisibleEnabled(enabled: boolean) {
+    const indexes = new Set(visibleCodeIndexes());
+    if (indexes.size === 0) {
+      setCsvStatus('当前筛选范围内没有故障码可操作');
+      return;
+    }
+    updateFaultCode({
+      ...faultCode,
+      codes: codes.map((item, index) => (indexes.has(index) ? { ...item, enabled } : item)),
+    });
+    setCsvStatus(`已${enabled ? '启用' : '禁用'}当前筛选范围 ${indexes.size} 条故障码`);
+  }
+
+  function batchRemoveVisibleCodes() {
+    const indexes = new Set(visibleCodeIndexes());
+    if (indexes.size === 0) {
+      setCsvStatus('当前筛选范围内没有故障码可删除');
+      return;
+    }
+    if (!window.confirm(`确定删除当前筛选范围内的 ${indexes.size} 条故障码吗？`)) {
+      return;
+    }
+    clearFaultCodeRowDrafts();
+    setCodeRowKeys((current) => current.filter((_, index) => !indexes.has(index)));
+    updateFaultCode({
+      ...faultCode,
+      codes: codes.filter((_, index) => !indexes.has(index)),
+    });
+    setCsvStatus(`已删除当前筛选范围 ${indexes.size} 条故障码`);
   }
 
   function cloneCodeToSource(index: number) {
@@ -1008,6 +1175,84 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section className="table-spec-card">
+        <div className="config-table-toolbar">
+          <strong>批量管理</strong>
+          <div className="fault-code-toolbar-actions">
+            <label className="fault-code-source-filter">
+              复制来源
+              <select
+                value={batchSourceKey}
+                onChange={(event) => setBatchSourceKey(event.target.value)}
+              >
+                {sources.map((source) => (
+                  <option key={sourceKeyFor(source)} value={sourceKeyFor(source)}>
+                    {sourceOptionLabel(source)} ({codeCountBySource.get(sourceKeyFor(source)) ?? 0})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="fault-code-source-filter">
+              目标来源
+              <select
+                value={batchTargetSourceKey}
+                onChange={(event) => setBatchTargetSourceKey(event.target.value)}
+              >
+                {sources.map((source) => (
+                  <option key={sourceKeyFor(source)} value={sourceKeyFor(source)}>
+                    {sourceOptionLabel(source)} ({codeCountBySource.get(sourceKeyFor(source)) ?? 0})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button disabled={sources.length < 2} type="button" onClick={batchCopySourceToTarget}>
+              批量复制
+            </button>
+          </div>
+        </div>
+        <div className="fault-code-batch-panel">
+          <div className="fault-code-batch-summary">
+            当前筛选：
+            <strong>
+              {effectiveSourceFilter === 'all'
+                ? `全部来源 ${codes.length} 条`
+                : `${sourceLabelForKey(sources, effectiveSourceFilter)} ${visibleCodeRows.length} 条`}
+            </strong>
+          </div>
+          <div className="fault-code-batch-actions">
+            <button
+              disabled={visibleCodeRows.length === 0}
+              type="button"
+              onClick={batchEnsureVisibleKeys}
+            >
+              补齐 Key/i18n
+            </button>
+            <button
+              disabled={visibleCodeRows.length === 0}
+              type="button"
+              onClick={() => batchSetVisibleEnabled(true)}
+            >
+              批量启用
+            </button>
+            <button
+              disabled={visibleCodeRows.length === 0}
+              type="button"
+              onClick={() => batchSetVisibleEnabled(false)}
+            >
+              批量禁用
+            </button>
+            <button
+              className="danger"
+              disabled={visibleCodeRows.length === 0}
+              type="button"
+              onClick={batchRemoveVisibleCodes}
+            >
+              删除筛选项
+            </button>
+          </div>
         </div>
       </section>
 

@@ -3642,12 +3642,14 @@ button {
   align-items: center;
   gap: 8px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .fault-code-source-filter {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
   min-height: 32px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -3667,7 +3669,8 @@ button {
 }
 
 .fault-code-source-filter select {
-  min-width: 240px;
+  width: min(280px, 42vw);
+  min-width: 180px;
   border: 0;
   padding: 5px 26px 5px 6px;
   background: transparent;
@@ -3678,6 +3681,76 @@ button {
 
 .fault-code-source-filter select:focus {
   outline: none;
+}
+
+.fault-code-batch-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: var(--color-surface-alt);
+}
+
+.fault-code-batch-summary {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.fault-code-batch-summary strong {
+  margin-left: 4px;
+  color: var(--color-text);
+}
+
+.fault-code-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.fault-code-batch-actions button {
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s,
+    opacity 0.15s;
+}
+
+.fault-code-batch-actions button:hover:not(:disabled) {
+  border-color: var(--color-primary-border);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.fault-code-batch-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.fault-code-batch-actions button.danger {
+  border-color: rgba(220, 38, 38, 0.35);
+  color: var(--color-danger);
+}
+
+.fault-code-batch-actions button.danger:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  background: var(--color-danger-light);
+  color: var(--color-danger);
 }
 
 [data-theme="dark"] .fault-code-source-filter {
@@ -3693,6 +3766,39 @@ button {
 
 [data-theme="dark"] .fault-code-source-filter select {
   color: #d4d4d4;
+}
+
+[data-theme="dark"] .fault-code-source-filter option {
+  background: #3c3c3c;
+  color: #d4d4d4;
+}
+
+[data-theme="dark"] .fault-code-batch-panel {
+  border-color: #333333;
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .fault-code-batch-actions button {
+  border-color: #3e3e3e;
+  background: #3c3c3c;
+  color: #d4d4d4;
+}
+
+[data-theme="dark"] .fault-code-batch-actions button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: rgba(55, 148, 255, 0.12);
+  color: var(--color-primary-hover);
+}
+
+[data-theme="dark"] .fault-code-batch-actions button.danger {
+  border-color: rgba(244, 71, 71, 0.45);
+  color: #ff8585;
+}
+
+[data-theme="dark"] .fault-code-batch-actions button.danger:hover:not(:disabled) {
+  border-color: #f44747;
+  background: rgba(244, 71, 71, 0.14);
+  color: #ff9b9b;
 }
 
 .fault-code-csv-status {
@@ -3804,6 +3910,14 @@ button {
   .fault-code-source-filter select {
     flex: 1;
     min-width: 0;
+  }
+
+  .fault-code-batch-actions {
+    width: 100%;
+  }
+
+  .fault-code-batch-actions button {
+    flex: 1;
   }
 }
 
