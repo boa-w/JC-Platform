@@ -186,6 +186,11 @@ fn order_fault_code_info(root: &mut Value) {
         return;
     };
 
+    if let Some(object) = fault_code_info.as_object_mut() {
+        object.remove("groups");
+        object.remove("bindings");
+    }
+
     if let Some(sources) = fault_code_info
         .get_mut("sources")
         .and_then(Value::as_array_mut)
@@ -201,6 +206,10 @@ fn order_fault_code_info(root: &mut Value) {
         .and_then(Value::as_array_mut)
     {
         for code in codes {
+            if let Some(object) = code.as_object_mut() {
+                object.remove("generated_from_group");
+                object.remove("group_key");
+            }
             let value = std::mem::take(code);
             *code = order_object_value(value, FAULT_CODE_ITEM_FIELD_ORDER);
         }
@@ -294,6 +303,8 @@ mod tests {
             "fault_code_info": {
                 "codes": [
                     {
+                        "group_key": "traction_common",
+                        "generated_from_group": true,
                         "enabled": true,
                         "name": "故障",
                         "message_key": "fault.traction.001",
@@ -302,6 +313,39 @@ mod tests {
                         "type_char": "T",
                         "source_id": 1,
                         "source_key": "traction"
+                    }
+                ],
+                "bindings": [
+                    {
+                        "overrides": [
+                            {
+                                "enabled": true,
+                                "name": "覆盖故障",
+                                "message_key": "fault.pump.001",
+                                "severity": "warning",
+                                "code": 1
+                            }
+                        ],
+                        "excludes": [2],
+                        "enabled": true,
+                        "group_key": "traction_common",
+                        "source_key": "pump"
+                    }
+                ],
+                "groups": [
+                    {
+                        "codes": [
+                            {
+                                "enabled": true,
+                                "name": "模板故障",
+                                "message_key": "fault.common.001",
+                                "severity": "fault",
+                                "code": 1
+                            }
+                        ],
+                        "enabled": true,
+                        "name": "通用故障",
+                        "group_key": "traction_common"
                     }
                 ],
                 "sources": [
@@ -399,6 +443,8 @@ mod tests {
             fault.keys().map(String::as_str).collect::<Vec<_>>(),
             vec!["schema_version", "enabled", "version", "sources", "codes"]
         );
+        assert!(fault.get("groups").is_none());
+        assert!(fault.get("bindings").is_none());
 
         let source = fault
             .get("sources")
@@ -422,6 +468,29 @@ mod tests {
                 "clear_code",
                 "invalid_codes",
                 "enabled",
+            ]
+        );
+
+        let fault_code = fault
+            .get("codes")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .first()
+            .unwrap()
+            .as_object()
+            .unwrap();
+        assert_eq!(
+            fault_code.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "source_key",
+                "source_id",
+                "type_char",
+                "code",
+                "severity",
+                "message_key",
+                "name",
+                "enabled"
             ]
         );
 

@@ -3913,30 +3913,32 @@ export function Dashboard({
                     if (event.key === 'Enter') void handleOpenProject();
                   }}
                 />
-                <button
-                  className="project-open-btn"
-                  type="button"
-                  onClick={() => void handleSelectProjectFile()}
-                  disabled={isOpening}
-                >
-                  {isOpening ? '打开中...' : '浏览'}
-                </button>
-                <button
-                  className="project-open-btn project-open-btn--secondary"
-                  type="button"
-                  onClick={() => void handleOpenProject()}
-                  disabled={isOpening || projectPath.trim() === ''}
-                >
-                  打开
-                </button>
-                <button
-                  className="project-open-btn project-open-btn--secondary"
-                  type="button"
-                  onClick={() => void handleReloadProject()}
-                  disabled={isOpening || currentProjectPath.trim() === ''}
-                >
-                  重新加载
-                </button>
+                <div className="project-open-actions">
+                  <button
+                    className="project-open-btn"
+                    type="button"
+                    onClick={() => void handleSelectProjectFile()}
+                    disabled={isOpening}
+                  >
+                    {isOpening ? '打开中...' : '浏览'}
+                  </button>
+                  <button
+                    className="project-open-btn project-open-btn--secondary"
+                    type="button"
+                    onClick={() => void handleOpenProject()}
+                    disabled={isOpening || projectPath.trim() === ''}
+                  >
+                    打开
+                  </button>
+                  <button
+                    className="project-open-btn project-open-btn--secondary"
+                    type="button"
+                    onClick={() => void handleReloadProject()}
+                    disabled={isOpening || currentProjectPath.trim() === ''}
+                  >
+                    重新加载
+                  </button>
+                </div>
               </div>
               {openError ? <p className="project-open-error">{openError}</p> : null}
             </div>
@@ -3972,22 +3974,24 @@ export function Dashboard({
                       </option>
                     ))}
                   </select>
-                  <button
-                    className="project-open-btn project-open-btn--secondary"
-                    type="button"
-                    onClick={() => void handleOpenProject(selectedRecentProjectPath)}
-                    disabled={isOpening || selectedRecentProjectPath === ''}
-                  >
-                    打开历史
-                  </button>
-                  <button
-                    className="project-open-btn project-open-btn--secondary"
-                    type="button"
-                    onClick={() => removeRecentProject(selectedRecentProjectPath)}
-                    disabled={isOpening || selectedRecentProjectPath === ''}
-                  >
-                    移除
-                  </button>
+                  <div className="project-open-actions project-open-actions--compact">
+                    <button
+                      className="project-open-btn project-open-btn--secondary"
+                      type="button"
+                      onClick={() => void handleOpenProject(selectedRecentProjectPath)}
+                      disabled={isOpening || selectedRecentProjectPath === ''}
+                    >
+                      打开历史
+                    </button>
+                    <button
+                      className="project-open-btn project-open-btn--secondary"
+                      type="button"
+                      onClick={() => removeRecentProject(selectedRecentProjectPath)}
+                      disabled={isOpening || selectedRecentProjectPath === ''}
+                    >
+                      移除
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}

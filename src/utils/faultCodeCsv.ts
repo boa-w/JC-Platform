@@ -94,6 +94,18 @@ function sourceKeyFor(source: Pick<FaultCodeSource, 'source_key' | 'source_id'>)
   return source.source_key || sourcePresets[source.source_id]?.key || `source_${source.source_id}`;
 }
 
+function findSourceForCode(item: FaultCodeItem, sources: FaultCodeSource[]) {
+  if (item.source_key) {
+    const byKey = sources.find((source) => sourceKeyFor(source) === item.source_key);
+    if (byKey) return byKey;
+  }
+  if (item.source_id !== undefined) {
+    const byId = sources.find((source) => source.source_id === item.source_id);
+    if (byId) return byId;
+  }
+  return undefined;
+}
+
 function messageKeyFor(
   item: Pick<FaultCodeItem, 'source_key' | 'type_char' | 'source_id' | 'code'>,
 ): string {
@@ -198,12 +210,20 @@ export function csvToFaultSources(text: string): {
   return { sources, errors };
 }
 
-export function faultCodesToCsv(codes: FaultCodeItem[], language: LanguageDocument): string {
+export function faultCodesToCsv(
+  codes: FaultCodeItem[],
+  sources: FaultCodeSource[],
+  language: LanguageDocument,
+): string {
   const languageHeaders = language.list_code_language.map((code) => `text_${code}`);
   const header = [
     'enabled',
     'source_key',
     'source_id',
+    'source_name',
+    'can_id',
+    'frame_type',
+    'code_byte',
     'type_char',
     'code',
     'severity',
@@ -212,12 +232,17 @@ export function faultCodesToCsv(codes: FaultCodeItem[], language: LanguageDocume
     ...languageHeaders,
   ];
   const rows = codes.map((item) => {
+    const source = findSourceForCode(item, sources);
     const key = item.message_key || item.name_key || messageKeyFor(item);
     return [
       (item.enabled ?? true) ? '1' : '0',
-      item.source_key ?? '',
-      String(item.source_id ?? ''),
-      item.type_char ?? typeChars[item.source_id ?? 0] ?? '',
+      item.source_key ?? (source ? sourceKeyFor(source) : ''),
+      String(item.source_id ?? source?.source_id ?? ''),
+      escapeCsvField(source?.name ?? ''),
+      source ? `0x${source.can_id.toString(16).toUpperCase()}` : '',
+      String(source?.frame_type ?? source?.type ?? ''),
+      String(source?.code_byte ?? source?.code_offset ?? ''),
+      source?.type_char ?? item.type_char ?? typeChars[item.source_id ?? 0] ?? '',
       String(item.code),
       item.severity ?? 'fault',
       key,

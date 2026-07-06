@@ -195,8 +195,11 @@ function codePatchForSource(source: FaultCodeSource): Partial<FaultCodeItem> {
 
 function normalizeCode(item: FaultCodeItem, sources: FaultCodeSource[]): FaultCodeItem {
   const source = findSourceForCode(item, sources);
+  const plainItem = { ...item };
+  delete plainItem.generated_from_group;
+  delete plainItem.group_key;
   return {
-    ...item,
+    ...plainItem,
     source_key: item.source_key || (source ? sourceKeyFor(source) : undefined),
     source_id: item.source_id ?? source?.source_id,
     type_char: source?.type_char || item.type_char,
@@ -774,7 +777,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
 
     setIsCsvBusy(true);
     try {
-      await saveTextFile(selected, `\uFEFF${faultCodesToCsv(codes, language)}`);
+      await saveTextFile(selected, `\uFEFF${faultCodesToCsv(codes, sources, language)}`);
       setCsvStatus(`故障码 CSV 已导出：${selected}`);
     } catch (error) {
       setCsvStatus(error instanceof Error ? error.message : String(error));
@@ -1051,7 +1054,9 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               <tr>
                 <th>启用</th>
                 <th>来源</th>
+                <th>CAN ID</th>
                 <th>类型</th>
+                <th>取码字节</th>
                 <th>Code</th>
                 <th>等级</th>
                 <th>文案 Key</th>
@@ -1065,6 +1070,11 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                 const codeSource = findSourceForCode(item, sources);
                 const codeSourceKey = codeSource ? sourceKeyFor(codeSource) : '';
                 const codeTypeChar = codeSource?.type_char ?? item.type_char ?? '';
+                const codeCanId =
+                  typeof codeSource?.can_id === 'number' && Number.isFinite(codeSource.can_id)
+                    ? hexOrDecimal(codeSource.can_id)
+                    : '-';
+                const codeByte = codeSource?.code_byte ?? codeSource?.code_offset ?? '-';
                 const duplicateCanId = sourceCanIdForCode(item, sources);
                 const isDuplicate = duplicateFaultCodes.duplicateIndexes.has(index);
                 const isDuplicateMessageKey = duplicateMessageKeys.duplicateIndexes.has(index);
@@ -1117,8 +1127,18 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       </select>
                     </td>
                     <td>
+                      <span className="fault-code-readonly-value" title="CAN ID 由来源规则决定">
+                        {codeCanId}
+                      </span>
+                    </td>
+                    <td>
                       <span className="fault-code-readonly-value" title="类型由来源规则决定">
                         {codeTypeChar || '-'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="fault-code-readonly-value" title="取码字节由来源规则决定">
+                        {codeByte}
                       </span>
                     </td>
                     <td>
@@ -1270,7 +1290,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               })}
               {visibleCodeRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
+                  <td colSpan={10}>
                     <div className="fault-code-empty-filter">当前来源下没有故障码</div>
                   </td>
                 </tr>

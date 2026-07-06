@@ -16,6 +16,8 @@ interface SidebarProps {
   onToggleTheme: () => void;
   health: BackendHealth | null;
   project: ProjectSummary | null;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
 function lifecycleLabel(lifecycle?: ModuleLifecycle) {
@@ -33,6 +35,8 @@ export function Sidebar({
   onToggleTheme,
   health,
   project,
+  collapsed,
+  onToggleCollapsed,
 }: SidebarProps) {
   const groupOfActive = findGroupForKey(activeKey);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>(
@@ -78,8 +82,20 @@ export function Sidebar({
   }, [showPopup, handleClickOutside]);
 
   return (
-    <div className="activity-shell">
+    <div className={collapsed ? 'activity-shell activity-shell--collapsed' : 'activity-shell'}>
       <div className="activity-bar">
+        <button
+          className="activity-icon activity-icon--toggle"
+          type="button"
+          onClick={onToggleCollapsed}
+          title={collapsed ? '展开侧边栏' : '收起侧边栏'}
+          aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
+          aria-expanded={!collapsed}
+        >
+          <span className="activity-icon-glyph" aria-hidden="true">
+            {collapsed ? '▸' : '◂'}
+          </span>
+        </button>
         {navGroups.map((group) => {
           const isActive = group.label === activeGroupLabel;
           return (
@@ -168,35 +184,37 @@ export function Sidebar({
         </div>
       ) : null}
 
-      <nav className="activity-list" aria-label={`${activeGroup.label} 功能`}>
-        <div className="activity-list-header">
-          <span className="activity-list-title">{activeGroup.label}</span>
-          <span className="activity-list-count">{activeGroupModules.length}</span>
-        </div>
-        <div className="activity-list-items">
-          {activeGroupModules.map((module) => {
-            const label = lifecycleLabel(module.lifecycle);
-            return (
-              <button
-                className={module.key === activeKey ? 'activity-item active' : 'activity-item'}
-                key={module.key}
-                type="button"
-                onClick={() => onSelect(module.key)}
-                title={module.lifecycleReason ?? module.description}
-              >
-                <span className="activity-item-label">{module.title}</span>
-                {label ? (
-                  <span
-                    className={`module-lifecycle-badge module-lifecycle-badge--${module.lifecycle}`}
-                  >
-                    {label}
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      {collapsed ? null : (
+        <nav className="activity-list" aria-label={`${activeGroup.label} 功能`}>
+          <div className="activity-list-header">
+            <span className="activity-list-title">{activeGroup.label}</span>
+            <span className="activity-list-count">{activeGroupModules.length}</span>
+          </div>
+          <div className="activity-list-items">
+            {activeGroupModules.map((module) => {
+              const label = lifecycleLabel(module.lifecycle);
+              return (
+                <button
+                  className={module.key === activeKey ? 'activity-item active' : 'activity-item'}
+                  key={module.key}
+                  type="button"
+                  onClick={() => onSelect(module.key)}
+                  title={module.lifecycleReason ?? module.description}
+                >
+                  <span className="activity-item-label">{module.title}</span>
+                  {label ? (
+                    <span
+                      className={`module-lifecycle-badge module-lifecycle-badge--${module.lifecycle}`}
+                    >
+                      {label}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

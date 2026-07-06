@@ -1444,13 +1444,6 @@ fn build_fault_code_bytes(
         .cloned()
         .unwrap_or_default();
     sources.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
-    let mut codes = root
-        .get("codes")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    codes.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
-
     let source_by_key = sources
         .iter()
         .filter_map(|source| {
@@ -1473,6 +1466,12 @@ fn build_fault_code_bytes(
             }
         })
         .collect::<HashMap<_, _>>();
+    let mut codes = root
+        .get("codes")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    codes.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
     codes.retain(|code| {
         let source_key = object_string(code, "source_key");
         if !source_key.is_empty() {

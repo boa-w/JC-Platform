@@ -910,6 +910,12 @@ button {
   background: var(--tb-accent);
 }
 
+.activity-icon--toggle {
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--tb-sep);
+  border-radius: 6px 6px 2px 2px;
+}
+
 .activity-icon-glyph {
   font-size: 18px;
   line-height: 1;
@@ -928,6 +934,10 @@ button {
   color: var(--tb-text);
   border-right: 1px solid var(--tb-sep);
   overflow: hidden;
+  transition:
+    width 0.16s ease,
+    border-color 0.16s ease,
+    visibility 0.16s ease;
 }
 
 .activity-list-header {
@@ -1439,13 +1449,15 @@ button {
 
 /* Open project row */
 .project-open-row {
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(260px, 560px) max-content;
+  gap: 8px;
   align-items: center;
+  justify-content: start;
 }
 
 .project-open-input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -1460,6 +1472,18 @@ button {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.project-open-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: max-content;
+}
+
+.project-open-actions--compact {
+  min-width: 0;
 }
 
 .project-open-btn {
@@ -1520,13 +1544,15 @@ button {
 
 /* Recent projects */
 .project-recent-row {
-  display: flex;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(240px, 560px) max-content;
+  gap: 8px;
   align-items: center;
+  justify-content: start;
 }
 
 .project-recent-select {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-sm);
@@ -2313,6 +2339,15 @@ button {
   .export-report--primary,
   .export-tool-grid {
     grid-template-columns: 1fr;
+  }
+
+  .project-open-row,
+  .project-recent-row {
+    grid-template-columns: 1fr;
+  }
+
+  .project-open-actions {
+    min-width: 0;
   }
 }
 
@@ -3598,7 +3633,7 @@ button {
 }
 
 .fault-code-table {
-  min-width: 1280px;
+  min-width: 1400px;
 }
 
 .fault-code-toolbar-actions {

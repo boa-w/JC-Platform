@@ -13,6 +13,7 @@ export default function App() {
   const [health, setHealth] = useState<BackendHealth | null>(null);
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [loadedProject, setLoadedProject] = useState<LoadedProject | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -35,6 +36,8 @@ export default function App() {
         onToggleTheme={toggleTheme}
         health={health}
         project={project}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
       />
       <Dashboard
         activeModule={activeModule}
