@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { translateBaiduText } from '../../api/commands';
 import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
@@ -27,11 +27,28 @@ type ViewMode = 'editor' | 'comparison';
 const TRANSLATE_SCOPE_STORAGE_KEY = 'jc.language.translateScope';
 const TRANSLATE_OPTIONS_STORAGE_KEY = 'jc.language.translateOptions';
 const LEGACY_BAIDU_TRANSLATE_STORAGE_KEY = 'jc.language.baiduTranslateConfig';
+const SCROLL_TOP_POSITION_STORAGE_KEY = 'jc.language.scrollTopPosition';
+const SCROLL_TOP_BUTTON_WIDTH = 92;
+const SCROLL_TOP_BUTTON_HEIGHT = 34;
+const SCROLL_TOP_BUTTON_MARGIN = 12;
 
 interface SavedTranslateOptions {
   scope?: string;
   sourceLanguage?: string;
   targetLanguage?: string;
+}
+
+interface FloatingButtonPosition {
+  left: number;
+  top: number;
+}
+
+interface FloatingButtonDragState {
+  startX: number;
+  startY: number;
+  initialLeft: number;
+  initialTop: number;
+  moved: boolean;
 }
 
 const initialTranslateProgress: TranslateProgress = {
@@ -41,6 +58,51 @@ const initialTranslateProgress: TranslateProgress = {
   failed: 0,
   currentKey: '',
 };
+
+function clampFloatingButtonPosition(
+  position: FloatingButtonPosition,
+  width = SCROLL_TOP_BUTTON_WIDTH,
+  height = SCROLL_TOP_BUTTON_HEIGHT,
+): FloatingButtonPosition {
+  if (typeof window === 'undefined') return position;
+  const maxLeft = Math.max(
+    SCROLL_TOP_BUTTON_MARGIN,
+    window.innerWidth - width - SCROLL_TOP_BUTTON_MARGIN,
+  );
+  const maxTop = Math.max(
+    SCROLL_TOP_BUTTON_MARGIN,
+    window.innerHeight - height - SCROLL_TOP_BUTTON_MARGIN,
+  );
+  return {
+    left: Math.min(Math.max(position.left, SCROLL_TOP_BUTTON_MARGIN), maxLeft),
+    top: Math.min(Math.max(position.top, SCROLL_TOP_BUTTON_MARGIN), maxTop),
+  };
+}
+
+function getDefaultScrollTopPosition(): FloatingButtonPosition {
+  if (typeof window === 'undefined') {
+    return { left: 0, top: 0 };
+  }
+  return clampFloatingButtonPosition({
+    left: window.innerWidth - SCROLL_TOP_BUTTON_WIDTH - 28,
+    top: Math.round(window.innerHeight * 0.72),
+  });
+}
+
+function readSavedScrollTopPosition(): FloatingButtonPosition {
+  if (typeof window === 'undefined') return getDefaultScrollTopPosition();
+  const saved = window.localStorage.getItem(SCROLL_TOP_POSITION_STORAGE_KEY);
+  if (!saved) return getDefaultScrollTopPosition();
+  try {
+    const parsed = JSON.parse(saved) as Partial<FloatingButtonPosition>;
+    if (typeof parsed.left === 'number' && typeof parsed.top === 'number') {
+      return clampFloatingButtonPosition({ left: parsed.left, top: parsed.top });
+    }
+  } catch {
+    window.localStorage.removeItem(SCROLL_TOP_POSITION_STORAGE_KEY);
+  }
+  return getDefaultScrollTopPosition();
+}
 
 function readSavedTranslateOptions(): SavedTranslateOptions {
   if (typeof window === 'undefined') return {};
@@ -127,6 +189,9 @@ function normalizeDocument(
 
 export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguagePageProps) {
   const langMainRef = useRef<HTMLDivElement | null>(null);
+  const scrollTopButtonRef = useRef<HTMLButtonElement | null>(null);
+  const scrollTopDragRef = useRef<FloatingButtonDragState | null>(null);
+  const suppressScrollTopClickRef = useRef(false);
   const cancelTranslateRef = useRef(false);
   const translateLogIdRef = useRef(0);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(() => {
@@ -156,6 +221,9 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     useState<TranslateProgress>(initialTranslateProgress);
   const [translateLogs, setTranslateLogs] = useState<TranslateLogEntry[]>([]);
   const [showTranslateLogs, setShowTranslateLogs] = useState(false);
+  const [scrollTopPosition, setScrollTopPosition] = useState<FloatingButtonPosition>(
+    readSavedScrollTopPosition,
+  );
   const [selectedTranslationKeys, setSelectedTranslationKeys] = useState<Set<string>>(
     () => new Set(),
   );
@@ -203,6 +271,19 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       return next.size === current.size ? current : next;
     });
   }, [document]);
+
+  useEffect(() => {
+    function handleResize() {
+      const rect = scrollTopButtonRef.current?.getBoundingClientRect();
+      setScrollTopPosition((current) =>
+        clampFloatingButtonPosition(current, rect?.width, rect?.height),
+      );
+    }
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const translationKeys = useMemo(() => {
     return visibleTranslationKeys(document);
@@ -588,6 +669,88 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
   }
 
+  function handleScrollTopPointerDown(event: PointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    scrollTopDragRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      initialLeft: scrollTopPosition.left,
+      initialTop: scrollTopPosition.top,
+      moved: false,
+    };
+  }
+
+  function handleScrollTopPointerMove(event: PointerEvent<HTMLButtonElement>) {
+    const dragState = scrollTopDragRef.current;
+    if (!dragState) return;
+
+    const deltaX = event.clientX - dragState.startX;
+    const deltaY = event.clientY - dragState.startY;
+    if (!dragState.moved && Math.hypot(deltaX, deltaY) > 3) {
+      dragState.moved = true;
+    }
+
+    if (!dragState.moved) return;
+    event.preventDefault();
+    const rect = scrollTopButtonRef.current?.getBoundingClientRect();
+    setScrollTopPosition(
+      clampFloatingButtonPosition(
+        {
+          left: dragState.initialLeft + deltaX,
+          top: dragState.initialTop + deltaY,
+        },
+        rect?.width,
+        rect?.height,
+      ),
+    );
+  }
+
+  function handleScrollTopPointerUp(event: PointerEvent<HTMLButtonElement>) {
+    const dragState = scrollTopDragRef.current;
+    if (!dragState) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (dragState.moved) {
+      suppressScrollTopClickRef.current = true;
+      const rect = scrollTopButtonRef.current?.getBoundingClientRect();
+      const nextPosition = clampFloatingButtonPosition(
+        {
+          left: dragState.initialLeft + event.clientX - dragState.startX,
+          top: dragState.initialTop + event.clientY - dragState.startY,
+        },
+        rect?.width,
+        rect?.height,
+      );
+      setScrollTopPosition(nextPosition);
+      window.localStorage.setItem(SCROLL_TOP_POSITION_STORAGE_KEY, JSON.stringify(nextPosition));
+      window.setTimeout(() => {
+        suppressScrollTopClickRef.current = false;
+      }, 0);
+    }
+
+    scrollTopDragRef.current = null;
+  }
+
+  function handleScrollTopPointerCancel(event: PointerEvent<HTMLButtonElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    scrollTopDragRef.current = null;
+  }
+
+  function handleScrollTopClick(event: MouseEvent<HTMLButtonElement>) {
+    if (suppressScrollTopClickRef.current) {
+      event.preventDefault();
+      suppressScrollTopClickRef.current = false;
+      return;
+    }
+    handleScrollToTop();
+  }
+
   if (!loaded) {
     return (
       <section className="lang-page">
@@ -723,11 +886,18 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
         <button
           aria-label="回到顶部"
           className="lang-scroll-top"
-          onClick={handleScrollToTop}
+          onClick={handleScrollTopClick}
+          onPointerDown={handleScrollTopPointerDown}
+          onPointerMove={handleScrollTopPointerMove}
+          onPointerCancel={handleScrollTopPointerCancel}
+          onPointerUp={handleScrollTopPointerUp}
+          ref={scrollTopButtonRef}
+          style={{ left: scrollTopPosition.left, top: scrollTopPosition.top }}
           title="回到顶部"
           type="button"
         >
-          ↑
+          <span className="lang-scroll-top-icon">↑</span>
+          <span>顶部</span>
         </button>
       </div>
     </section>
