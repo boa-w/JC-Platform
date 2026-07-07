@@ -78,7 +78,8 @@ PR 构建只验证安装包构建。`main` 分支 push 和正式 Release 构建�
 
 1. 根据 `package.json` 当前版本计算 nightly 版本号。
    - 例如当前版本 `0.1.0`
-   - nightly 版本会构建为 `0.1.1-nightly.<run_number>`
+   - nightly 版本会构建为 `0.1.1-<run_number>`
+   - Windows MSI 要求预发布标识只能是 `0..65535` 的数字，因此 nightly 版本不使用 `nightly.<run_number>` 这种带字母的格式。
 2. 删除并重建固定 tag/release：`nightly`。
 3. 使用 updater 签名私钥构建 Windows/macOS 安装包。
 4. 由 `tauri-apps/tauri-action` 上传安装包、`.sig` 和 `latest.json`。
