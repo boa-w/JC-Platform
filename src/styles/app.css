@@ -27,6 +27,7 @@
   --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.1);
   --font-sans: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   --font-mono: "Cascadia Code", Consolas, "Courier New", monospace;
+  --app-toolbar-height: 36px;
 
   /* Toolbar (light theme) */
   --tb-bg: #f3f3f3;
@@ -277,6 +278,7 @@ button {
   min-height: 100vh;
   display: flex;
   align-items: stretch;
+  padding-top: var(--app-toolbar-height);
 }
 
 .workspace {
@@ -289,14 +291,17 @@ button {
 /* ── Action Bar (VSCode tab bar style) ── */
 
 .action-bar {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 19;
+  left: 0;
+  right: 0;
+  z-index: 30;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--tb-bg-alt);
+  gap: 8px;
+  height: var(--app-toolbar-height);
+  padding: 4px 10px;
+  background: var(--tb-bg);
   border-bottom: 1px solid var(--tb-border);
   flex-shrink: 0;
   flex-wrap: nowrap;
@@ -306,7 +311,7 @@ button {
 .action-bar-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
 }
@@ -314,19 +319,46 @@ button {
 .action-bar-right {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   flex-shrink: 0;
+}
+
+.action-bar-command-center {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 220px;
+  max-width: min(42vw, 480px);
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--tb-sep);
+  border-radius: 4px;
+  background: var(--tb-bg-alt);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
 
 .action-bar-project {
   font-size: 11.5px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--tb-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
-  letter-spacing: -0.1px;
+  min-width: 0;
+}
+
+.action-bar-module {
+  overflow: hidden;
+  color: var(--tb-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-bar-project + .action-bar-module::before {
+  content: "/";
+  margin-right: 7px;
+  color: var(--tb-text-muted);
 }
 
 .action-bar-dot {
@@ -345,9 +377,15 @@ button {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.action-bar-dot--empty {
+  background: var(--tb-text-muted);
+}
+
 .action-bar-pills {
   display: flex;
   gap: 3px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .action-bar-pill {
@@ -371,10 +409,17 @@ button {
 
 .action-bar-sep {
   width: 1px;
-  height: 14px;
+  height: 18px;
   background: var(--tb-sep);
   flex-shrink: 0;
-  margin: 0 3px;
+  margin: 0 2px;
+}
+
+.action-bar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .action-bar-btn {
@@ -407,13 +452,13 @@ button {
 }
 
 .action-bar-btn--secondary {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--tb-active);
   color: var(--tb-text);
 }
 
 .action-bar-btn--secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: var(--tb-hover);
+  color: var(--tb-text);
 }
 
 .action-bar-btn--ghost {
@@ -423,13 +468,22 @@ button {
 
 .action-bar-btn--ghost:hover:not(:disabled) {
   color: var(--tb-text);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--tb-hover);
 }
 
 .action-bar-icon {
   font-size: 12px;
   line-height: 1;
   flex-shrink: 0;
+}
+
+.action-bar-status {
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--tb-text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Language Section ── */
@@ -852,9 +906,9 @@ button {
   display: flex;
   flex-shrink: 0;
   align-items: stretch;
-  height: 100vh;
+  height: calc(100vh - var(--app-toolbar-height));
   position: sticky;
-  top: 0;
+  top: var(--app-toolbar-height);
 }
 
 .activity-bar {

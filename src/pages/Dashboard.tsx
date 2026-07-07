@@ -3604,137 +3604,74 @@ export function Dashboard({
 
   return (
     <main className="workspace">
-      {loadedProject ? (
-        <div className="action-bar">
-          <div className="action-bar-left">
-            <span className="action-bar-project">{loadedProject.summary.name || '未命名项目'}</span>
+      <div className="action-bar">
+        <div className="action-bar-left">
+          <div className="action-bar-command-center" title={loadedProject?.summary.path ?? ''}>
             <span
-              className={`action-bar-dot ${hasUnsavedChanges ? 'action-bar-dot--dirty' : 'action-bar-dot--clean'}`}
+              className={`action-bar-dot ${
+                loadedProject
+                  ? hasUnsavedChanges
+                    ? 'action-bar-dot--dirty'
+                    : 'action-bar-dot--clean'
+                  : 'action-bar-dot--empty'
+              }`}
             />
-            {modifiedSections.length > 0 ? (
-              <div className="action-bar-pills">
-                {modifiedSections.map((section) => (
-                  <button
-                    className="action-bar-pill"
-                    key={section}
-                    onClick={() => restoreModifiedPath([section])}
-                    type="button"
-                    title={`恢复 ${modifiedSectionLabels[section] ?? section}`}
-                  >
-                    {modifiedSectionLabels[section] ?? section}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            <span className="action-bar-project">
+              {loadedProject?.summary.name || '未打开项目'}
+            </span>
+            <span className="action-bar-module">{activeModule.title}</span>
           </div>
-          <div className="action-bar-right">
-            {currentLegacyTableKind ? (
-              <>
+          {modifiedSections.length > 0 ? (
+            <div className="action-bar-pills">
+              {modifiedSections.map((section) => (
                 <button
-                  className="action-bar-btn action-bar-btn--secondary"
-                  disabled={!loadedProject || isImportingTable}
-                  onClick={() => void handleImportTableConfig(currentLegacyTableKind)}
+                  className="action-bar-pill"
+                  key={section}
+                  onClick={() => restoreModifiedPath([section])}
                   type="button"
-                  title="从 CSV/XLS/XLSX/XML 文件导入"
+                  title={`恢复 ${modifiedSectionLabels[section] ?? section}`}
                 >
-                  <span className="action-bar-icon">↓</span>
-                  {isImportingTable ? '导入中...' : '导入'}
+                  {modifiedSectionLabels[section] ?? section}
                 </button>
-                <button
-                  className="action-bar-btn action-bar-btn--ghost"
-                  disabled={!loadedProject || isExportingTable}
-                  onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'csv')}
-                  type="button"
-                  title="导出为 CSV 格式"
-                >
-                  CSV
-                </button>
-                <button
-                  className="action-bar-btn action-bar-btn--ghost"
-                  disabled={!loadedProject || isExportingTable}
-                  onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'xml')}
-                  type="button"
-                  title="导出为 Excel XML 格式"
-                >
-                  Excel
-                </button>
-                <span className="action-bar-sep" />
-              </>
-            ) : null}
-            {(['realtime-data', 'battery-protocol', 'battery-monitor'] as string[]).includes(
-              activeModule.key,
-            ) ? (
-              <button
-                className="action-bar-btn action-bar-btn--secondary"
-                disabled={!loadedProject || generatingTestKey !== null}
-                onClick={() => {
-                  if (!loadedProject) return;
-                  const type: TestDataType =
-                    activeModule.key === 'realtime-data' && realtimeMode === 'simple'
-                      ? 'pdo-simple'
-                      : activeModule.key === 'realtime-data'
-                        ? 'pdo-advanced'
-                        : activeModule.key === 'battery-protocol'
-                          ? 'battery-protocol'
-                          : 'battery-monitor';
-                  setConfirmGenerateType(type);
-                }}
-                type="button"
-                title="自动构建当前页面的 CAN 测试数据"
-              >
-                <span className="action-bar-icon">⚡</span>
-                {generatingTestKey !== null ? '生成中...' : '生成测试数据'}
-              </button>
-            ) : null}
-            {(
-              [
-                'setting-data',
-                'realtime-data',
-                'battery-protocol',
-                'battery-monitor',
-                'language',
-                'signal-dictionary',
-                'private-protocol',
-                'protocol-mapping',
-              ] as string[]
-            ).includes(activeModule.key) ? (
-              <>
-                <button
-                  className={`action-bar-btn ${showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'}`}
-                  disabled={!loadedProject}
-                  onClick={() => setShowJsonEditor((v) => !v)}
-                  type="button"
-                  title="打开 JSON 编辑器"
-                >
-                  {'{ }'}
-                </button>
-                <span className="action-bar-sep" />
-              </>
-            ) : null}
-            {hasUnsavedChanges ? (
-              <button
-                className="action-bar-btn action-bar-btn--ghost"
-                disabled={isSavingProject}
-                onClick={restoreAllChanges}
-                type="button"
-                title="恢复所有未保存修改"
-              >
-                ↩ 恢复
-              </button>
-            ) : null}
-            {activeModule.key === 'ui' ? (
-              <>
-                <button
-                  className={`action-bar-btn ${showCanvasLabels ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'}`}
-                  onClick={() => setShowCanvasLabels((v) => !v)}
-                  title={showCanvasLabels ? '隐藏画布上的资源文字标注' : '显示画布上的资源文字标注'}
-                  type="button"
-                >
-                  {showCanvasLabels ? '隐藏标注' : '显示标注'}
-                </button>
-                <span className="action-bar-sep" />
-              </>
-            ) : null}
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="action-bar-right">
+          <div className="action-bar-group">
+            <button
+              className="action-bar-btn action-bar-btn--ghost"
+              disabled={isOpening}
+              onClick={() => void handleSelectProjectFile()}
+              type="button"
+              title="打开项目文件"
+            >
+              <span className="action-bar-icon">▣</span>
+              打开
+            </button>
+            <button
+              className="action-bar-btn action-bar-btn--ghost"
+              disabled={isOpening || !(loadedProject?.summary.path || projectPath.trim())}
+              onClick={() => void handleReloadProject()}
+              type="button"
+              title="重新加载当前项目"
+            >
+              <span className="action-bar-icon">↻</span>
+              重载
+            </button>
+          </div>
+          <span className="action-bar-sep" />
+          <div className="action-bar-group">
+            <button
+              className="action-bar-btn action-bar-btn--ghost"
+              disabled={!hasUnsavedChanges || isSavingProject}
+              onClick={restoreAllChanges}
+              type="button"
+              title="恢复所有未保存修改"
+            >
+              <span className="action-bar-icon">↩</span>
+              恢复
+            </button>
             <button
               className="action-bar-btn action-bar-btn--ghost"
               disabled={!loadedProject?.summary.path || isSavingProject}
@@ -3745,15 +3682,110 @@ export function Dashboard({
             </button>
             <button
               className="action-bar-btn action-bar-btn--save"
-              disabled={!hasUnsavedChanges || !loadedProject.summary.path || isSavingProject}
+              disabled={!hasUnsavedChanges || !loadedProject?.summary.path || isSavingProject}
               onClick={requestSaveProject}
               type="button"
             >
               {savingProjectAction === 'save' ? '保存中...' : '保存'}
             </button>
           </div>
+          <span className="action-bar-sep" />
+          {currentLegacyTableKind ? (
+            <div className="action-bar-group">
+              <button
+                className="action-bar-btn action-bar-btn--secondary"
+                disabled={!loadedProject || isImportingTable}
+                onClick={() => void handleImportTableConfig(currentLegacyTableKind)}
+                type="button"
+                title="从 CSV/XLS/XLSX/XML 文件导入"
+              >
+                <span className="action-bar-icon">↓</span>
+                {isImportingTable ? '导入中...' : '导入'}
+              </button>
+              <button
+                className="action-bar-btn action-bar-btn--ghost"
+                disabled={!loadedProject || isExportingTable}
+                onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'csv')}
+                type="button"
+                title="导出为 CSV 格式"
+              >
+                CSV
+              </button>
+              <button
+                className="action-bar-btn action-bar-btn--ghost"
+                disabled={!loadedProject || isExportingTable}
+                onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'xml')}
+                type="button"
+                title="导出为 Excel XML 格式"
+              >
+                Excel
+              </button>
+            </div>
+          ) : null}
+          {(['realtime-data', 'battery-protocol', 'battery-monitor'] as string[]).includes(
+            activeModule.key,
+          ) ? (
+            <button
+              className="action-bar-btn action-bar-btn--secondary"
+              disabled={!loadedProject || generatingTestKey !== null}
+              onClick={() => {
+                if (!loadedProject) return;
+                const type: TestDataType =
+                  activeModule.key === 'realtime-data' && realtimeMode === 'simple'
+                    ? 'pdo-simple'
+                    : activeModule.key === 'realtime-data'
+                      ? 'pdo-advanced'
+                      : activeModule.key === 'battery-protocol'
+                        ? 'battery-protocol'
+                        : 'battery-monitor';
+                setConfirmGenerateType(type);
+              }}
+              type="button"
+              title="自动构建当前页面的 CAN 测试数据"
+            >
+              <span className="action-bar-icon">⚡</span>
+              {generatingTestKey !== null ? '生成中...' : '生成测试数据'}
+            </button>
+          ) : null}
+          {activeModule.key === 'ui' ? (
+            <button
+              className={`action-bar-btn ${
+                showCanvasLabels ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'
+              }`}
+              onClick={() => setShowCanvasLabels((v) => !v)}
+              title={showCanvasLabels ? '隐藏画布上的资源文字标注' : '显示画布上的资源文字标注'}
+              type="button"
+            >
+              {showCanvasLabels ? '隐藏标注' : '显示标注'}
+            </button>
+          ) : null}
+          {(
+            [
+              'setting-data',
+              'realtime-data',
+              'battery-protocol',
+              'battery-monitor',
+              'language',
+              'signal-dictionary',
+              'private-protocol',
+              'protocol-mapping',
+            ] as string[]
+          ).includes(activeModule.key) ? (
+            <button
+              className={`action-bar-btn ${
+                showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'
+              }`}
+              disabled={!loadedProject}
+              onClick={() => setShowJsonEditor((v) => !v)}
+              type="button"
+              title="打开 JSON 编辑器"
+            >
+              {'{ }'}
+            </button>
+          ) : null}
+          {saveStatus ? <span className="action-bar-status">{saveStatus}</span> : null}
         </div>
-      ) : null}
+      </div>
 
       {showSaveModal && loadedProject ? (
         <div className="modal-overlay" onClick={cancelSaveProject}>
