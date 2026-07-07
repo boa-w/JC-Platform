@@ -44,6 +44,16 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            if let Err(error) = app
+                .handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())
+            {
+                eprintln!("初始化更新插件失败，已跳过：{error}");
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             backend_health,
             project_summary,

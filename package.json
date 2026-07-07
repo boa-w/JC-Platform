@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run version:check",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
@@ -12,6 +13,8 @@
     "tauri:build": "tauri build",
     "cli": "cargo run --manifest-path src-tauri/Cargo.toml --bin jc-cli --",
     "cli:build": "cargo build --manifest-path src-tauri/Cargo.toml --bin jc-cli --release",
+    "version:check": "node scripts/check-version.mjs",
+    "version:sync": "node scripts/sync-version.mjs",
     "format": "biome format --write .",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
@@ -20,6 +23,8 @@
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

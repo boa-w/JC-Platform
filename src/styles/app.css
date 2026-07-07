@@ -1059,7 +1059,7 @@ button {
   position: fixed;
   left: 52px;
   bottom: 8px;
-  width: 280px;
+  width: 320px;
   background: var(--tb-bg-alt);
   border: 1px solid var(--tb-sep);
   border-radius: 8px;
@@ -1108,7 +1108,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-height: 320px;
+  max-height: 420px;
   overflow-y: auto;
 }
 
@@ -1135,6 +1135,91 @@ button {
   color: var(--tb-text);
   font-weight: 500;
   word-break: break-all;
+}
+
+.version-update-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.version-update-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-update-status {
+  flex: 1;
+  min-width: 0;
+  color: var(--tb-text);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.version-update-button {
+  flex-shrink: 0;
+  min-width: 76px;
+  border: 1px solid var(--tb-accent);
+  border-radius: 5px;
+  padding: 4px 8px;
+  background: var(--tb-accent);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    opacity 0.1s,
+    background 0.1s;
+}
+
+.version-update-button:hover:not(:disabled) {
+  background: var(--tb-accent-hover);
+}
+
+.version-update-button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.version-update-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--tb-hover);
+}
+
+.version-update-progress span {
+  display: block;
+  height: 100%;
+  min-width: 12%;
+  border-radius: inherit;
+  background: var(--tb-accent);
+  transition: width 0.18s ease;
+}
+
+.version-update-notes {
+  max-height: 96px;
+  margin: 0;
+  overflow: auto;
+  color: var(--tb-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.version-update-link {
+  width: fit-content;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--tb-accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.version-update-link:hover {
+  color: var(--tb-accent-hover);
+  text-decoration: underline;
 }
 
 /* ── Breadcrumb ── */

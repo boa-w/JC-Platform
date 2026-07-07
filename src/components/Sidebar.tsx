@@ -1,5 +1,8 @@
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { APP_RELEASES_URL, APP_VERSION } from '../constants/app';
 import { findGroupForKey, navGroups } from '../data/navigation';
+import { useAppUpdate } from '../hooks/useAppUpdate';
 import type {
   BackendHealth,
   FeatureModule,
@@ -27,6 +30,12 @@ function lifecycleLabel(lifecycle?: ModuleLifecycle) {
   return null;
 }
 
+function formatUpdateProgress(downloaded: number, total: number | null) {
+  const downloadedMb = (downloaded / 1024 / 1024).toFixed(1);
+  if (!total) return `${downloadedMb} MB`;
+  return `${downloadedMb} / ${(total / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function Sidebar({
   modules,
   activeKey,
@@ -46,6 +55,14 @@ export function Sidebar({
 
   const [showPopup, setShowPopup] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
+  const {
+    status: updateStatus,
+    updateInfo,
+    progress,
+    error: updateError,
+    checkUpdate,
+    installUpdate,
+  } = useAppUpdate();
 
   const activeGroup = useMemo(
     () => navGroups.find((group) => group.label === activeGroupLabel) ?? navGroups[0],
@@ -80,6 +97,43 @@ export function Sidebar({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showPopup, handleClickOutside]);
+
+  const progressPercent =
+    progress?.total && progress.total > 0
+      ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
+      : null;
+  const updateButtonDisabled =
+    updateStatus === 'checking' || updateStatus === 'downloading' || updateStatus === 'restarting';
+  const updateButtonLabel =
+    updateStatus === 'checking'
+      ? '检查中'
+      : updateStatus === 'downloading'
+        ? progressPercent !== null
+          ? `下载 ${progressPercent}%`
+          : '下载中'
+        : updateStatus === 'restarting'
+          ? '正在重启'
+          : updateStatus === 'available'
+            ? '安装更新'
+            : '检查更新';
+  const updateMessage =
+    updateStatus === 'available' && updateInfo
+      ? `发现新版本 ${updateInfo.availableVersion}`
+      : updateStatus === 'up-to-date'
+        ? '当前已是最新版本'
+        : updateStatus === 'downloading' && progress
+          ? formatUpdateProgress(progress.downloaded, progress.total)
+          : updateStatus === 'restarting'
+            ? '更新已安装，正在重启应用'
+            : updateError;
+
+  const handleUpdateAction = () => {
+    if (updateStatus === 'available') {
+      void installUpdate();
+      return;
+    }
+    void checkUpdate();
+  };
 
   return (
     <div className={collapsed ? 'activity-shell activity-shell--collapsed' : 'activity-shell'}>
@@ -162,7 +216,7 @@ export function Sidebar({
                 <span>软件名称</span>
                 <strong>{health?.app_name ?? '自定义开发平台'}</strong>
                 <span>前端版本</span>
-                <strong>0.1.0</strong>
+                <strong>{APP_VERSION}</strong>
                 <span>核心版本</span>
                 <strong>{health?.version ?? '-'}</strong>
                 <span>提交哈希</span>
@@ -178,6 +232,39 @@ export function Sidebar({
                 <strong>{project?.name ?? '未打开项目'}</strong>
                 <span>项目路径</span>
                 <strong>{project?.path ?? '—'}</strong>
+              </div>
+            </section>
+            <section>
+              <strong className="section-label--muted">软件更新</strong>
+              <div className="version-update-panel">
+                <div className="version-update-row">
+                  <span className="version-update-status">
+                    {updateMessage ?? '可手动检查新版本'}
+                  </span>
+                  <button
+                    className="version-update-button"
+                    type="button"
+                    onClick={handleUpdateAction}
+                    disabled={updateButtonDisabled}
+                  >
+                    {updateButtonLabel}
+                  </button>
+                </div>
+                {progress ? (
+                  <div className="version-update-progress" aria-hidden="true">
+                    <span style={{ width: `${progressPercent ?? 35}%` }} />
+                  </div>
+                ) : null}
+                {updateInfo?.notes ? (
+                  <p className="version-update-notes">{updateInfo.notes}</p>
+                ) : null}
+                <button
+                  className="version-update-link"
+                  type="button"
+                  onClick={() => void openUrl(APP_RELEASES_URL)}
+                >
+                  打开发布页面
+                </button>
               </div>
             </section>
           </div>
