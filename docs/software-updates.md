@@ -3,6 +3,18 @@
 本项目使用 Tauri v2 updater 插件进行应用内更新。前端版本弹层会检查
 GitHub Release 中的 `latest.json`，发现新版本后下载、安装并重启应用。
 
+当前 updater 会优先检查固定的 nightly release：
+
+```text
+https://github.com/boa-w/JC-Platform/releases/download/nightly/latest.json
+```
+
+如果 nightly endpoint 不可用，再回退到 GitHub 的 latest stable release：
+
+```text
+https://github.com/boa-w/JC-Platform/releases/latest/download/latest.json
+```
+
 ## 版本来源
 
 `package.json` 是版本号的主来源。发布前先修改 `package.json` 的 `version`，
@@ -57,5 +69,19 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD="你的私钥密码"
 npm run tauri:build -- --config src-tauri/tauri.updater.conf.json
 ```
 
-普通 push/PR 构建不会生成 updater artifacts。Release 构建会额外使用
+PR 构建只验证安装包构建。`main` 分支 push 和正式 Release 构建会额外使用
 `src-tauri/tauri.updater.conf.json`，生成并上传安装包、签名文件和 `latest.json`。
+
+## Nightly 发布
+
+每次 `main` 分支有新提交时，GitHub Actions 会自动：
+
+1. 根据 `package.json` 当前版本计算 nightly 版本号。
+   - 例如当前版本 `0.1.0`
+   - nightly 版本会构建为 `0.1.1-nightly.<run_number>`
+2. 删除并重建固定 tag/release：`nightly`。
+3. 使用 updater 签名私钥构建 Windows/macOS 安装包。
+4. 由 `tauri-apps/tauri-action` 上传安装包、`.sig` 和 `latest.json`。
+
+`latest.json` 必须包含当前平台的下载 URL 和 `.sig` 文件内容，Tauri updater
+会先校验签名再安装更新。不要手动把 `.sig` 文件路径写进 JSON。
