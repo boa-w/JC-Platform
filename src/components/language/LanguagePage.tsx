@@ -194,6 +194,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   const suppressScrollTopClickRef = useRef(false);
   const cancelTranslateRef = useRef(false);
   const translateLogIdRef = useRef(0);
+  const lastSelectedTranslationKeyRef = useRef<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(() => {
     const codes = document.list_code_language;
     const savedTarget = readSavedTranslateOptions().targetLanguage;
@@ -266,6 +267,12 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
 
   useEffect(() => {
     const availableKeys = new Set(visibleTranslationKeys(document));
+    if (
+      lastSelectedTranslationKeyRef.current &&
+      !availableKeys.has(lastSelectedTranslationKeyRef.current)
+    ) {
+      lastSelectedTranslationKeyRef.current = null;
+    }
     setSelectedTranslationKeys((current) => {
       const next = new Set([...current].filter((key) => availableKeys.has(key)));
       return next.size === current.size ? current : next;
@@ -491,19 +498,43 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     setNewKeyInput('');
   }
 
-  function handleToggleSelectedKey(key: string, selected: boolean) {
+  function handleToggleSelectedKey(key: string, selected: boolean, range: boolean) {
+    const selectableRows = rows.filter((row) => !row.isConfigKey);
+    const targetIndex = selectableRows.findIndex((row) => row.key === key);
+    const anchorKey = lastSelectedTranslationKeyRef.current;
+    const anchorIndex =
+      range && anchorKey ? selectableRows.findIndex((row) => row.key === anchorKey) : -1;
+
     setSelectedTranslationKeys((current) => {
       const next = new Set(current);
-      if (selected) {
-        next.add(key);
+
+      if (range && anchorIndex >= 0 && targetIndex >= 0) {
+        const start = Math.min(anchorIndex, targetIndex);
+        const end = Math.max(anchorIndex, targetIndex);
+        for (const row of selectableRows.slice(start, end + 1)) {
+          if (selected) {
+            next.add(row.key);
+          } else {
+            next.delete(row.key);
+          }
+        }
       } else {
-        next.delete(key);
+        if (selected) {
+          next.add(key);
+        } else {
+          next.delete(key);
+        }
       }
       return next;
     });
+
+    if (targetIndex >= 0) {
+      lastSelectedTranslationKeyRef.current = key;
+    }
   }
 
   function handleToggleAllVisible(selected: boolean) {
+    lastSelectedTranslationKeyRef.current = null;
     setSelectedTranslationKeys((current) => {
       const next = new Set(current);
       for (const row of rows) {

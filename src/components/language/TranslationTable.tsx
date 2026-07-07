@@ -1,4 +1,5 @@
 import {
+  type ChangeEvent,
   type DragEvent,
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -21,7 +22,7 @@ interface TranslationTableProps {
   onRemoveKey: (index: number) => void;
   onReorderKeys: (keys: string[], targetIndex: number, position: 'before' | 'after') => void;
   onRestoreKey: (key: string) => void;
-  onToggleSelectedKey: (key: string, selected: boolean) => void;
+  onToggleSelectedKey: (key: string, selected: boolean, range: boolean) => void;
   onToggleAllVisible: (selected: boolean) => void;
 }
 
@@ -179,6 +180,11 @@ export function TranslationTable({
     return '拖动排序';
   }
 
+  function handleRowSelectionChange(event: ChangeEvent<HTMLInputElement>, row: TranslationRow) {
+    const nativeEvent = event.nativeEvent as Event & { shiftKey?: boolean };
+    onToggleSelectedKey(row.key, event.target.checked, Boolean(nativeEvent.shiftKey));
+  }
+
   return (
     <div className="lang-table-wrap">
       <table className="lang-table">
@@ -250,7 +256,7 @@ export function TranslationTable({
                     aria-label={`选择 ${row.key}`}
                     checked={isSelected}
                     disabled={row.isConfigKey}
-                    onChange={(event) => onToggleSelectedKey(row.key, event.target.checked)}
+                    onChange={(event) => handleRowSelectionChange(event, row)}
                     type="checkbox"
                   />
                 </td>
