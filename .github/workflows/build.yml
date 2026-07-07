@@ -176,3 +176,87 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.tar.gz
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
           if-no-files-found: warn
+
+  normalize-nightly-assets:
+    name: Normalize nightly assets
+    needs:
+      - prepare-nightly
+      - build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Rename assets and publish latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NIGHTLY_VERSION: ${{ needs.prepare-nightly.outputs.version }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p release-assets
+          gh release download "$NIGHTLY_TAG" --repo "$REPO" --dir release-assets --clobber
+
+          cd release-assets
+
+          rename_asset() {
+            local pattern="$1"
+            local new_name="$2"
+            local old_name
+            old_name=$(find . -maxdepth 1 -type f -name "$pattern" -printf '%f\n' | head -n 1 || true)
+            if [ -z "$old_name" ]; then
+              echo "No asset matched $pattern, skipping $new_name"
+              return 0
+            fi
+            if [ "$old_name" = "$new_name" ]; then
+              echo "$new_name already normalized"
+              return 0
+            fi
+            local asset_id
+            asset_id=$(gh api "repos/$REPO/releases/tags/$NIGHTLY_TAG" \
+              --jq ".assets[] | select(.name == \"$old_name\") | .id")
+            if [ -z "$asset_id" ]; then
+              echo "Could not resolve GitHub asset id for $old_name" >&2
+              return 1
+            fi
+            gh api --method PATCH "repos/$REPO/releases/assets/$asset_id" -f name="$new_name" >/dev/null
+            mv "$old_name" "$new_name"
+            echo "Renamed $old_name -> $new_name"
+          }
+
+          rename_asset '*_x64-setup.exe' "JC-Platform_${NIGHTLY_VERSION}_x64-setup.exe"
+          rename_asset '*_x64-setup.exe.sig' "JC-Platform_${NIGHTLY_VERSION}_x64-setup.exe.sig"
+          rename_asset '*_x64_zh-CN.msi' "JC-Platform_${NIGHTLY_VERSION}_x64_zh-CN.msi"
+          rename_asset '*_x64_zh-CN.msi.sig' "JC-Platform_${NIGHTLY_VERSION}_x64_zh-CN.msi.sig"
+          rename_asset '*_aarch64.dmg' "JC-Platform_${NIGHTLY_VERSION}_aarch64.dmg"
+          rename_asset '*_aarch64.app.tar.gz' "JC-Platform_${NIGHTLY_VERSION}_aarch64.app.tar.gz"
+          rename_asset '*_aarch64.app.tar.gz.sig' "JC-Platform_${NIGHTLY_VERSION}_aarch64.app.tar.gz.sig"
+
+          windows_sig=$(tr -d '\r\n' < "JC-Platform_${NIGHTLY_VERSION}_x64-setup.exe.sig")
+          mac_sig=$(tr -d '\r\n' < "JC-Platform_${NIGHTLY_VERSION}_aarch64.app.tar.gz.sig")
+          pub_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          base_url="https://github.com/${REPO}/releases/download/${NIGHTLY_TAG}"
+
+          cat > latest.json <<JSON
+          {
+            "version": "${NIGHTLY_VERSION}",
+            "notes": "Automated nightly build from main commit ${GITHUB_SHA}.",
+            "pub_date": "${pub_date}",
+            "platforms": {
+              "windows-x86_64": {
+                "signature": "${windows_sig}",
+                "url": "${base_url}/JC-Platform_${NIGHTLY_VERSION}_x64-setup.exe"
+              },
+              "darwin-aarch64": {
+                "signature": "${mac_sig}",
+                "url": "${base_url}/JC-Platform_${NIGHTLY_VERSION}_aarch64.app.tar.gz"
+              }
+            }
+          }
+          JSON
+
+          if gh release view "$NIGHTLY_TAG" --repo "$REPO" --json assets \
+            --jq '.assets[].name' | grep -Fxq latest.json; then
+            gh release delete-asset "$NIGHTLY_TAG" latest.json --repo "$REPO" --yes
+          fi
+          gh release upload "$NIGHTLY_TAG" latest.json --repo "$REPO" --clobber
