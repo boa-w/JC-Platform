@@ -149,6 +149,7 @@ jobs:
           tagName: ${{ github.event_name == 'push' && env.NIGHTLY_TAG || github.event.release.tag_name || '' }}
           releaseDraft: false
           prerelease: ${{ github.event_name == 'push' && 'true' || github.event.release.prerelease }}
+          appName: JC-Platform
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
           args: --target ${{ matrix.target }} ${{ github.event_name != 'pull_request' && '--config src-tauri/tauri.updater.conf.json' || '' }}

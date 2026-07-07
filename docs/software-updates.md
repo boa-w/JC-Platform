@@ -83,6 +83,8 @@ PR 构建只验证安装包构建。`main` 分支 push 和正式 Release 构建�
 2. 删除并重建固定 tag/release：`nightly`。
 3. 使用 updater 签名私钥构建 Windows/macOS 安装包。
 4. 由 `tauri-apps/tauri-action` 上传安装包、`.sig` 和 `latest.json`。
+   - workflow 显式设置 `appName: JC-Platform`，避免中文 `productName` 被 action
+     转成空 slug 后产物名只剩 `_0.1.1-xx_...`。
 
 `latest.json` 必须包含当前平台的下载 URL 和 `.sig` 文件内容，Tauri updater
 会先校验签名再安装更新。不要手动把 `.sig` 文件路径写进 JSON。
