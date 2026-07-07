@@ -2,6 +2,7 @@ import { type MouseEvent, type PointerEvent, useEffect, useMemo, useRef, useStat
 import { translateBaiduText } from '../../api/commands';
 import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
+import { ConfirmDialog } from './ConfirmDialog';
 import { LanguageComparisonView } from './LanguageComparisonView';
 import { LanguageSidebar } from './LanguageSidebar';
 import {
@@ -225,6 +226,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   const [scrollTopPosition, setScrollTopPosition] = useState<FloatingButtonPosition>(
     readSavedScrollTopPosition,
   );
+  const [confirmDeleteSelected, setConfirmDeleteSelected] = useState(false);
   const [selectedTranslationKeys, setSelectedTranslationKeys] = useState<Set<string>>(
     () => new Set(),
   );
@@ -299,6 +301,11 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   const visibleLanguageKeys = useMemo(() => {
     return [...document.list_inner, ...externalTranslationKeys(document)];
   }, [document]);
+
+  const selectedDeletableKeys = useMemo(() => {
+    const minIndex = document.list_code_language.length;
+    return document.list_inner.slice(minIndex).filter((key) => selectedTranslationKeys.has(key));
+  }, [document.list_code_language.length, document.list_inner, selectedTranslationKeys]);
 
   const modifiedKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -444,6 +451,25 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     const nextInner = document.list_inner.filter((_, i) => i !== index);
     const nextTranslate = { ...document.list_translate };
     delete nextTranslate[key];
+    onUpdate({ ...document, list_inner: nextInner, list_translate: nextTranslate });
+  }
+
+  function handleConfirmDeleteSelected() {
+    if (selectedDeletableKeys.length === 0) {
+      setConfirmDeleteSelected(false);
+      return;
+    }
+
+    const deleteKeySet = new Set(selectedDeletableKeys);
+    const nextInner = document.list_inner.filter((key) => !deleteKeySet.has(key));
+    const nextTranslate = { ...document.list_translate };
+    for (const key of deleteKeySet) {
+      delete nextTranslate[key];
+    }
+
+    lastSelectedTranslationKeyRef.current = null;
+    setSelectedTranslationKeys(new Set());
+    setConfirmDeleteSelected(false);
     onUpdate({ ...document, list_inner: nextInner, list_translate: nextTranslate });
   }
 
@@ -881,6 +907,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               }}
               onToggleSelectedKey={handleToggleSelectedKey}
               onToggleAllVisible={handleToggleAllVisible}
+              selectedDeletableCount={selectedDeletableKeys.length}
+              onRequestDeleteSelected={() => setConfirmDeleteSelected(true)}
             />
             <div className="lang-footer">
               <div className="lang-footer-add">
@@ -930,6 +958,20 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
           <span className="lang-scroll-top-icon">↑</span>
           <span>顶部</span>
         </button>
+        {confirmDeleteSelected ? (
+          <ConfirmDialog
+            title="删除已选条目"
+            message={`确定要删除已选的 ${selectedDeletableKeys.length} 个翻译条目吗？此操作会同时移除这些条目的所有语言翻译。${
+              selectedTranslationKeys.size > selectedDeletableKeys.length
+                ? `另外 ${selectedTranslationKeys.size - selectedDeletableKeys.length} 个已选条目不可删除，将不会被移除。`
+                : ''
+            }`}
+            confirmLabel="删除"
+            danger
+            onConfirm={handleConfirmDeleteSelected}
+            onCancel={() => setConfirmDeleteSelected(false)}
+          />
+        ) : null}
       </div>
     </section>
   );

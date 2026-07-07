@@ -24,6 +24,8 @@ interface TranslationTableProps {
   onRestoreKey: (key: string) => void;
   onToggleSelectedKey: (key: string, selected: boolean, range: boolean) => void;
   onToggleAllVisible: (selected: boolean) => void;
+  selectedDeletableCount: number;
+  onRequestDeleteSelected: () => void;
 }
 
 function getLabel(document: LanguageDocument, code: string): string {
@@ -44,6 +46,8 @@ export function TranslationTable({
   onRestoreKey,
   onToggleSelectedKey,
   onToggleAllVisible,
+  selectedDeletableCount,
+  onRequestDeleteSelected,
 }: TranslationTableProps) {
   const [editingKeyIndex, setEditingKeyIndex] = useState<number | null>(null);
   const [keyDraft, setKeyDraft] = useState('');
@@ -187,6 +191,24 @@ export function TranslationTable({
 
   return (
     <div className="lang-table-wrap">
+      {selectedKeys.size > 0 ? (
+        <div className="lang-table-bulkbar">
+          <span>
+            已选择 <strong>{selectedKeys.size}</strong> 条
+            {selectedDeletableCount !== selectedKeys.size
+              ? `，可删除 ${selectedDeletableCount} 条`
+              : ''}
+          </span>
+          <button
+            className="lang-btn lang-btn--danger"
+            disabled={selectedDeletableCount === 0}
+            onClick={onRequestDeleteSelected}
+            type="button"
+          >
+            删除已选
+          </button>
+        </div>
+      ) : null}
       <table className="lang-table">
         <thead>
           <tr>

@@ -5460,6 +5460,22 @@ html {
   overflow: auto;
 }
 
+.lang-table-bulkbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.lang-table-bulkbar strong {
+  color: var(--color-text);
+}
+
 .lang-table {
   width: 100%;
   border-collapse: collapse;
