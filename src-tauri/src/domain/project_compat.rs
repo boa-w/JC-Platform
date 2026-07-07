@@ -55,6 +55,12 @@ const UI_RESOURCE_FIELD_ORDER: &[&str] = &[
     "isjpg",
     "option",
 ];
+const LANGUAGE_INFO_FIELD_ORDER: &[&str] = &[
+    "list_code_language",
+    "language_labels",
+    "list_inner",
+    "list_translate",
+];
 const PDO_SIMPLE_FIELD_ORDER: &[&str] = &["pdo_send", "pdo_recv"];
 const SDO_FIELD_ORDER: &[&str] = &["type", "user_auth", "name_index", "name", "children"];
 const FAULT_CODE_INFO_FIELD_ORDER: &[&str] =
@@ -140,6 +146,7 @@ fn order_legacy_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "project", PROJECT_FIELD_ORDER);
     order_child_object(&mut document, "device", DEVICE_FIELD_ORDER);
     order_ui_info(&mut document);
+    order_language_info(&mut document);
     order_child_object(
         &mut document,
         "pdo_simple_send_recv",
@@ -171,6 +178,93 @@ fn order_ui_info(root: &mut Value) {
     order_child_object(ui_info, "main", UI_MAIN_FIELD_ORDER);
     let value = std::mem::take(ui_info);
     *ui_info = order_object_value(value, UI_INFO_FIELD_ORDER);
+}
+
+fn order_language_info(root: &mut Value) {
+    let Some(language_info) = root.get_mut("language_info") else {
+        return;
+    };
+
+    let language_codes = language_info
+        .get("list_code_language")
+        .and_then(Value::as_array)
+        .map(|items| string_array_values(items))
+        .unwrap_or_default();
+    let inner_keys = language_info
+        .get("list_inner")
+        .and_then(Value::as_array)
+        .map(|items| string_array_values(items))
+        .unwrap_or_default();
+
+    if let Some(labels) = language_info.get_mut("language_labels") {
+        let value = std::mem::take(labels);
+        *labels = order_object_by_primary_keys(value, &language_codes);
+    }
+
+    if let Some(translations) = language_info.get_mut("list_translate") {
+        let value = std::mem::take(translations);
+        *translations = order_list_translate_value(value, &inner_keys, &language_codes);
+    }
+
+    let value = std::mem::take(language_info);
+    *language_info = order_object_value(value, LANGUAGE_INFO_FIELD_ORDER);
+}
+
+fn string_array_values(items: &[Value]) -> Vec<String> {
+    items
+        .iter()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect()
+}
+
+fn order_list_translate_value(
+    value: Value,
+    inner_keys: &[String],
+    language_codes: &[String],
+) -> Value {
+    let Value::Object(mut object) = value else {
+        return value;
+    };
+
+    let mut ordered = Map::new();
+    for key in inner_keys {
+        if let Some(value) = object.remove(key) {
+            ordered.insert(
+                key.clone(),
+                order_object_by_primary_keys(value, language_codes),
+            );
+        }
+    }
+
+    let mut remaining = object.into_iter().collect::<Vec<_>>();
+    remaining.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (key, value) in remaining {
+        ordered.insert(key, order_object_by_primary_keys(value, language_codes));
+    }
+
+    Value::Object(ordered)
+}
+
+fn order_object_by_primary_keys(value: Value, primary_keys: &[String]) -> Value {
+    let Value::Object(mut object) = value else {
+        return value;
+    };
+
+    let mut ordered = Map::new();
+    for key in primary_keys {
+        if let Some(value) = object.remove(key) {
+            ordered.insert(key.clone(), value);
+        }
+    }
+
+    let mut remaining = object.into_iter().collect::<Vec<_>>();
+    remaining.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (key, value) in remaining {
+        ordered.insert(key, value);
+    }
+
+    Value::Object(ordered)
 }
 
 fn order_child_object(root: &mut Value, key: &str, field_order: &[&str]) {
@@ -543,6 +637,62 @@ mod tests {
                 "dest",
                 "option",
             ]
+        );
+    }
+
+    #[test]
+    fn sanitize_jcpro_orders_language_translate_for_stable_diff() {
+        let document = json!({
+            "project": { "name": "demo" },
+            "language_info": {
+                "list_translate": {
+                    "z_external": { "ja": "外部 Z", "en": "External Z", "zh": "外部Z" },
+                    "key_b": { "ja": "B日", "extra": "B+", "zh": "B中", "en": "B英" },
+                    "a_external": { "zh": "外部A", "en": "External A" },
+                    "key_a": { "en": "A英", "zh": "A中", "ja": "A日" }
+                },
+                "list_inner": ["中文", "English", "key_a", "key_b"],
+                "language_labels": { "ja": "日语", "zh": "中文", "en": "English" },
+                "list_code_language": ["zh", "en", "ja"]
+            }
+        });
+
+        let sanitized = sanitize_document_for_target("demo.jcpro", document);
+        let language_info = sanitized.get("language_info").unwrap().as_object().unwrap();
+        assert_eq!(
+            language_info.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "list_code_language",
+                "language_labels",
+                "list_inner",
+                "list_translate"
+            ]
+        );
+
+        let labels = language_info
+            .get("language_labels")
+            .unwrap()
+            .as_object()
+            .unwrap();
+        assert_eq!(
+            labels.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["zh", "en", "ja"]
+        );
+
+        let translations = language_info
+            .get("list_translate")
+            .unwrap()
+            .as_object()
+            .unwrap();
+        assert_eq!(
+            translations.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["key_a", "key_b", "a_external", "z_external"]
+        );
+
+        let key_b = translations.get("key_b").unwrap().as_object().unwrap();
+        assert_eq!(
+            key_b.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["zh", "en", "ja", "extra"]
         );
     }
 }
