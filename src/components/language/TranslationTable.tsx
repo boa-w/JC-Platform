@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import type { LanguageDocument } from '../../types/platform';
+import { TranslationValueInput } from './TranslationValueInput';
 import type { TranslationRow } from './types';
 
 interface TranslationTableProps {
@@ -316,18 +317,18 @@ export function TranslationTable({
                   )}
                 </td>
                 <td className="lang-table-cell-source">
-                  <input
-                    className={`lang-table-input ${isModified ? 'modified' : ''}`}
+                  <TranslationValueInput
+                    modified={isModified}
                     value={sourceValue}
-                    onChange={(e) => onUpdateValue(row.key, sourceLanguage, e.target.value)}
+                    onCommit={(value) => onUpdateValue(row.key, sourceLanguage, value)}
                   />
                 </td>
                 {targetLanguage && targetLanguage !== sourceLanguage ? (
                   <td className="lang-table-cell-target">
-                    <input
-                      className={`lang-table-input ${isModified ? 'modified' : ''}`}
+                    <TranslationValueInput
+                      modified={isModified}
                       value={targetValue}
-                      onChange={(e) => onUpdateValue(row.key, targetLanguage, e.target.value)}
+                      onCommit={(value) => onUpdateValue(row.key, targetLanguage, value)}
                     />
                   </td>
                 ) : null}
