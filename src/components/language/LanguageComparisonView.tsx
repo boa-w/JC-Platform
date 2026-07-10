@@ -7,9 +7,11 @@ import {
   useState,
 } from 'react';
 import type { LanguageDocument } from '../../types/platform';
+import type { LanguageIndex } from './useLanguageIndex';
 
 interface LanguageComparisonViewProps {
   document: LanguageDocument;
+  languageIndex: LanguageIndex;
   onUpdate: (document: LanguageDocument) => void;
 }
 
@@ -17,12 +19,11 @@ function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
 }
 
-function externalTranslationKeys(document: LanguageDocument) {
-  const indexedKeys = new Set(document.list_inner);
-  return Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
-}
-
-export function LanguageComparisonView({ document, onUpdate }: LanguageComparisonViewProps) {
+export function LanguageComparisonView({
+  document,
+  languageIndex,
+  onUpdate,
+}: LanguageComparisonViewProps) {
   const [editingCell, setEditingCell] = useState<{ key: string; code: string } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [editingKeyIndex, setEditingKeyIndex] = useState<number | null>(null);
@@ -38,11 +39,8 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
     position: 'before' | 'after';
   } | null>(null);
 
-  const visibleLanguageKeys = [...document.list_inner, ...externalTranslationKeys(document)];
-  const translationKeys = [
-    ...document.list_inner.slice(document.list_code_language.length),
-    ...externalTranslationKeys(document),
-  ];
+  const visibleLanguageKeys = languageIndex.visibleLanguageKeys;
+  const translationKeys = languageIndex.translationKeys;
 
   function handleStartEdit(key: string, code: string, currentValue: string) {
     setEditingCell({ key, code });
@@ -219,20 +217,13 @@ export function LanguageComparisonView({ document, onUpdate }: LanguageCompariso
     if (fromIndex !== null) event.preventDefault();
   }
 
-  function computeCompletionStats() {
-    return document.list_code_language.map((code) => {
-      let translated = 0;
-      for (const key of translationKeys) {
-        const translations = document.list_translate[key] as Record<string, string> | undefined;
-        if (translations?.[code] && translations[code].trim() !== '') {
-          translated++;
-        }
-      }
-      return { code, label: getLabel(document, code), translated, total: translationKeys.length };
-    });
-  }
-
-  const stats = computeCompletionStats();
+  const stats = document.list_code_language.map((code) => {
+    const { translated, total } = languageIndex.progressByCode.get(code) ?? {
+      translated: 0,
+      total: translationKeys.length,
+    };
+    return { code, label: getLabel(document, code), translated, total };
+  });
 
   return (
     <div className="lang-comparison">

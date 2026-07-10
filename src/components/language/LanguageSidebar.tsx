@@ -2,9 +2,11 @@ import { useState } from 'react';
 import type { LanguageDocument } from '../../types/platform';
 import { ConfirmDialog } from './ConfirmDialog';
 import type { LanguageProgress } from './types';
+import type { LanguageIndex } from './useLanguageIndex';
 
 interface LanguageSidebarProps {
   document: LanguageDocument;
+  languageIndex: LanguageIndex;
   selectedLanguage: string | null;
   onSelectLanguage: (code: string | null) => void;
   onAddLanguage: (code: string, label: string) => void;
@@ -34,39 +36,13 @@ const commonLanguages = [
   { code: 'sv', label: 'Svenska' },
 ];
 
-function computeProgress(
-  document: LanguageDocument,
-  code: string,
-): { translated: number; total: number } {
-  const keys = visibleTranslationKeys(document);
-  let translated = 0;
-  for (const key of keys) {
-    const translations = document.list_translate[key] as Record<string, string> | undefined;
-    if (translations?.[code] && translations[code].trim() !== '') {
-      translated++;
-    }
-  }
-  return { translated, total: keys.length };
-}
-
-function externalTranslationKeys(document: LanguageDocument) {
-  const indexedKeys = new Set(document.list_inner);
-  return Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
-}
-
-function visibleTranslationKeys(document: LanguageDocument) {
-  return [
-    ...document.list_inner.slice(document.list_code_language.length),
-    ...externalTranslationKeys(document),
-  ];
-}
-
 function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
 }
 
 export function LanguageSidebar({
   document,
+  languageIndex,
   selectedLanguage,
   onSelectLanguage,
   onAddLanguage,
@@ -81,10 +57,13 @@ export function LanguageSidebar({
   const [editCode, setEditCode] = useState('');
   const [editLabel, setEditLabel] = useState('');
 
-  const totalKeys = visibleTranslationKeys(document).length;
+  const totalKeys = languageIndex.translationKeys.length;
 
   const progressList: LanguageProgress[] = document.list_code_language.map((code) => {
-    const { translated, total } = computeProgress(document, code);
+    const { translated, total } = languageIndex.progressByCode.get(code) ?? {
+      translated: 0,
+      total: totalKeys,
+    };
     return { code, label: getLabel(document, code), total, translated };
   });
 
@@ -137,7 +116,9 @@ export function LanguageSidebar({
   }
 
   const deleteTarget = confirmDelete ? getLabel(document, confirmDelete) : '';
-  const deleteCount = confirmDelete ? computeProgress(document, confirmDelete).translated : 0;
+  const deleteCount = confirmDelete
+    ? (languageIndex.progressByCode.get(confirmDelete)?.translated ?? 0)
+    : 0;
 
   return (
     <aside className="lang-sidebar">

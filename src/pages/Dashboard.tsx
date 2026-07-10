@@ -56,6 +56,7 @@ import { useCanTestData } from '../hooks/useCanTestData';
 import {
   advancedConfigSections,
   configSectionForEditor,
+  type DocumentSectionKey,
   jsonEditorKeyForModule,
   legacyTableKindForModule,
   modifiedSectionLabels,
@@ -119,6 +120,7 @@ import {
   cloneJson,
   deepEqual,
   isPathModified,
+  stableStringify,
   type JsonPath,
   restorePath,
 } from '../utils/projectDirty';
@@ -156,6 +158,48 @@ const appVersion = APP_VERSION;
 const recentProjectsStorageKey = 'jc-custom-platform.recentProjects';
 const maxRecentProjects = 8;
 const languageCodePattern = /^[a-z][a-z0-9-]*$/i;
+
+type SectionHashMap = Partial<Record<DocumentSectionKey, string>>;
+
+function documentRecord(document: unknown): Record<string, unknown> {
+  return document && typeof document === 'object' ? (document as Record<string, unknown>) : {};
+}
+
+function hashDocumentValue(value: unknown): string {
+  return stableStringify(value) ?? 'undefined';
+}
+
+function hashDocumentSection(document: unknown, section: DocumentSectionKey): string {
+  return hashDocumentValue(documentRecord(document)[section]);
+}
+
+function buildDocumentSectionHashes(document: unknown): SectionHashMap {
+  return Object.fromEntries(
+    trackedDocumentSections.map((section) => [section, hashDocumentSection(document, section)]),
+  ) as SectionHashMap;
+}
+
+function updateDirtySections(
+  document: unknown,
+  baselineHashes: SectionHashMap,
+  currentDirtySections: Set<DocumentSectionKey>,
+  changedSections?: Iterable<DocumentSectionKey>,
+): Set<DocumentSectionKey> {
+  const nextDirtySections = new Set(currentDirtySections);
+  const sections = changedSections ? [...changedSections] : trackedDocumentSections;
+
+  for (const section of sections) {
+    const baselineHash = baselineHashes[section] ?? hashDocumentValue(undefined);
+    const currentHash = hashDocumentSection(document, section);
+    if (currentHash === baselineHash) {
+      nextDirtySections.delete(section);
+    } else {
+      nextDirtySections.add(section);
+    }
+  }
+
+  return nextDirtySections;
+}
 
 interface RecentProject {
   path: string;
@@ -251,6 +295,8 @@ export function Dashboard({
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [baselineDocument, setBaselineDocument] = useState<unknown | null>(null);
+  const baselineSectionHashesRef = useRef<SectionHashMap>({});
+  const [dirtySections, setDirtySections] = useState<Set<DocumentSectionKey>>(() => new Set());
   const [newProjectName, setNewProjectName] = useState('新建项目');
   const [newResolutionW, setNewResolutionW] = useState(800);
   const [newResolutionH, setNewResolutionH] = useState(480);
@@ -563,10 +609,27 @@ export function Dashboard({
     saveRecentProjects([]);
   }
 
-  function applyLoadedProject(nextProject: LoadedProject, baselineOverride?: unknown) {
+  function applyLoadedProject(
+    nextProject: LoadedProject,
+    baselineOverride?: unknown,
+    changedSections?: Iterable<DocumentSectionKey>,
+  ) {
     const nextBaseline = baselineOverride ?? baselineDocument;
-    const nextHasChanges = nextBaseline ? !deepEqual(nextProject.document, nextBaseline) : true;
+    let nextDirtySections = new Set<DocumentSectionKey>();
+    if (nextBaseline) {
+      if (baselineOverride) {
+        baselineSectionHashesRef.current = buildDocumentSectionHashes(nextBaseline);
+      }
+      nextDirtySections = updateDirtySections(
+        nextProject.document,
+        baselineSectionHashesRef.current,
+        dirtySections,
+        changedSections,
+      );
+    }
+    const nextHasChanges = nextBaseline ? nextDirtySections.size > 0 : true;
     onProjectLoaded(nextProject);
+    setDirtySections(nextDirtySections);
     setHasUnsavedChanges(nextHasChanges);
     setSaveStatus(nextHasChanges ? '存在未保存修改' : null);
     if (nextHasChanges) setShowSaveModal(false);
@@ -575,7 +638,9 @@ export function Dashboard({
   function acceptLoadedProject(nextProject: LoadedProject, fallbackPath?: string) {
     const nextPath = nextProject.summary.path ?? fallbackPath;
     const nextBaseline = cloneJson(nextProject.document);
+    baselineSectionHashesRef.current = buildDocumentSectionHashes(nextBaseline);
     setBaselineDocument(nextBaseline);
+    setDirtySections(new Set());
     onProjectLoaded(nextProject);
     setHasUnsavedChanges(false);
     setShowSaveModal(false);
@@ -585,18 +650,33 @@ export function Dashboard({
   }
 
   function isModifiedPath(path: JsonPath) {
+    if (path.length === 1 && typeof path[0] === 'string') {
+      const section = path[0] as DocumentSectionKey;
+      if ((trackedDocumentSections as readonly string[]).includes(section)) {
+        return dirtySections.has(section);
+      }
+    }
     return loadedProject ? isPathModified(loadedProject.document, baselineDocument, path) : false;
   }
 
   function restoreModifiedPath(path: JsonPath) {
     if (!loadedProject || !baselineDocument) return;
     const document = restorePath(loadedProject.document, baselineDocument, path);
-    applyLoadedProject({ ...loadedProject, document });
+    const changedSection =
+      typeof path[0] === 'string' &&
+      (trackedDocumentSections as readonly string[]).includes(path[0])
+        ? ([path[0] as DocumentSectionKey] as const)
+        : undefined;
+    applyLoadedProject({ ...loadedProject, document }, undefined, changedSection);
   }
 
   function restoreAllChanges() {
     if (!loadedProject || !baselineDocument) return;
-    applyLoadedProject({ ...loadedProject, document: cloneJson(baselineDocument) });
+    applyLoadedProject(
+      { ...loadedProject, document: cloneJson(baselineDocument) },
+      undefined,
+      trackedDocumentSections,
+    );
   }
 
   function restoreCurrentConfigSection() {
@@ -605,7 +685,15 @@ export function Dashboard({
     for (const path of restorePathsForEditor(activeModule.key, { realtimeMode })) {
       document = restorePath(document, baselineDocument, path as JsonPath);
     }
-    applyLoadedProject({ ...loadedProject, document });
+    applyLoadedProject(
+      { ...loadedProject, document },
+      undefined,
+      restorePathsForEditor(activeModule.key, { realtimeMode })
+        .map((path) => path[0])
+        .filter((section): section is DocumentSectionKey =>
+          (trackedDocumentSections as readonly string[]).includes(section),
+        ),
+    );
     setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2));
   }
 
@@ -706,7 +794,7 @@ export function Dashboard({
   }
 
   const modifiedSections = loadedProject
-    ? trackedDocumentSections.filter((section) => isModifiedPath([section]))
+    ? trackedDocumentSections.filter((section) => dirtySections.has(section))
     : [];
   const hasRefactorOnlyChanges = modifiedSections.some((section) =>
     (refactorOnlySections as readonly string[]).includes(section),
@@ -730,14 +818,20 @@ export function Dashboard({
     if (!loadedProject) return;
 
     const document = { ...(loadedProject.document as Record<string, unknown>), [section]: value };
-    applyLoadedProject({ ...loadedProject, document });
+    const changedSection = (trackedDocumentSections as readonly string[]).includes(section)
+      ? [section as DocumentSectionKey]
+      : undefined;
+    applyLoadedProject({ ...loadedProject, document }, undefined, changedSection);
   }
 
   function updateProjectSections(sections: Record<string, unknown>) {
     if (!loadedProject) return;
 
     const document = { ...(loadedProject.document as Record<string, unknown>), ...sections };
-    applyLoadedProject({ ...loadedProject, document });
+    const changedSections = Object.keys(sections).filter((section): section is DocumentSectionKey =>
+      (trackedDocumentSections as readonly string[]).includes(section),
+    );
+    applyLoadedProject({ ...loadedProject, document }, undefined, changedSections);
   }
 
   function stripRefactorOnlySections(document: unknown) {
@@ -6151,9 +6245,7 @@ export function Dashboard({
                 <input
                   autoComplete="off"
                   value={translationSettings.baiduAppId}
-                  onChange={(event) =>
-                    updateTranslationSetting('baiduAppId', event.target.value)
-                  }
+                  onChange={(event) => updateTranslationSetting('baiduAppId', event.target.value)}
                 />
               </label>
               <label className="settings-field">
@@ -6162,9 +6254,7 @@ export function Dashboard({
                   autoComplete="new-password"
                   type="password"
                   value={translationSettings.baiduAppKey}
-                  onChange={(event) =>
-                    updateTranslationSetting('baiduAppKey', event.target.value)
-                  }
+                  onChange={(event) => updateTranslationSetting('baiduAppKey', event.target.value)}
                 />
               </label>
               <div className="settings-option-footer settings-option-footer--compact">
@@ -6379,8 +6469,7 @@ export function Dashboard({
                       <article>
                         <span>生成/参考大小</span>
                         <strong>
-                          {binaryCompareReport.generated_size} /{' '}
-                          {binaryCompareReport.legacy_size}
+                          {binaryCompareReport.generated_size} / {binaryCompareReport.legacy_size}
                         </strong>
                       </article>
                       <article>

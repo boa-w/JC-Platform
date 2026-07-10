@@ -1,4 +1,12 @@
-import { type MouseEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type MouseEvent,
+  type PointerEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { translateBaiduText } from '../../api/commands';
 import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
@@ -15,6 +23,7 @@ import {
 import { TranslationTable } from './TranslationTable';
 import { TranslationToolbar } from './TranslationToolbar';
 import type { FilterMode, TranslationRow } from './types';
+import { useLanguageIndex } from './useLanguageIndex';
 
 interface LanguagePageProps {
   document: LanguageDocument;
@@ -127,31 +136,9 @@ function getLabel(document: LanguageDocument, code: string): string {
   return document.language_labels?.[code] ?? code;
 }
 
-function computeTranslationCount(
-  document: LanguageDocument,
-  code: string,
-): { translated: number; total: number } {
-  const keys = visibleTranslationKeys(document);
-  let translated = 0;
-  for (const key of keys) {
-    const translations = document.list_translate[key] as Record<string, string> | undefined;
-    if (translations?.[code] && translations[code].trim() !== '') {
-      translated++;
-    }
-  }
-  return { translated, total: keys.length };
-}
-
 function externalTranslationKeys(document: LanguageDocument) {
   const indexedKeys = new Set(document.list_inner);
   return Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
-}
-
-function visibleTranslationKeys(document: LanguageDocument) {
-  return [
-    ...document.list_inner.slice(document.list_code_language.length),
-    ...externalTranslationKeys(document),
-  ];
 }
 
 function normalizeDocument(
@@ -231,6 +218,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     () => new Set(),
   );
   const { settings: translationSettings } = useTranslationSettings();
+  const languageIndex = useLanguageIndex(document);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const isBaiduTranslateConfigured =
     translationSettings.baiduAppId.trim() !== '' && translationSettings.baiduAppKey.trim() !== '';
@@ -268,7 +257,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   }, [translateSourceLanguage, selectedLanguage, translateScope]);
 
   useEffect(() => {
-    const availableKeys = new Set(visibleTranslationKeys(document));
+    const availableKeys = new Set(languageIndex.translationKeys);
     if (
       lastSelectedTranslationKeyRef.current &&
       !availableKeys.has(lastSelectedTranslationKeyRef.current)
@@ -279,7 +268,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       const next = new Set([...current].filter((key) => availableKeys.has(key)));
       return next.size === current.size ? current : next;
     });
-  }, [document]);
+  }, [languageIndex.translationKeys]);
 
   useEffect(() => {
     function handleResize() {
@@ -294,13 +283,8 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const translationKeys = useMemo(() => {
-    return visibleTranslationKeys(document);
-  }, [document]);
-
-  const visibleLanguageKeys = useMemo(() => {
-    return [...document.list_inner, ...externalTranslationKeys(document)];
-  }, [document]);
+  const translationKeys = languageIndex.translationKeys;
+  const visibleLanguageKeys = languageIndex.visibleLanguageKeys;
 
   const selectedDeletableKeys = useMemo(() => {
     const minIndex = document.list_code_language.length;
@@ -331,12 +315,12 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       translations: (document.list_translate[key] as Record<string, string>) ?? {},
     }));
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (deferredSearchQuery.trim()) {
+      const q = deferredSearchQuery.toLowerCase();
       filtered = filtered.filter(
         (row) =>
           row.key.toLowerCase().includes(q) ||
-          Object.values(row.translations).some((v) => String(v).toLowerCase().includes(q)),
+          Boolean(languageIndex.searchTextByKey.get(row.key)?.includes(q)),
       );
     }
 
@@ -357,11 +341,12 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
     return filtered;
   }, [
     visibleLanguageKeys,
+    languageIndex.searchTextByKey,
     document.list_code_language.length,
     document.list_inner.length,
     document.list_translate,
     modifiedKeys,
-    searchQuery,
+    deferredSearchQuery,
     filterMode,
     selectedLanguage,
   ]);
@@ -820,13 +805,17 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   }
 
   const { translated, total } = selectedLanguage
-    ? computeTranslationCount(document, selectedLanguage)
+    ? (languageIndex.progressByCode.get(selectedLanguage) ?? {
+        translated: 0,
+        total: translationKeys.length,
+      })
     : { translated: 0, total: translationKeys.length };
 
   return (
     <section className="lang-page">
       <LanguageSidebar
         document={document}
+        languageIndex={languageIndex}
         selectedLanguage={selectedLanguage}
         onSelectLanguage={setSelectedLanguage}
         onAddLanguage={handleAddLanguage}
@@ -940,7 +929,11 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
             </div>
           </>
         ) : (
-          <LanguageComparisonView document={document} onUpdate={onUpdate} />
+          <LanguageComparisonView
+            document={document}
+            languageIndex={languageIndex}
+            onUpdate={onUpdate}
+          />
         )}
         <button
           aria-label="回到顶部"

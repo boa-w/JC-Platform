@@ -1,5 +1,5 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { loadTextFile, saveTextFile } from '../../api/commands';
 import type {
   FaultCodeInfo,
@@ -407,39 +407,59 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   const [csvStatus, setCsvStatus] = useState<string | null>(null);
   const [isCsvBusy, setIsCsvBusy] = useState(false);
   const document = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
-  const faultCode = normalizeFaultDocument(document.fault_code_info);
-  const language =
-    (document.language_info as LanguageDocument | undefined) ?? defaultLanguageDocument();
+  const faultCode = useMemo(
+    () => normalizeFaultDocument(document.fault_code_info),
+    [document.fault_code_info],
+  );
+  const language = useMemo(
+    () => (document.language_info as LanguageDocument | undefined) ?? defaultLanguageDocument(),
+    [document.language_info],
+  );
   const sources = faultCode.sources ?? [];
   const codes = faultCode.codes ?? [];
   const [i18nSearchByRow, setI18nSearchByRow] = useState<Record<number, string>>({});
   const [messageKeyDraftByRow, setMessageKeyDraftByRow] = useState<Record<number, string>>({});
   const [cloneSourceByRow, setCloneSourceByRow] = useState<Record<number, string>>({});
+  const [activeI18nRow, setActiveI18nRow] = useState<number | null>(null);
   const [sourceFilter, setSourceFilter] = useState('all');
   const [batchSourceKey, setBatchSourceKey] = useState('');
   const [batchTargetSourceKey, setBatchTargetSourceKey] = useState('');
   const [batchCopyI18nMode, setBatchCopyI18nMode] = useState<BatchCopyI18nMode>('independent');
   const [codeRowKeys, setCodeRowKeys] = useState(() => codes.map(createFaultCodeRowKey));
-  const duplicateFaultCodes = buildDuplicateFaultCodeHints(sources, codes);
-  const duplicateMessageKeys = buildDuplicateMessageKeyHints(codes, messageKeyDraftByRow);
-  const i18nKeys = languageEntryKeys(language);
-  const sourceFilterKeys = new Set(sources.map(sourceKeyFor));
+  const duplicateFaultCodes = useMemo(
+    () => buildDuplicateFaultCodeHints(sources, codes),
+    [sources, codes],
+  );
+  const duplicateMessageKeys = useMemo(
+    () => buildDuplicateMessageKeyHints(codes, messageKeyDraftByRow),
+    [codes, messageKeyDraftByRow],
+  );
+  const i18nKeys = useMemo(() => languageEntryKeys(language), [language]);
+  const sourceFilterKeys = useMemo(() => new Set(sources.map(sourceKeyFor)), [sources]);
   const effectiveSourceFilter = sourceFilterKeys.has(sourceFilter) ? sourceFilter : 'all';
-  const codeCountBySource = codes.reduce((counts, item) => {
-    const source = findSourceForCode(item, sources);
-    const key = source ? sourceKeyFor(source) : item.source_key || '';
-    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
-    return counts;
-  }, new Map<string, number>());
-  const visibleCodeRows = codes
-    .map((item, index) => ({ item, index }))
-    .filter(({ item }) => {
-      if (effectiveSourceFilter === 'all') return true;
-      const source = findSourceForCode(item, sources);
-      return source
-        ? sourceKeyFor(source) === effectiveSourceFilter
-        : item.source_key === effectiveSourceFilter;
-    });
+  const codeCountBySource = useMemo(
+    () =>
+      codes.reduce((counts, item) => {
+        const source = findSourceForCode(item, sources);
+        const key = source ? sourceKeyFor(source) : item.source_key || '';
+        if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+        return counts;
+      }, new Map<string, number>()),
+    [codes, sources],
+  );
+  const visibleCodeRows = useMemo(
+    () =>
+      codes
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => {
+          if (effectiveSourceFilter === 'all') return true;
+          const source = findSourceForCode(item, sources);
+          return source
+            ? sourceKeyFor(source) === effectiveSourceFilter
+            : item.source_key === effectiveSourceFilter;
+        }),
+    [codes, effectiveSourceFilter, sources],
+  );
 
   useEffect(() => {
     setCodeRowKeys((current) => {
@@ -687,6 +707,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     setI18nSearchByRow({});
     setMessageKeyDraftByRow({});
     setCloneSourceByRow({});
+    setActiveI18nRow(null);
   }
 
   function batchCopySourceToTarget() {
@@ -1348,11 +1369,10 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                 const isDuplicateMessageKey = duplicateMessageKeys.duplicateIndexes.has(index);
                 const selectedI18nKey = i18nKeys.includes(key) ? key : '';
                 const i18nSearchText = i18nSearchByRow[index] ?? '';
-                const filteredI18nKeys = filterLanguageEntryKeys(
-                  language,
-                  i18nKeys,
-                  i18nSearchText,
-                );
+                const isI18nPickerActive = activeI18nRow === index || i18nSearchText.trim() !== '';
+                const filteredI18nKeys = isI18nPickerActive
+                  ? filterLanguageEntryKeys(language, i18nKeys, i18nSearchText)
+                  : [];
                 const limitedI18nKeys = filteredI18nKeys.slice(0, maxVisibleI18nOptions);
                 const visibleI18nKeys = [
                   ...(selectedI18nKey && !limitedI18nKeys.includes(selectedI18nKey)
@@ -1445,6 +1465,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                             placeholder="搜索 i18n key / 文案"
                             type="search"
                             value={i18nSearchText}
+                            onFocus={() => setActiveI18nRow(index)}
                             onChange={(event) =>
                               setI18nSearchByRow((current) => ({
                                 ...current,
@@ -1467,14 +1488,17 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                         <select
                           disabled={i18nKeys.length === 0}
                           value={selectedI18nKey}
+                          onFocus={() => setActiveI18nRow(index)}
                           onChange={(event) => bindCodeMessageKey(index, event.target.value)}
                         >
                           <option value="">
                             {i18nKeys.length === 0
                               ? '暂无可绑定 i18n'
-                              : filteredI18nKeys.length === 0
-                                ? '无匹配 i18n'
-                                : '选择已有 i18n'}
+                              : !isI18nPickerActive
+                                ? '聚焦选择已有 i18n'
+                                : filteredI18nKeys.length === 0
+                                  ? '无匹配 i18n'
+                                  : '选择已有 i18n'}
                           </option>
                           {visibleI18nKeys.map((entryKey) => (
                             <option key={entryKey} value={entryKey}>
@@ -1485,9 +1509,13 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                         <small className="fault-code-i18n-meta">
                           {i18nKeys.length === 0
                             ? '请先在语言表中添加条目'
-                            : `${filteredI18nKeys.length}/${i18nKeys.length} 个匹配${
-                                isI18nResultLimited ? `，仅显示前 ${maxVisibleI18nOptions} 个` : ''
-                              }`}
+                            : isI18nPickerActive
+                              ? `${filteredI18nKeys.length}/${i18nKeys.length} 个匹配${
+                                  isI18nResultLimited
+                                    ? `，仅显示前 ${maxVisibleI18nOptions} 个`
+                                    : ''
+                                }`
+                              : selectedI18nKey || '聚焦后选择已有 i18n'}
                         </small>
                         <input
                           value={messageKeyDraftByRow[index] ?? key}
