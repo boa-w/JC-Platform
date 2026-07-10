@@ -587,7 +587,9 @@ export function Dashboard({
     } else {
       clearDirtySections();
     }
-    const nextHasChanges = nextBaseline ? nextDirtySections.size > 0 : true;
+    const nextHasChanges = nextBaseline
+      ? nextDirtySections.size > 0 || !deepEqual(nextProject.document, nextBaseline)
+      : true;
     onProjectLoaded(nextProject);
     setHasUnsavedChanges(nextHasChanges);
     setSaveStatus(nextHasChanges ? '存在未保存修改' : null);
