@@ -41,6 +41,7 @@ const SCROLL_TOP_POSITION_STORAGE_KEY = 'jc.language.scrollTopPosition';
 const SCROLL_TOP_BUTTON_WIDTH = 92;
 const SCROLL_TOP_BUTTON_HEIGHT = 34;
 const SCROLL_TOP_BUTTON_MARGIN = 12;
+const TRANSLATION_UPDATE_BATCH_SIZE = 20;
 
 interface SavedTranslateOptions {
   scope?: string;
@@ -623,8 +624,14 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       'info',
       `开始翻译 ${candidates.length} 条，${translateSourceLanguage} → ${selectedLanguage}`,
     );
+    const nextTranslate: Record<string, unknown> = { ...document.list_translate };
+    let pendingUpdates = 0;
+    const flushTranslationUpdates = () => {
+      if (pendingUpdates === 0) return;
+      onUpdate({ ...document, list_translate: { ...nextTranslate } });
+      pendingUpdates = 0;
+    };
     try {
-      const nextTranslate: Record<string, unknown> = { ...document.list_translate };
       let success = 0;
       let failed = 0;
       let done = 0;
@@ -663,7 +670,10 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
 
           const translations = (nextTranslate[row.key] as Record<string, string> | undefined) ?? {};
           nextTranslate[row.key] = { ...translations, [selectedLanguage]: translated };
-          onUpdate({ ...document, list_translate: { ...nextTranslate } });
+          pendingUpdates += 1;
+          if (pendingUpdates >= TRANSLATION_UPDATE_BATCH_SIZE) {
+            flushTranslationUpdates();
+          }
           addTranslateLog('success', '翻译成功', row.key);
           success += 1;
           done += 1;
@@ -677,6 +687,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
         }
       }
 
+      flushTranslationUpdates();
       const wasCancelled = cancelTranslateRef.current;
       setTranslateProgress((current) => ({ ...current, currentKey: '' }));
       setTranslateStatus(
@@ -691,6 +702,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
           : `翻译完成：成功 ${success} 条，失败 ${failed} 条`,
       );
     } catch (error) {
+      flushTranslationUpdates();
       const message = error instanceof Error ? error.message : String(error);
       setTranslateStatus(message);
       addTranslateLog('error', message);
