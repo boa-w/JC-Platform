@@ -53,6 +53,7 @@ import { APP_VERSION } from '../constants/app';
 import { featureModules } from '../data/modules';
 import { getTestData, type TestDataType, testDataLabels } from '../data/test-data';
 import { useCanTestData } from '../hooks/useCanTestData';
+import { useDocumentDirtySections } from '../hooks/useDocumentDirtySections';
 import {
   advancedConfigSections,
   configSectionForEditor,
@@ -120,7 +121,6 @@ import {
   cloneJson,
   deepEqual,
   isPathModified,
-  stableStringify,
   type JsonPath,
   restorePath,
 } from '../utils/projectDirty';
@@ -158,48 +158,6 @@ const appVersion = APP_VERSION;
 const recentProjectsStorageKey = 'jc-custom-platform.recentProjects';
 const maxRecentProjects = 8;
 const languageCodePattern = /^[a-z][a-z0-9-]*$/i;
-
-type SectionHashMap = Partial<Record<DocumentSectionKey, string>>;
-
-function documentRecord(document: unknown): Record<string, unknown> {
-  return document && typeof document === 'object' ? (document as Record<string, unknown>) : {};
-}
-
-function hashDocumentValue(value: unknown): string {
-  return stableStringify(value) ?? 'undefined';
-}
-
-function hashDocumentSection(document: unknown, section: DocumentSectionKey): string {
-  return hashDocumentValue(documentRecord(document)[section]);
-}
-
-function buildDocumentSectionHashes(document: unknown): SectionHashMap {
-  return Object.fromEntries(
-    trackedDocumentSections.map((section) => [section, hashDocumentSection(document, section)]),
-  ) as SectionHashMap;
-}
-
-function updateDirtySections(
-  document: unknown,
-  baselineHashes: SectionHashMap,
-  currentDirtySections: Set<DocumentSectionKey>,
-  changedSections?: Iterable<DocumentSectionKey>,
-): Set<DocumentSectionKey> {
-  const nextDirtySections = new Set(currentDirtySections);
-  const sections = changedSections ? [...changedSections] : trackedDocumentSections;
-
-  for (const section of sections) {
-    const baselineHash = baselineHashes[section] ?? hashDocumentValue(undefined);
-    const currentHash = hashDocumentSection(document, section);
-    if (currentHash === baselineHash) {
-      nextDirtySections.delete(section);
-    } else {
-      nextDirtySections.add(section);
-    }
-  }
-
-  return nextDirtySections;
-}
 
 interface RecentProject {
   path: string;
@@ -295,8 +253,12 @@ export function Dashboard({
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [baselineDocument, setBaselineDocument] = useState<unknown | null>(null);
-  const baselineSectionHashesRef = useRef<SectionHashMap>({});
-  const [dirtySections, setDirtySections] = useState<Set<DocumentSectionKey>>(() => new Set());
+  const {
+    clearDirtySections,
+    dirtySections,
+    recalculateDirtySections,
+    resetBaseline: resetDirtySectionBaseline,
+  } = useDocumentDirtySections();
   const [newProjectName, setNewProjectName] = useState('新建项目');
   const [newResolutionW, setNewResolutionW] = useState(800);
   const [newResolutionH, setNewResolutionH] = useState(480);
@@ -617,19 +579,16 @@ export function Dashboard({
     const nextBaseline = baselineOverride ?? baselineDocument;
     let nextDirtySections = new Set<DocumentSectionKey>();
     if (nextBaseline) {
-      if (baselineOverride) {
-        baselineSectionHashesRef.current = buildDocumentSectionHashes(nextBaseline);
-      }
-      nextDirtySections = updateDirtySections(
+      nextDirtySections = recalculateDirtySections(
         nextProject.document,
-        baselineSectionHashesRef.current,
-        dirtySections,
         changedSections,
+        baselineOverride !== undefined ? nextBaseline : undefined,
       );
+    } else {
+      clearDirtySections();
     }
     const nextHasChanges = nextBaseline ? nextDirtySections.size > 0 : true;
     onProjectLoaded(nextProject);
-    setDirtySections(nextDirtySections);
     setHasUnsavedChanges(nextHasChanges);
     setSaveStatus(nextHasChanges ? '存在未保存修改' : null);
     if (nextHasChanges) setShowSaveModal(false);
@@ -638,9 +597,8 @@ export function Dashboard({
   function acceptLoadedProject(nextProject: LoadedProject, fallbackPath?: string) {
     const nextPath = nextProject.summary.path ?? fallbackPath;
     const nextBaseline = cloneJson(nextProject.document);
-    baselineSectionHashesRef.current = buildDocumentSectionHashes(nextBaseline);
+    resetDirtySectionBaseline(nextBaseline);
     setBaselineDocument(nextBaseline);
-    setDirtySections(new Set());
     onProjectLoaded(nextProject);
     setHasUnsavedChanges(false);
     setShowSaveModal(false);
