@@ -30,6 +30,7 @@ export type SdoNodeField = keyof Pick<
 >;
 
 export type SettingParameterColumnKey =
+  | 'select'
   | 'index'
   | 'name'
   | 'auth'

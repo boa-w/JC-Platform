@@ -9,7 +9,6 @@ interface TranslationToolbarProps {
   filteredCount: number;
   onSearch: (query: string) => void;
   onFilter: (mode: FilterMode) => void;
-  onAddKey: (key: string) => void;
   onSyncKeys: () => void;
 }
 
@@ -29,7 +28,6 @@ export function TranslationToolbar({
   filteredCount,
   onSearch,
   onFilter,
-  onAddKey,
   onSyncKeys,
 }: TranslationToolbarProps) {
   return (

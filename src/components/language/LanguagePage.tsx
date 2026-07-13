@@ -836,20 +836,45 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
       />
       <div className="lang-main" ref={langMainRef}>
         <div className="lang-view-toggle">
-          <button
-            className={`lang-view-toggle-btn ${viewMode === 'editor' ? 'active' : ''}`}
-            onClick={() => setViewMode('editor')}
-            type="button"
-          >
-            编辑模式
-          </button>
-          <button
-            className={`lang-view-toggle-btn ${viewMode === 'comparison' ? 'active' : ''}`}
-            onClick={() => setViewMode('comparison')}
-            type="button"
-          >
-            全语言对比
-          </button>
+          <div className="lang-view-toggle-tabs">
+            <button
+              className={`lang-view-toggle-btn ${viewMode === 'editor' ? 'active' : ''}`}
+              onClick={() => setViewMode('editor')}
+              type="button"
+            >
+              编辑模式
+            </button>
+            <button
+              className={`lang-view-toggle-btn ${viewMode === 'comparison' ? 'active' : ''}`}
+              onClick={() => setViewMode('comparison')}
+              type="button"
+            >
+              全语言对比
+            </button>
+          </div>
+          {viewMode === 'editor' ? (
+            <form
+              className="lang-editor-add"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleAddKey();
+              }}
+            >
+              <input
+                aria-label="新增翻译键"
+                placeholder="新增翻译键..."
+                value={newKeyInput}
+                onChange={(event) => setNewKeyInput(event.target.value)}
+              />
+              <button
+                className="lang-btn lang-btn--primary"
+                disabled={!newKeyInput.trim()}
+                type="submit"
+              >
+                添加键
+              </button>
+            </form>
+          ) : null}
         </div>
         {viewMode === 'editor' ? (
           <>
@@ -862,10 +887,6 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               filteredCount={rows.length}
               onSearch={setSearchQuery}
               onFilter={setFilterMode}
-              onAddKey={(key) => {
-                setNewKeyInput(key);
-                handleAddKey();
-              }}
               onSyncKeys={() => {}}
             />
             <TranslationServicePanel
@@ -911,23 +932,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
               selectedDeletableCount={selectedDeletableKeys.length}
               onRequestDeleteSelected={() => setConfirmDeleteSelected(true)}
             />
-            <div className="lang-footer">
-              <div className="lang-footer-add">
-                <input
-                  placeholder="新增翻译键..."
-                  value={newKeyInput}
-                  onChange={(e) => setNewKeyInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddKey()}
-                />
-                <button
-                  className="lang-btn lang-btn--primary"
-                  disabled={!newKeyInput.trim()}
-                  onClick={handleAddKey}
-                  type="button"
-                >
-                  添加键
-                </button>
-              </div>
+            <div className="lang-footer lang-footer--status">
               <div className="lang-footer-progress">
                 {selectedLanguage ? (
                   <span>

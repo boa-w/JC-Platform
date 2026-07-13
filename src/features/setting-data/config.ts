@@ -4,6 +4,7 @@ export const settingColumnWidthStorageKey = 'jc-custom-platform.settingData.colu
 export const maxSettingColumnWidth = 480;
 
 export const settingParameterColumns: SettingParameterColumn[] = [
+  { key: 'select', label: '', defaultWidth: 44, minWidth: 44, align: 'center' },
   { key: 'index', label: '', defaultWidth: 54, minWidth: 44, align: 'center' },
   { key: 'name', label: '参数名称', defaultWidth: 180, minWidth: 120, align: 'left' },
   { key: 'auth', label: '使用权限', defaultWidth: 96, minWidth: 76 },

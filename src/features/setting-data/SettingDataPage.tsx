@@ -1,5 +1,12 @@
+import { useState } from 'react';
+import { ConfirmDialog } from '../../components/language/ConfirmDialog';
 import { settingParameterColumns } from './config';
-import type { SettingDataPageProps, SettingEditorField, SettingParameterColumn, SettingParameterRow } from './types';
+import type {
+  SettingDataPageProps,
+  SettingEditorField,
+  SettingParameterColumn,
+  SettingParameterRow,
+} from './types';
 import { useSettingData } from './useSettingData';
 import {
   formatSettingPath,
@@ -24,8 +31,65 @@ export function SettingDataPage({
     isModifiedPath,
     restoreModifiedPath,
   });
+  const [selectedParameterPaths, setSelectedParameterPaths] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [pendingDeleteRows, setPendingDeleteRows] = useState<SettingParameterRow[]>([]);
+  const visibleParameterPathKeys = settingData.settingParameters.map((row) => row.path.join('/'));
+  const selectedParameterRows = settingData.settingParameters.filter((row) =>
+    selectedParameterPaths.has(row.path.join('/')),
+  );
+  const allVisibleParametersSelected =
+    visibleParameterPathKeys.length > 0 &&
+    visibleParameterPathKeys.every((key) => selectedParameterPaths.has(key));
+  const someVisibleParametersSelected = visibleParameterPathKeys.some((key) =>
+    selectedParameterPaths.has(key),
+  );
+
+  function clearParameterSelection() {
+    setSelectedParameterPaths(new Set());
+    setPendingDeleteRows([]);
+  }
+
+  function toggleParameterSelection(path: number[], selected: boolean) {
+    const key = path.join('/');
+    setSelectedParameterPaths((current) => {
+      const next = new Set(current);
+      if (selected) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
+
+  function toggleAllVisibleParameters(selected: boolean) {
+    setSelectedParameterPaths(selected ? new Set(visibleParameterPathKeys) : new Set());
+  }
+
+  function confirmDeleteParameters() {
+    const paths = pendingDeleteRows.map((row) => row.path);
+    settingData.removeSdoNodes(paths);
+    if (
+      settingData.editingSettingPath &&
+      paths.some((path) => isSameOrDescendantPath(path, settingData.editingSettingPath!))
+    ) {
+      settingData.setEditingSettingPath(null);
+    }
+    setSelectedParameterPaths(new Set());
+    setPendingDeleteRows([]);
+  }
 
   function renderSettingParameterCell(row: SettingParameterRow, column: SettingParameterColumn) {
+    if (column.key === 'select') {
+      const key = row.path.join('/');
+      return (
+        <input
+          aria-label={`选择参数 ${row.name}`}
+          checked={selectedParameterPaths.has(key)}
+          onChange={(event) => toggleParameterSelection(row.path, event.target.checked)}
+          type="checkbox"
+        />
+      );
+    }
     if (column.key === 'actions') {
       return (
         <>
@@ -38,15 +102,7 @@ export function SettingDataPage({
           </button>
           <button
             className="danger"
-            onClick={() => {
-              settingData.removeSdoNode(row.path);
-              if (
-                settingData.editingSettingPath &&
-                isSameOrDescendantPath(row.path, settingData.editingSettingPath)
-              ) {
-                settingData.setEditingSettingPath(null);
-              }
-            }}
+            onClick={() => setPendingDeleteRows([row])}
             type="button"
           >
             删除
@@ -213,12 +269,21 @@ export function SettingDataPage({
           {!sidebarCollapsed ? (
             <div className="setting-menu-search">
               <input
-                onChange={(event) => settingData.setSettingSearchQuery(event.target.value)}
+                onChange={(event) => {
+                  clearParameterSelection();
+                  settingData.setSettingSearchQuery(event.target.value);
+                }}
                 placeholder="搜索菜单或参数，例如：开关、座椅、前进"
                 value={settingData.settingSearchQuery}
               />
               {settingData.settingSearchQuery ? (
-                <button onClick={() => settingData.setSettingSearchQuery('')} type="button">
+                <button
+                  onClick={() => {
+                    clearParameterSelection();
+                    settingData.setSettingSearchQuery('');
+                  }}
+                  type="button"
+                >
                   清空
                 </button>
               ) : null}
@@ -234,7 +299,10 @@ export function SettingDataPage({
                   .filter(Boolean)
                   .join(' ')}
                 key={menu.key}
-                onClick={() => settingData.setSelectedSettingPath(menu.key)}
+                onClick={() => {
+                  clearParameterSelection();
+                  settingData.setSelectedSettingPath(menu.key);
+                }}
                 style={{ paddingLeft: `${16 + menu.level * 22}px` }}
                 title={`${formatSettingPath(menu.pathNames)}｜参数 ${menu.parameterCount}`}
                 type="button"
@@ -299,6 +367,15 @@ export function SettingDataPage({
               <button onClick={settingData.resetSettingColumnWidths} type="button">
                 重置列宽
               </button>
+              {selectedParameterRows.length > 0 ? (
+                <button
+                  className="danger"
+                  onClick={() => setPendingDeleteRows(selectedParameterRows)}
+                  type="button"
+                >
+                  删除已选 ({selectedParameterRows.length})
+                </button>
+              ) : null}
               <button
                 className="danger"
                 disabled={!settingData.activeSettingNode}
@@ -329,27 +406,67 @@ export function SettingDataPage({
                 </colgroup>
                 <thead>
                   <tr>
-                    {settingParameterColumns.map((column) => (
-                      <th key={column.key} className={column.align ? `text-${column.align}` : undefined}>
-                        <span className="legacy-data-th-content">{column.label}</span>
-                        <span
-                          className="legacy-data-column-resizer"
-                          onMouseDown={(event) => settingData.handleSettingColumnResizeStart(event, column)}
-                        />
-                      </th>
-                    ))}
+                    {settingParameterColumns.map((column) => {
+                      if (column.key === 'select') {
+                        return (
+                          <th className="text-center setting-select-column" key={column.key}>
+                            <input
+                              aria-label="选择当前显示的全部参数"
+                              checked={allVisibleParametersSelected}
+                              onChange={(event) =>
+                                toggleAllVisibleParameters(event.target.checked)
+                              }
+                              ref={(element) => {
+                                if (element) {
+                                  element.indeterminate =
+                                    someVisibleParametersSelected && !allVisibleParametersSelected;
+                                }
+                              }}
+                              type="checkbox"
+                            />
+                          </th>
+                        );
+                      }
+                      return (
+                        <th
+                          key={column.key}
+                          className={column.align ? `text-${column.align}` : undefined}
+                        >
+                          <span className="legacy-data-th-content">{column.label}</span>
+                          <span
+                            className="legacy-data-column-resizer"
+                            onMouseDown={(event) =>
+                              settingData.handleSettingColumnResizeStart(event, column)
+                            }
+                          />
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
-                  {settingData.settingParameters.map((row) => (
-                    <tr key={row.path.join('/')}>
-                      {settingParameterColumns.map((column) => (
-                        <td key={column.key} className={column.align ? `text-${column.align}` : undefined}>
-                          {renderSettingParameterCell(row, column)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
+                  {settingData.settingParameters.map((row) => {
+                    const rowKey = row.path.join('/');
+                    return (
+                      <tr
+                        className={
+                          selectedParameterPaths.has(rowKey)
+                            ? 'setting-parameter-row--selected'
+                            : undefined
+                        }
+                        key={rowKey}
+                      >
+                        {settingParameterColumns.map((column) => (
+                          <td
+                            key={column.key}
+                            className={column.align ? `text-${column.align}` : undefined}
+                          >
+                            {renderSettingParameterCell(row, column)}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             ) : settingData.activeSettingNode ? (
@@ -367,6 +484,20 @@ export function SettingDataPage({
         </div>
       </section>
       {renderSettingEditorDrawer()}
+      {pendingDeleteRows.length > 0 ? (
+        <ConfirmDialog
+          title={pendingDeleteRows.length === 1 ? '删除参数' : '删除已选参数'}
+          message={
+            pendingDeleteRows.length === 1
+              ? `确定要删除参数「${pendingDeleteRows[0].name}」吗？`
+              : `确定要删除已选的 ${pendingDeleteRows.length} 个参数吗？此操作会同时移除其完整配置定义。`
+          }
+          confirmLabel="删除"
+          danger
+          onConfirm={confirmDeleteParameters}
+          onCancel={() => setPendingDeleteRows([])}
+        />
+      ) : null}
     </>
   );
 }

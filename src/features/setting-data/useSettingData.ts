@@ -299,6 +299,27 @@ export function useSettingData({
     );
   }
 
+  function removeSdoNodes(paths: number[][]) {
+    const document = sdoDocument();
+    const pathKeys = new Set(
+      paths.filter((path) => path.length > 0).map((path) => path.join('/')),
+    );
+    if (!document || pathKeys.size === 0) return;
+
+    function removeFromNode(node: SdoNodeDocument, parentPath: number[]): SdoNodeDocument {
+      return {
+        ...node,
+        children: (node.children ?? []).flatMap((child, index) => {
+          const childPath = [...parentPath, index];
+          if (pathKeys.has(childPath.join('/'))) return [];
+          return [removeFromNode(child, childPath)];
+        }),
+      };
+    }
+
+    updateSdoDocument(removeFromNode(document, []));
+  }
+
   const currentSdoDocument = sdoDocument();
   const settingMenus = collectSettingMenus(currentSdoDocument, settingSearchQuery);
   const activeSettingPath = selectedSettingPath ?? settingMenus[0]?.key ?? null;
@@ -334,6 +355,7 @@ export function useSettingData({
     openSettingEditorDrawer,
     readonlySettingParameterCount,
     removeSdoNode,
+    removeSdoNodes,
     resetSettingColumnWidths,
     restoreModifiedPath,
     selectedSettingPath,

@@ -1,5 +1,5 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APP_RELEASES_URL, APP_VERSION } from '../constants/app';
 import { findGroupForKey, navGroups } from '../data/navigation';
 import { useAppUpdate } from '../hooks/useAppUpdate';
@@ -79,9 +79,18 @@ export function Sidebar({
   function selectGroup(label: string) {
     const group = navGroups.find((item) => item.label === label);
     if (!group) return;
+
+    if (group.label === activeGroupLabel) {
+      onToggleCollapsed();
+      return;
+    }
+
     setSelectedGroupLabel(label);
     if (!group.keys.includes(activeKey)) {
       onSelect(group.keys[0]);
+    }
+    if (collapsed) {
+      onToggleCollapsed();
     }
   }
 
@@ -138,18 +147,6 @@ export function Sidebar({
   return (
     <div className={collapsed ? 'activity-shell activity-shell--collapsed' : 'activity-shell'}>
       <div className="activity-bar">
-        <button
-          className="activity-icon activity-icon--toggle"
-          type="button"
-          onClick={onToggleCollapsed}
-          title={collapsed ? '展开侧边栏' : '收起侧边栏'}
-          aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
-          aria-expanded={!collapsed}
-        >
-          <span className="activity-icon-glyph" aria-hidden="true">
-            {collapsed ? '▸' : '◂'}
-          </span>
-        </button>
         {navGroups.map((group) => {
           const isActive = group.label === activeGroupLabel;
           return (
@@ -158,13 +155,20 @@ export function Sidebar({
               key={group.label}
               type="button"
               onClick={() => selectGroup(group.label)}
-              title={group.label}
+              title={
+                isActive
+                  ? `${group.label}（点击${collapsed ? '展开' : '折叠'}菜单）`
+                  : `切换到${group.label}`
+              }
               aria-label={group.label}
               aria-pressed={isActive}
+              aria-expanded={isActive ? !collapsed : undefined}
+              style={{ '--activity-accent': group.accent } as CSSProperties}
             >
               <span className="activity-icon-glyph" aria-hidden="true">
                 {group.icon}
               </span>
+              <span className="activity-icon-label">{group.label}</span>
             </button>
           );
         })}
@@ -181,6 +185,7 @@ export function Sidebar({
           <span className="activity-icon-glyph" aria-hidden="true">
             ℹ
           </span>
+          <span className="activity-icon-label">关于</span>
         </button>
         {/* 主题切换 */}
         <button
@@ -193,6 +198,7 @@ export function Sidebar({
           <span className="activity-icon-glyph" aria-hidden="true">
             {theme === 'dark' ? '☀' : '🌙'}
           </span>
+          <span className="activity-icon-label">{theme === 'dark' ? '浅色' : '深色'}</span>
         </button>
       </div>
 
