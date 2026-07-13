@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import type { SdoNodeDocument } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
-import { settingEditorSections, settingParameterColumns, settingColumnWidthStorageKey } from './config';
+import { settingEditorSections, settingColumnWidthStorageKey } from './config';
 import type { SettingEditorField, SettingParameterColumn, SdoNodeField } from './types';
 import {
   clampSettingColumnWidth,
@@ -163,10 +163,6 @@ export function useSettingData({
 
   function settingColumnWidth(column: SettingParameterColumn) {
     return settingColumnWidths[column.key] ?? column.defaultWidth;
-  }
-
-  function settingTableMinWidth() {
-    return settingParameterColumns.reduce((total, column) => total + settingColumnWidth(column), 0);
   }
 
   function resetSettingColumnWidths() {
@@ -368,7 +364,6 @@ export function useSettingData({
     settingMenus,
     settingParameters,
     settingSearchQuery,
-    settingTableMinWidth,
     updateSettingEditorField,
     updateSdoNode,
     visibleSettingEditorSections,

@@ -51,6 +51,14 @@ export type SettingParameterColumnKey =
   | 'decimals'
   | 'actions';
 
+export type SettingColumnPreset = 'common' | 'communication' | 'values' | 'processing' | 'all';
+
+export interface SettingColumnPresetOption {
+  value: SettingColumnPreset;
+  label: string;
+  columns: SettingParameterColumnKey[];
+}
+
 export interface SettingParameterColumn {
   key: SettingParameterColumnKey;
   label: string;

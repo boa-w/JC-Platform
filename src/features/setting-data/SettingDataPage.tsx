@@ -1,10 +1,16 @@
-import { useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/language/ConfirmDialog';
-import { settingParameterColumns } from './config';
+import {
+  settingColumnPresetOptions,
+  settingColumnPresetStorageKey,
+  settingParameterColumns,
+} from './config';
 import type {
+  SettingColumnPreset,
   SettingDataPageProps,
   SettingEditorField,
   SettingParameterColumn,
+  SettingParameterColumnKey,
   SettingParameterRow,
 } from './types';
 import { useSettingData } from './useSettingData';
@@ -14,6 +20,24 @@ import {
   optionsWithCurrentValue,
   sdoNodeDocumentPath,
 } from './utils';
+
+const pinnedSettingColumnKeys: SettingParameterColumnKey[] = ['select', 'index', 'name'];
+
+function readSettingColumnPreset(): SettingColumnPreset {
+  if (typeof window === 'undefined') return 'common';
+  const saved = window.localStorage.getItem(settingColumnPresetStorageKey);
+  return settingColumnPresetOptions.some((option) => option.value === saved)
+    ? (saved as SettingColumnPreset)
+    : 'common';
+}
+
+function settingBreadcrumbEntries(pathNames: string[]) {
+  let path = '';
+  return pathNames.map((name) => {
+    path = `${path}/${name}`;
+    return { key: path, name };
+  });
+}
 
 export function SettingDataPage({
   loadedProject,
@@ -35,7 +59,30 @@ export function SettingDataPage({
     () => new Set(),
   );
   const [pendingDeleteRows, setPendingDeleteRows] = useState<SettingParameterRow[]>([]);
+  const [columnPreset, setColumnPreset] = useState<SettingColumnPreset>(readSettingColumnPreset);
+  const lastSelectedParameterPathRef = useRef<string | null>(null);
+  const visibleParameterPathKeysRef = useRef<string[]>([]);
+  const selectedColumnPreset =
+    settingColumnPresetOptions.find((option) => option.value === columnPreset) ??
+    settingColumnPresetOptions[0];
+  const visibleColumnKeySet = new Set(selectedColumnPreset.columns);
+  const visibleSettingParameterColumns = settingParameterColumns.filter((column) =>
+    visibleColumnKeySet.has(column.key),
+  );
+  const pinnedColumnLeftOffsets = new Map<SettingParameterColumnKey, number>();
+  let pinnedColumnOffset = 0;
+  for (const column of visibleSettingParameterColumns) {
+    if (!pinnedSettingColumnKeys.includes(column.key)) continue;
+    pinnedColumnLeftOffsets.set(column.key, pinnedColumnOffset);
+    pinnedColumnOffset += settingData.settingColumnWidth(column);
+  }
+  const visibleTableMinWidth = visibleSettingParameterColumns.reduce(
+    (total, column) => total + settingData.settingColumnWidth(column),
+    0,
+  );
+  const activeSettingBreadcrumbs = settingBreadcrumbEntries(settingData.activeSettingPathNames);
   const visibleParameterPathKeys = settingData.settingParameters.map((row) => row.path.join('/'));
+  visibleParameterPathKeysRef.current = visibleParameterPathKeys;
   const selectedParameterRows = settingData.settingParameters.filter((row) =>
     selectedParameterPaths.has(row.path.join('/')),
   );
@@ -46,23 +93,99 @@ export function SettingDataPage({
     selectedParameterPaths.has(key),
   );
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a') return;
+      const target = event.target;
+      if (
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLInputElement && target.type !== 'checkbox') ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      setSelectedParameterPaths(new Set(visibleParameterPathKeysRef.current));
+      lastSelectedParameterPathRef.current = null;
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   function clearParameterSelection() {
     setSelectedParameterPaths(new Set());
     setPendingDeleteRows([]);
+    lastSelectedParameterPathRef.current = null;
   }
 
-  function toggleParameterSelection(path: number[], selected: boolean) {
+  function toggleParameterSelection(path: number[], selected: boolean, range: boolean) {
     const key = path.join('/');
+    const targetIndex = visibleParameterPathKeys.indexOf(key);
+    const anchorIndex = lastSelectedParameterPathRef.current
+      ? visibleParameterPathKeys.indexOf(lastSelectedParameterPathRef.current)
+      : -1;
     setSelectedParameterPaths((current) => {
       const next = new Set(current);
-      if (selected) next.add(key);
-      else next.delete(key);
+      if (range && anchorIndex >= 0 && targetIndex >= 0) {
+        const start = Math.min(anchorIndex, targetIndex);
+        const end = Math.max(anchorIndex, targetIndex);
+        for (const rangeKey of visibleParameterPathKeys.slice(start, end + 1)) {
+          if (selected) next.add(rangeKey);
+          else next.delete(rangeKey);
+        }
+      } else if (selected) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
       return next;
     });
+    lastSelectedParameterPathRef.current = key;
   }
 
   function toggleAllVisibleParameters(selected: boolean) {
     setSelectedParameterPaths(selected ? new Set(visibleParameterPathKeys) : new Set());
+    lastSelectedParameterPathRef.current = null;
+  }
+
+  function handleParameterSelectionChange(
+    event: ChangeEvent<HTMLInputElement>,
+    row: SettingParameterRow,
+  ) {
+    const nativeEvent = event.nativeEvent as Event & { shiftKey?: boolean };
+    toggleParameterSelection(row.path, event.target.checked, Boolean(nativeEvent.shiftKey));
+  }
+
+  function handleColumnPresetChange(nextPreset: SettingColumnPreset) {
+    setColumnPreset(nextPreset);
+    window.localStorage.setItem(settingColumnPresetStorageKey, nextPreset);
+  }
+
+  function settingColumnClassName(column: SettingParameterColumn) {
+    return [
+      column.align ? `text-${column.align}` : '',
+      pinnedColumnLeftOffsets.has(column.key) ? 'setting-table-sticky-left' : '',
+      column.key === 'name' ? 'setting-table-sticky-left-edge' : '',
+      column.key === 'actions' ? 'setting-table-sticky-right' : '',
+      `setting-column-${column.key}`,
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  function settingColumnStyle(column: SettingParameterColumn) {
+    const left = pinnedColumnLeftOffsets.get(column.key);
+    if (left !== undefined) {
+      const width = settingData.settingColumnWidth(column);
+      return { left, maxWidth: width, minWidth: width, width };
+    }
+    if (column.key === 'actions') {
+      const width = settingData.settingColumnWidth(column);
+      return { maxWidth: width, minWidth: width, width };
+    }
+    return undefined;
   }
 
   function confirmDeleteParameters() {
@@ -74,8 +197,7 @@ export function SettingDataPage({
     ) {
       settingData.setEditingSettingPath(null);
     }
-    setSelectedParameterPaths(new Set());
-    setPendingDeleteRows([]);
+    clearParameterSelection();
   }
 
   function renderSettingParameterCell(row: SettingParameterRow, column: SettingParameterColumn) {
@@ -85,7 +207,8 @@ export function SettingDataPage({
         <input
           aria-label={`选择参数 ${row.name}`}
           checked={selectedParameterPaths.has(key)}
-          onChange={(event) => toggleParameterSelection(row.path, event.target.checked)}
+          onChange={(event) => handleParameterSelectionChange(event, row)}
+          title="按住 Shift 可连续选择"
           type="checkbox"
         />
       );
@@ -100,11 +223,7 @@ export function SettingDataPage({
           >
             编辑定义
           </button>
-          <button
-            className="danger"
-            onClick={() => setPendingDeleteRows([row])}
-            type="button"
-          >
+          <button className="danger" onClick={() => setPendingDeleteRows([row])} type="button">
             删除
           </button>
         </>
@@ -165,7 +284,9 @@ export function SettingDataPage({
           <input
             type="number"
             value={value}
-            onChange={(event) => settingData.updateSettingEditorField(path, field, Number(event.target.value))}
+            onChange={(event) =>
+              settingData.updateSettingEditorField(path, field, Number(event.target.value))
+            }
           />
         </label>
       );
@@ -175,7 +296,9 @@ export function SettingDataPage({
         {field.label}
         <input
           value={String(value)}
-          onChange={(event) => settingData.updateSettingEditorField(path, field, event.target.value)}
+          onChange={(event) =>
+            settingData.updateSettingEditorField(path, field, event.target.value)
+          }
         />
       </label>
     );
@@ -205,7 +328,8 @@ export function SettingDataPage({
           <div className="legacy-drawer-header">
             <div>
               <strong id="setting-editor-drawer-title">
-                {isMenu ? '菜单编辑' : '参数编辑'}：{settingData.editingSettingNode.name || '未命名'}
+                {isMenu ? '菜单编辑' : '参数编辑'}：
+                {settingData.editingSettingNode.name || '未命名'}
               </strong>
               <p id="setting-editor-drawer-desc">编辑设置数据定义，不写入设备当前运行状态。</p>
             </div>
@@ -235,14 +359,18 @@ export function SettingDataPage({
                 </div>
               </div>
               <div className="legacy-edit-sections">
-                {settingData.visibleSettingEditorSections(settingData.editingSettingNode).map((section) => (
-                  <section className="legacy-edit-section" key={section.title}>
-                    <div className="legacy-edit-section-title">{section.title}</div>
-                    <div className="legacy-edit-grid legacy-edit-grid--sectioned">
-                      {section.fields.map((field) => renderSettingEditorField(field, settingData.editingSettingPath!))}
-                    </div>
-                  </section>
-                ))}
+                {settingData
+                  .visibleSettingEditorSections(settingData.editingSettingNode)
+                  .map((section) => (
+                    <section className="legacy-edit-section" key={section.title}>
+                      <div className="legacy-edit-section-title">{section.title}</div>
+                      <div className="legacy-edit-grid legacy-edit-grid--sectioned">
+                        {section.fields.map((field) =>
+                          renderSettingEditorField(field, settingData.editingSettingPath!),
+                        )}
+                      </div>
+                    </section>
+                  ))}
               </div>
             </section>
           </div>
@@ -253,7 +381,11 @@ export function SettingDataPage({
 
   return (
     <>
-      <section className={sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'}>
+      <section
+        className={
+          sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'
+        }
+      >
         <div className="legacy-data-sidebar">
           <div className="legacy-data-sidebar-header">
             <div className="legacy-data-sidebar-title">菜单</div>
@@ -293,7 +425,9 @@ export function SettingDataPage({
             {settingData.settingMenus.map((menu) => (
               <button
                 className={[
-                  menu.key === settingData.activeSettingPath ? 'legacy-menu-item active' : 'legacy-menu-item',
+                  menu.key === settingData.activeSettingPath
+                    ? 'legacy-menu-item active'
+                    : 'legacy-menu-item',
                   menu.isSearchMatch ? 'setting-menu-match' : '',
                 ]
                   .filter(Boolean)
@@ -310,7 +444,13 @@ export function SettingDataPage({
                 <span className="legacy-menu-arrow">{menu.hasMenuChildren ? '▸' : ''}</span>
                 <span className="setting-menu-label">
                   <span className="setting-menu-main">{menu.name}</span>
-                  <span className={menu.parameterCount > 0 ? 'setting-menu-count' : 'setting-menu-count setting-menu-count--empty'}>
+                  <span
+                    className={
+                      menu.parameterCount > 0
+                        ? 'setting-menu-count'
+                        : 'setting-menu-count setting-menu-count--empty'
+                    }
+                  >
                     {menu.parameterCount}
                   </span>
                 </span>
@@ -329,30 +469,42 @@ export function SettingDataPage({
           <div className="legacy-data-header">
             <div className="setting-data-heading">
               <div className="setting-breadcrumb">
-                {settingData.activeSettingPathNames.map((name, index) => (
-                  <span className="setting-breadcrumb-segment" key={`${name}-${index}`}>
-                    {name}
+                {activeSettingBreadcrumbs.map((item) => (
+                  <span className="setting-breadcrumb-segment" key={item.key}>
+                    {item.name}
                   </span>
                 ))}
               </div>
               <div className="setting-menu-summary">
                 <strong>{settingData.activeSettingNode?.name ?? '菜单'}</strong>
-                <span className="setting-summary-chip">{settingData.settingParameters.length} 个参数</span>
-                <span className="setting-summary-chip">{settingData.readonlySettingParameterCount} 个只读</span>
-                <span className="setting-summary-chip">{settingData.booleanMonitorParameterCount} 个 0/1 监测项</span>
+                <span className="setting-summary-chip">
+                  {settingData.settingParameters.length} 个参数
+                </span>
+                <span className="setting-summary-chip">
+                  {settingData.readonlySettingParameterCount} 个只读
+                </span>
+                <span className="setting-summary-chip">
+                  {settingData.booleanMonitorParameterCount} 个 0/1 监测项
+                </span>
               </div>
             </div>
             <div className="legacy-data-actions">
               <button
                 disabled={!settingData.currentSdoDocument}
-                onClick={() => settingData.addSdoMenu(settingData.activeSettingNode ? settingData.activeSettingPathNumbers : [])}
+                onClick={() =>
+                  settingData.addSdoMenu(
+                    settingData.activeSettingNode ? settingData.activeSettingPathNumbers : [],
+                  )
+                }
                 type="button"
               >
                 新增菜单
               </button>
               <button
                 disabled={!settingData.activeSettingNode}
-                onClick={() => settingData.openSettingEditorDrawer(settingData.activeSettingPathNumbers)}
+                onClick={() =>
+                  settingData.openSettingEditorDrawer(settingData.activeSettingPathNumbers)
+                }
                 type="button"
               >
                 修改菜单
@@ -364,18 +516,6 @@ export function SettingDataPage({
               >
                 新增参数
               </button>
-              <button onClick={settingData.resetSettingColumnWidths} type="button">
-                重置列宽
-              </button>
-              {selectedParameterRows.length > 0 ? (
-                <button
-                  className="danger"
-                  onClick={() => setPendingDeleteRows(selectedParameterRows)}
-                  type="button"
-                >
-                  删除已选 ({selectedParameterRows.length})
-                </button>
-              ) : null}
               <button
                 className="danger"
                 disabled={!settingData.activeSettingNode}
@@ -390,7 +530,7 @@ export function SettingDataPage({
               </button>
             </div>
           </div>
-          <div className="legacy-data-table-wrap">
+          <div className="legacy-data-table-wrap setting-data-table-wrap">
             {settingData.hasBooleanMonitorParameters ? (
               <div className="setting-help-card">
                 此菜单包含只读开关监测项。0/1
@@ -398,77 +538,137 @@ export function SettingDataPage({
               </div>
             ) : null}
             {settingData.activeSettingNode && settingData.settingParameters.length > 0 ? (
-              <table className="legacy-data-table" style={{ minWidth: settingData.settingTableMinWidth() }}>
-                <colgroup>
-                  {settingParameterColumns.map((column) => (
-                    <col key={column.key} style={{ width: settingData.settingColumnWidth(column) }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr>
-                    {settingParameterColumns.map((column) => {
-                      if (column.key === 'select') {
-                        return (
-                          <th className="text-center setting-select-column" key={column.key}>
-                            <input
-                              aria-label="选择当前显示的全部参数"
-                              checked={allVisibleParametersSelected}
-                              onChange={(event) =>
-                                toggleAllVisibleParameters(event.target.checked)
-                              }
-                              ref={(element) => {
-                                if (element) {
-                                  element.indeterminate =
-                                    someVisibleParametersSelected && !allVisibleParametersSelected;
+              <>
+                <div className="setting-table-toolbar">
+                  <div className="setting-table-view-controls">
+                    <label className="setting-column-preset">
+                      <span>列视图</span>
+                      <select
+                        value={columnPreset}
+                        onChange={(event) =>
+                          handleColumnPresetChange(event.target.value as SettingColumnPreset)
+                        }
+                      >
+                        {settingColumnPresetOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button onClick={settingData.resetSettingColumnWidths} type="button">
+                      重置列宽
+                    </button>
+                    <span className="setting-visible-column-count">
+                      {visibleSettingParameterColumns.length} / {settingParameterColumns.length} 列
+                    </span>
+                  </div>
+                  <div className="setting-table-bulk-actions">
+                    {selectedParameterRows.length > 0 ? (
+                      <>
+                        <span>
+                          已选择 <strong>{selectedParameterRows.length}</strong> 条
+                        </span>
+                        <button onClick={clearParameterSelection} type="button">
+                          清除选择
+                        </button>
+                        <button
+                          className="danger"
+                          onClick={() => setPendingDeleteRows(selectedParameterRows)}
+                          type="button"
+                        >
+                          删除已选
+                        </button>
+                      </>
+                    ) : (
+                      <span>共 {settingData.settingParameters.length} 条</span>
+                    )}
+                  </div>
+                </div>
+                <table className="legacy-data-table" style={{ minWidth: visibleTableMinWidth }}>
+                  <colgroup>
+                    {visibleSettingParameterColumns.map((column) => (
+                      <col
+                        key={column.key}
+                        style={{ width: settingData.settingColumnWidth(column) }}
+                      />
+                    ))}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      {visibleSettingParameterColumns.map((column) => {
+                        if (column.key === 'select') {
+                          return (
+                            <th
+                              className={`${settingColumnClassName(column)} setting-select-column`}
+                              key={column.key}
+                              style={settingColumnStyle(column)}
+                            >
+                              <input
+                                aria-label="选择当前显示的全部参数"
+                                checked={allVisibleParametersSelected}
+                                onChange={(event) =>
+                                  toggleAllVisibleParameters(event.target.checked)
                                 }
-                              }}
-                              type="checkbox"
+                                ref={(element) => {
+                                  if (element) {
+                                    element.indeterminate =
+                                      someVisibleParametersSelected &&
+                                      !allVisibleParametersSelected;
+                                  }
+                                }}
+                                type="checkbox"
+                              />
+                            </th>
+                          );
+                        }
+                        return (
+                          <th
+                            key={column.key}
+                            className={settingColumnClassName(column)}
+                            style={settingColumnStyle(column)}
+                          >
+                            <span className="legacy-data-th-content">{column.label}</span>
+                            <button
+                              aria-label={`调整${column.label}列宽`}
+                              className="legacy-data-column-resizer"
+                              onMouseDown={(event) =>
+                                settingData.handleSettingColumnResizeStart(event, column)
+                              }
+                              type="button"
                             />
                           </th>
                         );
-                      }
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {settingData.settingParameters.map((row) => {
+                      const rowKey = row.path.join('/');
                       return (
-                        <th
-                          key={column.key}
-                          className={column.align ? `text-${column.align}` : undefined}
+                        <tr
+                          className={
+                            selectedParameterPaths.has(rowKey)
+                              ? 'setting-parameter-row--selected'
+                              : undefined
+                          }
+                          key={rowKey}
                         >
-                          <span className="legacy-data-th-content">{column.label}</span>
-                          <span
-                            className="legacy-data-column-resizer"
-                            onMouseDown={(event) =>
-                              settingData.handleSettingColumnResizeStart(event, column)
-                            }
-                          />
-                        </th>
+                          {visibleSettingParameterColumns.map((column) => (
+                            <td
+                              key={column.key}
+                              className={settingColumnClassName(column)}
+                              style={settingColumnStyle(column)}
+                            >
+                              {renderSettingParameterCell(row, column)}
+                            </td>
+                          ))}
+                        </tr>
                       );
                     })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {settingData.settingParameters.map((row) => {
-                    const rowKey = row.path.join('/');
-                    return (
-                      <tr
-                        className={
-                          selectedParameterPaths.has(rowKey)
-                            ? 'setting-parameter-row--selected'
-                            : undefined
-                        }
-                        key={rowKey}
-                      >
-                        {settingParameterColumns.map((column) => (
-                          <td
-                            key={column.key}
-                            className={column.align ? `text-${column.align}` : undefined}
-                          >
-                            {renderSettingParameterCell(row, column)}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </>
             ) : settingData.activeSettingNode ? (
               <div className="legacy-data-empty">
                 {settingData.settingSearchQuery

@@ -1,6 +1,12 @@
-import type { SettingEditorOption, SettingEditorSection, SettingParameterColumn } from './types';
+import type {
+  SettingColumnPresetOption,
+  SettingEditorOption,
+  SettingEditorSection,
+  SettingParameterColumn,
+} from './types';
 
 export const settingColumnWidthStorageKey = 'jc-custom-platform.settingData.columnWidths';
+export const settingColumnPresetStorageKey = 'jc-custom-platform.settingData.columnPreset';
 export const maxSettingColumnWidth = 480;
 
 export const settingParameterColumns: SettingParameterColumn[] = [
@@ -24,6 +30,77 @@ export const settingParameterColumns: SettingParameterColumn[] = [
   { key: 'offset', label: '偏移值', defaultWidth: 100, minWidth: 76 },
   { key: 'decimals', label: '保留小数', defaultWidth: 100, minWidth: 76 },
   { key: 'actions', label: '操作', defaultWidth: 120, minWidth: 100 },
+];
+
+export const settingColumnPresetOptions: SettingColumnPresetOption[] = [
+  {
+    value: 'common',
+    label: '常用',
+    columns: [
+      'select',
+      'index',
+      'name',
+      'access',
+      'frameId',
+      'mainIndex',
+      'subIndex',
+      'dataType',
+      'actions',
+    ],
+  },
+  {
+    value: 'communication',
+    label: '通信',
+    columns: [
+      'select',
+      'index',
+      'name',
+      'auth',
+      'protocol',
+      'frameId',
+      'mainIndex',
+      'subIndex',
+      'access',
+      'actions',
+    ],
+  },
+  {
+    value: 'values',
+    label: '数值',
+    columns: [
+      'select',
+      'index',
+      'name',
+      'access',
+      'maxValue',
+      'minValue',
+      'defaultValue',
+      'dataType',
+      'actions',
+    ],
+  },
+  {
+    value: 'processing',
+    label: '位段处理',
+    columns: [
+      'select',
+      'index',
+      'name',
+      'dataType',
+      'bitStart',
+      'bitLength',
+      'preprocess',
+      'scale',
+      'offset',
+      'decimals',
+      'actions',
+    ],
+  },
+  {
+    value: 'all',
+    label: '全部',
+    columns: settingParameterColumns.map((column) => column.key),
+  },
 ];
 
 export const sdoTypeOptions: SettingEditorOption[] = [
@@ -67,16 +144,50 @@ export const settingEditorSections: SettingEditorSection[] = [
     title: '基础信息',
     fields: [
       { field: 'name', label: '名称', kind: 'text', defaultValue: '', visibleFor: 'all' },
-      { field: 'type', label: '类型', kind: 'select', defaultValue: 0, visibleFor: 'all', options: sdoTypeOptions },
-      { field: 'user_auth', label: '权限', kind: 'select', defaultValue: 0, visibleFor: 'all', options: sdoAuthOptions },
-      { field: 'name_index', label: '语言索引', kind: 'number', defaultValue: 0, visibleFor: 'all' },
+      {
+        field: 'type',
+        label: '类型',
+        kind: 'select',
+        defaultValue: 0,
+        visibleFor: 'all',
+        options: sdoTypeOptions,
+      },
+      {
+        field: 'user_auth',
+        label: '权限',
+        kind: 'select',
+        defaultValue: 0,
+        visibleFor: 'all',
+        options: sdoAuthOptions,
+      },
+      {
+        field: 'name_index',
+        label: '语言索引',
+        kind: 'number',
+        defaultValue: 0,
+        visibleFor: 'all',
+      },
     ],
   },
   {
     title: '通信索引',
     fields: [
-      { field: 'control_protocol', label: '协议', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoProtocolOptions },
-      { field: 'control_rw', label: '读写', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoAccessOptions },
+      {
+        field: 'control_protocol',
+        label: '协议',
+        kind: 'select',
+        defaultValue: 0,
+        visibleFor: 'parameter',
+        options: sdoProtocolOptions,
+      },
+      {
+        field: 'control_rw',
+        label: '读写',
+        kind: 'select',
+        defaultValue: 0,
+        visibleFor: 'parameter',
+        options: sdoAccessOptions,
+      },
       { field: 'fid', label: 'FID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
       { field: 'mid', label: 'MID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
       { field: 'sid', label: 'SID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
@@ -85,23 +196,98 @@ export const settingEditorSections: SettingEditorSection[] = [
   {
     title: '默认值与范围',
     fields: [
-      { field: 'control_use_default', label: '使用默认值', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoBooleanOptions },
-      { field: 'control_use_min_max', label: '使用范围', kind: 'select', defaultValue: 0, visibleFor: 'parameter', options: sdoBooleanOptions },
-      { field: 'data_max', label: '最大值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'data_min', label: '最小值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'data_default', label: '默认值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      {
+        field: 'control_use_default',
+        label: '使用默认值',
+        kind: 'select',
+        defaultValue: 0,
+        visibleFor: 'parameter',
+        options: sdoBooleanOptions,
+      },
+      {
+        field: 'control_use_min_max',
+        label: '使用范围',
+        kind: 'select',
+        defaultValue: 0,
+        visibleFor: 'parameter',
+        options: sdoBooleanOptions,
+      },
+      {
+        field: 'data_max',
+        label: '最大值',
+        kind: 'text',
+        defaultValue: '',
+        visibleFor: 'parameter',
+      },
+      {
+        field: 'data_min',
+        label: '最小值',
+        kind: 'text',
+        defaultValue: '',
+        visibleFor: 'parameter',
+      },
+      {
+        field: 'data_default',
+        label: '默认值',
+        kind: 'text',
+        defaultValue: '',
+        visibleFor: 'parameter',
+      },
     ],
   },
   {
     title: '设置条目',
     fields: [
-      { field: 'data_type_label', label: '数据类型', kind: 'select', defaultValue: 'u8:0', visibleFor: 'parameter', options: sdoDataTypeOptions },
-      { field: 'bit_start', label: 'bit开始位置', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'bit_length', label: 'bit长度', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'preprocess_label', label: '数据预处理', kind: 'text', defaultValue: '原始数据', visibleFor: 'parameter' },
-      { field: 'scale_value', label: '缩放值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'offset_value', label: '偏移值', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
-      { field: 'decimals_value', label: '保留小数', kind: 'text', defaultValue: '', visibleFor: 'parameter' },
+      {
+        field: 'data_type_label',
+        label: '数据类型',
+        kind: 'select',
+        defaultValue: 'u8:0',
+        visibleFor: 'parameter',
+        options: sdoDataTypeOptions,
+      },
+      {
+        field: 'bit_start',
+        label: 'bit开始位置',
+        kind: 'text',
+        defaultValue: '',
+        visibleFor: 'parameter',
+      },
+      {
+        field: 'bit_length',
+        label: 'bit长度',
+        kind: 'text',
+        defaultValue: '',
+        visibleFor: 'parameter',
+      },
+      {
+        field: 'preprocess_label',
+        label: '数据预处理',
+        kind: 'text',
+        defaultValue: '原始数据',
+        visibleFor: 'parameter',
+      },
+      {
+        field: 'scale_value',
+        label: '缩放值',
+        kind: 'text',
+        defaultValue: '',
+        visibleFor: 'parameter',
+      },
+      {
+        field: 'offset_value',
+        label: '偏移值',
+        kind: 'text',
+        defaultValue: '',
+        visibleFor: 'parameter',
+      },
+      {
+        field: 'decimals_value',
+        label: '保留小数',
+        kind: 'text',
+        defaultValue: '',
+        visibleFor: 'parameter',
+      },
     ],
   },
 ];
