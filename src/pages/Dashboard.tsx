@@ -1,5 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
@@ -8,6 +8,7 @@ import { featureModules } from '../data/modules';
 import { getTestData, type TestDataType } from '../data/test-data';
 import { useBatteryLegacyController } from '../features/battery-legacy/useBatteryLegacyController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
+import { useProjectJsonEditor } from '../features/json-editor/useProjectJsonEditor';
 import { useProjectDocumentController } from '../features/project-document';
 import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
@@ -26,13 +27,7 @@ import {
   useUiResourceController,
 } from '../features/ui-resource/useUiResourceController';
 import { useCanTestData } from '../hooks/useCanTestData';
-import {
-  advancedConfigSections,
-  configSectionForEditor,
-  jsonEditorKeyForModule,
-  restorePathsForEditor,
-  trackedDocumentSections,
-} from '../modules/documentSections';
+import { trackedDocumentSections } from '../modules/documentSections';
 import { useExportBatteryOptions } from '../stores/exportSettings';
 import { useTranslationSettings } from '../stores/translationSettings';
 import type {
@@ -154,9 +149,6 @@ export function Dashboard({
   onNavigate,
   onProjectLoaded,
 }: DashboardProps) {
-  const [showJsonEditor, setShowJsonEditor] = useState(false);
-  const [configEditorText, setConfigEditorText] = useState('');
-  const [configEditorError, setConfigEditorError] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
@@ -203,6 +195,13 @@ export function Dashboard({
     updateProjectSections,
   });
   const pdoAdvancedReport = usePdoAdvancedReport(loadedProject?.document ?? null);
+  const jsonEditor = useProjectJsonEditor({
+    activeModuleKey: activeModule.key,
+    applyLoadedProject,
+    loadedProject,
+    realtimeMode: pdoEditor.mode,
+    restoreProjectPaths,
+  });
   const protocolEditor = useProtocolEditor({
     activeModuleKey: activeModule.key,
     document: loadedProject?.document ?? null,
@@ -291,36 +290,6 @@ export function Dashboard({
     };
   }, [hasUnsavedChanges]);
 
-  function activeJsonEditorKey() {
-    return jsonEditorKeyForModule(activeModule.key, { realtimeMode: pdoEditor.mode });
-  }
-
-  const currentConfigSection = useCallback(() => {
-    if (!loadedProject) return null;
-    const document = loadedProject.document as Record<string, unknown>;
-    return configSectionForEditor(document, activeModule.key, { realtimeMode: pdoEditor.mode });
-  }, [activeModule.key, loadedProject, pdoEditor.mode]);
-
-  useEffect(() => {
-    if (activeModule.key === 'fault-code') {
-      setShowJsonEditor(false);
-      return;
-    }
-    setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2));
-    setConfigEditorError(null);
-  }, [activeModule.key, currentConfigSection]);
-
-  function restoreCurrentConfigSection() {
-    const document = restoreProjectPaths(
-      restorePathsForEditor(activeModule.key, { realtimeMode: pdoEditor.mode }),
-    );
-    if (!document) return;
-    const section = configSectionForEditor(document as Record<string, unknown>, activeModule.key, {
-      realtimeMode: pdoEditor.mode,
-    });
-    setConfigEditorText(JSON.stringify(section, null, 2));
-  }
-
   function baselineLanguageDocument(): LanguageDocument | null {
     if (!baselineDocument) return null;
     return (
@@ -328,33 +297,6 @@ export function Dashboard({
         | LanguageDocument
         | undefined) ?? null
     );
-  }
-
-  function applyConfigEditor() {
-    if (!loadedProject) return;
-
-    try {
-      const parsed = JSON.parse(configEditorText);
-      const document = { ...(loadedProject.document as Record<string, unknown>) };
-      const jsonEditorKey = activeJsonEditorKey();
-      if (jsonEditorKey === 'sdo') document.sdo_info = parsed;
-      if (jsonEditorKey === 'pdo-simple') document.pdo_simple_send_recv = parsed;
-      if (activeModule.key === 'language') document.language_info = parsed;
-      if (activeModule.key === 'battery-protocol') document.battery_protocol = parsed;
-      if (activeModule.key === 'battery-monitor') document.battery_monitor_info = parsed;
-      if (activeModule.key === 'signal-dictionary') document.signal_dictionary = parsed;
-      if (activeModule.key === 'private-protocol') document.private_protocol = parsed;
-      if (activeModule.key === 'protocol-mapping') document.protocol_mapping = parsed;
-      if (jsonEditorKey === 'pdo-advanced') {
-        for (const section of advancedConfigSections) {
-          document[section] = parsed?.[section];
-        }
-      }
-      applyLoadedProject({ ...loadedProject, document });
-      setConfigEditorError(null);
-    } catch (error) {
-      setConfigEditorError(error instanceof Error ? error.message : String(error));
-    }
   }
 
   function languageDocument(): LanguageDocument | null {
@@ -408,7 +350,7 @@ export function Dashboard({
         generatingTestKey={generatingTestKey}
         pdoMode={pdoEditor.mode}
         showCanvasLabels={uiResource.showCanvasLabels}
-        showJsonEditor={showJsonEditor}
+        showJsonEditor={jsonEditor.open}
         gitStatus={projectGit.status}
         gitBusy={projectGit.busy}
         gitError={projectGit.error}
@@ -425,7 +367,7 @@ export function Dashboard({
         onExportTable={tableConfig.exportTable}
         onRequestTestData={setConfirmGenerateType}
         onToggleCanvasLabels={uiResource.toggleCanvasLabels}
-        onToggleJsonEditor={() => setShowJsonEditor((visible) => !visible)}
+        onToggleJsonEditor={jsonEditor.toggle}
         onRefreshGit={projectGit.refresh}
         onOpenGitReview={projectGit.openReview}
         onOpenGitRepository={projectGit.openRepository}
@@ -474,23 +416,23 @@ export function Dashboard({
         }}
       />
 
-      <FeatureBoundary fallback={null} resetKey={`json-${showJsonEditor}`}>
-        {showJsonEditor && loadedProject ? (
+      <FeatureBoundary fallback={null} resetKey={`json-${jsonEditor.open}`}>
+        {jsonEditor.open && loadedProject ? (
           <JsonEditorPopup
             open
-            text={configEditorText}
-            error={configEditorError}
+            text={jsonEditor.text}
+            error={jsonEditor.error}
             canRestore={Boolean(baselineDocument)}
-            onTextChange={setConfigEditorText}
-            onFormat={() => setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2))}
-            onRestore={restoreCurrentConfigSection}
-            onApply={applyConfigEditor}
-            onClose={() => setShowJsonEditor(false)}
+            onTextChange={jsonEditor.setText}
+            onFormat={jsonEditor.format}
+            onRestore={jsonEditor.restore}
+            onApply={jsonEditor.apply}
+            onClose={jsonEditor.close}
           />
         ) : null}
       </FeatureBoundary>
 
-      <div className={showJsonEditor && loadedProject ? 'workspace-json-active' : undefined}>
+      <div className={jsonEditor.open && loadedProject ? 'workspace-json-active' : undefined}>
         {activeModule.key !== 'project' ? (
           <Breadcrumb
             activeKey={activeModule.key}
