@@ -18,6 +18,7 @@ import type {
   ExportTableRequest,
   GitCommitReport,
   GitCommitRequest,
+  GitProjectContext,
   GitProjectRequest,
   GitProjectStatus,
   GitRevision,
@@ -86,6 +87,13 @@ export async function inspectProjectGit(request: GitProjectRequest): Promise<Git
   return invoke<GitProjectStatus>('inspect_project_git', { request });
 }
 
+export async function loadProjectGitContext(
+  request: GitProjectRequest,
+  limit = 20,
+): Promise<GitProjectContext> {
+  return invoke<GitProjectContext>('load_project_git_context', { request, limit });
+}
+
 export async function listProjectGitRevisions(
   request: GitProjectRequest,
   limit = 20,
@@ -108,6 +116,13 @@ export async function reviewProjectGitChanges(
   request: GitProjectRequest,
 ): Promise<GitReviewReport> {
   return invoke<GitReviewReport>('review_project_git_changes', { request });
+}
+
+export async function reviewProjectGitRevision(
+  request: GitProjectRequest,
+  revision: string,
+): Promise<GitReviewReport> {
+  return invoke<GitReviewReport>('review_project_git_revision', { request, revision });
 }
 
 export async function loadProject(path: string): Promise<LoadedProject> {

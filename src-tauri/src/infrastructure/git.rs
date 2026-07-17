@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
@@ -53,6 +54,12 @@ pub struct GitRevision {
     pub author: String,
     pub authored_at: String,
     pub subject: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GitProjectContext {
+    pub status: GitProjectStatus,
+    pub revisions: Vec<GitRevision>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -119,43 +126,85 @@ struct RepositoryContext {
     warning: Option<String>,
 }
 
+#[derive(Default)]
+struct ProjectMetadata {
+    branch: Option<String>,
+    head_hash: Option<String>,
+    head_short_hash: Option<String>,
+    head_subject: Option<String>,
+}
+
 pub fn inspect_project(request: &GitProjectRequest) -> GitProjectStatus {
+    load_project_context(request, 1).status
+}
+
+pub fn load_project_context(request: &GitProjectRequest, limit: usize) -> GitProjectContext {
     let context = match discover_repository(request) {
         Ok(context) => context,
-        Err(error) => return GitProjectStatus::unavailable(error),
+        Err(error) => {
+            return GitProjectContext {
+                status: GitProjectStatus::unavailable(error),
+                revisions: Vec::new(),
+            }
+        }
     };
 
-    let branch = git_text(&context.root, &["branch", "--show-current"])
-        .ok()
-        .filter(|value| !value.is_empty())
-        .or_else(|| Some("HEAD (detached)".to_string()));
-    let head_line =
-        git_text(&context.root, &["log", "-1", "--format=%H%x1f%h%x1f%s"]).unwrap_or_default();
-    let mut head_parts = head_line.splitn(3, '\x1f');
-    let head_hash = non_empty(head_parts.next());
-    let head_short_hash = non_empty(head_parts.next());
-    let head_subject = non_empty(head_parts.next());
+    let (metadata, path_statuses, tracked_stats, staged, revisions) = std::thread::scope(|scope| {
+        let metadata = scope.spawn(|| project_metadata(&context.root));
+        let path_statuses =
+            scope.spawn(|| managed_path_statuses(&context.root, &context.managed_paths));
+        let tracked_stats =
+            scope.spawn(|| tracked_change_stats(&context.root, &context.managed_paths));
+        let staged = scope.spawn(|| has_staged_changes(&context.root));
+        let revisions = scope.spawn(|| revisions_for_context(&context, limit));
+        (
+            metadata
+                .join()
+                .unwrap_or_else(|_| Err("读取 Git 元数据失败".to_string())),
+            path_statuses
+                .join()
+                .unwrap_or_else(|_| Err("读取 Git 文件状态失败".to_string())),
+            tracked_stats.join().unwrap_or((0, 0)),
+            staged.join().unwrap_or(Ok(false)),
+            revisions
+                .join()
+                .unwrap_or_else(|_| Err("读取 Git 历史失败".to_string())),
+        )
+    });
+
+    let metadata = metadata.unwrap_or_default();
+    let path_statuses = path_statuses.unwrap_or_default();
     let changed_paths = context
         .managed_paths
         .iter()
-        .filter(|path| path_has_changes(&context.root, path))
+        .filter(|path| path_statuses.contains_key(path.as_str()))
         .cloned()
         .collect();
-    let (additions, deletions) = change_stats(&context.root, &context.managed_paths);
+    let (mut additions, deletions) = tracked_stats;
+    for path in &context.managed_paths {
+        if path_statuses.get(path).is_some_and(|code| code == "??") {
+            additions += std::fs::read_to_string(context.root.join(path))
+                .map(|content| content.lines().count())
+                .unwrap_or(0);
+        }
+    }
 
-    GitProjectStatus {
-        available: true,
-        repo_root: Some(context.root.to_string_lossy().to_string()),
-        branch,
-        head_hash,
-        head_short_hash,
-        head_subject,
-        managed_paths: context.managed_paths,
-        changed_paths,
-        additions,
-        deletions,
-        has_staged_changes: has_staged_changes(&context.root).unwrap_or(false),
-        warning: context.warning,
+    GitProjectContext {
+        status: GitProjectStatus {
+            available: true,
+            repo_root: Some(context.root.to_string_lossy().to_string()),
+            branch: metadata.branch,
+            head_hash: metadata.head_hash,
+            head_short_hash: metadata.head_short_hash,
+            head_subject: metadata.head_subject,
+            managed_paths: context.managed_paths,
+            changed_paths,
+            additions,
+            deletions,
+            has_staged_changes: staged.unwrap_or(false),
+            warning: context.warning,
+        },
+        revisions: revisions.unwrap_or_default(),
     }
 }
 
@@ -164,9 +213,13 @@ pub fn list_revisions(
     limit: usize,
 ) -> Result<Vec<GitRevision>, String> {
     let context = discover_repository(request)?;
-    if git_text(&context.root, &["rev-parse", "--verify", "HEAD"]).is_err() {
-        return Ok(Vec::new());
-    }
+    revisions_for_context(&context, limit)
+}
+
+fn revisions_for_context(
+    context: &RepositoryContext,
+    limit: usize,
+) -> Result<Vec<GitRevision>, String> {
     let limit = limit.clamp(1, 100).to_string();
     let mut args = vec![
         "log".to_string(),
@@ -175,7 +228,7 @@ pub fn list_revisions(
         "--".to_string(),
     ];
     args.extend(context.managed_paths.iter().cloned());
-    let output = git_text_owned(&context.root, &args)?;
+    let output = git_text_owned(&context.root, &args).unwrap_or_default();
 
     Ok(output
         .split('\x1e')
@@ -265,52 +318,59 @@ pub fn commit_project(request: &GitCommitRequest) -> Result<GitCommitReport, Str
 
 pub fn review_project(request: &GitProjectRequest) -> Result<GitReviewReport, String> {
     let context = discover_repository(request)?;
-    let has_head = git_text(&context.root, &["rev-parse", "--verify", "HEAD"]).is_ok();
-    let branch = git_text(&context.root, &["branch", "--show-current"])
-        .ok()
-        .filter(|value| !value.is_empty())
+    let (metadata, base_ref, statuses, tracked_paths) = std::thread::scope(|scope| {
+        let metadata = scope.spawn(|| project_metadata(&context.root));
+        let base_ref = scope.spawn(|| {
+            git_text(
+                &context.root,
+                &[
+                    "rev-parse",
+                    "--abbrev-ref",
+                    "--symbolic-full-name",
+                    "@{upstream}",
+                ],
+            )
+            .ok()
+        });
+        let statuses = scope.spawn(|| managed_path_statuses(&context.root, &context.managed_paths));
+        let tracked_paths = scope.spawn(|| tracked_paths(&context.root, &context.managed_paths));
+        (
+            metadata
+                .join()
+                .unwrap_or_else(|_| Err("读取 Git 元数据失败".to_string())),
+            base_ref.join().unwrap_or(None),
+            statuses
+                .join()
+                .unwrap_or_else(|_| Err("读取 Git 文件状态失败".to_string())),
+            tracked_paths
+                .join()
+                .unwrap_or_else(|_| Err("读取 Git 跟踪状态失败".to_string())),
+        )
+    });
+    let metadata = metadata.unwrap_or_default();
+    let branch = metadata
+        .branch
         .unwrap_or_else(|| "HEAD (detached)".to_string());
-    let base_ref = git_text(
-        &context.root,
-        &[
-            "rev-parse",
-            "--abbrev-ref",
-            "--symbolic-full-name",
-            "@{upstream}",
-        ],
-    )
-    .ok();
-    let mut files = Vec::new();
-
-    for path in &context.managed_paths {
-        if !path_has_changes(&context.root, path) {
-            continue;
+    let has_head = metadata.head_hash.is_some();
+    let statuses = statuses?;
+    let tracked_paths = tracked_paths?;
+    let files = std::thread::scope(|scope| {
+        let root = &context.root;
+        let mut jobs = Vec::new();
+        for path in &context.managed_paths {
+            let Some(code) = statuses.get(path) else {
+                continue;
+            };
+            let is_tracked = tracked_paths.contains(path);
+            jobs.push(scope.spawn(move || review_file(root, path, code, has_head, is_tracked)));
         }
-        let is_tracked =
-            git_success(&context.root, &["ls-files", "--error-unmatch", "--", path]).is_ok();
-        let file_path = context.root.join(path);
-
-        if !has_head || !is_tracked {
-            let content = std::fs::read_to_string(&file_path).map_err(|error| {
-                format!("读取新增配置文件失败 {}：{error}", file_path.display())
-            })?;
-            files.push(added_file_review(path, &content));
-            continue;
-        }
-
-        let mut args = vec![
-            "diff".to_string(),
-            "--no-ext-diff".to_string(),
-            "--no-color".to_string(),
-            "--unified=3".to_string(),
-            "HEAD".to_string(),
-            "--".to_string(),
-            path.clone(),
-        ];
-        let diff = git_raw_text_owned(&context.root, &mut args)?;
-        let status = worktree_file_status(&context.root, path);
-        files.push(parse_unified_diff(path, &status, &diff));
-    }
+        jobs.into_iter()
+            .map(|job| {
+                job.join()
+                    .unwrap_or_else(|_| Err("生成 Git 差异失败".to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()
+    })?;
 
     let additions = files.iter().map(|file| file.additions).sum();
     let deletions = files.iter().map(|file| file.deletions).sum();
@@ -322,6 +382,96 @@ pub fn review_project(request: &GitProjectRequest) -> Result<GitReviewReport, St
         deletions,
         files,
     })
+}
+
+pub fn review_revision(
+    request: &GitProjectRequest,
+    revision: &str,
+) -> Result<GitReviewReport, String> {
+    validate_revision(revision)?;
+    let context = discover_repository(request)?;
+    let revision = revision_details(&context.root, revision)?;
+    let parent = git_text(
+        &context.root,
+        &["rev-parse", &format!("{}^", revision.hash)],
+    )
+    .ok();
+    let base = parent
+        .as_deref()
+        .unwrap_or("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+    let statuses =
+        revision_path_statuses(&context.root, base, &revision.hash, &context.managed_paths)?;
+    let files = std::thread::scope(|scope| {
+        let root = &context.root;
+        let revision_hash = &revision.hash;
+        let mut jobs = Vec::new();
+        for path in &context.managed_paths {
+            let Some(status) = statuses.get(path) else {
+                continue;
+            };
+            jobs.push(scope.spawn(move || {
+                let mut args = vec![
+                    "diff".to_string(),
+                    "--no-ext-diff".to_string(),
+                    "--no-color".to_string(),
+                    "--unified=3".to_string(),
+                    base.to_string(),
+                    revision_hash.to_string(),
+                    "--".to_string(),
+                    path.clone(),
+                ];
+                let diff = git_raw_text_owned(root, &mut args)?;
+                Ok(parse_unified_diff(path, status, &diff))
+            }));
+        }
+        jobs.into_iter()
+            .map(|job| {
+                job.join()
+                    .unwrap_or_else(|_| Err("生成历史版本差异失败".to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()
+    })?;
+    let additions = files.iter().map(|file| file.additions).sum();
+    let deletions = files.iter().map(|file| file.deletions).sum();
+    Ok(GitReviewReport {
+        repo_root: context.root.to_string_lossy().to_string(),
+        branch: revision.short_hash,
+        base_ref: Some(
+            parent
+                .map(|hash| hash.chars().take(7).collect())
+                .unwrap_or_else(|| "空版本".to_string()),
+        ),
+        additions,
+        deletions,
+        files,
+    })
+}
+
+fn review_file(
+    root: &Path,
+    path: &str,
+    code: &str,
+    has_head: bool,
+    is_tracked: bool,
+) -> Result<GitReviewFile, String> {
+    let file_path = root.join(path);
+    if !has_head || !is_tracked {
+        let content = std::fs::read_to_string(&file_path)
+            .map_err(|error| format!("读取新增配置文件失败 {}：{error}", file_path.display()))?;
+        return Ok(added_file_review(path, &content));
+    }
+
+    let args = vec![
+        "diff".to_string(),
+        "--no-ext-diff".to_string(),
+        "--no-color".to_string(),
+        "--unified=3".to_string(),
+        "HEAD".to_string(),
+        "--".to_string(),
+        path.to_string(),
+    ];
+    let diff = git_raw_text(root, &args)?;
+    Ok(parse_unified_diff(path, &status_name(code), &diff))
 }
 
 fn added_file_review(path: &str, content: &str) -> GitReviewFile {
@@ -436,13 +586,7 @@ fn parse_hunk_starts(header: &str) -> (usize, usize) {
     (old_start, new_start)
 }
 
-fn worktree_file_status(root: &Path, path: &str) -> String {
-    let status = git_text(
-        root,
-        &["status", "--porcelain", "--untracked-files=all", "--", path],
-    )
-    .unwrap_or_default();
-    let code = status.get(..2).unwrap_or_default();
+fn status_name(code: &str) -> String {
     if code.contains('D') {
         "deleted".to_string()
     } else if code.contains('A') || code == "??" {
@@ -457,11 +601,8 @@ fn discover_repository(request: &GitProjectRequest) -> Result<RepositoryContext,
     let project_dir = project_path
         .parent()
         .ok_or_else(|| "无法确定项目文件所在目录".to_string())?;
-    let root_text = git_text(project_dir, &["rev-parse", "--show-toplevel"])
-        .map_err(|_| "项目路径不在 Git 仓库中".to_string())?;
-    let root = PathBuf::from(root_text)
-        .canonicalize()
-        .map_err(|error| format!("无法解析 Git 仓库根目录：{error}"))?;
+    let root =
+        find_repository_root(project_dir).ok_or_else(|| "项目路径不在 Git 仓库中".to_string())?;
     let mut managed_paths = vec![repo_relative_path(&root, &project_path)?];
     let mut warning = None;
 
@@ -492,6 +633,13 @@ fn discover_repository(request: &GitProjectRequest) -> Result<RepositoryContext,
         managed_paths,
         warning,
     })
+}
+
+fn find_repository_root(start: &Path) -> Option<PathBuf> {
+    start
+        .ancestors()
+        .find(|directory| directory.join(".git").exists())
+        .map(Path::to_path_buf)
 }
 
 fn canonical_existing_file(path: &str) -> Result<PathBuf, String> {
@@ -573,41 +721,136 @@ fn path_has_history(root: &Path, path: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn change_stats(root: &Path, paths: &[String]) -> (usize, usize) {
-    let has_head = git_text(root, &["rev-parse", "--verify", "HEAD"]).is_ok();
+fn project_metadata(root: &Path) -> Result<ProjectMetadata, String> {
+    let output = git_text(
+        root,
+        &[
+            "log",
+            "-1",
+            "--decorate=short",
+            "--format=%H%x1f%h%x1f%s%x1f%D",
+        ],
+    )?;
+    let mut fields = output.splitn(4, '\x1f');
+    let head_hash = non_empty(fields.next());
+    let head_short_hash = non_empty(fields.next());
+    let head_subject = non_empty(fields.next());
+    let decorations = fields.next().unwrap_or_default();
+    let branch = decorations
+        .split(", ")
+        .find_map(|decoration| decoration.strip_prefix("HEAD -> "))
+        .map(str::to_string)
+        .or_else(|| head_hash.as_ref().map(|_| "HEAD (detached)".to_string()));
+    Ok(ProjectMetadata {
+        branch,
+        head_hash,
+        head_short_hash,
+        head_subject,
+    })
+}
+
+fn managed_path_statuses(root: &Path, paths: &[String]) -> Result<HashMap<String, String>, String> {
+    let mut args = vec![
+        "status".to_string(),
+        "--porcelain=v1".to_string(),
+        "-z".to_string(),
+        "--untracked-files=all".to_string(),
+        "--".to_string(),
+    ];
+    args.extend(paths.iter().cloned());
+    let output = git_raw_text(root, &args)?;
+    let managed: HashSet<_> = paths.iter().map(String::as_str).collect();
+    let mut statuses = HashMap::new();
+    let mut records = output.split('\0');
+    while let Some(record) = records.next() {
+        if record.len() < 4 {
+            continue;
+        }
+        let code = &record[..2];
+        let path = &record[3..];
+        if managed.contains(path) {
+            statuses.insert(path.to_string(), code.to_string());
+        }
+        if code.contains('R') || code.contains('C') {
+            let _ = records.next();
+        }
+    }
+    Ok(statuses)
+}
+
+fn revision_path_statuses(
+    root: &Path,
+    base: &str,
+    revision: &str,
+    paths: &[String],
+) -> Result<HashMap<String, String>, String> {
+    let mut args = vec![
+        "diff".to_string(),
+        "--name-status".to_string(),
+        "-z".to_string(),
+        base.to_string(),
+        revision.to_string(),
+        "--".to_string(),
+    ];
+    args.extend(paths.iter().cloned());
+    let output = git_raw_text(root, &args)?;
+    let mut records = output.split('\0');
+    let mut statuses = HashMap::new();
+    while let Some(code) = records.next() {
+        if code.is_empty() {
+            continue;
+        }
+        let Some(path) = records.next() else {
+            break;
+        };
+        let status = match code.chars().next() {
+            Some('A') => "added",
+            Some('D') => "deleted",
+            _ => "modified",
+        };
+        if code.starts_with('R') || code.starts_with('C') {
+            if let Some(new_path) = records.next() {
+                statuses.insert(new_path.to_string(), status.to_string());
+            }
+        } else {
+            statuses.insert(path.to_string(), status.to_string());
+        }
+    }
+    Ok(statuses)
+}
+
+fn tracked_paths(root: &Path, paths: &[String]) -> Result<HashSet<String>, String> {
+    let mut args = vec!["ls-files".to_string(), "-z".to_string(), "--".to_string()];
+    args.extend(paths.iter().cloned());
+    Ok(git_raw_text(root, &args)?
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
+fn tracked_change_stats(root: &Path, paths: &[String]) -> (usize, usize) {
     let mut additions = 0;
     let mut deletions = 0;
 
-    if has_head {
-        let mut args = vec![
-            "diff".to_string(),
-            "--numstat".to_string(),
-            "HEAD".to_string(),
-        ];
-        args.push("--".to_string());
-        args.extend(paths.iter().cloned());
-        if let Ok(output) = git_text_owned(root, &args) {
-            for line in output.lines() {
-                let mut fields = line.split('\t');
-                additions += fields
-                    .next()
-                    .and_then(|value| value.parse().ok())
-                    .unwrap_or(0);
-                deletions += fields
-                    .next()
-                    .and_then(|value| value.parse().ok())
-                    .unwrap_or(0);
-            }
-        }
-    }
-
-    for path in paths {
-        let is_tracked = git_success(root, &["ls-files", "--error-unmatch", "--", path]).is_ok();
-        if !is_tracked {
-            let file = root.join(path);
-            if let Ok(content) = std::fs::read_to_string(file) {
-                additions += content.lines().count();
-            }
+    let mut args = vec![
+        "diff".to_string(),
+        "--numstat".to_string(),
+        "HEAD".to_string(),
+        "--".to_string(),
+    ];
+    args.extend(paths.iter().cloned());
+    if let Ok(output) = git_text_owned(root, &args) {
+        for line in output.lines() {
+            let mut fields = line.split('\t');
+            additions += fields
+                .next()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(0);
+            deletions += fields
+                .next()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(0);
         }
     }
 
@@ -650,6 +893,10 @@ fn git_text_owned(root: &Path, args: &[String]) -> Result<String, String> {
 }
 
 fn git_raw_text_owned(root: &Path, args: &mut [String]) -> Result<String, String> {
+    git_raw_text(root, args)
+}
+
+fn git_raw_text(root: &Path, args: &[String]) -> Result<String, String> {
     let refs: Vec<_> = args.iter().map(String::as_str).collect();
     let output = git_output(root, &refs)?;
     if !output.status.success() {
@@ -692,7 +939,46 @@ fn non_empty(value: Option<&str>) -> Option<String> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
+    #[test]
+    #[ignore = "requires JC_GIT_BENCH_PROJECT pointing to a real .jcpro file"]
+    fn benchmarks_real_project_context() {
+        let project_path = std::env::var("JC_GIT_BENCH_PROJECT")
+            .expect("JC_GIT_BENCH_PROJECT must point to a real .jcpro file");
+        let sidecar_path = std::env::var("JC_GIT_BENCH_SIDECAR").ok();
+        let request = GitProjectRequest {
+            project_path,
+            sidecar_path,
+        };
+        let _ = load_project_context(&request, 20);
+        let samples: Vec<_> = (0..10)
+            .map(|_| {
+                let started = Instant::now();
+                let context = load_project_context(&request, 20);
+                assert!(context.status.available, "{:?}", context.status.warning);
+                started.elapsed()
+            })
+            .collect();
+        let total: std::time::Duration = samples.iter().sum();
+        println!(
+            "project Git context: min={:?}, avg={:?}, max={:?}",
+            samples.iter().min().unwrap(),
+            total / samples.len() as u32,
+            samples.iter().max().unwrap()
+        );
+        let context = load_project_context(&request, 20);
+        if let Some(revision) = context.revisions.first() {
+            let started = Instant::now();
+            let review = review_revision(&request, &revision.hash).unwrap();
+            println!(
+                "historical review {}: {:?}, {} managed files",
+                revision.short_hash,
+                started.elapsed(),
+                review.files.len()
+            );
+        }
+    }
 
     #[test]
     fn commits_only_managed_project_files_and_reads_history() {
@@ -746,6 +1032,17 @@ mod tests {
             vec!["meter.jcpro", "meter.refactor-config.json"]
         );
         assert!(path_has_changes(&root, "notes.txt"));
+        let historical_review = review_revision(
+            &GitProjectRequest {
+                project_path: request.project_path.clone(),
+                sidecar_path: request.sidecar_path.clone(),
+            },
+            &report.hash,
+        )
+        .unwrap();
+        assert_eq!(historical_review.files.len(), 2);
+        assert_eq!(historical_review.additions, 2);
+        assert_eq!(historical_review.deletions, 1);
 
         let project_request = GitProjectRequest {
             project_path: project.to_string_lossy().to_string(),

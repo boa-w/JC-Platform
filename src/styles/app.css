@@ -1005,6 +1005,66 @@ body.git-review-open {
   opacity: 0.42;
 }
 
+.git-review-history-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.git-review-history-bar > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.git-review-history-bar > div > span {
+  display: grid;
+  min-width: 0;
+}
+
+.git-review-history-bar strong,
+.git-review-history-bar small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-review-history-bar strong {
+  font-size: 12px;
+}
+
+.git-review-history-bar small {
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.git-review-history-bar > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  padding: 0 10px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.git-review-history-bar > button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.git-review-history-bar > button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
 .git-review-content {
   min-height: 0;
   overflow: auto;

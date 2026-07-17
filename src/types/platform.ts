@@ -82,6 +82,11 @@ export interface GitRevision {
   subject: string;
 }
 
+export interface GitProjectContext {
+  status: GitProjectStatus;
+  revisions: GitRevision[];
+}
+
 export interface GitRevisionSnapshot {
   revision: GitRevision;
   project_document: unknown;

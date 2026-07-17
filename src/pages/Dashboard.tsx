@@ -14,6 +14,7 @@ import {
   GitCommitHorizontal,
   History,
   RefreshCw,
+  RotateCcw,
   Rows3,
   ScanSearch,
   X,
@@ -40,11 +41,10 @@ import {
   importPdoSimpleWorkbook,
   importSdoCsv,
   importSdoWorkbook,
-  inspectProjectGit,
   languageDocumentTable,
-  listProjectGitRevisions,
   loadJsonFile,
   loadProject,
+  loadProjectGitContext,
   loadProjectGitRevision,
   loadTextFile,
   migrateProjectDocument,
@@ -56,6 +56,7 @@ import {
   pdoSimpleDocumentTable,
   removeUiResourceOptionDocument,
   reviewProjectGitChanges,
+  reviewProjectGitRevision,
   revealItemInDir,
   saveJsonFile,
   saveProject,
@@ -105,7 +106,6 @@ import type {
   GitProjectRequest,
   GitProjectStatus,
   GitRevision,
-  GitRevisionSnapshot,
   GitReviewFile,
   GitDiffLine,
   GitReviewReport,
@@ -363,8 +363,8 @@ export function Dashboard({
   const [gitMessage, setGitMessage] = useState('更新项目配置');
   const [gitError, setGitError] = useState<string | null>(null);
   const [gitBusy, setGitBusy] = useState(false);
-  const [gitPreview, setGitPreview] = useState<GitRevisionSnapshot | null>(null);
   const [gitReview, setGitReview] = useState<GitReviewReport | null>(null);
+  const [gitReviewRevision, setGitReviewRevision] = useState<GitRevision | null>(null);
   const [showGitReview, setShowGitReview] = useState(false);
   const [gitReviewBusy, setGitReviewBusy] = useState(false);
   const [gitReviewError, setGitReviewError] = useState<string | null>(null);
@@ -469,6 +469,7 @@ export function Dashboard({
   const [orphanLanguageKeys, setOrphanLanguageKeys] = useState<string[]>([]);
   const [languageEditorError, setLanguageEditorError] = useState<string | null>(null);
   const pdoJumpRowRef = useRef<HTMLTableRowElement | null>(null);
+  const gitRefreshGenerationRef = useRef(0);
 
   useEffect(() => {
     void Promise.all([
@@ -483,7 +484,8 @@ export function Dashboard({
   }, []);
 
   useEffect(() => {
-    void refreshProjectGit();
+    const timeout = window.setTimeout(() => void refreshProjectGit(), 100);
+    return () => window.clearTimeout(timeout);
   }, [loadedProject?.summary.path, refactorConfigPath]);
 
   useEffect(() => {
@@ -1015,6 +1017,7 @@ export function Dashboard({
   }
 
   async function refreshProjectGit() {
+    const generation = ++gitRefreshGenerationRef.current;
     const request = currentProjectGitRequest();
     if (!request || !isTauriRuntime()) {
       setGitStatus(null);
@@ -1024,11 +1027,13 @@ export function Dashboard({
     }
 
     try {
-      const status = await inspectProjectGit(request);
-      setGitStatus(status);
+      const context = await loadProjectGitContext(request, 20);
+      if (generation !== gitRefreshGenerationRef.current) return;
+      setGitStatus(context.status);
       setGitError(null);
-      setGitRevisions(status.available ? await listProjectGitRevisions(request, 20) : []);
+      setGitRevisions(context.revisions);
     } catch (error) {
+      if (generation !== gitRefreshGenerationRef.current) return;
       setGitStatus(null);
       setGitRevisions([]);
       setGitError(error instanceof Error ? error.message : String(error));
@@ -1061,38 +1066,44 @@ export function Dashboard({
   async function handlePreviewProjectVersion(revision: GitRevision) {
     const request = currentProjectGitRequest();
     if (!request) return;
-    setGitBusy(true);
-    setGitError(null);
-    try {
-      setGitPreview(await loadProjectGitRevision(request, revision.hash));
-    } catch (error) {
-      setGitError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setGitBusy(false);
-    }
+    setGitReviewRevision(revision);
+    setGitReview(null);
+    setShowGitReview(true);
+    await refreshGitReview(revision);
   }
 
   async function handleRestoreProjectVersion() {
-    if (!loadedProject || !gitPreview) return;
+    const request = currentProjectGitRequest();
+    if (!loadedProject || !gitReviewRevision || !request) return;
     if (
       hasUnsavedChanges &&
       !window.confirm('当前项目存在未保存修改。继续恢复会用历史版本替换这些修改，是否继续？')
     ) {
       return;
     }
-
-    const document = gitPreview.sidecar_document
-      ? mergeRefactorConfigDocument(gitPreview.project_document, gitPreview.sidecar_document)
-      : gitPreview.project_document;
-    const validation = await validateProjectDocument(document);
-    applyLoadedProject(
-      { ...loadedProject, document, validation },
-      undefined,
-      trackedDocumentSections,
-    );
-    void parseUiPreview(document, loadedProject.summary.path).then(setUiPreview);
-    setGitPreview(null);
-    setSaveStatus(`已载入 Git 版本 ${gitPreview.revision.short_hash}，保存后将形成新的修改。`);
+    setGitBusy(true);
+    setGitReviewError(null);
+    try {
+      const snapshot = await loadProjectGitRevision(request, gitReviewRevision.hash);
+      const document = snapshot.sidecar_document
+        ? mergeRefactorConfigDocument(snapshot.project_document, snapshot.sidecar_document)
+        : snapshot.project_document;
+      const validation = await validateProjectDocument(document);
+      applyLoadedProject(
+        { ...loadedProject, document, validation },
+        undefined,
+        trackedDocumentSections,
+      );
+      void parseUiPreview(document, loadedProject.summary.path).then(setUiPreview);
+      closeGitReview();
+      setSaveStatus(
+        `已载入 Git 版本 ${snapshot.revision.short_hash}，保存后将形成新的修改。`,
+      );
+    } catch (error) {
+      setGitReviewError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGitBusy(false);
+    }
   }
 
   async function handleOpenGitRepository() {
@@ -1113,13 +1124,15 @@ export function Dashboard({
     );
   }
 
-  async function refreshGitReview() {
+  async function refreshGitReview(revision: GitRevision | null = gitReviewRevision) {
     const request = currentProjectGitRequest();
     if (!request) return;
     setGitReviewBusy(true);
     setGitReviewError(null);
     try {
-      const report = await reviewProjectGitChanges(request);
+      const report = revision
+        ? await reviewProjectGitRevision(request, revision.hash)
+        : await reviewProjectGitChanges(request);
       setGitReview(report);
       setActiveReviewPath((current) =>
         current && report.files.some((file) => file.path === current)
@@ -1140,8 +1153,17 @@ export function Dashboard({
 
   async function openGitReview() {
     setShowGitSummary(false);
+    setGitReviewRevision(null);
+    setGitReview(null);
     setShowGitReview(true);
-    await refreshGitReview();
+    await refreshGitReview(null);
+  }
+
+  function closeGitReview() {
+    setShowGitReview(false);
+    setGitReviewRevision(null);
+    setGitReview(null);
+    setGitReviewError(null);
   }
 
   function toggleReviewFile(path: string) {
@@ -4326,7 +4348,7 @@ export function Dashboard({
           <aside className="git-review-sidebar">
             <div className="git-review-sidebar-header">
               <div>
-                <span>更改</span>
+                <span>{gitReviewRevision ? '版本差异' : '更改'}</span>
                 <strong>{gitReview?.files.length ?? 0}</strong>
               </div>
               <span className="git-review-stats">
@@ -4365,17 +4387,21 @@ export function Dashboard({
               <div className="git-review-branch-info">
                 <div>
                   <GitBranch aria-hidden="true" size={17} strokeWidth={1.8} />
-                  <strong>{gitReview?.branch ?? gitStatus?.branch ?? '分支'}</strong>
+                  <strong>
+                    {gitReviewRevision?.short_hash ?? gitReview?.branch ?? gitStatus?.branch ?? '分支'}
+                  </strong>
                   <span className="git-review-stats">
                     <strong>+{gitReview?.additions ?? 0}</strong>
                     <em>-{gitReview?.deletions ?? 0}</em>
                   </span>
                 </div>
                 <p>
-                  HEAD
+                  {gitReviewRevision ? (gitReview?.base_ref ?? '父版本') : 'HEAD'}
                   <span>→</span>
-                  工作区
-                  {gitReview?.base_ref ? <small>上游 {gitReview.base_ref}</small> : null}
+                  {gitReviewRevision?.short_hash ?? '工作区'}
+                  {!gitReviewRevision && gitReview?.base_ref ? (
+                    <small>上游 {gitReview.base_ref}</small>
+                  ) : null}
                 </p>
               </div>
               <div className="git-review-toolbar-actions">
@@ -4421,30 +4447,49 @@ export function Dashboard({
                 </button>
                 <button
                   aria-label="关闭审阅"
-                  onClick={() => setShowGitReview(false)}
+                  onClick={closeGitReview}
                   title="关闭审阅"
                   type="button"
                 >
                   <X aria-hidden="true" size={17} strokeWidth={1.7} />
                 </button>
               </div>
-              <div className="git-review-commit-bar">
-                <input
-                  aria-label="版本说明"
-                  maxLength={120}
-                  onChange={(event) => setGitMessage(event.target.value)}
-                  placeholder="版本说明"
-                  value={gitMessage}
-                />
-                <button
-                  disabled={gitSummaryCommitDisabled || gitMessage.trim() === ''}
-                  onClick={() => void handleCommitProjectVersion()}
-                  type="button"
-                >
-                  <GitCommitHorizontal aria-hidden="true" size={16} strokeWidth={1.8} />
-                  {gitBusy ? '提交中...' : '提交版本'}
-                </button>
-              </div>
+              {gitReviewRevision ? (
+                <div className="git-review-history-bar">
+                  <div>
+                    <History aria-hidden="true" size={16} strokeWidth={1.8} />
+                    <span>
+                      <strong>{gitReviewRevision.subject}</strong>
+                      <small>
+                        {gitReviewRevision.author} ·{' '}
+                        {new Date(gitReviewRevision.authored_at).toLocaleString()}
+                      </small>
+                    </span>
+                  </div>
+                  <button disabled={gitBusy} onClick={() => void handleRestoreProjectVersion()} type="button">
+                    <RotateCcw aria-hidden="true" size={16} strokeWidth={1.8} />
+                    {gitBusy ? '正在恢复...' : '恢复为工作副本'}
+                  </button>
+                </div>
+              ) : (
+                <div className="git-review-commit-bar">
+                  <input
+                    aria-label="版本说明"
+                    maxLength={120}
+                    onChange={(event) => setGitMessage(event.target.value)}
+                    placeholder="版本说明"
+                    value={gitMessage}
+                  />
+                  <button
+                    disabled={gitSummaryCommitDisabled || gitMessage.trim() === ''}
+                    onClick={() => void handleCommitProjectVersion()}
+                    type="button"
+                  >
+                    <GitCommitHorizontal aria-hidden="true" size={16} strokeWidth={1.8} />
+                    {gitBusy ? '提交中...' : '提交版本'}
+                  </button>
+                </div>
+              )}
             </header>
 
             <div className="git-review-content">
@@ -4559,64 +4604,14 @@ export function Dashboard({
               ) : (
                 <div className="git-review-empty">
                   <Check aria-hidden="true" size={24} strokeWidth={1.8} />
-                  <strong>没有待审阅的配置更改</strong>
+                  <strong>
+                    {gitReviewRevision ? '该版本未修改受管配置文件' : '没有待审阅的配置更改'}
+                  </strong>
                 </div>
               )}
             </div>
           </div>
         </section>
-      ) : null}
-
-      {gitPreview ? (
-        <div className="modal-overlay">
-          <div className="modal-box git-preview-modal">
-            <div className="git-preview-header">
-              <div>
-                <h3>{gitPreview.revision.subject}</h3>
-                <p>
-                  {gitPreview.revision.short_hash} · {gitPreview.revision.author} ·{' '}
-                  {new Date(gitPreview.revision.authored_at).toLocaleString()}
-                </p>
-              </div>
-              <button
-                className="version-popup-close"
-                onClick={() => setGitPreview(null)}
-                type="button"
-                aria-label="关闭版本预览"
-              >
-                ×
-              </button>
-            </div>
-            <div className="git-preview-content">
-              <section>
-                <strong>.jcpro</strong>
-                <pre>{JSON.stringify(gitPreview.project_document, null, 2)}</pre>
-              </section>
-              {gitPreview.sidecar_document ? (
-                <section>
-                  <strong>重构配置</strong>
-                  <pre>{JSON.stringify(gitPreview.sidecar_document, null, 2)}</pre>
-                </section>
-              ) : null}
-            </div>
-            <div className="modal-actions">
-              <button
-                className="modal-btn-cancel"
-                onClick={() => setGitPreview(null)}
-                type="button"
-              >
-                关闭
-              </button>
-              <button
-                className="modal-btn-confirm"
-                onClick={() => void handleRestoreProjectVersion()}
-                type="button"
-              >
-                恢复为工作副本
-              </button>
-            </div>
-          </div>
-        </div>
       ) : null}
 
       {showSaveModal && loadedProject ? (
