@@ -4,6 +4,7 @@ import {
   addUiResourceOptionDocument,
   buildProjectBinaryReport,
   compareProjectBinaryReport,
+  commitProjectGitVersion,
   copyUiResourceImages,
   createProject,
   exportDbc,
@@ -20,9 +21,12 @@ import {
   importPdoSimpleWorkbook,
   importSdoCsv,
   importSdoWorkbook,
+  inspectProjectGit,
   languageDocumentTable,
+  listProjectGitRevisions,
   loadJsonFile,
   loadProject,
+  loadProjectGitRevision,
   loadTextFile,
   migrateProjectDocument,
   parsePdoAdvancedProject,
@@ -78,6 +82,10 @@ import type {
   BinaryBuildReport,
   BinaryCompareReport,
   FeatureModule,
+  GitProjectRequest,
+  GitProjectStatus,
+  GitRevision,
+  GitRevisionSnapshot,
   LanguageDocument,
   LanguageImportReport,
   LegacyTableKind,
@@ -274,6 +282,12 @@ export function Dashboard({
   const isSavingProject = savingProjectAction !== null;
   const [refactorConfigPath, setRefactorConfigPath] = useState<string | null>(null);
   const [refactorConfigStatus, setRefactorConfigStatus] = useState<string | null>(null);
+  const [gitStatus, setGitStatus] = useState<GitProjectStatus | null>(null);
+  const [gitRevisions, setGitRevisions] = useState<GitRevision[]>([]);
+  const [gitMessage, setGitMessage] = useState('更新项目配置');
+  const [gitError, setGitError] = useState<string | null>(null);
+  const [gitBusy, setGitBusy] = useState(false);
+  const [gitPreview, setGitPreview] = useState<GitRevisionSnapshot | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [jsonPopupSize, setJsonPopupSize] = useState({ w: 520, h: 420 });
@@ -378,6 +392,10 @@ export function Dashboard({
     setRecentProjects(storedProjects);
     setProjectPath(storedProjects[0]?.path ?? '');
   }, []);
+
+  useEffect(() => {
+    void refreshProjectGit();
+  }, [loadedProject?.summary.path, refactorConfigPath]);
 
   useEffect(() => {
     if (
@@ -855,6 +873,95 @@ export function Dashboard({
     setRefactorConfigPath(null);
     setRefactorConfigStatus('未挂载重构配置 JSON；修改重构专属配置时会提示创建 sidecar。');
     return project;
+  }
+
+  function currentProjectGitRequest(): GitProjectRequest | null {
+    const path = loadedProject?.summary.path;
+    if (!path) return null;
+    return {
+      project_path: path,
+      sidecar_path: refactorConfigPath ?? undefined,
+    };
+  }
+
+  async function refreshProjectGit() {
+    const request = currentProjectGitRequest();
+    if (!request || !isTauriRuntime()) {
+      setGitStatus(null);
+      setGitRevisions([]);
+      setGitError(null);
+      return;
+    }
+
+    try {
+      const status = await inspectProjectGit(request);
+      setGitStatus(status);
+      setGitError(null);
+      setGitRevisions(status.available ? await listProjectGitRevisions(request, 20) : []);
+    } catch (error) {
+      setGitStatus(null);
+      setGitRevisions([]);
+      setGitError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleCommitProjectVersion() {
+    const request = currentProjectGitRequest();
+    if (!request) return;
+    if (hasUnsavedChanges) {
+      setGitError('请先保存当前项目配置，再创建 Git 版本。');
+      return;
+    }
+
+    setGitBusy(true);
+    setGitError(null);
+    try {
+      const report = await commitProjectGitVersion({ ...request, message: gitMessage });
+      setGitMessage('更新项目配置');
+      setSaveStatus(`已保存 Git 版本 ${report.short_hash}：${report.subject}`);
+      await refreshProjectGit();
+    } catch (error) {
+      setGitError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGitBusy(false);
+    }
+  }
+
+  async function handlePreviewProjectVersion(revision: GitRevision) {
+    const request = currentProjectGitRequest();
+    if (!request) return;
+    setGitBusy(true);
+    setGitError(null);
+    try {
+      setGitPreview(await loadProjectGitRevision(request, revision.hash));
+    } catch (error) {
+      setGitError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGitBusy(false);
+    }
+  }
+
+  async function handleRestoreProjectVersion() {
+    if (!loadedProject || !gitPreview) return;
+    if (
+      hasUnsavedChanges &&
+      !window.confirm('当前项目存在未保存修改。继续恢复会用历史版本替换这些修改，是否继续？')
+    ) {
+      return;
+    }
+
+    const document = gitPreview.sidecar_document
+      ? mergeRefactorConfigDocument(gitPreview.project_document, gitPreview.sidecar_document)
+      : gitPreview.project_document;
+    const validation = await validateProjectDocument(document);
+    applyLoadedProject(
+      { ...loadedProject, document, validation },
+      undefined,
+      trackedDocumentSections,
+    );
+    void parseUiPreview(document, loadedProject.summary.path).then(setUiPreview);
+    setGitPreview(null);
+    setSaveStatus(`已载入 Git 版本 ${gitPreview.revision.short_hash}，保存后将形成新的修改。`);
   }
 
   function signalDictionaryDocument(): SignalDictionary {
@@ -2887,6 +2994,7 @@ export function Dashboard({
           ? '已保存 .jcpro 兼容段，并已导出重构专属 JSON。'
           : '已保存',
       );
+      void refreshProjectGit();
     } catch (error) {
       setSaveStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -3841,6 +3949,58 @@ export function Dashboard({
         </div>
       </div>
 
+      {gitPreview ? (
+        <div className="modal-overlay">
+          <div className="modal-box git-preview-modal">
+            <div className="git-preview-header">
+              <div>
+                <h3>{gitPreview.revision.subject}</h3>
+                <p>
+                  {gitPreview.revision.short_hash} · {gitPreview.revision.author} ·{' '}
+                  {new Date(gitPreview.revision.authored_at).toLocaleString()}
+                </p>
+              </div>
+              <button
+                className="version-popup-close"
+                onClick={() => setGitPreview(null)}
+                type="button"
+                aria-label="关闭版本预览"
+              >
+                ×
+              </button>
+            </div>
+            <div className="git-preview-content">
+              <section>
+                <strong>.jcpro</strong>
+                <pre>{JSON.stringify(gitPreview.project_document, null, 2)}</pre>
+              </section>
+              {gitPreview.sidecar_document ? (
+                <section>
+                  <strong>重构配置</strong>
+                  <pre>{JSON.stringify(gitPreview.sidecar_document, null, 2)}</pre>
+                </section>
+              ) : null}
+            </div>
+            <div className="modal-actions">
+              <button
+                className="modal-btn-cancel"
+                onClick={() => setGitPreview(null)}
+                type="button"
+              >
+                关闭
+              </button>
+              <button
+                className="modal-btn-confirm"
+                onClick={() => void handleRestoreProjectVersion()}
+                type="button"
+              >
+                恢复为工作副本
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {showSaveModal && loadedProject ? (
         <div className="modal-overlay" onClick={cancelSaveProject}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -4210,6 +4370,130 @@ export function Dashboard({
                     警告：{loadedProject.validation.warnings.join('；')}
                   </p>
                 ) : null}
+              </div>
+            ) : null}
+
+            {loadedProject ? (
+              <div className="project-section project-git-section">
+                <div className="project-section-header">
+                  <strong>Git 版本管理</strong>
+                  <button
+                    className="project-link-btn"
+                    disabled={gitBusy}
+                    onClick={() => void refreshProjectGit()}
+                    type="button"
+                  >
+                    刷新
+                  </button>
+                </div>
+                {gitStatus?.available ? (
+                  <>
+                    <div className="project-info-grid">
+                      <div className="project-info-item">
+                        <span>仓库</span>
+                        <strong className="project-info-path">{gitStatus.repo_root}</strong>
+                      </div>
+                      <div className="project-info-item">
+                        <span>分支</span>
+                        <strong>{gitStatus.branch}</strong>
+                      </div>
+                      <div className="project-info-item">
+                        <span>当前版本</span>
+                        <strong className="project-info-path">
+                          {gitStatus.head_short_hash ?? '尚无提交'}
+                        </strong>
+                      </div>
+                      <div className="project-info-item">
+                        <span>配置状态</span>
+                        <strong
+                          className={
+                            gitStatus.changed_paths.length > 0 ? 'text-warning' : 'text-success'
+                          }
+                        >
+                          {gitStatus.changed_paths.length > 0
+                            ? `${gitStatus.changed_paths.length} 个文件待提交`
+                            : '已同步'}
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="git-version-create">
+                      <input
+                        className="git-version-input"
+                        maxLength={120}
+                        onChange={(event) => setGitMessage(event.target.value)}
+                        placeholder="版本说明"
+                        value={gitMessage}
+                      />
+                      <button
+                        className="project-open-btn"
+                        disabled={
+                          gitBusy ||
+                          hasUnsavedChanges ||
+                          gitStatus.has_staged_changes ||
+                          gitStatus.changed_paths.length === 0 ||
+                          gitMessage.trim() === ''
+                        }
+                        onClick={() => void handleCommitProjectVersion()}
+                        type="button"
+                      >
+                        {gitBusy ? '处理中...' : '保存版本'}
+                      </button>
+                    </div>
+                    <p className="git-managed-paths">
+                      受管文件：{gitStatus.managed_paths.join('、')}
+                    </p>
+                    {hasUnsavedChanges ? (
+                      <p className="project-open-warning">
+                        请先保存当前项目配置，再创建 Git 版本。
+                      </p>
+                    ) : null}
+                    {gitStatus.has_staged_changes ? (
+                      <p className="project-open-warning">
+                        Git 暂存区已有内容。为避免混入其他改动，项目版本提交已停用。
+                      </p>
+                    ) : null}
+                    {gitStatus.warning ? (
+                      <p className="project-open-warning">{gitStatus.warning}</p>
+                    ) : null}
+                    <div className="git-history">
+                      <div className="git-history-header">
+                        <strong>版本历史</strong>
+                        <span>{gitRevisions.length} 条</span>
+                      </div>
+                      {gitRevisions.length > 0 ? (
+                        <div className="git-history-list">
+                          {gitRevisions.map((revision) => (
+                            <div className="git-history-row" key={revision.hash}>
+                              <code>{revision.short_hash}</code>
+                              <div className="git-history-copy">
+                                <strong>{revision.subject}</strong>
+                                <span>
+                                  {revision.author} ·{' '}
+                                  {new Date(revision.authored_at).toLocaleString()}
+                                </span>
+                              </div>
+                              <button
+                                className="project-link-btn"
+                                disabled={gitBusy}
+                                onClick={() => void handlePreviewProjectVersion(revision)}
+                                type="button"
+                              >
+                                查看
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="git-history-empty">当前项目文件还没有 Git 提交记录。</p>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="git-history-empty">
+                    {gitStatus?.warning ?? '正在检查项目所在的 Git 仓库...'}
+                  </p>
+                )}
+                {gitError ? <p className="project-open-error">{gitError}</p> : null}
               </div>
             ) : null}
 

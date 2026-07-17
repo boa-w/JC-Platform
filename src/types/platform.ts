@@ -54,6 +54,50 @@ export interface LoadedProject {
   document: unknown;
 }
 
+export interface GitProjectRequest {
+  project_path: string;
+  sidecar_path?: string;
+}
+
+export interface GitProjectStatus {
+  available: boolean;
+  repo_root?: string;
+  branch?: string;
+  head_hash?: string;
+  head_short_hash?: string;
+  head_subject?: string;
+  managed_paths: string[];
+  changed_paths: string[];
+  has_staged_changes: boolean;
+  warning?: string;
+}
+
+export interface GitRevision {
+  hash: string;
+  short_hash: string;
+  author: string;
+  authored_at: string;
+  subject: string;
+}
+
+export interface GitRevisionSnapshot {
+  revision: GitRevision;
+  project_document: unknown;
+  sidecar_document?: unknown;
+  sidecar_path?: string;
+}
+
+export interface GitCommitRequest extends GitProjectRequest {
+  message: string;
+}
+
+export interface GitCommitReport {
+  hash: string;
+  short_hash: string;
+  subject: string;
+  committed_paths: string[];
+}
+
 export interface MigratedProject {
   summary: ProjectSummary;
   validation: ProjectValidationReport;

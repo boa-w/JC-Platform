@@ -42,6 +42,10 @@ use crate::infrastructure::csv_excel::{
     write_workbook_xml, ExportTableRequest, TableDocument, TableFileRequest, TableValidationReport,
     LANGUAGE_REQUIRED_PREFIX_HEADERS, PDO_SIMPLE_HEADERS, SDO_HEADERS,
 };
+use crate::infrastructure::git::{
+    self, GitCommitReport, GitCommitRequest, GitProjectRequest, GitProjectStatus, GitRevision,
+    GitRevisionSnapshot,
+};
 use crate::infrastructure::json_store;
 use can_dbc::{ByteOrder, Dbc, MessageId, NumericValue, ValueType};
 use serde::{Deserialize, Serialize};
@@ -76,6 +80,36 @@ pub fn backend_health() -> BackendHealth {
 #[tauri::command]
 pub fn project_summary() -> ProjectSummary {
     ProjectSummary::empty()
+}
+
+/// 检查项目文件所属的 Git 仓库及受管配置状态。
+#[tauri::command]
+pub fn inspect_project_git(request: GitProjectRequest) -> GitProjectStatus {
+    git::inspect_project(&request)
+}
+
+/// 返回影响当前项目配置的最近 Git 版本。
+#[tauri::command]
+pub fn list_project_git_revisions(
+    request: GitProjectRequest,
+    limit: usize,
+) -> Result<Vec<GitRevision>, String> {
+    git::list_revisions(&request, limit)
+}
+
+/// 读取指定版本中的项目配置和可选 sidecar。
+#[tauri::command]
+pub fn load_project_git_revision(
+    request: GitProjectRequest,
+    revision: String,
+) -> Result<GitRevisionSnapshot, String> {
+    git::load_revision(&request, &revision)
+}
+
+/// 仅提交当前项目明确受管的配置文件。
+#[tauri::command]
+pub fn commit_project_git_version(request: GitCommitRequest) -> Result<GitCommitReport, String> {
+    git::commit_project(&request)
 }
 
 /// 从磁盘加载 `.jcpro` 项目文件，返回摘要、校验结果与原始 JSON。

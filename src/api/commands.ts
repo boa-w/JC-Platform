@@ -16,6 +16,12 @@ import type {
   ExportPlanReport,
   ExportPlanRequest,
   ExportTableRequest,
+  GitCommitReport,
+  GitCommitRequest,
+  GitProjectRequest,
+  GitProjectStatus,
+  GitRevision,
+  GitRevisionSnapshot,
   LanguageImportReport,
   LegacyTableKind,
   LegacyTableSpec,
@@ -73,6 +79,28 @@ export async function getProjectSummary(): Promise<ProjectSummary> {
   } catch {
     return fallbackProject;
   }
+}
+
+export async function inspectProjectGit(request: GitProjectRequest): Promise<GitProjectStatus> {
+  return invoke<GitProjectStatus>('inspect_project_git', { request });
+}
+
+export async function listProjectGitRevisions(
+  request: GitProjectRequest,
+  limit = 20,
+): Promise<GitRevision[]> {
+  return invoke<GitRevision[]>('list_project_git_revisions', { request, limit });
+}
+
+export async function loadProjectGitRevision(
+  request: GitProjectRequest,
+  revision: string,
+): Promise<GitRevisionSnapshot> {
+  return invoke<GitRevisionSnapshot>('load_project_git_revision', { request, revision });
+}
+
+export async function commitProjectGitVersion(request: GitCommitRequest): Promise<GitCommitReport> {
+  return invoke<GitCommitReport>('commit_project_git_version', { request });
 }
 
 export async function loadProject(path: string): Promise<LoadedProject> {
