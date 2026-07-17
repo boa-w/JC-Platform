@@ -1,3 +1,5 @@
+import { FileArchive, FileCode2 } from 'lucide-react';
+import { EmptyState } from '../../components/EmptyState';
 import type { LoadedProject } from '../../types/platform';
 import { useCanopenExport } from './useCanopenExport';
 
@@ -16,8 +18,7 @@ export function CanopenExportPage({ loadedProject }: CanopenExportPageProps) {
           <h2>CANopen 导出</h2>
           <p>
             基于「数据 / 设置数据」生成 SDO 对象，纳入能匹配 CANopen 默认 PDO 连接集的实时
-            PDO，并导出覆盖 SDO 通道与 PDO 帧的协议 DBC；无法归属到 Node-ID
-            的自定义实时帧会被排除。
+            PDO，并导出覆盖 SDO 通道与 PDO 帧的协议 DBC；无法归属到 Node-ID 的自定义实时帧会被排除。
           </p>
         </div>
         <div className="sample-actions">
@@ -66,11 +67,15 @@ export function CanopenExportPage({ loadedProject }: CanopenExportPageProps) {
             </article>
             <article>
               <span>PDO 数</span>
-              <strong>{report?.nodes.reduce((total, node) => total + node.pdoCount, 0) ?? 0}</strong>
+              <strong>
+                {report?.nodes.reduce((total, node) => total + node.pdoCount, 0) ?? 0}
+              </strong>
             </article>
             <article>
               <span>位域映射</span>
-              <strong>{report?.nodes.reduce((total, node) => total + node.bitfieldCount, 0) ?? 0}</strong>
+              <strong>
+                {report?.nodes.reduce((total, node) => total + node.bitfieldCount, 0) ?? 0}
+              </strong>
             </article>
             <article>
               <span>转换提示</span>
@@ -79,7 +84,9 @@ export function CanopenExportPage({ loadedProject }: CanopenExportPageProps) {
           </div>
           {canopenExport.status ? (
             <p
-              className={canopenExport.status.startsWith('已') ? 'text-success' : 'project-open-error'}
+              className={
+                canopenExport.status.startsWith('已') ? 'text-success' : 'project-open-error'
+              }
               style={{ marginTop: 8 }}
             >
               {canopenExport.status}
@@ -122,13 +129,10 @@ export function CanopenExportPage({ loadedProject }: CanopenExportPageProps) {
               </div>
             </section>
           ) : (
-            <div className="empty-state">
-              <div className="empty-state-icon">DBC</div>
-              <p>
-                点击「导出 CANopen 包」生成 EDS、model、vendor 扩展、协议 DBC、SDO
-                对象映射、位域映射和 SDO/PDO 测试帧。
-              </p>
-            </div>
+            <EmptyState icon={FileArchive}>
+              点击「导出 CANopen 包」生成 EDS、model、vendor 扩展、协议 DBC、SDO
+              对象映射、位域映射和 SDO/PDO 测试帧。
+            </EmptyState>
           )}
           {report && report.warnings.length > 0 ? (
             <div className="project-open-error" style={{ marginTop: 8 }}>
@@ -142,10 +146,7 @@ export function CanopenExportPage({ loadedProject }: CanopenExportPageProps) {
           ) : null}
         </>
       ) : (
-        <div className="empty-state">
-          <div className="empty-state-icon">EDS</div>
-          <p>请先在项目管理中打开 .jcpro 项目文件。</p>
-        </div>
+        <EmptyState icon={FileCode2}>请先在项目管理中打开 .jcpro 项目文件。</EmptyState>
       )}
     </section>
   );

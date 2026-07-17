@@ -476,12 +476,6 @@ button {
   background: var(--tb-hover);
 }
 
-.action-bar-icon {
-  font-size: 12px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
 .action-bar-status {
   max-width: 260px;
   overflow: hidden;

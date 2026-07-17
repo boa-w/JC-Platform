@@ -1,3 +1,4 @@
+import { ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/language/ConfirmDialog';
 import {
@@ -398,7 +399,11 @@ export function SettingDataPage({
               type="button"
               title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'}
             >
-              {sidebarCollapsed ? '▸' : '◂'}
+              {sidebarCollapsed ? (
+                <PanelLeftOpen aria-hidden="true" size={15} strokeWidth={1.8} />
+              ) : (
+                <PanelLeftClose aria-hidden="true" size={15} strokeWidth={1.8} />
+              )}
             </button>
           </div>
           {!sidebarCollapsed ? (
@@ -444,7 +449,16 @@ export function SettingDataPage({
                 title={`${formatSettingPath(menu.pathNames)}｜参数 ${menu.parameterCount}`}
                 type="button"
               >
-                <span className="legacy-menu-arrow">{menu.hasMenuChildren ? '▸' : ''}</span>
+                {menu.hasMenuChildren ? (
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="legacy-menu-arrow"
+                    size={14}
+                    strokeWidth={1.8}
+                  />
+                ) : (
+                  <span className="legacy-menu-arrow" />
+                )}
                 <span className="setting-menu-label">
                   <span className="setting-menu-main">{menu.name}</span>
                   <span

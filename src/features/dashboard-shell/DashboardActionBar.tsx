@@ -2,8 +2,10 @@ import {
   ArrowUpRight,
   ChevronDown,
   ChevronRight,
+  Braces,
   CloudOff,
   FileDiff,
+  FileDown,
   FolderGit2,
   FolderOpen,
   GitBranch,
@@ -14,6 +16,7 @@ import {
   SaveAll,
   ScanSearch,
   Undo2,
+  WandSparkles,
   X,
 } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -293,7 +296,7 @@ export function DashboardActionBar({
                 type="button"
                 title="从 CSV/XLS/XLSX/XML 文件导入"
               >
-                <span className="action-bar-icon">↓</span>
+                <FileDown aria-hidden="true" size={14} strokeWidth={1.8} />
                 {isImportingTable ? '导入中...' : '导入'}
               </button>
               <button
@@ -326,7 +329,7 @@ export function DashboardActionBar({
               type="button"
               title="自动构建当前页面的 CAN 测试数据"
             >
-              <span className="action-bar-icon">⚡</span>
+              <WandSparkles aria-hidden="true" size={14} strokeWidth={1.8} />
               {generatingTestKey !== null ? '生成中...' : '生成测试数据'}
             </button>
           ) : null}
@@ -363,7 +366,7 @@ export function DashboardActionBar({
               type="button"
               title="打开 JSON 编辑器"
             >
-              {'{ }'}
+              <Braces aria-hidden="true" size={14} strokeWidth={1.8} />
             </button>
           ) : null}
           {saveStatus ? (
@@ -507,7 +510,6 @@ export function DashboardActionBar({
           )}
         </div>
       ) : null}
-
     </>
   );
 }

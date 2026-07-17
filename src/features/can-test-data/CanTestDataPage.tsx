@@ -1,3 +1,5 @@
+import { FileDown, FileUp, WandSparkles } from 'lucide-react';
+import { EmptyState } from '../../components/EmptyState';
 import type { useCanTestData } from '../../hooks/useCanTestData';
 import type { CanTestProfile, LoadedProject } from '../../types/platform';
 
@@ -87,32 +89,37 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
               onClick={() => void canTestData.generate(loadedProject)}
               type="button"
             >
-              {canTestData.isGeneratingCanTest ? '生成中...' : '⚡ 生成'}
+              <WandSparkles aria-hidden="true" size={14} strokeWidth={1.8} />
+              {canTestData.isGeneratingCanTest ? '生成中...' : '生成'}
             </button>
             <button
               disabled={canTestData.canTestFrames.length === 0}
               onClick={() => void canTestData.exportTxt(loadedProject)}
               type="button"
             >
-              📤 导出纯帧 TXT
+              <FileUp aria-hidden="true" size={14} strokeWidth={1.8} />
+              导出纯帧 TXT
             </button>
             <button
               disabled={canTestData.canTestFrames.length === 0}
               onClick={() => void canTestData.exportCsv(loadedProject)}
               type="button"
             >
-              📤 导出 CSV
+              <FileUp aria-hidden="true" size={14} strokeWidth={1.8} />
+              导出 CSV
             </button>
             <span className="action-bar-sep" />
             <button onClick={() => void canTestData.importConfig()} type="button">
-              📥 导入配置
+              <FileDown aria-hidden="true" size={14} strokeWidth={1.8} />
+              导入配置
             </button>
             <button
               disabled={canTestData.canTestFrames.length === 0}
               onClick={() => void canTestData.exportConfig()}
               type="button"
             >
-              📤 导出说明 JSON
+              <FileUp aria-hidden="true" size={14} strokeWidth={1.8} />
+              导出说明 JSON
             </button>
           </div>
           {canTestData.canTestCoverage ? (
@@ -242,7 +249,9 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                         名称
                         <input
                           value={frame.name}
-                          onChange={(e) => canTestData.updateFrame(frameIndex, 'name', e.target.value)}
+                          onChange={(e) =>
+                            canTestData.updateFrame(frameIndex, 'name', e.target.value)
+                          }
                         />
                       </label>
                       <div className="pdo-frame-field">
@@ -330,10 +339,9 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
               ))}
             </>
           ) : canTestData.canTestStatus?.startsWith('已生成') ? null : (
-            <div className="empty-state">
-              <div className="empty-state-icon">📂</div>
-              <p>点击「⚡ 生成」从项目配置中构建 CAN 测试数据</p>
-            </div>
+            <EmptyState icon={WandSparkles}>
+              点击「生成测试数据」从项目配置中构建 CAN 测试数据
+            </EmptyState>
           )}
           {canTestData.canTestStatus ? (
             <p
@@ -347,10 +355,7 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
           ) : null}
         </div>
       ) : (
-        <div className="empty-state">
-          <div className="empty-state-icon">📂</div>
-          <p>请先在项目管理中打开 .jcpro 项目文件</p>
-        </div>
+        <EmptyState>请先在项目管理中打开 .jcpro 项目文件</EmptyState>
       )}
     </section>
   );

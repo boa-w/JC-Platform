@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { translateBaiduText } from '../../api/commands';
+import { EmptyState } from '../EmptyState';
 import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -808,10 +809,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   if (!loaded) {
     return (
       <section className="lang-page">
-        <div className="empty-state">
-          <div className="empty-state-icon">📂</div>
-          <p>请先在项目管理中打开 .jcpro 项目文件</p>
-        </div>
+        <EmptyState>请先在项目管理中打开 .jcpro 项目文件</EmptyState>
       </section>
     );
   }
