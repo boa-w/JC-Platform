@@ -1,5 +1,5 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { Component, Suspense, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode, Suspense } from 'react';
 
 interface RecoveryBoundaryProps {
   children: ReactNode;
@@ -34,17 +34,17 @@ class RecoveryBoundary extends Component<RecoveryBoundaryProps, RecoveryBoundary
           {isAppFailure ? <h1>应用遇到问题</h1> : <h2>此功能暂时无法显示</h2>}
           <p>
             {isAppFailure
-              ? '当前界面未能正常启动。重新加载后可以继续使用。'
-              : '当前模块加载或渲染失败，其他功能仍可继续使用。'}
+              ? '当前界面未能正常启动。可以重试加载界面，不会强制刷新应用窗口。'
+              : '当前模块加载或渲染失败，其他功能仍可继续使用。重试不会刷新整个应用。'}
           </p>
         </div>
         <button
           className="recovery-boundary-action"
-          onClick={() => window.location.reload()}
+          onClick={() => this.setState({ error: null })}
           type="button"
         >
           <RefreshCw size={16} aria-hidden="true" />
-          重新加载
+          重试
         </button>
         <details className="recovery-boundary-details">
           <summary>技术信息</summary>
