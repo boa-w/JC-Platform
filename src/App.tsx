@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { getBackendHealth, getProjectSummary } from './api/commands';
 import { Sidebar } from './components/Sidebar';
 import { featureModules } from './data/modules';
@@ -15,6 +15,7 @@ export default function App() {
   const [project, setProject] = useState<ProjectSummary | null>(null);
   const [loadedProject, setLoadedProject] = useState<LoadedProject | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [, startNavigationTransition] = useTransition();
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -27,12 +28,16 @@ export default function App() {
     [activeKey],
   );
 
+  function navigate(key: NavigationKey) {
+    startNavigationTransition(() => setActiveKey(key));
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
         modules={featureModules}
         activeKey={activeKey}
-        onSelect={setActiveKey}
+        onSelect={navigate}
         theme={theme}
         onToggleTheme={toggleTheme}
         health={health}
@@ -47,7 +52,7 @@ export default function App() {
         loadedProject={loadedProject}
         theme={theme}
         onToggleTheme={toggleTheme}
-        onNavigate={setActiveKey}
+        onNavigate={navigate}
         onProjectLoaded={(nextProject) => {
           setLoadedProject(nextProject);
           setProject(nextProject.summary);
