@@ -21,9 +21,9 @@ import type {
   GitProjectContext,
   GitProjectRequest,
   GitProjectStatus,
+  GitReviewReport,
   GitRevision,
   GitRevisionSnapshot,
-  GitReviewReport,
   LanguageImportReport,
   LegacyTableKind,
   LegacyTableSpec,
@@ -83,6 +83,10 @@ export async function getProjectSummary(): Promise<ProjectSummary> {
   } catch {
     return fallbackProject;
   }
+}
+
+export async function takePendingProjectPath(): Promise<string | null> {
+  return invoke<string | null>('take_pending_project_path');
 }
 
 export async function inspectProjectGit(request: GitProjectRequest): Promise<GitProjectStatus> {

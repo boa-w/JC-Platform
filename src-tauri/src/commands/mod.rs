@@ -53,7 +53,36 @@ use serde_json::json;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tauri::Manager;
+
+#[derive(Default)]
+pub struct PendingProjectPath(Mutex<Option<String>>);
+
+impl PendingProjectPath {
+    pub fn new(path: Option<String>) -> Self {
+        Self(Mutex::new(path))
+    }
+
+    pub fn replace(&self, path: String) {
+        if let Ok(mut pending) = self.0.lock() {
+            *pending = Some(path);
+        }
+    }
+
+    fn take(&self) -> Option<String> {
+        self.0.lock().ok()?.take()
+    }
+}
+
+pub fn project_path_from_args(args: impl IntoIterator<Item = String>) -> Option<String> {
+    args.into_iter().find(|argument| {
+        Path::new(argument)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("jcpro"))
+    })
+}
 
 /// 后端健康检查响应。
 #[derive(Debug, Serialize)]
@@ -81,6 +110,11 @@ pub fn backend_health() -> BackendHealth {
 #[tauri::command]
 pub fn project_summary() -> ProjectSummary {
     ProjectSummary::empty()
+}
+
+#[tauri::command]
+pub fn take_pending_project_path(state: tauri::State<'_, PendingProjectPath>) -> Option<String> {
+    state.take()
 }
 
 /// 检查项目文件所属的 Git 仓库及受管配置状态。
@@ -961,6 +995,25 @@ mod tests {
                 project_dir.join("images/speed-0.png"),
                 project_dir.join("images/speed-1.png"),
             ]
+        );
+    }
+
+    #[test]
+    fn selects_jcpro_project_path_from_desktop_arguments() {
+        assert_eq!(
+            project_path_from_args([
+                "jc-custom-platform.exe".to_string(),
+                "--flag".to_string(),
+                r#"D:\projects\meter.JCPRO"#.to_string(),
+            ]),
+            Some(r#"D:\projects\meter.JCPRO"#.to_string())
+        );
+        assert_eq!(
+            project_path_from_args([
+                "jc-custom-platform.exe".to_string(),
+                "notes.json".to_string()
+            ]),
+            None
         );
     }
 }

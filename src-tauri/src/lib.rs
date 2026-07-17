@@ -31,9 +31,23 @@ use commands::{
     parse_ui_resources_with_project_path, parse_unified_protocol_project,
     pdo_simple_document_table, project_summary, remove_ui_resource_option_document,
     review_project_git_changes, review_project_git_revision, save_json_file, save_project,
-    save_project_as, save_text_file, sdo_document_table, translate_baidu_text,
-    update_ui_resource_document, validate_project_document, validate_table_headers,
+    save_project_as, save_text_file, sdo_document_table, take_pending_project_path,
+    translate_baidu_text, update_ui_resource_document, validate_project_document,
+    validate_table_headers, PendingProjectPath,
 };
+use tauri::{Emitter, Manager};
+
+fn dispatch_project_open(app: &tauri::AppHandle, path: String) {
+    app.state::<PendingProjectPath>().replace(path.clone());
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    if let Err(error) = app.emit("open-project", path) {
+        eprintln!("发送项目打开事件失败：{error}");
+    }
+}
 
 /// 构建并启动 Tauri 应用。
 ///
@@ -43,7 +57,15 @@ use commands::{
 /// 桌面端由 `main()` 调用，移动端由 `mobile_entry_point` 宏调用。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let pending_project_path =
+        PendingProjectPath::new(commands::project_path_from_args(std::env::args()));
     tauri::Builder::default()
+        .manage(pending_project_path)
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if let Some(path) = commands::project_path_from_args(args) {
+                dispatch_project_open(app, path);
+            }
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -59,6 +81,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             backend_health,
             project_summary,
+            take_pending_project_path,
             inspect_project_git,
             load_project_git_context,
             list_project_git_revisions,
@@ -119,6 +142,21 @@ pub fn run() {
             export_dbc,
             generate_dbc_content
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run jc custom platform tauri app");
+        .build(tauri::generate_context!())
+        .expect("failed to build jc custom platform tauri app")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        let path = path.to_string_lossy().into_owned();
+                        if let Some(project_path) = commands::project_path_from_args([path]) {
+                            dispatch_project_open(app, project_path);
+                        }
+                    }
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }

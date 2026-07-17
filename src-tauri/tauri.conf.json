@@ -36,6 +36,19 @@
     "category": "DeveloperTool",
     "shortDescription": "JC 配置项目桌面开发平台",
     "longDescription": "用于编辑、校验、版本审阅和导出 JC 配置项目的桌面工具。",
+    "fileAssociations": [
+      {
+        "ext": ["jcpro"],
+        "name": "JC 配置项目",
+        "description": "JC 配置项目文件",
+        "role": "Editor",
+        "mimeType": "application/x-jcpro",
+        "exportedType": {
+          "identifier": "com.jc.custom-platform.jcpro",
+          "conformsTo": ["public.json", "public.data"]
+        }
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -1,6 +1,7 @@
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { lazy, useEffect, useRef, useState } from 'react';
-import { validateProjectDocument } from '../api/commands';
+import { takePendingProjectPath, validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
@@ -155,6 +156,8 @@ export function Dashboard({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const documentStateChangeRef = useRef<(hasChanges: boolean) => void>(() => undefined);
   const projectGitRefreshRef = useRef<() => void | Promise<void>>(() => undefined);
+  const externalProjectOpenRef = useRef<(path: string) => void>(() => undefined);
+  const externalProjectStatusRef = useRef<(message: string) => void>(() => undefined);
   const projectDocument = useProjectDocumentController({
     loadedProject,
     onDocumentStateChange: (hasChanges) => documentStateChangeRef.current(hasChanges),
@@ -261,6 +264,12 @@ export function Dashboard({
     },
   });
 
+  externalProjectOpenRef.current = (path) => {
+    onNavigate('project');
+    void projectLifecycle.openProject(path);
+  };
+  externalProjectStatusRef.current = projectLifecycle.setSaveStatus;
+
   useEffect(() => {
     documentStateChangeRef.current = projectLifecycle.markDocumentState;
   }, [projectLifecycle.markDocumentState]);
@@ -268,6 +277,49 @@ export function Dashboard({
   useEffect(() => {
     projectGitRefreshRef.current = projectGit.refresh;
   }, [projectGit.refresh]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    let lastHandledPath = '';
+    let lastHandledAt = 0;
+
+    function openExternalProject(path: string) {
+      const normalizedPath = path.trim();
+      if (!normalizedPath) return;
+      const now = Date.now();
+      if (normalizedPath === lastHandledPath && now - lastHandledAt < 1000) return;
+      lastHandledPath = normalizedPath;
+      lastHandledAt = now;
+      externalProjectOpenRef.current(normalizedPath);
+    }
+
+    async function bindProjectOpenEvents() {
+      unlisten = await listen<string>('open-project', (event) =>
+        openExternalProject(event.payload),
+      );
+      if (disposed) {
+        unlisten();
+        return;
+      }
+      const pendingPath = await takePendingProjectPath();
+      if (!disposed && pendingPath) openExternalProject(pendingPath);
+    }
+
+    void bindProjectOpenEvents().catch((cause) => {
+      if (!disposed) {
+        externalProjectStatusRef.current(
+          `无法接收系统项目打开请求：${cause instanceof Error ? cause.message : String(cause)}`,
+        );
+      }
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
