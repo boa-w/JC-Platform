@@ -1,6 +1,6 @@
 import type { ProtocolMappingTarget } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
-import { formatFrameId } from '../realtime-data';
+import { formatFrameId } from '../realtime-data/usePdoEditor';
 import type { ProtocolEditorController } from './useProtocolEditor';
 
 interface ProtocolMappingPageProps {

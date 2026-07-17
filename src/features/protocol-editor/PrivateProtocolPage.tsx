@@ -1,4 +1,4 @@
-import { formatFrameId, parseFrameId } from '../realtime-data';
+import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
 import type { JsonPath } from '../../utils/projectDirty';
 import type { ProtocolEditorController } from './useProtocolEditor';
 

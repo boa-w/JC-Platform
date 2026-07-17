@@ -1,45 +1,24 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useEffect, useRef, useState } from 'react';
-import {
-  parsePdoAdvancedProject,
-  validateProjectDocument,
-} from '../api/commands';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { parsePdoAdvancedProject, validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
-import { GitReviewWorkspace } from '../components/git';
-import { JsonEditorPopup } from '../components/json-editor';
 import { ProjectManagementPage } from '../components/project';
-import { LanguagePage } from '../components/language';
-import {
-  BatteryMonitorPage,
-  BatteryProtocolPage,
-  useBatteryLegacyController,
-} from '../features/battery-legacy';
-import { CanTestDataPage } from '../features/can-test-data';
-import { CanopenExportPage } from '../features/canopen-export';
-import { FaultCodePage } from '../features/fault-code';
+import { useBatteryLegacyController } from '../features/battery-legacy/useBatteryLegacyController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
-import {
-  PrivateProtocolPage,
-  ProtocolMappingPage,
-  SignalDictionaryPage,
-  useProtocolEditor,
-} from '../features/protocol-editor';
-import { ProjectExportPage, useProjectExport } from '../features/project-export';
+import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
+import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
 import { useProjectLifecycleController } from '../features/project-lifecycle';
-import { SettingsPage } from '../features/settings';
-import { RealtimeDataPage, usePdoEditor } from '../features/realtime-data';
-import { SettingDataPage } from '../features/setting-data';
+import { usePdoEditor } from '../features/realtime-data/usePdoEditor';
 import {
   TableConfigStatusPanel,
   TableFormatReference,
   useTableConfigController,
 } from '../features/table-config';
 import {
-  UiResourcePage,
   uiResourcePreviewDocument,
   useUiResourceController,
-} from '../features/ui-resource';
+} from '../features/ui-resource/useUiResourceController';
 import { featureModules } from '../data/modules';
 import { getTestData, type TestDataType } from '../data/test-data';
 import { useCanTestData } from '../hooks/useCanTestData';
@@ -71,6 +50,95 @@ import {
   type JsonPath,
   restorePath,
 } from '../utils/projectDirty';
+
+const GitReviewWorkspace = lazy(() =>
+  import('../components/git/GitReviewWorkspace').then((module) => ({
+    default: module.GitReviewWorkspace,
+  })),
+);
+const JsonEditorPopup = lazy(() =>
+  import('../components/json-editor/JsonEditorPopup').then((module) => ({
+    default: module.JsonEditorPopup,
+  })),
+);
+const LanguagePage = lazy(() =>
+  import('../components/language/LanguagePage').then((module) => ({
+    default: module.LanguagePage,
+  })),
+);
+const BatteryProtocolPage = lazy(() =>
+  import('../features/battery-legacy/BatteryLegacyPages').then((module) => ({
+    default: module.BatteryProtocolPage,
+  })),
+);
+const BatteryMonitorPage = lazy(() =>
+  import('../features/battery-legacy/BatteryLegacyPages').then((module) => ({
+    default: module.BatteryMonitorPage,
+  })),
+);
+const CanTestDataPage = lazy(() =>
+  import('../features/can-test-data/CanTestDataPage').then((module) => ({
+    default: module.CanTestDataPage,
+  })),
+);
+const CanopenExportPage = lazy(() =>
+  import('../features/canopen-export/CanopenExportPage').then((module) => ({
+    default: module.CanopenExportPage,
+  })),
+);
+const FaultCodePage = lazy(() =>
+  import('../features/fault-code/FaultCodePage').then((module) => ({
+    default: module.FaultCodePage,
+  })),
+);
+const PrivateProtocolPage = lazy(() =>
+  import('../features/protocol-editor/PrivateProtocolPage').then((module) => ({
+    default: module.PrivateProtocolPage,
+  })),
+);
+const ProtocolMappingPage = lazy(() =>
+  import('../features/protocol-editor/ProtocolMappingPage').then((module) => ({
+    default: module.ProtocolMappingPage,
+  })),
+);
+const SignalDictionaryPage = lazy(() =>
+  import('../features/protocol-editor/SignalDictionaryPage').then((module) => ({
+    default: module.SignalDictionaryPage,
+  })),
+);
+const ProjectExportPage = lazy(() =>
+  import('../features/project-export/ProjectExportPage').then((module) => ({
+    default: module.ProjectExportPage,
+  })),
+);
+const RealtimeDataPage = lazy(() =>
+  import('../features/realtime-data/RealtimeDataPage').then((module) => ({
+    default: module.RealtimeDataPage,
+  })),
+);
+const SettingDataPage = lazy(() =>
+  import('../features/setting-data/SettingDataPage').then((module) => ({
+    default: module.SettingDataPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import('../features/settings/SettingsPage').then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
+const UiResourcePage = lazy(() =>
+  import('../features/ui-resource/UiResourcePage').then((module) => ({
+    default: module.UiResourcePage,
+  })),
+);
+
+function WorkspaceLoading() {
+  return (
+    <section className="empty-state" role="status">
+      正在加载...
+    </section>
+  );
+}
 
 interface DashboardProps {
   activeModule: FeatureModule;
@@ -529,24 +597,25 @@ export function Dashboard({
         onCommitGitVersion={projectGit.commitVersion}
       />
 
-
-      {projectGit.showReview ? (
-        <GitReviewWorkspace
-          report={projectGit.review}
-          revision={projectGit.reviewRevision}
-          statusBranch={projectGit.status?.branch}
-          busy={projectGit.reviewBusy}
-          error={projectGit.reviewError}
-          commitBusy={projectGit.busy}
-          commitDisabled={projectGit.commitDisabled}
-          message={projectGit.message}
-          onMessageChange={projectGit.setMessage}
-          onCommit={() => void projectGit.commitVersion()}
-          onRestore={() => void projectGit.restoreVersion()}
-          onRefresh={() => void projectGit.refreshReview()}
-          onClose={projectGit.closeReview}
-        />
-      ) : null}
+      <Suspense fallback={<WorkspaceLoading />}>
+        {projectGit.showReview ? (
+          <GitReviewWorkspace
+            report={projectGit.review}
+            revision={projectGit.reviewRevision}
+            statusBranch={projectGit.status?.branch}
+            busy={projectGit.reviewBusy}
+            error={projectGit.reviewError}
+            commitBusy={projectGit.busy}
+            commitDisabled={projectGit.commitDisabled}
+            message={projectGit.message}
+            onMessageChange={projectGit.setMessage}
+            onCommit={() => void projectGit.commitVersion()}
+            onRestore={() => void projectGit.restoreVersion()}
+            onRefresh={() => void projectGit.refreshReview()}
+            onClose={projectGit.closeReview}
+          />
+        ) : null}
+      </Suspense>
       <DashboardDialogs
         loadedProject={loadedProject}
         showSaveModal={projectLifecycle.showSaveModal}
@@ -563,17 +632,21 @@ export function Dashboard({
         onConfirmTestData={confirmGenerateTestData}
       />
 
-      <JsonEditorPopup
-        open={showJsonEditor && Boolean(loadedProject)}
-        text={configEditorText}
-        error={configEditorError}
-        canRestore={Boolean(baselineDocument)}
-        onTextChange={setConfigEditorText}
-        onFormat={() => setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2))}
-        onRestore={restoreCurrentConfigSection}
-        onApply={applyConfigEditor}
-        onClose={() => setShowJsonEditor(false)}
-      />
+      <Suspense fallback={null}>
+        {showJsonEditor && loadedProject ? (
+          <JsonEditorPopup
+            open
+            text={configEditorText}
+            error={configEditorError}
+            canRestore={Boolean(baselineDocument)}
+            onTextChange={setConfigEditorText}
+            onFormat={() => setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2))}
+            onRestore={restoreCurrentConfigSection}
+            onApply={applyConfigEditor}
+            onClose={() => setShowJsonEditor(false)}
+          />
+        ) : null}
+      </Suspense>
 
       <div className={showJsonEditor && loadedProject ? 'workspace-json-active' : undefined}>
         {activeModule.key !== 'project' ? (
@@ -583,201 +656,191 @@ export function Dashboard({
             onNavigate={onNavigate}
           />
         ) : null}
-        {activeModule.key === 'project' ? (
-          <ProjectManagementPage
-            projectPath={projectLifecycle.projectPath}
-            setProjectPath={projectLifecycle.setProjectPath}
-            isOpening={projectLifecycle.isOpening}
-            openError={projectLifecycle.openError}
-            recentProjects={projectLifecycle.recentProjects}
-            selectedRecentProjectPath={projectLifecycle.selectedRecentProjectPath}
-            clearRecentProjects={projectLifecycle.clearRecentProjects}
-            removeRecentProject={projectLifecycle.removeRecentProject}
-            newProjectName={projectLifecycle.newProjectName}
-            setNewProjectName={projectLifecycle.setNewProjectName}
-            newResolutionW={projectLifecycle.newResolutionW}
-            setNewResolutionW={projectLifecycle.setNewResolutionW}
-            newResolutionH={projectLifecycle.newResolutionH}
-            setNewResolutionH={projectLifecycle.setNewResolutionH}
-            loadedProject={loadedProject}
-            effectiveProjectValid={effectiveProjectValid}
-            refactorConfigPath={projectLifecycle.refactorConfigPath}
-            refactorConfigStatus={projectLifecycle.refactorConfigStatus}
-            compatibleMissingSections={compatibleMissingSections}
-            sidecarMissingSections={sidecarMissingSections}
-            projectGitSectionRef={projectGit.projectSectionRef}
-            gitBusy={projectGit.busy}
-            gitStatus={projectGit.status}
-            gitMessage={projectGit.message}
-            setGitMessage={projectGit.setMessage}
-            hasUnsavedChanges={hasUnsavedChanges}
-            gitRevisions={projectGit.revisions}
-            gitError={projectGit.error}
-            projectParseReport={projectLifecycle.projectParseReport}
-            handleSelectProjectFile={projectLifecycle.selectProjectFile}
-            handleOpenProject={projectLifecycle.openProject}
-            handleCreateProject={projectLifecycle.createNewProject}
-            handleParseProject={projectLifecycle.parseProject}
-            handleMigrateProject={projectLifecycle.migrateProject}
-            handleMountRefactorConfig={projectLifecycle.mountRefactorConfig}
-            handleCreateRefactorConfig={projectLifecycle.createRefactorConfig}
-            refreshProjectGit={projectGit.refresh}
-            handleCommitProjectVersion={projectGit.commitVersion}
-            handlePreviewProjectVersion={projectGit.previewVersion}
-          />
-        ) : null}
+        <Suspense fallback={<WorkspaceLoading />}>
+          {activeModule.key === 'project' ? (
+            <ProjectManagementPage
+              projectPath={projectLifecycle.projectPath}
+              setProjectPath={projectLifecycle.setProjectPath}
+              isOpening={projectLifecycle.isOpening}
+              openError={projectLifecycle.openError}
+              recentProjects={projectLifecycle.recentProjects}
+              selectedRecentProjectPath={projectLifecycle.selectedRecentProjectPath}
+              clearRecentProjects={projectLifecycle.clearRecentProjects}
+              removeRecentProject={projectLifecycle.removeRecentProject}
+              newProjectName={projectLifecycle.newProjectName}
+              setNewProjectName={projectLifecycle.setNewProjectName}
+              newResolutionW={projectLifecycle.newResolutionW}
+              setNewResolutionW={projectLifecycle.setNewResolutionW}
+              newResolutionH={projectLifecycle.newResolutionH}
+              setNewResolutionH={projectLifecycle.setNewResolutionH}
+              loadedProject={loadedProject}
+              effectiveProjectValid={effectiveProjectValid}
+              refactorConfigPath={projectLifecycle.refactorConfigPath}
+              refactorConfigStatus={projectLifecycle.refactorConfigStatus}
+              compatibleMissingSections={compatibleMissingSections}
+              sidecarMissingSections={sidecarMissingSections}
+              projectGitSectionRef={projectGit.projectSectionRef}
+              gitBusy={projectGit.busy}
+              gitStatus={projectGit.status}
+              gitMessage={projectGit.message}
+              setGitMessage={projectGit.setMessage}
+              hasUnsavedChanges={hasUnsavedChanges}
+              gitRevisions={projectGit.revisions}
+              gitError={projectGit.error}
+              projectParseReport={projectLifecycle.projectParseReport}
+              handleSelectProjectFile={projectLifecycle.selectProjectFile}
+              handleOpenProject={projectLifecycle.openProject}
+              handleCreateProject={projectLifecycle.createNewProject}
+              handleParseProject={projectLifecycle.parseProject}
+              handleMigrateProject={projectLifecycle.migrateProject}
+              handleMountRefactorConfig={projectLifecycle.mountRefactorConfig}
+              handleCreateRefactorConfig={projectLifecycle.createRefactorConfig}
+              refreshProjectGit={projectGit.refresh}
+              handleCommitProjectVersion={projectGit.commitVersion}
+              handlePreviewProjectVersion={projectGit.previewVersion}
+            />
+          ) : null}
 
+          {activeModule.key === 'setting-data' ? (
+            <SettingDataPage
+              loadedProject={loadedProject}
+              isActive={activeModule.key === 'setting-data'}
+              sidebarCollapsed={sidebarCollapsed}
+              setSidebarCollapsed={setSidebarCollapsed}
+              updateProjectDocument={updateProjectDocument}
+              isModifiedPath={isModifiedPath}
+              restoreModifiedPath={restoreModifiedPath}
+            />
+          ) : null}
 
-        {activeModule.key === 'setting-data' ? (
-          <SettingDataPage
-            loadedProject={loadedProject}
-            isActive={activeModule.key === 'setting-data'}
-            sidebarCollapsed={sidebarCollapsed}
-            setSidebarCollapsed={setSidebarCollapsed}
-            updateProjectDocument={updateProjectDocument}
-            isModifiedPath={isModifiedPath}
-            restoreModifiedPath={restoreModifiedPath}
-          />
-        ) : null}
+          {activeModule.key === 'realtime-data' ? (
+            <RealtimeDataPage
+              controller={pdoEditor}
+              sidebarCollapsed={sidebarCollapsed}
+              setSidebarCollapsed={setSidebarCollapsed}
+              isModifiedPath={isModifiedPath}
+              restoreModifiedPath={restoreModifiedPath}
+            />
+          ) : null}
 
-        {activeModule.key === 'realtime-data' ? (
-          <RealtimeDataPage
-            controller={pdoEditor}
-            sidebarCollapsed={sidebarCollapsed}
-            setSidebarCollapsed={setSidebarCollapsed}
-            isModifiedPath={isModifiedPath}
-            restoreModifiedPath={restoreModifiedPath}
-          />
-        ) : null}
+          <TableConfigStatusPanel controller={tableConfig} />
 
+          {activeModule.key === 'battery-protocol' ? (
+            <BatteryProtocolPage
+              loadedProject={loadedProject}
+              controller={batteryLegacyController}
+            />
+          ) : null}
 
-        <TableConfigStatusPanel controller={tableConfig} />
-
-        {activeModule.key === 'battery-protocol' ? (
-          <BatteryProtocolPage loadedProject={loadedProject} controller={batteryLegacyController} />
-        ) : null}
-
-        {activeModule.key === 'battery-monitor' ? (
-          <BatteryMonitorPage loadedProject={loadedProject} controller={batteryLegacyController} />
-        ) : null}
-        {activeModule.key === 'fault-code' ? (
-          <FaultCodePage loadedProject={loadedProject} onUpdateSections={updateProjectSections} />
-        ) : null}
-        {activeModule.key === 'can-test-data' ? (
-          <CanTestDataPage loadedProject={loadedProject} canTestData={canTestData} />
-        ) : null}
-        {activeModule.key === 'language' ? (
-          <LanguagePage
-            document={
-              currentLanguageDocument ?? {
-                list_code_language: [],
-                list_inner: [],
-                list_translate: {},
+          {activeModule.key === 'battery-monitor' ? (
+            <BatteryMonitorPage
+              loadedProject={loadedProject}
+              controller={batteryLegacyController}
+            />
+          ) : null}
+          {activeModule.key === 'fault-code' ? (
+            <FaultCodePage loadedProject={loadedProject} onUpdateSections={updateProjectSections} />
+          ) : null}
+          {activeModule.key === 'can-test-data' ? (
+            <CanTestDataPage loadedProject={loadedProject} canTestData={canTestData} />
+          ) : null}
+          {activeModule.key === 'language' ? (
+            <LanguagePage
+              document={
+                currentLanguageDocument ?? {
+                  list_code_language: [],
+                  list_inner: [],
+                  list_translate: {},
+                }
               }
-            }
-            baseline={baselineLanguageDocument()}
-            loaded={!!loadedProject}
-            onUpdate={updateLanguageDocument}
-          />
-        ) : null}
+              baseline={baselineLanguageDocument()}
+              loaded={!!loadedProject}
+              onUpdate={updateLanguageDocument}
+            />
+          ) : null}
 
-        {activeModule.key === 'realtime-data' && pdoEditor.mode === 'advanced' ? (
-          <section className="table-spec-card">
-            <div>
-              <h2>PDO 高级配置校验</h2>
-              <p>
-                解析当前项目中的全局变量、条件表、PDO 接收帧和发送帧，展示结构统计与引用校验错误。
-              </p>
-            </div>
-            <button
-              className="path-open-button"
-              disabled={!loadedProject || isParsingPdoAdvanced}
-              onClick={() => void handleParsePdoAdvanced()}
-              type="button"
-            >
-              {isParsingPdoAdvanced ? '解析中...' : '解析当前高级 PDO 配置'}
-            </button>
-            {pdoAdvancedReport ? (
-              <div className="project-open-report">
-                <article>
-                  <span>全局变量</span>
-                  <strong>{pdoAdvancedReport.document?.pdo_global_param.length ?? 0}</strong>
-                </article>
-                <article>
-                  <span>条件表</span>
-                  <strong>{pdoAdvancedReport.document?.pdo_condition.length ?? 0}</strong>
-                </article>
-                <article>
-                  <span>接收帧</span>
-                  <strong>{pdoAdvancedReport.document?.pdo_recv.length ?? 0}</strong>
-                </article>
-                <article>
-                  <span>发送帧</span>
-                  <strong>{pdoAdvancedReport.document?.pdo_send.length ?? 0}</strong>
-                </article>
+          {activeModule.key === 'realtime-data' && pdoEditor.mode === 'advanced' ? (
+            <section className="table-spec-card">
+              <div>
+                <h2>PDO 高级配置校验</h2>
+                <p>
+                  解析当前项目中的全局变量、条件表、PDO 接收帧和发送帧，展示结构统计与引用校验错误。
+                </p>
               </div>
-            ) : null}
-            {pdoAdvancedError ? <p className="project-open-error">{pdoAdvancedError}</p> : null}
-          </section>
-        ) : null}
+              <button
+                className="path-open-button"
+                disabled={!loadedProject || isParsingPdoAdvanced}
+                onClick={() => void handleParsePdoAdvanced()}
+                type="button"
+              >
+                {isParsingPdoAdvanced ? '解析中...' : '解析当前高级 PDO 配置'}
+              </button>
+              {pdoAdvancedReport ? (
+                <div className="project-open-report">
+                  <article>
+                    <span>全局变量</span>
+                    <strong>{pdoAdvancedReport.document?.pdo_global_param.length ?? 0}</strong>
+                  </article>
+                  <article>
+                    <span>条件表</span>
+                    <strong>{pdoAdvancedReport.document?.pdo_condition.length ?? 0}</strong>
+                  </article>
+                  <article>
+                    <span>接收帧</span>
+                    <strong>{pdoAdvancedReport.document?.pdo_recv.length ?? 0}</strong>
+                  </article>
+                  <article>
+                    <span>发送帧</span>
+                    <strong>{pdoAdvancedReport.document?.pdo_send.length ?? 0}</strong>
+                  </article>
+                </div>
+              ) : null}
+              {pdoAdvancedError ? <p className="project-open-error">{pdoAdvancedError}</p> : null}
+            </section>
+          ) : null}
 
-        {activeModule.key === 'signal-dictionary' ? (
-          <SignalDictionaryPage
-            controller={protocolEditor}
-            isModifiedPath={isModifiedPath}
-          />
-        ) : null}
+          {activeModule.key === 'signal-dictionary' ? (
+            <SignalDictionaryPage controller={protocolEditor} isModifiedPath={isModifiedPath} />
+          ) : null}
 
+          {activeModule.key === 'private-protocol' ? (
+            <PrivateProtocolPage controller={protocolEditor} isModifiedPath={isModifiedPath} />
+          ) : null}
 
-        {activeModule.key === 'private-protocol' ? (
-          <PrivateProtocolPage
-            controller={protocolEditor}
-            isModifiedPath={isModifiedPath}
-          />
-        ) : null}
+          {activeModule.key === 'protocol-mapping' ? (
+            <ProtocolMappingPage controller={protocolEditor} isModifiedPath={isModifiedPath} />
+          ) : null}
 
+          {activeModule.key === 'canopen-export' ? (
+            <CanopenExportPage loadedProject={loadedProject} />
+          ) : null}
 
-        {activeModule.key === 'protocol-mapping' ? (
-          <ProtocolMappingPage
-            controller={protocolEditor}
-            isModifiedPath={isModifiedPath}
-          />
-        ) : null}
+          {activeModule.key === 'project' || activeModule.key === 'export' ? (
+            <TableFormatReference specs={tableConfig.specs} />
+          ) : null}
 
+          {activeModule.key === 'ui' ? (
+            <UiResourcePage
+              controller={uiResource}
+              loadedProject={loadedProject}
+              onJumpToPdo={handleJumpToPdo}
+            />
+          ) : null}
+          {activeModule.key === 'settings' ? (
+            <SettingsPage
+              exportOptions={exportBatteryOptions}
+              onUpdateExportOption={updateExportBatteryOption}
+              onResetExportOptions={resetExportBatteryOptions}
+              translationSettings={translationSettings}
+              onUpdateTranslationSetting={updateTranslationSetting}
+              onResetTranslationSettings={resetTranslationSettings}
+              theme={theme}
+              onToggleTheme={onToggleTheme}
+            />
+          ) : null}
 
-        {activeModule.key === 'canopen-export' ? (
-          <CanopenExportPage loadedProject={loadedProject} />
-        ) : null}
-
-        {activeModule.key === 'project' || activeModule.key === 'export' ? (
-          <TableFormatReference specs={tableConfig.specs} />
-        ) : null}
-
-        {activeModule.key === 'ui' ? (
-          <UiResourcePage
-            controller={uiResource}
-            loadedProject={loadedProject}
-            onJumpToPdo={handleJumpToPdo}
-          />
-        ) : null}
-        {activeModule.key === 'settings' ? (
-          <SettingsPage
-            exportOptions={exportBatteryOptions}
-            onUpdateExportOption={updateExportBatteryOption}
-            onResetExportOptions={resetExportBatteryOptions}
-            translationSettings={translationSettings}
-            onUpdateTranslationSetting={updateTranslationSetting}
-            onResetTranslationSettings={resetTranslationSettings}
-            theme={theme}
-            onToggleTheme={onToggleTheme}
-          />
-        ) : null}
-
-
-        {activeModule.key === 'export' ? (
-          <ProjectExportPage controller={projectExport} />
-        ) : null}
-
+          {activeModule.key === 'export' ? <ProjectExportPage controller={projectExport} /> : null}
+        </Suspense>
       </div>
     </main>
   );

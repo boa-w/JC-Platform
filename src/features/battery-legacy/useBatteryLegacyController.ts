@@ -25,7 +25,7 @@ import {
   itemsToCsv,
   signalsToCsv,
 } from '../../utils/batteryCsv';
-import { formatFrameId, parseFrameId } from '../realtime-data';
+import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
 
 interface UseBatteryLegacyControllerOptions {
   document: unknown | null;
