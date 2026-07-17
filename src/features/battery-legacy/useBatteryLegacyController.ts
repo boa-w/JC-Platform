@@ -26,6 +26,7 @@ import {
   signalsToCsv,
 } from '../../utils/batteryCsv';
 import type { JsonPath } from '../../utils/projectDirty';
+import { runSystemDialog } from '../../utils/systemDialog';
 import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
 
 interface UseBatteryLegacyControllerOptions {
@@ -366,9 +367,10 @@ export function useBatteryLegacyController({
       return;
     }
 
-    const selected = await save({
-      filters: [{ name: '锂电监控配置', extensions: ['json'] }],
-    });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '锂电监控配置', extensions: ['json'] }] }),
+      setBatteryMonitorExportStatus,
+    );
     if (!selected) return;
 
     setIsExportingBatteryMonitor(true);
@@ -393,9 +395,10 @@ export function useBatteryLegacyController({
       return;
     }
 
-    const selected = await save({
-      filters: [{ name: '锂电协议', extensions: ['json'] }],
-    });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '锂电协议', extensions: ['json'] }] }),
+      setBatteryProtocolExportStatus,
+    );
     if (!selected) return;
 
     setIsExportingBatteryProtocol(true);
@@ -421,10 +424,16 @@ export function useBatteryLegacyController({
     }
 
     const operation = documentGuard.begin();
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '锂电协议', extensions: ['json'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '锂电协议', extensions: ['json'] }],
+        }),
+      (message) => {
+        if (documentGuard.isCurrent(operation)) setBatteryProtocolImportStatus(message);
+      },
+    );
     if (typeof selected !== 'string') return;
     if (!documentGuard.isCurrent(operation)) return;
 
@@ -461,10 +470,16 @@ export function useBatteryLegacyController({
     }
 
     const operation = documentGuard.begin();
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '锂电监控配置', extensions: ['json'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '锂电监控配置', extensions: ['json'] }],
+        }),
+      (message) => {
+        if (documentGuard.isCurrent(operation)) setBatteryMonitorImportStatus(message);
+      },
+    );
     if (typeof selected !== 'string') return;
     if (!documentGuard.isCurrent(operation)) return;
 
@@ -498,9 +513,10 @@ export function useBatteryLegacyController({
       return;
     }
 
-    const selected = await save({
-      filters: [{ name: '帧 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '帧 CSV', extensions: ['csv'] }] }),
+      setBatteryCsvStatus,
+    );
     if (!selected) return;
 
     setIsExportingBatteryCsv(true);
@@ -527,10 +543,12 @@ export function useBatteryLegacyController({
     }
 
     const operation = documentGuard.begin();
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '帧 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () => open({ multiple: false, filters: [{ name: '帧 CSV', extensions: ['csv'] }] }),
+      (message) => {
+        if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
+      },
+    );
     if (typeof selected !== 'string') return;
     if (!documentGuard.isCurrent(operation)) return;
 
@@ -567,9 +585,10 @@ export function useBatteryLegacyController({
       return;
     }
 
-    const selected = await save({
-      filters: [{ name: '信号 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '信号 CSV', extensions: ['csv'] }] }),
+      setBatteryCsvStatus,
+    );
     if (!selected) return;
 
     setIsExportingBatteryCsv(true);
@@ -596,10 +615,12 @@ export function useBatteryLegacyController({
     }
 
     const operation = documentGuard.begin();
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '信号 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () => open({ multiple: false, filters: [{ name: '信号 CSV', extensions: ['csv'] }] }),
+      (message) => {
+        if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
+      },
+    );
     if (typeof selected !== 'string') return;
     if (!documentGuard.isCurrent(operation)) return;
 
@@ -636,9 +657,10 @@ export function useBatteryLegacyController({
       return;
     }
 
-    const selected = await save({
-      filters: [{ name: '显示项 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '显示项 CSV', extensions: ['csv'] }] }),
+      setBatteryCsvStatus,
+    );
     if (!selected) return;
 
     setIsExportingBatteryCsv(true);
@@ -665,10 +687,12 @@ export function useBatteryLegacyController({
     }
 
     const operation = documentGuard.begin();
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '显示项 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () => open({ multiple: false, filters: [{ name: '显示项 CSV', extensions: ['csv'] }] }),
+      (message) => {
+        if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
+      },
+    );
     if (typeof selected !== 'string') return;
     if (!documentGuard.isCurrent(operation)) return;
 
@@ -706,10 +730,12 @@ export function useBatteryLegacyController({
     }
 
     const operation = documentGuard.begin();
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: 'DBC 文件', extensions: ['dbc'] }],
-    });
+    const selected = await runSystemDialog(
+      () => open({ multiple: false, filters: [{ name: 'DBC 文件', extensions: ['dbc'] }] }),
+      (message) => {
+        if (documentGuard.isCurrent(operation)) setBatteryDbcStatus(message);
+      },
+    );
     if (typeof selected !== 'string') return;
     if (!documentGuard.isCurrent(operation)) return;
 
@@ -766,9 +792,10 @@ export function useBatteryLegacyController({
       return;
     }
 
-    const selected = await save({
-      filters: [{ name: 'DBC 文件', extensions: ['dbc'] }],
-    });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: 'DBC 文件', extensions: ['dbc'] }] }),
+      setBatteryDbcStatus,
+    );
     if (!selected) return;
 
     setIsExportingBatteryDbc(true);

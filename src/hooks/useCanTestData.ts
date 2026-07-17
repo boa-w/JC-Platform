@@ -1,4 +1,4 @@
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useRef, useState } from 'react';
 import { generateCanTestData, loadJsonFile, saveJsonFile, saveTextFile } from '../api/commands';
 import type {
@@ -10,6 +10,9 @@ import type {
   CanTestSignalValue,
   LoadedProject,
 } from '../types/platform';
+import { runSystemDialog } from '../utils/systemDialog';
+
+const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export function useCanTestData(sourceDocument: unknown | null) {
   const [canTestFrames, setCanTestFrames] = useState<CanTestFrame[]>([]);
@@ -239,9 +242,14 @@ export function useCanTestData(sourceDocument: unknown | null) {
       setCanTestStatus('请先生成测试数据。');
       return;
     }
-    const selected = await open({
-      filters: [{ name: '文本文件', extensions: ['txt'] }],
-    });
+    if (!isTauriRuntime()) {
+      setCanTestStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '文本文件', extensions: ['txt'] }] }),
+      setCanTestStatus,
+    );
     if (typeof selected !== 'string') return;
 
     const lines: string[] = ['CAN_ID,TYPE,NAME,DLC,CYCLE_MS,DATA_HEX'];
@@ -262,9 +270,14 @@ export function useCanTestData(sourceDocument: unknown | null) {
       setCanTestStatus('请先生成测试数据。');
       return;
     }
-    const selected = await open({
-      filters: [{ name: 'CSV 文件', extensions: ['csv'] }],
-    });
+    if (!isTauriRuntime()) {
+      setCanTestStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: 'CSV 文件', extensions: ['csv'] }] }),
+      setCanTestStatus,
+    );
     if (typeof selected !== 'string') return;
 
     const lines = [
@@ -289,9 +302,14 @@ export function useCanTestData(sourceDocument: unknown | null) {
       setCanTestStatus('请先生成测试数据。');
       return;
     }
-    const selected = await open({
-      filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }],
-    });
+    if (!isTauriRuntime()) {
+      setCanTestStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }] }),
+      setCanTestStatus,
+    );
     if (typeof selected !== 'string') return;
 
     try {
@@ -312,10 +330,18 @@ export function useCanTestData(sourceDocument: unknown | null) {
   }
 
   async function importConfig() {
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }],
-    });
+    if (!isTauriRuntime()) {
+      setCanTestStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }],
+        }),
+      setCanTestStatus,
+    );
     if (typeof selected !== 'string') return;
 
     try {

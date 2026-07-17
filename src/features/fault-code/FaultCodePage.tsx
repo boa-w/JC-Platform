@@ -16,6 +16,7 @@ import {
   faultCodesToCsv,
   faultSourcesToCsv,
 } from '../../utils/faultCodeCsv';
+import { runSystemDialog } from '../../utils/systemDialog';
 import {
   buildDuplicateFaultCodeHints,
   buildDuplicateMessageKeyHints,
@@ -593,9 +594,10 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       setCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
       return;
     }
-    const selected = await save({
-      filters: [{ name: '故障来源 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '故障来源 CSV', extensions: ['csv'] }] }),
+      setCsvStatus,
+    );
     if (!selected) return;
 
     setIsCsvBusy(true);
@@ -615,10 +617,14 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       setCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
       return;
     }
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '故障来源 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '故障来源 CSV', extensions: ['csv'] }],
+        }),
+      setCsvStatus,
+    );
     if (typeof selected !== 'string') return;
 
     setIsCsvBusy(true);
@@ -644,9 +650,10 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       setCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
       return;
     }
-    const selected = await save({
-      filters: [{ name: '故障码 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '故障码 CSV', extensions: ['csv'] }] }),
+      setCsvStatus,
+    );
     if (!selected) return;
 
     setIsCsvBusy(true);
@@ -666,10 +673,14 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       setCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
       return;
     }
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '故障码 CSV', extensions: ['csv'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '故障码 CSV', extensions: ['csv'] }],
+        }),
+      setCsvStatus,
+    );
     if (typeof selected !== 'string') return;
 
     setIsCsvBusy(true);
