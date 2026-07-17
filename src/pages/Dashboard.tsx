@@ -1,6 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { parsePdoAdvancedProject, validateProjectDocument } from '../api/commands';
+import { validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
@@ -13,6 +13,8 @@ import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
 import { useProjectLifecycleController } from '../features/project-lifecycle';
 import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
+import { PdoAdvancedReportPanel } from '../features/realtime-data/PdoAdvancedReportPanel';
+import { usePdoAdvancedReport } from '../features/realtime-data/usePdoAdvancedReport';
 import { usePdoEditor } from '../features/realtime-data/usePdoEditor';
 import {
   TableConfigStatusPanel,
@@ -39,7 +41,6 @@ import type {
   LanguageDocument,
   LoadedProject,
   NavigationKey,
-  PdoAdvancedParseReport,
   ProjectSummary,
 } from '../types/platform';
 
@@ -156,9 +157,6 @@ export function Dashboard({
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [configEditorText, setConfigEditorText] = useState('');
   const [configEditorError, setConfigEditorError] = useState<string | null>(null);
-  const [pdoAdvancedReport, setPdoAdvancedReport] = useState<PdoAdvancedParseReport | null>(null);
-  const [pdoAdvancedError, setPdoAdvancedError] = useState<string | null>(null);
-  const [isParsingPdoAdvanced, setIsParsingPdoAdvanced] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
@@ -204,6 +202,7 @@ export function Dashboard({
     updateProjectDocument,
     updateProjectSections,
   });
+  const pdoAdvancedReport = usePdoAdvancedReport(loadedProject?.document ?? null);
   const protocolEditor = useProtocolEditor({
     activeModuleKey: activeModule.key,
     document: loadedProject?.document ?? null,
@@ -382,30 +381,6 @@ export function Dashboard({
 
   function updateLanguageDocument(next: LanguageDocument) {
     updateProjectDocument('language_info', next);
-  }
-
-  async function handleParsePdoAdvanced() {
-    setPdoAdvancedError(null);
-    setPdoAdvancedReport(null);
-
-    if (!loadedProject) {
-      setPdoAdvancedError('请先打开 .jcpro 项目。');
-      return;
-    }
-
-    setIsParsingPdoAdvanced(true);
-
-    try {
-      const report = await parsePdoAdvancedProject(loadedProject.document);
-      setPdoAdvancedReport(report);
-      if (!report.valid) {
-        setPdoAdvancedError(report.errors.join('；') || '高级 PDO 配置存在问题');
-      }
-    } catch (error) {
-      setPdoAdvancedError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsParsingPdoAdvanced(false);
-    }
   }
 
   function handleJumpToPdo(pdoParamIndex: number) {
@@ -627,43 +602,7 @@ export function Dashboard({
           ) : null}
 
           {activeModule.key === 'realtime-data' && pdoEditor.mode === 'advanced' ? (
-            <section className="table-spec-card">
-              <div>
-                <h2>PDO 高级配置校验</h2>
-                <p>
-                  解析当前项目中的全局变量、条件表、PDO 接收帧和发送帧，展示结构统计与引用校验错误。
-                </p>
-              </div>
-              <button
-                className="path-open-button"
-                disabled={!loadedProject || isParsingPdoAdvanced}
-                onClick={() => void handleParsePdoAdvanced()}
-                type="button"
-              >
-                {isParsingPdoAdvanced ? '解析中...' : '解析当前高级 PDO 配置'}
-              </button>
-              {pdoAdvancedReport ? (
-                <div className="project-open-report">
-                  <article>
-                    <span>全局变量</span>
-                    <strong>{pdoAdvancedReport.document?.pdo_global_param.length ?? 0}</strong>
-                  </article>
-                  <article>
-                    <span>条件表</span>
-                    <strong>{pdoAdvancedReport.document?.pdo_condition.length ?? 0}</strong>
-                  </article>
-                  <article>
-                    <span>接收帧</span>
-                    <strong>{pdoAdvancedReport.document?.pdo_recv.length ?? 0}</strong>
-                  </article>
-                  <article>
-                    <span>发送帧</span>
-                    <strong>{pdoAdvancedReport.document?.pdo_send.length ?? 0}</strong>
-                  </article>
-                </div>
-              ) : null}
-              {pdoAdvancedError ? <p className="project-open-error">{pdoAdvancedError}</p> : null}
-            </section>
+            <PdoAdvancedReportPanel controller={pdoAdvancedReport} />
           ) : null}
 
           {activeModule.key === 'signal-dictionary' ? (
