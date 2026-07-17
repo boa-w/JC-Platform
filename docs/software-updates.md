@@ -76,6 +76,25 @@ PR 构建只验证应用构建。正式 Release 叠加
 `main` 分支 push 叠加 `src-tauri/tauri.nightly.conf.json`，切换为 nightly endpoint
 并生成签名文件和 `latest.json`。
 
+## 正式发布前检查
+
+本地可运行以下命令查看 stable 发布仍缺少的条件：
+
+```bash
+npm run release:check -- --channel stable --target x86_64-pc-windows-msvc
+npm run release:check -- --channel stable --target aarch64-apple-darwin
+```
+
+检查内容包括版本与 Release tag 一致、stable updater 地址、updater 签名私钥、
+Windows Authenticode 配置，以及 macOS Developer ID 签名和 notarization 凭据。
+GitHub Release 构建会自动运行同一检查，任一条件缺失都会在安装包构建前失败，
+不会继续上传未签名的正式版。
+
+Windows 需要在 Tauri 配置中设置 `bundle.windows.certificateThumbprint` 或
+`bundle.windows.signCommand`。macOS CI 需要配置 `APPLE_CERTIFICATE`、
+`APPLE_CERTIFICATE_PASSWORD`、`APPLE_SIGNING_IDENTITY`，并提供 Apple ID 或
+App Store Connect API key 形式的 notarization 凭据。
+
 ## Nightly 发布
 
 每次 `main` 分支有新提交时，GitHub Actions 会自动：

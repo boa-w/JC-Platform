@@ -18,6 +18,7 @@
     "cli:build": "cargo build --manifest-path src-tauri/Cargo.toml --bin jc-cli --release",
     "version:check": "node scripts/check-version.mjs",
     "version:sync": "node scripts/sync-version.mjs",
+    "release:check": "node scripts/check-release.mjs",
     "format": "biome format --write .",
     "lint": "biome lint . --max-diagnostics=500",
     "lint:fix": "biome check --write .",

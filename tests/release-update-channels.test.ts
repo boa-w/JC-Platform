@@ -40,4 +40,9 @@ test('selects the matching updater config in the release workflow', () => {
     workflow,
     /github\.event_name == 'release' && '--config src-tauri\/tauri\.updater\.conf\.json'/,
   );
+  assert.match(
+    workflow,
+    /npm run release:check -- --channel stable --target \$\{\{ matrix\.target \}\}/,
+  );
+  assert.match(workflow, /APPLE_CERTIFICATE: \$\{\{ secrets\.APPLE_CERTIFICATE \}\}/);
 });
