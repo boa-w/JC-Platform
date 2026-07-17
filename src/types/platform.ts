@@ -68,6 +68,8 @@ export interface GitProjectStatus {
   head_subject?: string;
   managed_paths: string[];
   changed_paths: string[];
+  additions: number;
+  deletions: number;
   has_staged_changes: boolean;
   warning?: string;
 }

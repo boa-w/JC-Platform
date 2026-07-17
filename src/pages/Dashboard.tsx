@@ -1,4 +1,17 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
+import {
+  ArrowUpRight,
+  ChevronDown,
+  ChevronRight,
+  CloudOff,
+  FileDiff,
+  FolderGit2,
+  GitBranch,
+  GitCommitHorizontal,
+  History,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   addUiResourceOptionDocument,
@@ -288,6 +301,10 @@ export function Dashboard({
   const [gitError, setGitError] = useState<string | null>(null);
   const [gitBusy, setGitBusy] = useState(false);
   const [gitPreview, setGitPreview] = useState<GitRevisionSnapshot | null>(null);
+  const [showGitSummary, setShowGitSummary] = useState(false);
+  const gitSummaryRef = useRef<HTMLDivElement | null>(null);
+  const gitSummaryTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const projectGitSectionRef = useRef<HTMLDivElement | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [jsonPopupSize, setJsonPopupSize] = useState({ w: 520, h: 420 });
@@ -396,6 +413,34 @@ export function Dashboard({
   useEffect(() => {
     void refreshProjectGit();
   }, [loadedProject?.summary.path, refactorConfigPath]);
+
+  useEffect(() => {
+    if (!showGitSummary) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        !gitSummaryRef.current?.contains(target) &&
+        !gitSummaryTriggerRef.current?.contains(target)
+      ) {
+        setShowGitSummary(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setShowGitSummary(false);
+        gitSummaryTriggerRef.current?.focus();
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showGitSummary]);
 
   useEffect(() => {
     if (
@@ -791,6 +836,14 @@ export function Dashboard({
   const selectedRecentProjectPath = recentProjects.some((item) => item.path === projectPath)
     ? projectPath
     : '';
+  const gitRepositoryName =
+    gitStatus?.repo_root?.split(/[\\/]/).filter(Boolean).pop() ?? '本地仓库';
+  const gitSummaryCommitDisabled =
+    !gitStatus?.available ||
+    gitBusy ||
+    hasUnsavedChanges ||
+    gitStatus.has_staged_changes ||
+    gitStatus.changed_paths.length === 0;
 
   function updateProjectDocument(section: string, value: unknown) {
     if (!loadedProject) return;
@@ -962,6 +1015,24 @@ export function Dashboard({
     void parseUiPreview(document, loadedProject.summary.path).then(setUiPreview);
     setGitPreview(null);
     setSaveStatus(`已载入 Git 版本 ${gitPreview.revision.short_hash}，保存后将形成新的修改。`);
+  }
+
+  async function handleOpenGitRepository() {
+    if (!gitStatus?.repo_root) return;
+    try {
+      await revealItemInDir(gitStatus.repo_root);
+    } catch (error) {
+      setGitError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function showProjectGitHistory() {
+    setShowGitSummary(false);
+    onNavigate('project');
+    window.setTimeout(
+      () => projectGitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      0,
+    );
   }
 
   function signalDictionaryDocument(): SignalDictionary {
@@ -3800,6 +3871,27 @@ export function Dashboard({
           ) : null}
         </div>
         <div className="action-bar-right">
+          <button
+            aria-controls="git-summary-panel"
+            aria-expanded={showGitSummary}
+            className={
+              showGitSummary
+                ? 'action-bar-git-trigger action-bar-git-trigger--active'
+                : 'action-bar-git-trigger'
+            }
+            onClick={() => setShowGitSummary((visible) => !visible)}
+            ref={gitSummaryTriggerRef}
+            title="切换 Git 版本摘要"
+            type="button"
+          >
+            <GitBranch aria-hidden="true" size={14} strokeWidth={1.8} />
+            <span>{gitStatus?.branch ?? 'Git'}</span>
+            {gitStatus?.changed_paths.length ? (
+              <span className="action-bar-git-badge">{gitStatus.changed_paths.length}</span>
+            ) : null}
+            <ChevronDown aria-hidden="true" size={13} strokeWidth={1.8} />
+          </button>
+          <span className="action-bar-sep" />
           <div className="action-bar-group">
             <button
               className="action-bar-btn action-bar-btn--ghost"
@@ -3948,6 +4040,122 @@ export function Dashboard({
           {saveStatus ? <span className="action-bar-status">{saveStatus}</span> : null}
         </div>
       </div>
+
+      {showGitSummary ? (
+        <div
+          aria-label="Git 版本摘要"
+          className="git-summary-popover"
+          id="git-summary-panel"
+          ref={gitSummaryRef}
+          role="dialog"
+        >
+          <div className="git-summary-header">
+            <span>版本摘要</span>
+            <div className="git-summary-header-actions">
+              <button
+                aria-label="刷新 Git 状态"
+                disabled={gitBusy || !loadedProject}
+                onClick={() => void refreshProjectGit()}
+                title="刷新 Git 状态"
+                type="button"
+              >
+                <RefreshCw aria-hidden="true" size={15} strokeWidth={1.8} />
+              </button>
+              <button
+                aria-label="关闭 Git 版本摘要"
+                onClick={() => setShowGitSummary(false)}
+                title="关闭"
+                type="button"
+              >
+                <X aria-hidden="true" size={16} strokeWidth={1.8} />
+              </button>
+            </div>
+          </div>
+
+          {!loadedProject ? (
+            <div className="git-summary-empty">
+              <FolderGit2 aria-hidden="true" size={18} strokeWidth={1.6} />
+              <span>未打开项目</span>
+            </div>
+          ) : gitStatus?.available ? (
+            <div className="git-summary-body">
+              <button className="git-summary-row" onClick={showProjectGitHistory} type="button">
+                <FileDiff aria-hidden="true" size={17} strokeWidth={1.7} />
+                <span className="git-summary-row-label">变更</span>
+                <span className="git-summary-change-count">
+                  <strong>+{gitStatus.additions}</strong>
+                  <em>-{gitStatus.deletions}</em>
+                </span>
+              </button>
+
+              <button
+                className="git-summary-row"
+                onClick={() => void handleOpenGitRepository()}
+                title={gitStatus.repo_root ?? undefined}
+                type="button"
+              >
+                <FolderGit2 aria-hidden="true" size={17} strokeWidth={1.7} />
+                <span className="git-summary-row-label">本地</span>
+                <span className="git-summary-row-value">{gitRepositoryName}</span>
+                <ChevronRight aria-hidden="true" size={15} strokeWidth={1.7} />
+              </button>
+
+              <button className="git-summary-row" onClick={showProjectGitHistory} type="button">
+                <GitBranch aria-hidden="true" size={17} strokeWidth={1.7} />
+                <span className="git-summary-row-label">{gitStatus.branch}</span>
+                <span className="git-summary-row-value git-summary-hash">
+                  {gitStatus.head_short_hash ?? '尚无提交'}
+                </span>
+                <ChevronRight aria-hidden="true" size={15} strokeWidth={1.7} />
+              </button>
+
+              <div className="git-summary-divider" />
+
+              <button
+                className="git-summary-row"
+                disabled={gitSummaryCommitDisabled}
+                onClick={() => void handleCommitProjectVersion()}
+                title={
+                  hasUnsavedChanges
+                    ? '请先保存项目配置'
+                    : gitStatus.has_staged_changes
+                      ? '暂存区已有其他内容'
+                      : gitStatus.changed_paths.length === 0
+                        ? '没有可提交的配置修改'
+                        : '提交当前项目配置版本'
+                }
+                type="button"
+              >
+                <GitCommitHorizontal aria-hidden="true" size={17} strokeWidth={1.7} />
+                <span className="git-summary-row-label">
+                  {gitBusy ? '提交中...' : '提交项目版本'}
+                </span>
+              </button>
+
+              <div className="git-summary-row git-summary-row--muted">
+                <CloudOff aria-hidden="true" size={17} strokeWidth={1.7} />
+                <span className="git-summary-row-label">远程同步未接入</span>
+              </div>
+
+              <button className="git-summary-row" onClick={showProjectGitHistory} type="button">
+                <History aria-hidden="true" size={17} strokeWidth={1.7} />
+                <span className="git-summary-row-label">版本历史</span>
+                <span className="git-summary-row-value">{gitRevisions.length} 条</span>
+                <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.7} />
+              </button>
+
+              {gitStatus.warning || gitError ? (
+                <p className="git-summary-warning">{gitError ?? gitStatus.warning}</p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="git-summary-empty git-summary-empty--stacked">
+              <FolderGit2 aria-hidden="true" size={18} strokeWidth={1.6} />
+              <span>{gitError ?? gitStatus?.warning ?? '正在读取 Git 状态'}</span>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {gitPreview ? (
         <div className="modal-overlay">
@@ -4374,7 +4582,7 @@ export function Dashboard({
             ) : null}
 
             {loadedProject ? (
-              <div className="project-section project-git-section">
+              <div className="project-section project-git-section" ref={projectGitSectionRef}>
                 <div className="project-section-header">
                   <strong>Git 版本管理</strong>
                   <button

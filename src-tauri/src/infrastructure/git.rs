@@ -21,6 +21,8 @@ pub struct GitProjectStatus {
     pub head_subject: Option<String>,
     pub managed_paths: Vec<String>,
     pub changed_paths: Vec<String>,
+    pub additions: usize,
+    pub deletions: usize,
     pub has_staged_changes: bool,
     pub warning: Option<String>,
 }
@@ -36,6 +38,8 @@ impl GitProjectStatus {
             head_subject: None,
             managed_paths: Vec::new(),
             changed_paths: Vec::new(),
+            additions: 0,
+            deletions: 0,
             has_staged_changes: false,
             warning: Some(message.into()),
         }
@@ -102,6 +106,7 @@ pub fn inspect_project(request: &GitProjectRequest) -> GitProjectStatus {
         .filter(|path| path_has_changes(&context.root, path))
         .cloned()
         .collect();
+    let (additions, deletions) = change_stats(&context.root, &context.managed_paths);
 
     GitProjectStatus {
         available: true,
@@ -112,6 +117,8 @@ pub fn inspect_project(request: &GitProjectRequest) -> GitProjectStatus {
         head_subject,
         managed_paths: context.managed_paths,
         changed_paths,
+        additions,
+        deletions,
         has_staged_changes: has_staged_changes(&context.root).unwrap_or(false),
         warning: context.warning,
     }
@@ -342,6 +349,47 @@ fn path_has_history(root: &Path, path: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn change_stats(root: &Path, paths: &[String]) -> (usize, usize) {
+    let has_head = git_text(root, &["rev-parse", "--verify", "HEAD"]).is_ok();
+    let mut additions = 0;
+    let mut deletions = 0;
+
+    if has_head {
+        let mut args = vec![
+            "diff".to_string(),
+            "--numstat".to_string(),
+            "HEAD".to_string(),
+        ];
+        args.push("--".to_string());
+        args.extend(paths.iter().cloned());
+        if let Ok(output) = git_text_owned(root, &args) {
+            for line in output.lines() {
+                let mut fields = line.split('\t');
+                additions += fields
+                    .next()
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(0);
+                deletions += fields
+                    .next()
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(0);
+            }
+        }
+    }
+
+    for path in paths {
+        let is_tracked = git_success(root, &["ls-files", "--error-unmatch", "--", path]).is_ok();
+        if !is_tracked {
+            let file = root.join(path);
+            if let Ok(content) = std::fs::read_to_string(file) {
+                additions += content.lines().count();
+            }
+        }
+    }
+
+    (additions, deletions)
+}
+
 fn has_staged_changes(root: &Path) -> Result<bool, String> {
     let output = git_output(root, &["diff", "--cached", "--quiet"])?;
     match output.status.code() {
@@ -441,6 +489,12 @@ mod tests {
             sidecar_path: Some(sidecar.to_string_lossy().to_string()),
             message: "project version".to_string(),
         };
+        let status = inspect_project(&GitProjectRequest {
+            project_path: request.project_path.clone(),
+            sidecar_path: request.sidecar_path.clone(),
+        });
+        assert_eq!(status.additions, 2);
+        assert_eq!(status.deletions, 1);
         let report = commit_project(&request).unwrap();
         assert_eq!(
             report.committed_paths,
