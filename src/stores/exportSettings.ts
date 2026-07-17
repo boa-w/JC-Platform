@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ExportBatteryOptions } from '../types/platform';
+import { getStorageItem, setStorageItem } from '../utils/safeStorage';
 
 const STORAGE_KEY = 'jc-platform.export.battery-options';
 
@@ -56,7 +57,7 @@ function normalizeExportBatteryOptions(value: unknown): ExportBatteryOptions {
 
 function getInitialExportBatteryOptions(): ExportBatteryOptions {
   if (typeof window === 'undefined') return defaultExportBatteryOptions;
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = getStorageItem(STORAGE_KEY);
   if (!stored) return defaultExportBatteryOptions;
   try {
     return normalizeExportBatteryOptions(JSON.parse(stored));
@@ -69,7 +70,7 @@ export function useExportBatteryOptions() {
   const [options, setOptions] = useState<ExportBatteryOptions>(getInitialExportBatteryOptions);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(options));
+    setStorageItem(STORAGE_KEY, JSON.stringify(options));
   }, [options]);
 
   function updateOption(

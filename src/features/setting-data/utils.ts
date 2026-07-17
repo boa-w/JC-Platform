@@ -1,5 +1,6 @@
 import type { SdoNodeDocument } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
+import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import {
   maxSettingColumnWidth,
   settingColumnWidthStorageKey,
@@ -30,7 +31,7 @@ export function clampSettingColumnWidth(value: number, column: SettingParameterC
 export function loadSettingColumnWidths() {
   if (typeof window === 'undefined') return {};
   try {
-    const stored = window.localStorage.getItem(settingColumnWidthStorageKey);
+    const stored = getStorageItem(settingColumnWidthStorageKey);
     if (!stored) return {};
     const parsed = JSON.parse(stored);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
@@ -49,7 +50,7 @@ export function loadSettingColumnWidths() {
 
 export function saveSettingColumnWidths(widths: Record<string, number>) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(settingColumnWidthStorageKey, JSON.stringify(widths));
+  setStorageItem(settingColumnWidthStorageKey, JSON.stringify(widths));
 }
 
 export function sdoAuthLabel(value?: number) {

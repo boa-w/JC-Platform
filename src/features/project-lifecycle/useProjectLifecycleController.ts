@@ -15,6 +15,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { type DocumentSectionKey, refactorOnlySections } from '../../modules/documentSections';
 import type { LoadedProject, ProjectParseReport } from '../../types/platform';
 import { cloneJson } from '../../utils/projectDirty';
+import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import { runSystemDialog } from '../../utils/systemDialog';
 
 export interface RecentProject {
@@ -47,7 +48,7 @@ const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS
 function loadRecentProjects() {
   if (typeof window === 'undefined') return [];
   try {
-    const stored = window.localStorage.getItem(recentProjectsStorageKey);
+    const stored = getStorageItem(recentProjectsStorageKey);
     if (!stored) return [];
     const parsed = JSON.parse(stored);
     return Array.isArray(parsed)
@@ -60,10 +61,7 @@ function loadRecentProjects() {
 
 function persistRecentProjects(projects: RecentProject[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(
-    recentProjectsStorageKey,
-    JSON.stringify(projects.slice(0, maxRecentProjects)),
-  );
+  setStorageItem(recentProjectsStorageKey, JSON.stringify(projects.slice(0, maxRecentProjects)));
 }
 
 function stripRefactorOnlySections(document: unknown) {

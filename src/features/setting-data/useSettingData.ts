@@ -2,6 +2,7 @@ import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import type { SdoNodeDocument } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
+import { removeStorageItem } from '../../utils/safeStorage';
 import { settingColumnWidthStorageKey, settingEditorSections } from './config';
 import type { SdoNodeField, SettingEditorField, SettingParameterColumn } from './types';
 import {
@@ -173,7 +174,7 @@ export function useSettingData({
   function resetSettingColumnWidths() {
     setSettingColumnWidths({});
     if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(settingColumnWidthStorageKey);
+      removeStorageItem(settingColumnWidthStorageKey);
     }
   }
 

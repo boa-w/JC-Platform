@@ -10,6 +10,7 @@ import {
 import { translateBaiduText } from '../../api/commands';
 import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
+import { getStorageItem, removeStorageItem, setStorageItem } from '../../utils/safeStorage';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { LanguageComparisonView } from './LanguageComparisonView';
@@ -103,7 +104,7 @@ function getDefaultScrollTopPosition(): FloatingButtonPosition {
 
 function readSavedScrollTopPosition(): FloatingButtonPosition {
   if (typeof window === 'undefined') return getDefaultScrollTopPosition();
-  const saved = window.localStorage.getItem(SCROLL_TOP_POSITION_STORAGE_KEY);
+  const saved = getStorageItem(SCROLL_TOP_POSITION_STORAGE_KEY);
   if (!saved) return getDefaultScrollTopPosition();
   try {
     const parsed = JSON.parse(saved) as Partial<FloatingButtonPosition>;
@@ -111,7 +112,7 @@ function readSavedScrollTopPosition(): FloatingButtonPosition {
       return clampFloatingButtonPosition({ left: parsed.left, top: parsed.top });
     }
   } catch {
-    window.localStorage.removeItem(SCROLL_TOP_POSITION_STORAGE_KEY);
+    removeStorageItem(SCROLL_TOP_POSITION_STORAGE_KEY);
   }
   return getDefaultScrollTopPosition();
 }
@@ -123,12 +124,12 @@ function readSavedTranslateOptions(): SavedTranslateOptions {
     TRANSLATE_SCOPE_STORAGE_KEY,
     LEGACY_BAIDU_TRANSLATE_STORAGE_KEY,
   ]) {
-    const saved = window.localStorage.getItem(key);
+    const saved = getStorageItem(key);
     if (!saved) continue;
     try {
       return JSON.parse(saved) as SavedTranslateOptions;
     } catch {
-      window.localStorage.removeItem(key);
+      removeStorageItem(key);
     }
   }
   return {};
@@ -248,7 +249,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   }, [document.list_code_language, translateSourceLanguage]);
 
   useEffect(() => {
-    window.localStorage.setItem(
+    setStorageItem(
       TRANSLATE_OPTIONS_STORAGE_KEY,
       JSON.stringify({
         sourceLanguage: translateSourceLanguage,
@@ -781,7 +782,7 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
         rect?.height,
       );
       setScrollTopPosition(nextPosition);
-      window.localStorage.setItem(SCROLL_TOP_POSITION_STORAGE_KEY, JSON.stringify(nextPosition));
+      setStorageItem(SCROLL_TOP_POSITION_STORAGE_KEY, JSON.stringify(nextPosition));
       window.setTimeout(() => {
         suppressScrollTopClickRef.current = false;
       }, 0);

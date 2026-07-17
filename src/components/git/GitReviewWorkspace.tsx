@@ -19,6 +19,7 @@ import type {
   GitReviewReport,
   GitRevision,
 } from '../../types/platform';
+import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 
 type GitReviewViewMode = 'unified' | 'split';
 
@@ -47,7 +48,7 @@ const viewModeStorageKey = 'jc-custom-platform.gitReviewView';
 
 function loadViewMode(): GitReviewViewMode {
   if (typeof window === 'undefined') return 'unified';
-  return window.localStorage.getItem(viewModeStorageKey) === 'split' ? 'split' : 'unified';
+  return getStorageItem(viewModeStorageKey) === 'split' ? 'split' : 'unified';
 }
 
 function unchangedLinesBeforeHunk(file: GitReviewFile, hunkIndex: number) {
@@ -109,13 +110,15 @@ export function GitReviewWorkspace({
 
   useEffect(() => {
     const paths = new Set(report?.files.map((file) => file.path) ?? []);
-    setActivePath((current) => (current && paths.has(current) ? current : (report?.files[0]?.path ?? null)));
+    setActivePath((current) =>
+      current && paths.has(current) ? current : (report?.files[0]?.path ?? null),
+    );
     setCollapsedFiles((current) => new Set([...current].filter((path) => paths.has(path))));
   }, [report]);
 
   function updateViewMode(mode: GitReviewViewMode) {
     setViewMode(mode);
-    window.localStorage.setItem(viewModeStorageKey, mode);
+    setStorageItem(viewModeStorageKey, mode);
   }
 
   function toggleFile(path: string) {
@@ -130,7 +133,9 @@ export function GitReviewWorkspace({
   function toggleAllFiles() {
     if (!report) return;
     setCollapsedFiles((current) =>
-      current.size === report.files.length ? new Set() : new Set(report.files.map((file) => file.path)),
+      current.size === report.files.length
+        ? new Set()
+        : new Set(report.files.map((file) => file.path)),
     );
   }
 
@@ -237,7 +242,13 @@ export function GitReviewWorkspace({
             >
               <ChevronsUpDown aria-hidden="true" size={16} strokeWidth={1.7} />
             </button>
-            <button aria-label="刷新审阅" disabled={busy} onClick={onRefresh} title="刷新审阅" type="button">
+            <button
+              aria-label="刷新审阅"
+              disabled={busy}
+              onClick={onRefresh}
+              title="刷新审阅"
+              type="button"
+            >
               <RefreshCw aria-hidden="true" size={16} strokeWidth={1.7} />
             </button>
             <button aria-label="关闭审阅" onClick={onClose} title="关闭审阅" type="button">
@@ -269,7 +280,11 @@ export function GitReviewWorkspace({
                 placeholder="版本说明"
                 value={message}
               />
-              <button disabled={commitDisabled || message.trim() === ''} onClick={onCommit} type="button">
+              <button
+                disabled={commitDisabled || message.trim() === ''}
+                onClick={onCommit}
+                type="button"
+              >
                 <GitCommitHorizontal aria-hidden="true" size={16} strokeWidth={1.8} />
                 {commitBusy ? '提交中...' : '提交版本'}
               </button>
@@ -323,7 +338,10 @@ export function GitReviewWorkspace({
                       {file.hunks.map((hunk, hunkIndex) => {
                         const unchanged = unchangedLinesBeforeHunk(file, hunkIndex);
                         return (
-                          <div className="git-review-hunk" key={`${hunk.old_start}-${hunk.new_start}`}>
+                          <div
+                            className="git-review-hunk"
+                            key={`${hunk.old_start}-${hunk.new_start}`}
+                          >
                             <div className="git-review-hunk-header" title={hunk.header}>
                               <ChevronDown aria-hidden="true" size={14} strokeWidth={1.7} />
                               <span>
@@ -340,7 +358,13 @@ export function GitReviewWorkspace({
                                 >
                                   <span>{line.old_line ?? ''}</span>
                                   <span>{line.new_line ?? ''}</span>
-                                  <i>{line.kind === 'addition' ? '+' : line.kind === 'deletion' ? '-' : ' '}</i>
+                                  <i>
+                                    {line.kind === 'addition'
+                                      ? '+'
+                                      : line.kind === 'deletion'
+                                        ? '-'
+                                        : ' '}
+                                  </i>
                                   <code>{line.content || ' '}</code>
                                 </div>
                               ))

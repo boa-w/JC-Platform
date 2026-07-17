@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getStorageItem, setStorageItem } from '../utils/safeStorage';
 
 const STORAGE_KEY = 'jc-platform.translation-settings';
 const LEGACY_LANGUAGE_STORAGE_KEY = 'jc.language.baiduTranslateConfig';
@@ -32,7 +33,7 @@ function normalizeTranslationSettings(value: unknown): TranslationSettings {
 }
 
 function loadLegacyTranslationSettings(): TranslationSettings | null {
-  const stored = localStorage.getItem(LEGACY_LANGUAGE_STORAGE_KEY);
+  const stored = getStorageItem(LEGACY_LANGUAGE_STORAGE_KEY);
   if (!stored) return null;
   try {
     const settings = normalizeTranslationSettings(JSON.parse(stored));
@@ -44,7 +45,7 @@ function loadLegacyTranslationSettings(): TranslationSettings | null {
 
 function getInitialTranslationSettings(): TranslationSettings {
   if (typeof window === 'undefined') return defaultTranslationSettings;
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = getStorageItem(STORAGE_KEY);
   if (stored) {
     try {
       return normalizeTranslationSettings(JSON.parse(stored));
@@ -59,7 +60,7 @@ export function useTranslationSettings() {
   const [settings, setSettings] = useState<TranslationSettings>(getInitialTranslationSettings);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    setStorageItem(STORAGE_KEY, JSON.stringify(settings));
   }, [settings]);
 
   function updateSetting(key: TranslationSettingKey, value: string) {

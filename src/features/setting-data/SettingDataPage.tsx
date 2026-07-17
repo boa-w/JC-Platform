@@ -1,6 +1,7 @@
 import { ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import {
   settingColumnPresetOptions,
   settingColumnPresetStorageKey,
@@ -26,7 +27,7 @@ const pinnedSettingColumnKeys: SettingParameterColumnKey[] = ['select', 'index',
 
 function readSettingColumnPreset(): SettingColumnPreset {
   if (typeof window === 'undefined') return 'common';
-  const saved = window.localStorage.getItem(settingColumnPresetStorageKey);
+  const saved = getStorageItem(settingColumnPresetStorageKey);
   return settingColumnPresetOptions.some((option) => option.value === saved)
     ? (saved as SettingColumnPreset)
     : 'common';
@@ -163,7 +164,7 @@ export function SettingDataPage({
 
   function handleColumnPresetChange(nextPreset: SettingColumnPreset) {
     setColumnPreset(nextPreset);
-    window.localStorage.setItem(settingColumnPresetStorageKey, nextPreset);
+    setStorageItem(settingColumnPresetStorageKey, nextPreset);
   }
 
   function settingColumnClassName(column: SettingParameterColumn) {
