@@ -22,13 +22,9 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import {
   addUiResourceOptionDocument,
-  buildProjectBinaryReport,
-  compareProjectBinaryReport,
   commitProjectGitVersion,
-  copyUiResourceImages,
   createProject,
   exportDbc,
-  exportProjectPackage,
   exportTableCsv,
   exportTableWorkbook,
   generateDbcContent,
@@ -79,6 +75,7 @@ import {
   SignalDictionaryPage,
   useProtocolEditor,
 } from '../features/protocol-editor';
+import { ProjectExportPage, useProjectExport } from '../features/project-export';
 import {
   formatFrameId,
   parseFrameId,
@@ -112,8 +109,6 @@ import type {
   BatteryMonitorItem,
   BatteryMonitorSignal,
   BatteryProtocol,
-  BinaryBuildReport,
-  BinaryCompareReport,
   FeatureModule,
   GitProjectRequest,
   GitProjectStatus,
@@ -127,11 +122,9 @@ import type {
   NavigationKey,
   PdoAdvancedParseReport,
   PdoSimpleImportReport,
-  ProjectExportReport,
   ProjectParseReport,
   ProjectSummary,
   SdoImportReport,
-  UiImageCopyReport,
   UiResourceParseReport,
   UiResourceUpdateRequest,
 } from '../types/platform';
@@ -338,15 +331,6 @@ export function Dashboard({
   const [isImportingBatteryMonitor, setIsImportingBatteryMonitor] = useState(false);
   const [batteryMonitorExportStatus, setBatteryMonitorExportStatus] = useState<string | null>(null);
   const [isExportingBatteryMonitor, setIsExportingBatteryMonitor] = useState(false);
-  const [exportOutputDir, setExportOutputDir] = useState('jc-export');
-  const [exportManifestFilename, setExportManifestFilename] = useState('ConfigUpdate.json');
-  const [exportBinaryFilename, setExportBinaryFilename] = useState('pdo_sdo_data.bin');
-  const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
-  const [imageCopyReport, setImageCopyReport] = useState<UiImageCopyReport | null>(null);
-  const [binaryReport, setBinaryReport] = useState<BinaryBuildReport | null>(null);
-  const [binaryCompareReport, setBinaryCompareReport] = useState<BinaryCompareReport | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
@@ -385,6 +369,11 @@ export function Dashboard({
     applyDocument: (document) => {
       if (loadedProject) applyLoadedProject({ ...loadedProject, document });
     },
+  });
+  const projectExport = useProjectExport({
+    document: loadedProject?.document ?? previewDocument,
+    projectPath: loadedProject?.summary.path,
+    exportOptions: exportBatteryOptions,
   });
 
   useEffect(() => {
@@ -2680,118 +2669,6 @@ export function Dashboard({
     onNavigate('realtime-data');
   }
 
-  async function handleCopyUiImages() {
-    setExportError(null);
-    setImageCopyReport(null);
-
-    try {
-      const report = await copyUiResourceImages({
-        project_path: loadedProject?.summary.path,
-        output_dir: exportOutputDir,
-        document: loadedProject?.document ?? previewDocument,
-      });
-      setImageCopyReport(report);
-      if (!report.valid) {
-        setExportError(report.errors.join('；') || 'UI 图片复制存在问题');
-      }
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleBuildBinaryReport() {
-    setExportError(null);
-    setBinaryCompareReport(null);
-
-    try {
-      const report = await buildProjectBinaryReport(
-        loadedProject?.document ?? previewDocument,
-        exportBatteryOptions,
-      );
-      setBinaryReport(report);
-      if (!report.valid) {
-        setExportError(report.errors.join('；') || '二进制构建报告存在问题');
-      }
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleCompareBinary() {
-    setExportError(null);
-    setBinaryCompareReport(null);
-
-    if (!isTauriRuntime()) {
-      setExportError('系统文件选择器只能在 Tauri 桌面应用中使用。');
-      return;
-    }
-
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '设备二进制', extensions: ['bin'] }],
-    });
-    if (typeof selected !== 'string') return;
-
-    try {
-      const report = await compareProjectBinaryReport({
-        document: loadedProject?.document ?? previewDocument,
-        legacy_binary_path: selected,
-        export_options: exportBatteryOptions,
-      });
-      setBinaryCompareReport(report);
-      setBinaryReport(report.build);
-      if (!report.valid || !report.same) {
-        setExportError(report.errors.join('；') || '新旧二进制不一致');
-      }
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleSelectExportDir() {
-    setExportError(null);
-
-    if (!isTauriRuntime()) {
-      setExportError('系统目录选择器只能在 Tauri 桌面应用中使用。');
-      return;
-    }
-
-    const selected = await open({ directory: true, multiple: false });
-    if (typeof selected === 'string') {
-      setExportOutputDir(selected);
-    }
-  }
-
-  async function handleExportPackage() {
-    setIsExporting(true);
-    setExportError(null);
-    setExportReport(null);
-
-    try {
-      const report = await exportProjectPackage({
-        project_path: loadedProject?.summary.path,
-        output_dir: exportOutputDir,
-        document: loadedProject?.document ?? previewDocument,
-        manifest_filename: exportManifestFilename,
-        binary_filename: exportBinaryFilename,
-        export_options: exportBatteryOptions,
-      });
-      setExportReport(report);
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsExporting(false);
-    }
-  }
-
-  async function handleOpenExportDir(dirPath: string) {
-    try {
-      await revealItemInDir(dirPath);
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
   const currentLanguageDocument = languageDocument();
   const currentBatteryProtocolDocument = batteryProtocolDocument();
   const currentBatteryMonitorDocument = batteryMonitorDocument();
@@ -3700,214 +3577,9 @@ export function Dashboard({
         ) : null}
 
         {activeModule.key === 'export' ? (
-          <section className="export-card">
-            <div className="export-header">
-              <div>
-                <h2>项目导出</h2>
-                <p>
-                  生成 jc_export、ConfigUpdate.json、UI 图片资源和
-                  pdo_sdo_data.bin，用于设备配置发布。
-                </p>
-              </div>
-              {exportReport ? (
-                <button
-                  className="path-open-button"
-                  type="button"
-                  onClick={() => void handleOpenExportDir(exportReport.export_root)}
-                >
-                  打开导出目录
-                </button>
-              ) : null}
-            </div>
-            <div className="export-form">
-              <label>
-                导出目录
-                <input
-                  value={exportOutputDir}
-                  onChange={(event) => setExportOutputDir(event.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void handleSelectExportDir()}
-                disabled={isExporting}
-              >
-                选择目录
-              </button>
-              <button
-                type="button"
-                onClick={handleExportPackage}
-                disabled={isExporting || exportOutputDir.trim() === ''}
-              >
-                {isExporting ? '导出中...' : '执行项目导出'}
-              </button>
-            </div>
-            <div className="export-filename-grid">
-              <label>
-                JSON 文件名
-                <input
-                  value={exportManifestFilename}
-                  onChange={(event) => setExportManifestFilename(event.target.value)}
-                  placeholder="ConfigUpdate.json"
-                />
-              </label>
-              <label>
-                Bin 文件名
-                <input
-                  value={exportBinaryFilename}
-                  onChange={(event) => setExportBinaryFilename(event.target.value)}
-                  placeholder="pdo_sdo_data.bin"
-                />
-              </label>
-            </div>
-            {exportError ? <p className="export-error">{exportError}</p> : null}
-            {exportReport ? (
-              <section className="export-result-panel">
-                <div className="export-result-header">
-                  <strong className="section-label--muted">导出结果</strong>
-                  <span>{exportReport.valid ? '有效' : '存在问题'}</span>
-                </div>
-                <div className="export-report export-report--primary">
-                  <article>
-                    <span>二进制大小 / CRC</span>
-                    <strong>
-                      {exportReport.binary.file_size} bytes / {exportReport.binary.crc}
-                    </strong>
-                  </article>
-                  <article>
-                    <span>图片复制</span>
-                    <strong>{exportReport.copied_images.length} 个文件</strong>
-                  </article>
-                  <article className="export-report__wide">
-                    <span>导出根目录</span>
-                    <strong>{exportReport.export_root}</strong>
-                  </article>
-                  <article className="export-report__wide">
-                    <span>JSON 文件</span>
-                    <strong>{exportReport.manifest_path}</strong>
-                  </article>
-                  <article className="export-report__wide">
-                    <span>Bin 文件</span>
-                    <strong>{exportReport.binary_path}</strong>
-                  </article>
-                </div>
-                {exportReport.errors.length > 0 ? (
-                  <p className="export-error export-message">{exportReport.errors.join('；')}</p>
-                ) : null}
-                {exportReport.warnings.length > 0 ? (
-                  <p className="export-warning export-message">
-                    {exportReport.warnings.join('；')}
-                  </p>
-                ) : null}
-              </section>
-            ) : null}
-            <div className="section-divider" />
-            <section className="export-tools-section">
-              <div className="export-tools-header">
-                <strong className="section-label--muted">辅助工具</strong>
-                <div className="sample-actions">
-                  <button type="button" onClick={() => void handleCopyUiImages()}>
-                    仅复制 UI 图片
-                  </button>
-                  <button type="button" onClick={() => void handleBuildBinaryReport()}>
-                    生成二进制报告
-                  </button>
-                  <button type="button" onClick={() => void handleCompareBinary()}>
-                    选择参考 bin 对比
-                  </button>
-                </div>
-              </div>
-              <div className="export-tool-grid">
-                {imageCopyReport ? (
-                  <section className="export-result-panel">
-                    <div className="export-result-header">
-                      <strong>图片复制</strong>
-                      <button
-                        type="button"
-                        onClick={() => void handleOpenExportDir(imageCopyReport.export_root)}
-                      >
-                        打开目录
-                      </button>
-                    </div>
-                    <div className="export-report">
-                      <article>
-                        <span>有效</span>
-                        <strong>{imageCopyReport.valid ? '是' : '否'}</strong>
-                      </article>
-                      <article>
-                        <span>复制数量</span>
-                        <strong>{imageCopyReport.copied_files.length}</strong>
-                      </article>
-                      <article className="export-report__wide">
-                        <span>导出根目录</span>
-                        <strong>{imageCopyReport.export_root}</strong>
-                      </article>
-                    </div>
-                    {imageCopyReport.warnings.length > 0 ? (
-                      <p className="export-warning export-message">
-                        {imageCopyReport.warnings.join('；')}
-                      </p>
-                    ) : null}
-                  </section>
-                ) : null}
-                {binaryReport ? (
-                  <section className="export-result-panel">
-                    <div className="export-result-header">
-                      <strong>二进制报告</strong>
-                      <span>{binaryReport.valid ? '有效' : '存在问题'}</span>
-                    </div>
-                    <div className="export-report">
-                      <article>
-                        <span>大小</span>
-                        <strong>{binaryReport.file_size} bytes</strong>
-                      </article>
-                      <article>
-                        <span>CRC</span>
-                        <strong>{binaryReport.crc}</strong>
-                      </article>
-                      <article>
-                        <span>语言数量</span>
-                        <strong>{binaryReport.data_description.language_code.length}</strong>
-                      </article>
-                    </div>
-                    {binaryReport.warnings.length > 0 ? (
-                      <p className="export-warning export-message">
-                        {binaryReport.warnings.join('；')}
-                      </p>
-                    ) : null}
-                  </section>
-                ) : null}
-                {binaryCompareReport ? (
-                  <section className="export-result-panel">
-                    <div className="export-result-header">
-                      <strong>参考 bin 对比</strong>
-                      <span>{binaryCompareReport.same ? '一致' : '不一致'}</span>
-                    </div>
-                    <div className="export-report">
-                      <article>
-                        <span>生成/参考大小</span>
-                        <strong>
-                          {binaryCompareReport.generated_size} / {binaryCompareReport.legacy_size}
-                        </strong>
-                      </article>
-                      <article>
-                        <span>首个差异偏移</span>
-                        <strong>{binaryCompareReport.first_diff_offset ?? '-'}</strong>
-                      </article>
-                      <article>
-                        <span>生成/参考字节</span>
-                        <strong>
-                          {binaryCompareReport.generated_byte ?? '-'} /{' '}
-                          {binaryCompareReport.legacy_byte ?? '-'}
-                        </strong>
-                      </article>
-                    </div>
-                  </section>
-                ) : null}
-              </div>
-            </section>
-          </section>
+          <ProjectExportPage controller={projectExport} />
         ) : null}
+
       </div>
     </main>
   );

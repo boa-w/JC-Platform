@@ -1784,6 +1784,7 @@ body.git-review-open {
   height: calc(100vh - var(--app-toolbar-height));
   position: sticky;
   top: var(--app-toolbar-height);
+  z-index: 40;
 }
 
 .activity-bar {
