@@ -144,7 +144,12 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
             </div>
           ) : null}
           {canTestData.canTestWarnings.length > 0 ? (
-            <div className="project-open-error" style={{ marginTop: 8 }}>
+            <div
+              aria-live="polite"
+              className="project-open-error"
+              role="status"
+              style={{ marginTop: 8 }}
+            >
               {canTestData.canTestWarnings.slice(0, 3).map((warning) => (
                 <p key={warning}>{warning}</p>
               ))}
@@ -357,9 +362,11 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
           )}
           {canTestData.canTestStatus ? (
             <p
+              aria-live="polite"
               className={
                 canTestData.canTestStatus.startsWith('已') ? 'text-success' : 'project-open-error'
               }
+              role="status"
               style={{ marginTop: 8 }}
             >
               {canTestData.canTestStatus}

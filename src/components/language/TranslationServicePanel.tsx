@@ -123,7 +123,9 @@ export function TranslationServicePanel({
         </div>
       </div>
       <div className="lang-translate-actions">
-        <span className="lang-translate-status">{status}</span>
+        <span aria-live="polite" className="lang-translate-status" role="status">
+          {status}
+        </span>
         {isTranslating ? (
           <button className="lang-btn lang-btn--ghost" onClick={onCancelTranslate} type="button">
             取消

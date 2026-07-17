@@ -119,13 +119,25 @@ export function BatteryProtocolPage({ loadedProject, controller }: BatteryLegacy
         </div>
       </div>
       {batteryProtocolExportStatus ? (
-        <p className="config-helper-text">{batteryProtocolExportStatus}</p>
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {batteryProtocolExportStatus}
+        </p>
       ) : null}
       {batteryProtocolImportStatus ? (
-        <p className="config-helper-text">{batteryProtocolImportStatus}</p>
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {batteryProtocolImportStatus}
+        </p>
       ) : null}
-      {batteryCsvStatus ? <p className="config-helper-text">{batteryCsvStatus}</p> : null}
-      {batteryDbcStatus ? <p className="config-helper-text">{batteryDbcStatus}</p> : null}
+      {batteryCsvStatus ? (
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {batteryCsvStatus}
+        </p>
+      ) : null}
+      {batteryDbcStatus ? (
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {batteryDbcStatus}
+        </p>
+      ) : null}
       {loadedProject ? (
         <div className="pdo-simple-editor battery-monitor-editor">
           <div className="config-summary-strip">
@@ -527,12 +539,20 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryLegacyP
         </div>
       </div>
       {batteryMonitorExportStatus ? (
-        <p className="config-helper-text">{batteryMonitorExportStatus}</p>
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {batteryMonitorExportStatus}
+        </p>
       ) : null}
       {batteryMonitorImportStatus ? (
-        <p className="config-helper-text">{batteryMonitorImportStatus}</p>
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {batteryMonitorImportStatus}
+        </p>
       ) : null}
-      {batteryCsvStatus ? <p className="config-helper-text">{batteryCsvStatus}</p> : null}
+      {batteryCsvStatus ? (
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {batteryCsvStatus}
+        </p>
+      ) : null}
       {loadedProject ? (
         <div className="pdo-simple-editor battery-monitor-editor">
           <div className="config-summary-strip">

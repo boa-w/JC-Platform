@@ -92,12 +92,20 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
           </button>
         </div>
       </div>
-      {unifiedProtocolError ? <p className="project-open-error">{unifiedProtocolError}</p> : null}
+      {unifiedProtocolError ? (
+        <p className="project-open-error" role="alert">
+          {unifiedProtocolError}
+        </p>
+      ) : null}
       {privateProtocolExportStatus ? (
-        <p className="config-helper-text">{privateProtocolExportStatus}</p>
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {privateProtocolExportStatus}
+        </p>
       ) : null}
       {privateProtocolImportStatus ? (
-        <p className="config-helper-text">{privateProtocolImportStatus}</p>
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {privateProtocolImportStatus}
+        </p>
       ) : null}
       {unifiedProtocol ? (
         <>

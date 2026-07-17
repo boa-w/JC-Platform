@@ -1,8 +1,8 @@
 import {
   ArrowUpRight,
+  Braces,
   ChevronDown,
   ChevronRight,
-  Braces,
   CloudOff,
   FileDiff,
   FileDown,
@@ -12,22 +12,22 @@ import {
   GitCommitHorizontal,
   History,
   RefreshCw,
-  Save as SaveIcon,
   SaveAll,
+  Save as SaveIcon,
   ScanSearch,
   Undo2,
   WandSparkles,
   X,
 } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import { modifiedSectionLabels, type DocumentSectionKey } from '../../modules/documentSections';
+import type { TestDataType } from '../../data/test-data';
+import { type DocumentSectionKey, modifiedSectionLabels } from '../../modules/documentSections';
 import type {
   FeatureModule,
   GitProjectStatus,
   GitRevision,
   LoadedProject,
 } from '../../types/platform';
-import type { TestDataType } from '../../data/test-data';
 
 type TableConfigKind = 'sdo' | 'pdoSimple' | 'language';
 
@@ -499,7 +499,9 @@ export function DashboardActionBar({
               </button>
 
               {gitStatus.warning || gitError ? (
-                <p className="git-summary-warning">{gitError ?? gitStatus.warning}</p>
+                <p className="git-summary-warning" role={gitError ? 'alert' : 'status'}>
+                  {gitError ?? gitStatus.warning}
+                </p>
               ) : null}
             </div>
           ) : (

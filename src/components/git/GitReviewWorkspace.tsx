@@ -299,7 +299,7 @@ export function GitReviewWorkspace({
               <span>正在读取更改</span>
             </div>
           ) : error ? (
-            <div className="git-review-empty git-review-empty--error">
+            <div className="git-review-empty git-review-empty--error" role="alert">
               <X aria-hidden="true" size={22} />
               <span>{error}</span>
             </div>

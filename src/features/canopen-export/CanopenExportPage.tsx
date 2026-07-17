@@ -84,9 +84,11 @@ export function CanopenExportPage({ loadedProject }: CanopenExportPageProps) {
           </div>
           {canopenExport.status ? (
             <p
+              aria-live="polite"
               className={
                 canopenExport.status.startsWith('已') ? 'text-success' : 'project-open-error'
               }
+              role="status"
               style={{ marginTop: 8 }}
             >
               {canopenExport.status}
@@ -135,7 +137,12 @@ export function CanopenExportPage({ loadedProject }: CanopenExportPageProps) {
             </EmptyState>
           )}
           {report && report.warnings.length > 0 ? (
-            <div className="project-open-error" style={{ marginTop: 8 }}>
+            <div
+              aria-live="polite"
+              className="project-open-error"
+              role="status"
+              style={{ marginTop: 8 }}
+            >
               {report.warnings.slice(0, 5).map((warning) => (
                 <p key={warning}>{warning}</p>
               ))}

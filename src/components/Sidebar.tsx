@@ -4,6 +4,7 @@ import {
   FolderKanban,
   Globe2,
   Info,
+  type LucideIcon,
   MonitorCog,
   Moon,
   PackageOpen,
@@ -11,7 +12,6 @@ import {
   Settings2,
   Sun,
   X,
-  type LucideIcon,
 } from 'lucide-react';
 import {
   type CSSProperties,
@@ -318,7 +318,7 @@ export function Sidebar({
               <strong className="section-label--muted">软件更新</strong>
               <div className="version-update-panel">
                 <div className="version-update-row">
-                  <span className="version-update-status">
+                  <span aria-live="polite" className="version-update-status" role="status">
                     {updateMessage ?? '可手动检查新版本'}
                   </span>
                   <button

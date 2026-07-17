@@ -570,7 +570,7 @@ export function UiCanvasPreview({
       </div>
 
       {report?.errors.length ? (
-        <ul className="ui-preview-errors">
+        <ul className="ui-preview-errors" role="alert">
           {report.errors.map((error) => (
             <li key={error}>{error}</li>
           ))}

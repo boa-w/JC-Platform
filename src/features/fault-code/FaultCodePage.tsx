@@ -754,7 +754,11 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
             <input readOnly value={codes.length} />
           </label>
         </div>
-        {csvStatus ? <p className="fault-code-csv-status">{csvStatus}</p> : null}
+        {csvStatus ? (
+          <p aria-live="polite" className="fault-code-csv-status" role="status">
+            {csvStatus}
+          </p>
+        ) : null}
       </section>
 
       <section className="table-spec-card">

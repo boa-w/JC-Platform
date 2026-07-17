@@ -110,9 +110,15 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
               <strong>{unifiedProtocol.private_protocol.frames.length}</strong>
             </article>
           </div>
-          {protocolFlattenStatus ? <p className="text-success">{protocolFlattenStatus}</p> : null}
+          {protocolFlattenStatus ? (
+            <p aria-live="polite" className="text-success" role="status">
+              {protocolFlattenStatus}
+            </p>
+          ) : null}
           {unifiedProtocol.validation.errors.length > 0 ? (
-            <p className="project-open-error">{unifiedProtocol.validation.errors.join('；')}</p>
+            <p className="project-open-error" role="alert">
+              {unifiedProtocol.validation.errors.join('；')}
+            </p>
           ) : null}
           {unifiedProtocol.validation.warnings.length > 0 ? (
             <p className="export-warning">{unifiedProtocol.validation.warnings.join('；')}</p>

@@ -57,7 +57,11 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
           </button>
         </div>
       </div>
-      {unifiedProtocolError ? <p className="project-open-error">{unifiedProtocolError}</p> : null}
+      {unifiedProtocolError ? (
+        <p className="project-open-error" role="alert">
+          {unifiedProtocolError}
+        </p>
+      ) : null}
       {unifiedProtocol ? (
         <>
           <div className="project-open-report">

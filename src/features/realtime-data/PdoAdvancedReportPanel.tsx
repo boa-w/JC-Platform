@@ -39,7 +39,11 @@ export function PdoAdvancedReportPanel({
           </article>
         </div>
       ) : null}
-      {controller.error ? <p className="project-open-error">{controller.error}</p> : null}
+      {controller.error ? (
+        <p className="project-open-error" role="alert">
+          {controller.error}
+        </p>
+      ) : null}
     </section>
   );
 }

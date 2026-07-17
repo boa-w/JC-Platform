@@ -1,8 +1,8 @@
 import type { LegacyTableSpec } from '../../types/platform';
 import {
+  type TableConfigController,
   tableConfigSections,
   tableConfigTitles,
-  type TableConfigController,
 } from './useTableConfigController';
 
 interface TableConfigStatusPanelProps {
@@ -22,9 +22,17 @@ export function TableConfigStatusPanel({ controller }: TableConfigStatusPanelPro
       {controller.specs
         .filter((spec) => spec.kind === kind)
         .map((spec) => (
-          <TableFormat key={spec.kind} spec={spec} title={`表头格式（${spec.headers.length} 列）`} />
+          <TableFormat
+            key={spec.kind}
+            spec={spec}
+            title={`表头格式（${spec.headers.length} 列）`}
+          />
         ))}
-      {controller.importError ? <p className="project-open-error">{controller.importError}</p> : null}
+      {controller.importError ? (
+        <p className="project-open-error" role="alert">
+          {controller.importError}
+        </p>
+      ) : null}
       {controller.importReport ? (
         <div className="table-io-result">
           <div className="table-io-result-row">
@@ -43,7 +51,11 @@ export function TableConfigStatusPanel({ controller }: TableConfigStatusPanelPro
           </div>
         </div>
       ) : null}
-      {controller.exportStatus ? <p className="config-helper-text">{controller.exportStatus}</p> : null}
+      {controller.exportStatus ? (
+        <p aria-live="polite" className="config-helper-text" role="status">
+          {controller.exportStatus}
+        </p>
+      ) : null}
     </section>
   );
 }
