@@ -3,6 +3,8 @@ name = "jc_custom_platform_tauri"
 version = "0.1.0"
 description = "自定义开发平台"
 authors = ["JC"]
+homepage = "https://github.com/boa-w/JC-Platform"
+repository = "https://github.com/boa-w/JC-Platform"
 edition = "2021"
 default-run = "jc_custom_platform_tauri"
 

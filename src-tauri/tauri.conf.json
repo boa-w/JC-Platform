@@ -30,6 +30,12 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "JC",
+    "homepage": "https://github.com/boa-w/JC-Platform",
+    "copyright": "Copyright © 2026 JC. All rights reserved.",
+    "category": "DeveloperTool",
+    "shortDescription": "JC 配置项目桌面开发平台",
+    "longDescription": "用于编辑、校验、版本审阅和导出 JC 配置项目的桌面工具。",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
