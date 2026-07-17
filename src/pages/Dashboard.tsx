@@ -5,16 +5,6 @@ import {
   addUiResourceOptionDocument,
   commitProjectGitVersion,
   createProject,
-  exportTableCsv,
-  exportTableWorkbook,
-  getLegacyTableSpec,
-  importLanguageCsv,
-  importLanguageWorkbook,
-  importPdoSimpleCsv,
-  importPdoSimpleWorkbook,
-  importSdoCsv,
-  importSdoWorkbook,
-  languageDocumentTable,
   loadJsonFile,
   loadProject,
   loadProjectGitContext,
@@ -24,7 +14,6 @@ import {
   parseProjectDocument,
   parseUiResources,
   parseUiResourcesWithProjectPath,
-  pdoSimpleDocumentTable,
   removeUiResourceOptionDocument,
   reviewProjectGitChanges,
   reviewProjectGitRevision,
@@ -32,7 +21,6 @@ import {
   saveJsonFile,
   saveProject,
   saveProjectAs,
-  sdoDocumentTable,
   updateUiResourceDocument,
   validateProjectDocument,
 } from '../api/commands';
@@ -60,6 +48,11 @@ import { ProjectExportPage, useProjectExport } from '../features/project-export'
 import { SettingsPage } from '../features/settings';
 import { RealtimeDataPage, usePdoEditor } from '../features/realtime-data';
 import { SettingDataPage } from '../features/setting-data';
+import {
+  TableConfigStatusPanel,
+  TableFormatReference,
+  useTableConfigController,
+} from '../features/table-config';
 import { UiCanvasPreview } from '../components/UiCanvasPreview';
 import { featureModules } from '../data/modules';
 import { getTestData, type TestDataType } from '../data/test-data';
@@ -70,7 +63,6 @@ import {
   configSectionForEditor,
   type DocumentSectionKey,
   jsonEditorKeyForModule,
-  legacyTableKindForModule,
   refactorOnlySections,
   restorePathsForEditor,
   trackedDocumentSections,
@@ -85,16 +77,11 @@ import type {
   GitRevision,
   GitReviewReport,
   LanguageDocument,
-  LanguageImportReport,
-  LegacyTableKind,
-  LegacyTableSpec,
   LoadedProject,
   NavigationKey,
   PdoAdvancedParseReport,
-  PdoSimpleImportReport,
   ProjectParseReport,
   ProjectSummary,
-  SdoImportReport,
   UiResourceParseReport,
   UiResourceUpdateRequest,
 } from '../types/platform';
@@ -118,21 +105,6 @@ interface DashboardProps {
 }
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
-type TableConfigKind = Extract<LegacyTableKind, 'sdo' | 'pdoSimple' | 'language'>;
-type TableImportReport = SdoImportReport | PdoSimpleImportReport | LanguageImportReport;
-
-const tableConfigSections: Record<TableConfigKind, string> = {
-  sdo: 'sdo_info',
-  pdoSimple: 'pdo_simple_send_recv',
-  language: 'language_info',
-};
-
-const tableConfigTitles: Record<TableConfigKind, string> = {
-  sdo: 'SDO 参数配置',
-  pdoSimple: 'PDO 简化配置',
-  language: '多国语言',
-};
 
 const recentProjectsStorageKey = 'jc-custom-platform.recentProjects';
 const maxRecentProjects = 8;
@@ -217,7 +189,6 @@ export function Dashboard({
   onNavigate,
   onProjectLoaded,
 }: DashboardProps) {
-  const [tableSpecs, setTableSpecs] = useState<LegacyTableSpec[]>([]);
   const [uiPreview, setUiPreview] = useState<UiResourceParseReport | null>(null);
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -256,11 +227,6 @@ export function Dashboard({
   const projectGitSectionRef = useRef<HTMLDivElement | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
-  const [tableImportReport, setTableImportReport] = useState<TableImportReport | null>(null);
-  const [tableImportError, setTableImportError] = useState<string | null>(null);
-  const [isImportingTable, setIsImportingTable] = useState(false);
-  const [tableExportStatus, setTableExportStatus] = useState<string | null>(null);
-  const [isExportingTable, setIsExportingTable] = useState(false);
   const [configEditorText, setConfigEditorText] = useState('');
   const [configEditorError, setConfigEditorError] = useState<string | null>(null);
   const [pdoAdvancedReport, setPdoAdvancedReport] = useState<PdoAdvancedParseReport | null>(null);
@@ -307,13 +273,13 @@ export function Dashboard({
     isModifiedPath,
     restoreModifiedPath,
   });
+  const tableConfig = useTableConfigController({
+    activeModuleKey: activeModule.key,
+    loadedProject,
+    applyLoadedProject,
+  });
 
   useEffect(() => {
-    void Promise.all([
-      getLegacyTableSpec('sdo'),
-      getLegacyTableSpec('pdoSimple'),
-      getLegacyTableSpec('language'),
-    ]).then(setTableSpecs);
     void parseUiPreview(previewDocument).then(setUiPreview);
     const storedProjects = loadRecentProjects();
     setRecentProjects(storedProjects);
@@ -418,10 +384,6 @@ export function Dashboard({
       return parseUiResourcesWithProjectPath({ project_path: path, document });
     }
     return parseUiResources(document);
-  }
-
-  function activeLegacyTableKind(): TableConfigKind | null {
-    return legacyTableKindForModule(activeModule.key) as TableConfigKind | null;
   }
 
   function activeJsonEditorKey() {
@@ -1242,108 +1204,6 @@ export function Dashboard({
     }
   }
 
-  async function handleExportTableConfig(kind: TableConfigKind, format: 'csv' | 'xml') {
-    setTableExportStatus(null);
-
-    if (!loadedProject) {
-      setTableExportStatus('请先打开 .jcpro 项目。');
-      return;
-    }
-
-    if (!isTauriRuntime()) {
-      setTableExportStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
-      return;
-    }
-
-    const path = await save({
-      filters: [{ name: format === 'csv' ? 'CSV 表格' : 'Excel XML 表格', extensions: [format] }],
-    });
-    if (!path) return;
-
-    setIsExportingTable(true);
-
-    try {
-      const document = (loadedProject.document as Record<string, unknown>)[
-        tableConfigSections[kind]
-      ];
-      const table = await exportableTableDocument(kind, document);
-      if (format === 'csv') {
-        await exportTableCsv({ path, document: table });
-      } else {
-        await exportTableWorkbook({ path, document: table });
-      }
-      setTableExportStatus(`已导出：${path}`);
-    } catch (error) {
-      setTableExportStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsExportingTable(false);
-    }
-  }
-
-  async function exportableTableDocument(kind: TableConfigKind, document: unknown) {
-    if (kind === 'sdo') return sdoDocumentTable(document);
-    if (kind === 'pdoSimple') return pdoSimpleDocumentTable(document);
-    return languageDocumentTable(document);
-  }
-
-  async function handleImportTableConfig(kind: TableConfigKind) {
-    setTableImportError(null);
-    setTableImportReport(null);
-
-    if (!loadedProject) {
-      setTableImportError('请先打开 .jcpro 项目。');
-      return;
-    }
-
-    if (!isTauriRuntime()) {
-      setTableImportError('系统文件选择器只能在 Tauri 桌面应用中使用。');
-      return;
-    }
-
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '表格文件', extensions: ['csv', 'xls', 'xlsx', 'xml'] }],
-    });
-
-    if (typeof selected !== 'string') return;
-
-    setIsImportingTable(true);
-
-    try {
-      const extension = selected.split('.').pop()?.toLowerCase();
-      const isCsv = extension === 'csv';
-      const report = await importTableConfig(kind, selected, isCsv);
-      setTableImportReport(report);
-
-      if (!report.valid || !report.document) {
-        setTableImportError(report.errors.join('；') || '表格导入失败');
-        return;
-      }
-
-      const section = tableConfigSections[kind];
-      const nextDocument = {
-        ...(loadedProject.document as Record<string, unknown>),
-        [section]: report.document,
-      };
-      applyLoadedProject({ ...loadedProject, document: nextDocument });
-    } catch (error) {
-      setTableImportError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsImportingTable(false);
-    }
-  }
-
-  async function importTableConfig(
-    kind: TableConfigKind,
-    path: string,
-    isCsv: boolean,
-  ): Promise<TableImportReport> {
-    if (kind === 'sdo') return isCsv ? importSdoCsv({ path }) : importSdoWorkbook({ path });
-    if (kind === 'pdoSimple')
-      return isCsv ? importPdoSimpleCsv({ path }) : importPdoSimpleWorkbook({ path });
-    return isCsv ? importLanguageCsv({ path }) : importLanguageWorkbook({ path });
-  }
-
   async function applyUiResourceDocument(nextDocument: unknown) {
     if (!loadedProject) return;
 
@@ -1450,7 +1310,6 @@ export function Dashboard({
   }
 
   const currentLanguageDocument = languageDocument();
-  const currentLegacyTableKind = activeLegacyTableKind();
 
   return (
     <main className={showGitReview ? 'workspace workspace--git-review' : 'workspace'}>
@@ -1464,9 +1323,9 @@ export function Dashboard({
         isSavingProject={isSavingProject}
         savingProjectAction={savingProjectAction}
         saveStatus={saveStatus}
-        currentLegacyTableKind={currentLegacyTableKind}
-        isImportingTable={isImportingTable}
-        isExportingTable={isExportingTable}
+        currentLegacyTableKind={tableConfig.currentKind}
+        isImportingTable={tableConfig.isImporting}
+        isExportingTable={tableConfig.isExporting}
         generatingTestKey={generatingTestKey}
         pdoMode={pdoEditor.mode}
         showCanvasLabels={showCanvasLabels}
@@ -1483,8 +1342,8 @@ export function Dashboard({
         onRestoreAllChanges={restoreAllChanges}
         onSaveProjectAs={handleSaveProjectAs}
         onRequestSave={requestSaveProject}
-        onImportTable={handleImportTableConfig}
-        onExportTable={handleExportTableConfig}
+        onImportTable={tableConfig.importTable}
+        onExportTable={tableConfig.exportTable}
         onRequestTestData={setConfirmGenerateType}
         onToggleCanvasLabels={() => setShowCanvasLabels((visible) => !visible)}
         onToggleJsonEditor={() => setShowJsonEditor((visible) => !visible)}
@@ -1617,48 +1476,7 @@ export function Dashboard({
         ) : null}
 
 
-        {currentLegacyTableKind ? (
-          <section className="table-spec-card">
-            <div>
-              <h2>{tableConfigTitles[currentLegacyTableKind]}</h2>
-              <p>导入/导出操作请使用顶部工具栏按钮。支持 CSV、XLS、XLSX、XML 格式。</p>
-            </div>
-            {tableSpecs
-              .filter((spec) => spec.kind === currentLegacyTableKind)
-              .map((spec) => (
-                <div className="table-format-ref" key={spec.kind}>
-                  <strong>表头格式（{spec.headers.length} 列）</strong>
-                  <div className="table-format-chips">
-                    {spec.headers.map((header) => (
-                      <span className="table-format-chip" key={header}>
-                        {header}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            {tableImportError ? <p className="project-open-error">{tableImportError}</p> : null}
-            {tableImportReport ? (
-              <div className="table-io-result">
-                <div className="table-io-result-row">
-                  <span>导入校验</span>
-                  <strong className={tableImportReport.valid ? 'text-success' : 'text-danger'}>
-                    {tableImportReport.valid ? '通过' : '存在问题'}
-                  </strong>
-                </div>
-                <div className="table-io-result-row">
-                  <span>表头列数</span>
-                  <strong>{tableImportReport.table.actual_headers.length}</strong>
-                </div>
-                <div className="table-io-result-row">
-                  <span>写回段落</span>
-                  <strong>{tableConfigSections[currentLegacyTableKind]}</strong>
-                </div>
-              </div>
-            ) : null}
-            {tableExportStatus ? <p className="config-helper-text">{tableExportStatus}</p> : null}
-          </section>
-        ) : null}
+        <TableConfigStatusPanel controller={tableConfig} />
 
         {activeModule.key === 'battery-protocol' ? (
           <BatteryProtocolPage loadedProject={loadedProject} controller={batteryLegacyController} />
@@ -1757,31 +1575,7 @@ export function Dashboard({
         ) : null}
 
         {activeModule.key === 'project' || activeModule.key === 'export' ? (
-          <section className="table-spec-card">
-            <div>
-              <h2>表格格式参考</h2>
-              <p>SDO、PDO 简化表和多语言表的表头定义，导入前可快速确认目标格式。</p>
-            </div>
-            {tableSpecs.map((spec) => (
-              <div className="table-format-ref" key={spec.kind}>
-                <strong>
-                  {spec.kind === 'sdo'
-                    ? 'SDO 参数表'
-                    : spec.kind === 'pdoSimple'
-                      ? 'PDO 简化表'
-                      : '多语言表'}
-                  （{spec.headers.length} 列）
-                </strong>
-                <div className="table-format-chips">
-                  {spec.headers.map((header) => (
-                    <span className="table-format-chip" key={header}>
-                      {header}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </section>
+          <TableFormatReference specs={tableConfig.specs} />
         ) : null}
 
         {activeModule.key === 'ui' ? (
