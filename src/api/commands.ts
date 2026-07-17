@@ -22,6 +22,7 @@ import type {
   GitProjectStatus,
   GitRevision,
   GitRevisionSnapshot,
+  GitReviewReport,
   LanguageImportReport,
   LegacyTableKind,
   LegacyTableSpec,
@@ -101,6 +102,12 @@ export async function loadProjectGitRevision(
 
 export async function commitProjectGitVersion(request: GitCommitRequest): Promise<GitCommitReport> {
   return invoke<GitCommitReport>('commit_project_git_version', { request });
+}
+
+export async function reviewProjectGitChanges(
+  request: GitProjectRequest,
+): Promise<GitReviewReport> {
+  return invoke<GitReviewReport>('review_project_git_changes', { request });
 }
 
 export async function loadProject(path: string): Promise<LoadedProject> {

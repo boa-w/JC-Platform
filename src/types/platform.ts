@@ -100,6 +100,37 @@ export interface GitCommitReport {
   committed_paths: string[];
 }
 
+export interface GitReviewReport {
+  repo_root: string;
+  branch: string;
+  base_ref?: string;
+  additions: number;
+  deletions: number;
+  files: GitReviewFile[];
+}
+
+export interface GitReviewFile {
+  path: string;
+  status: 'modified' | 'added' | 'deleted';
+  additions: number;
+  deletions: number;
+  hunks: GitDiffHunk[];
+}
+
+export interface GitDiffHunk {
+  header: string;
+  old_start: number;
+  new_start: number;
+  lines: GitDiffLine[];
+}
+
+export interface GitDiffLine {
+  kind: 'context' | 'addition' | 'deletion';
+  old_line?: number;
+  new_line?: number;
+  content: string;
+}
+
 export interface MigratedProject {
   summary: ProjectSummary;
   validation: ProjectValidationReport;

@@ -1,15 +1,21 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import {
   ArrowUpRight,
+  Check,
   ChevronDown,
   ChevronRight,
+  ChevronsUpDown,
   CloudOff,
+  Columns2,
+  FileJson2,
   FileDiff,
   FolderGit2,
   GitBranch,
   GitCommitHorizontal,
   History,
   RefreshCw,
+  Rows3,
+  ScanSearch,
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -49,6 +55,7 @@ import {
   parseUnifiedProtocolProject,
   pdoSimpleDocumentTable,
   removeUiResourceOptionDocument,
+  reviewProjectGitChanges,
   revealItemInDir,
   saveJsonFile,
   saveProject,
@@ -99,6 +106,9 @@ import type {
   GitProjectStatus,
   GitRevision,
   GitRevisionSnapshot,
+  GitReviewFile,
+  GitDiffLine,
+  GitReviewReport,
   LanguageDocument,
   LanguageImportReport,
   LegacyTableKind,
@@ -177,8 +187,61 @@ const tableConfigTitles: Record<TableConfigKind, string> = {
 const appVersion = APP_VERSION;
 
 const recentProjectsStorageKey = 'jc-custom-platform.recentProjects';
+const gitReviewViewStorageKey = 'jc-custom-platform.gitReviewView';
 const maxRecentProjects = 8;
 const languageCodePattern = /^[a-z][a-z0-9-]*$/i;
+
+function unchangedLinesBeforeHunk(file: GitReviewFile, hunkIndex: number) {
+  const hunk = file.hunks[hunkIndex];
+  if (!hunk || hunk.old_start === 0) return 0;
+  if (hunkIndex === 0) return Math.max(0, hunk.old_start - 1);
+  const previous = file.hunks[hunkIndex - 1];
+  const previousEnd = previous.lines.reduce(
+    (maximum, line) => Math.max(maximum, line.old_line ?? maximum),
+    previous.old_start,
+  );
+  return Math.max(0, hunk.old_start - previousEnd - 1);
+}
+
+type GitReviewViewMode = 'unified' | 'split';
+
+interface GitSplitDiffRow {
+  left?: GitDiffLine;
+  right?: GitDiffLine;
+}
+
+function loadGitReviewViewMode(): GitReviewViewMode {
+  if (typeof window === 'undefined') return 'unified';
+  return window.localStorage.getItem(gitReviewViewStorageKey) === 'split' ? 'split' : 'unified';
+}
+
+function buildSplitDiffRows(lines: GitDiffLine[]): GitSplitDiffRow[] {
+  const rows: GitSplitDiffRow[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (line.kind === 'context') {
+      rows.push({ left: line, right: line });
+      index += 1;
+      continue;
+    }
+
+    const deletions: GitDiffLine[] = [];
+    const additions: GitDiffLine[] = [];
+    while (index < lines.length && lines[index].kind !== 'context') {
+      if (lines[index].kind === 'deletion') deletions.push(lines[index]);
+      else additions.push(lines[index]);
+      index += 1;
+    }
+    const rowCount = Math.max(deletions.length, additions.length);
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+      rows.push({ left: deletions[rowIndex], right: additions[rowIndex] });
+    }
+  }
+
+  return rows;
+}
 
 interface RecentProject {
   path: string;
@@ -301,6 +364,15 @@ export function Dashboard({
   const [gitError, setGitError] = useState<string | null>(null);
   const [gitBusy, setGitBusy] = useState(false);
   const [gitPreview, setGitPreview] = useState<GitRevisionSnapshot | null>(null);
+  const [gitReview, setGitReview] = useState<GitReviewReport | null>(null);
+  const [showGitReview, setShowGitReview] = useState(false);
+  const [gitReviewBusy, setGitReviewBusy] = useState(false);
+  const [gitReviewError, setGitReviewError] = useState<string | null>(null);
+  const [collapsedReviewFiles, setCollapsedReviewFiles] = useState<Set<string>>(new Set());
+  const [activeReviewPath, setActiveReviewPath] = useState<string | null>(null);
+  const [gitReviewViewMode, setGitReviewViewMode] =
+    useState<GitReviewViewMode>(loadGitReviewViewMode);
+  const gitReviewFileRefs = useRef<Record<string, HTMLElement | null>>({});
   const [showGitSummary, setShowGitSummary] = useState(false);
   const gitSummaryRef = useRef<HTMLDivElement | null>(null);
   const gitSummaryTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -441,6 +513,11 @@ export function Dashboard({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showGitSummary]);
+
+  useEffect(() => {
+    document.body.classList.toggle('git-review-open', showGitReview);
+    return () => document.body.classList.remove('git-review-open');
+  }, [showGitReview]);
 
   useEffect(() => {
     if (
@@ -973,6 +1050,7 @@ export function Dashboard({
       setGitMessage('更新项目配置');
       setSaveStatus(`已保存 Git 版本 ${report.short_hash}：${report.subject}`);
       await refreshProjectGit();
+      if (showGitReview) await refreshGitReview();
     } catch (error) {
       setGitError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1033,6 +1111,74 @@ export function Dashboard({
       () => projectGitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
       0,
     );
+  }
+
+  async function refreshGitReview() {
+    const request = currentProjectGitRequest();
+    if (!request) return;
+    setGitReviewBusy(true);
+    setGitReviewError(null);
+    try {
+      const report = await reviewProjectGitChanges(request);
+      setGitReview(report);
+      setActiveReviewPath((current) =>
+        current && report.files.some((file) => file.path === current)
+          ? current
+          : (report.files[0]?.path ?? null),
+      );
+      setCollapsedReviewFiles(
+        (current) =>
+          new Set([...current].filter((path) => report.files.some((file) => file.path === path))),
+      );
+    } catch (error) {
+      setGitReview(null);
+      setGitReviewError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setGitReviewBusy(false);
+    }
+  }
+
+  async function openGitReview() {
+    setShowGitSummary(false);
+    setShowGitReview(true);
+    await refreshGitReview();
+  }
+
+  function toggleReviewFile(path: string) {
+    setCollapsedReviewFiles((current) => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }
+
+  function toggleAllReviewFiles() {
+    if (!gitReview) return;
+    setCollapsedReviewFiles((current) =>
+      current.size === gitReview.files.length
+        ? new Set()
+        : new Set(gitReview.files.map((file) => file.path)),
+    );
+  }
+
+  function scrollToReviewFile(path: string) {
+    setActiveReviewPath(path);
+    setCollapsedReviewFiles((current) => {
+      if (!current.has(path)) return current;
+      const next = new Set(current);
+      next.delete(path);
+      return next;
+    });
+    window.setTimeout(
+      () => gitReviewFileRefs.current[path]?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      0,
+    );
+  }
+
+  function updateGitReviewViewMode(mode: GitReviewViewMode) {
+    setGitReviewViewMode(mode);
+    window.localStorage.setItem(gitReviewViewStorageKey, mode);
   }
 
   function signalDictionaryDocument(): SignalDictionary {
@@ -3836,7 +3982,7 @@ export function Dashboard({
   }
 
   return (
-    <main className="workspace">
+    <main className={showGitReview ? 'workspace workspace--git-review' : 'workspace'}>
       <div className="action-bar">
         <div className="action-bar-left">
           <div className="action-bar-command-center" title={loadedProject?.summary.path ?? ''}>
@@ -4079,7 +4225,11 @@ export function Dashboard({
             </div>
           ) : gitStatus?.available ? (
             <div className="git-summary-body">
-              <button className="git-summary-row" onClick={showProjectGitHistory} type="button">
+              <button
+                className="git-summary-row"
+                onClick={() => void openGitReview()}
+                type="button"
+              >
                 <FileDiff aria-hidden="true" size={17} strokeWidth={1.7} />
                 <span className="git-summary-row-label">变更</span>
                 <span className="git-summary-change-count">
@@ -4110,6 +4260,20 @@ export function Dashboard({
               </button>
 
               <div className="git-summary-divider" />
+
+              <button
+                className="git-summary-row"
+                disabled={gitStatus.changed_paths.length === 0}
+                onClick={() => void openGitReview()}
+                type="button"
+              >
+                <ScanSearch aria-hidden="true" size={17} strokeWidth={1.7} />
+                <span className="git-summary-row-label">审阅更改</span>
+                <span className="git-summary-row-value">
+                  {gitStatus.changed_paths.length} 个文件
+                </span>
+                <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.7} />
+              </button>
 
               <button
                 className="git-summary-row"
@@ -4155,6 +4319,252 @@ export function Dashboard({
             </div>
           )}
         </div>
+      ) : null}
+
+      {showGitReview ? (
+        <section aria-label="Git 更改审阅" className="git-review-workspace">
+          <aside className="git-review-sidebar">
+            <div className="git-review-sidebar-header">
+              <div>
+                <span>更改</span>
+                <strong>{gitReview?.files.length ?? 0}</strong>
+              </div>
+              <span className="git-review-stats">
+                <strong>+{gitReview?.additions ?? 0}</strong>
+                <em>-{gitReview?.deletions ?? 0}</em>
+              </span>
+            </div>
+            <div className="git-review-file-list">
+              {gitReview?.files.map((file) => (
+                <button
+                  className={
+                    activeReviewPath === file.path
+                      ? 'git-review-file-item git-review-file-item--active'
+                      : 'git-review-file-item'
+                  }
+                  key={file.path}
+                  onClick={() => scrollToReviewFile(file.path)}
+                  title={file.path}
+                  type="button"
+                >
+                  <FileJson2 aria-hidden="true" size={15} strokeWidth={1.7} />
+                  <span>
+                    <strong>{file.path.split('/').pop()}</strong>
+                    <small>{file.path}</small>
+                  </span>
+                  <code className={`git-review-status git-review-status--${file.status}`}>
+                    {file.status === 'added' ? 'A' : file.status === 'deleted' ? 'D' : 'M'}
+                  </code>
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <div className="git-review-main">
+            <header className="git-review-toolbar">
+              <div className="git-review-branch-info">
+                <div>
+                  <GitBranch aria-hidden="true" size={17} strokeWidth={1.8} />
+                  <strong>{gitReview?.branch ?? gitStatus?.branch ?? '分支'}</strong>
+                  <span className="git-review-stats">
+                    <strong>+{gitReview?.additions ?? 0}</strong>
+                    <em>-{gitReview?.deletions ?? 0}</em>
+                  </span>
+                </div>
+                <p>
+                  HEAD
+                  <span>→</span>
+                  工作区
+                  {gitReview?.base_ref ? <small>上游 {gitReview.base_ref}</small> : null}
+                </p>
+              </div>
+              <div className="git-review-toolbar-actions">
+                <div aria-label="对比视图" className="git-review-view-switch" role="group">
+                  <button
+                    aria-label="统一对比视图"
+                    aria-pressed={gitReviewViewMode === 'unified'}
+                    className={gitReviewViewMode === 'unified' ? 'active' : undefined}
+                    onClick={() => updateGitReviewViewMode('unified')}
+                    title="统一对比视图"
+                    type="button"
+                  >
+                    <Rows3 aria-hidden="true" size={15} strokeWidth={1.7} />
+                  </button>
+                  <button
+                    aria-label="并排对比视图"
+                    aria-pressed={gitReviewViewMode === 'split'}
+                    className={gitReviewViewMode === 'split' ? 'active' : undefined}
+                    onClick={() => updateGitReviewViewMode('split')}
+                    title="并排对比视图"
+                    type="button"
+                  >
+                    <Columns2 aria-hidden="true" size={15} strokeWidth={1.7} />
+                  </button>
+                </div>
+                <button
+                  aria-label="展开或折叠全部文件"
+                  disabled={!gitReview?.files.length}
+                  onClick={toggleAllReviewFiles}
+                  title="展开或折叠全部文件"
+                  type="button"
+                >
+                  <ChevronsUpDown aria-hidden="true" size={16} strokeWidth={1.7} />
+                </button>
+                <button
+                  aria-label="刷新审阅"
+                  disabled={gitReviewBusy}
+                  onClick={() => void refreshGitReview()}
+                  title="刷新审阅"
+                  type="button"
+                >
+                  <RefreshCw aria-hidden="true" size={16} strokeWidth={1.7} />
+                </button>
+                <button
+                  aria-label="关闭审阅"
+                  onClick={() => setShowGitReview(false)}
+                  title="关闭审阅"
+                  type="button"
+                >
+                  <X aria-hidden="true" size={17} strokeWidth={1.7} />
+                </button>
+              </div>
+              <div className="git-review-commit-bar">
+                <input
+                  aria-label="版本说明"
+                  maxLength={120}
+                  onChange={(event) => setGitMessage(event.target.value)}
+                  placeholder="版本说明"
+                  value={gitMessage}
+                />
+                <button
+                  disabled={gitSummaryCommitDisabled || gitMessage.trim() === ''}
+                  onClick={() => void handleCommitProjectVersion()}
+                  type="button"
+                >
+                  <GitCommitHorizontal aria-hidden="true" size={16} strokeWidth={1.8} />
+                  {gitBusy ? '提交中...' : '提交版本'}
+                </button>
+              </div>
+            </header>
+
+            <div className="git-review-content">
+              {gitReviewBusy && !gitReview ? (
+                <div className="git-review-empty">
+                  <RefreshCw aria-hidden="true" className="git-review-spin" size={22} />
+                  <span>正在读取更改</span>
+                </div>
+              ) : gitReviewError ? (
+                <div className="git-review-empty git-review-empty--error">
+                  <X aria-hidden="true" size={22} />
+                  <span>{gitReviewError}</span>
+                </div>
+              ) : gitReview?.files.length ? (
+                gitReview.files.map((file) => {
+                  const collapsed = collapsedReviewFiles.has(file.path);
+                  return (
+                    <article
+                      className="git-review-file"
+                      key={file.path}
+                      ref={(element) => {
+                        gitReviewFileRefs.current[file.path] = element;
+                      }}
+                    >
+                      <button
+                        aria-expanded={!collapsed}
+                        className="git-review-file-header"
+                        onClick={() => toggleReviewFile(file.path)}
+                        type="button"
+                      >
+                        <ChevronDown
+                          aria-hidden="true"
+                          className={collapsed ? 'git-review-chevron--collapsed' : undefined}
+                          size={16}
+                          strokeWidth={1.8}
+                        />
+                        <FileJson2 aria-hidden="true" size={16} strokeWidth={1.7} />
+                        <strong>{file.path}</strong>
+                        <span className="git-review-stats">
+                          <strong>+{file.additions}</strong>
+                          <em>-{file.deletions}</em>
+                        </span>
+                      </button>
+                      {collapsed ? null : (
+                        <div className="git-review-diff">
+                          {file.hunks.map((hunk, hunkIndex) => {
+                            const unchanged = unchangedLinesBeforeHunk(file, hunkIndex);
+                            return (
+                              <div
+                                className="git-review-hunk"
+                                key={`${hunk.old_start}-${hunk.new_start}`}
+                              >
+                                <div className="git-review-hunk-header" title={hunk.header}>
+                                  <ChevronDown aria-hidden="true" size={14} strokeWidth={1.7} />
+                                  <span>
+                                    {unchanged > 0
+                                      ? `${unchanged} 行未修改`
+                                      : `${hunk.old_start} → ${hunk.new_start}`}
+                                  </span>
+                                </div>
+                                {gitReviewViewMode === 'unified' ? (
+                                  hunk.lines.map((line) => (
+                                    <div
+                                      className={`git-review-line git-review-line--${line.kind}`}
+                                      key={`${line.kind}-${line.old_line ?? 'n'}-${line.new_line ?? 'n'}`}
+                                    >
+                                      <span>{line.old_line ?? ''}</span>
+                                      <span>{line.new_line ?? ''}</span>
+                                      <i>
+                                        {line.kind === 'addition'
+                                          ? '+'
+                                          : line.kind === 'deletion'
+                                            ? '-'
+                                            : ' '}
+                                      </i>
+                                      <code>{line.content || ' '}</code>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="git-review-split-diff">
+                                    {buildSplitDiffRows(hunk.lines).map((row) => (
+                                      <div
+                                        className="git-review-split-row"
+                                        key={`${row.left?.old_line ?? 'n'}-${row.right?.new_line ?? 'n'}-${row.left?.kind ?? 'empty'}-${row.right?.kind ?? 'empty'}`}
+                                      >
+                                        <div
+                                          className={`git-review-split-side git-review-split-side--${row.left?.kind ?? 'empty'}`}
+                                        >
+                                          <span>{row.left?.old_line ?? ''}</span>
+                                          <i>{row.left?.kind === 'deletion' ? '-' : ' '}</i>
+                                          <code>{row.left?.content || ' '}</code>
+                                        </div>
+                                        <div
+                                          className={`git-review-split-side git-review-split-side--${row.right?.kind ?? 'empty'}`}
+                                        >
+                                          <span>{row.right?.new_line ?? ''}</span>
+                                          <i>{row.right?.kind === 'addition' ? '+' : ' '}</i>
+                                          <code>{row.right?.content || ' '}</code>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })
+              ) : (
+                <div className="git-review-empty">
+                  <Check aria-hidden="true" size={24} strokeWidth={1.8} />
+                  <strong>没有待审阅的配置更改</strong>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
       ) : null}
 
       {gitPreview ? (

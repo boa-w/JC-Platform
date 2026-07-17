@@ -43,8 +43,8 @@ use crate::infrastructure::csv_excel::{
     LANGUAGE_REQUIRED_PREFIX_HEADERS, PDO_SIMPLE_HEADERS, SDO_HEADERS,
 };
 use crate::infrastructure::git::{
-    self, GitCommitReport, GitCommitRequest, GitProjectRequest, GitProjectStatus, GitRevision,
-    GitRevisionSnapshot,
+    self, GitCommitReport, GitCommitRequest, GitProjectRequest, GitProjectStatus, GitReviewReport,
+    GitRevision, GitRevisionSnapshot,
 };
 use crate::infrastructure::json_store;
 use can_dbc::{ByteOrder, Dbc, MessageId, NumericValue, ValueType};
@@ -110,6 +110,12 @@ pub fn load_project_git_revision(
 #[tauri::command]
 pub fn commit_project_git_version(request: GitCommitRequest) -> Result<GitCommitReport, String> {
     git::commit_project(&request)
+}
+
+/// 返回当前受管项目配置的结构化逐行差异。
+#[tauri::command]
+pub fn review_project_git_changes(request: GitProjectRequest) -> Result<GitReviewReport, String> {
+    git::review_project(&request)
 }
 
 /// 从磁盘加载 `.jcpro` 项目文件，返回摘要、校验结果与原始 JSON。

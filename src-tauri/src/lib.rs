@@ -29,9 +29,10 @@ use commands::{
     migrate_unified_protocol_document, parse_pdo_advanced_file, parse_pdo_advanced_project,
     parse_project_document, parse_project_file, parse_ui_resource_file, parse_ui_resources,
     parse_ui_resources_with_project_path, parse_unified_protocol_project,
-    pdo_simple_document_table, project_summary, remove_ui_resource_option_document, save_json_file,
-    save_project, save_project_as, save_text_file, sdo_document_table, translate_baidu_text,
-    update_ui_resource_document, validate_project_document, validate_table_headers,
+    pdo_simple_document_table, project_summary, remove_ui_resource_option_document,
+    review_project_git_changes, save_json_file, save_project, save_project_as, save_text_file,
+    sdo_document_table, translate_baidu_text, update_ui_resource_document,
+    validate_project_document, validate_table_headers,
 };
 
 /// 构建并启动 Tauri 应用。
@@ -62,6 +63,7 @@ pub fn run() {
             list_project_git_revisions,
             load_project_git_revision,
             commit_project_git_version,
+            review_project_git_changes,
             load_project,
             create_project,
             save_project,

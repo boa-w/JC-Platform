@@ -78,6 +78,41 @@ pub struct GitCommitReport {
     pub committed_paths: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct GitReviewReport {
+    pub repo_root: String,
+    pub branch: String,
+    pub base_ref: Option<String>,
+    pub additions: usize,
+    pub deletions: usize,
+    pub files: Vec<GitReviewFile>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GitReviewFile {
+    pub path: String,
+    pub status: String,
+    pub additions: usize,
+    pub deletions: usize,
+    pub hunks: Vec<GitDiffHunk>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GitDiffHunk {
+    pub header: String,
+    pub old_start: usize,
+    pub new_start: usize,
+    pub lines: Vec<GitDiffLine>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GitDiffLine {
+    pub kind: String,
+    pub old_line: Option<usize>,
+    pub new_line: Option<usize>,
+    pub content: String,
+}
+
 struct RepositoryContext {
     root: PathBuf,
     managed_paths: Vec<String>,
@@ -226,6 +261,195 @@ pub fn commit_project(request: &GitCommitRequest) -> Result<GitCommitReport, Str
         subject: revision.subject,
         committed_paths: context.managed_paths,
     })
+}
+
+pub fn review_project(request: &GitProjectRequest) -> Result<GitReviewReport, String> {
+    let context = discover_repository(request)?;
+    let has_head = git_text(&context.root, &["rev-parse", "--verify", "HEAD"]).is_ok();
+    let branch = git_text(&context.root, &["branch", "--show-current"])
+        .ok()
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "HEAD (detached)".to_string());
+    let base_ref = git_text(
+        &context.root,
+        &[
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            "@{upstream}",
+        ],
+    )
+    .ok();
+    let mut files = Vec::new();
+
+    for path in &context.managed_paths {
+        if !path_has_changes(&context.root, path) {
+            continue;
+        }
+        let is_tracked =
+            git_success(&context.root, &["ls-files", "--error-unmatch", "--", path]).is_ok();
+        let file_path = context.root.join(path);
+
+        if !has_head || !is_tracked {
+            let content = std::fs::read_to_string(&file_path).map_err(|error| {
+                format!("读取新增配置文件失败 {}：{error}", file_path.display())
+            })?;
+            files.push(added_file_review(path, &content));
+            continue;
+        }
+
+        let mut args = vec![
+            "diff".to_string(),
+            "--no-ext-diff".to_string(),
+            "--no-color".to_string(),
+            "--unified=3".to_string(),
+            "HEAD".to_string(),
+            "--".to_string(),
+            path.clone(),
+        ];
+        let diff = git_raw_text_owned(&context.root, &mut args)?;
+        let status = worktree_file_status(&context.root, path);
+        files.push(parse_unified_diff(path, &status, &diff));
+    }
+
+    let additions = files.iter().map(|file| file.additions).sum();
+    let deletions = files.iter().map(|file| file.deletions).sum();
+    Ok(GitReviewReport {
+        repo_root: context.root.to_string_lossy().to_string(),
+        branch,
+        base_ref,
+        additions,
+        deletions,
+        files,
+    })
+}
+
+fn added_file_review(path: &str, content: &str) -> GitReviewFile {
+    let lines: Vec<_> = content
+        .lines()
+        .enumerate()
+        .map(|(index, content)| GitDiffLine {
+            kind: "addition".to_string(),
+            old_line: None,
+            new_line: Some(index + 1),
+            content: content.to_string(),
+        })
+        .collect();
+    let additions = lines.len();
+    GitReviewFile {
+        path: path.to_string(),
+        status: "added".to_string(),
+        additions,
+        deletions: 0,
+        hunks: vec![GitDiffHunk {
+            header: format!("@@ -0,0 +1,{additions} @@"),
+            old_start: 0,
+            new_start: 1,
+            lines,
+        }],
+    }
+}
+
+fn parse_unified_diff(path: &str, status: &str, diff: &str) -> GitReviewFile {
+    let mut hunks = Vec::new();
+    let mut current_hunk: Option<GitDiffHunk> = None;
+    let mut old_line = 0usize;
+    let mut new_line = 0usize;
+    let mut additions = 0usize;
+    let mut deletions = 0usize;
+
+    for line in diff.lines() {
+        if line.starts_with("@@ ") {
+            if let Some(hunk) = current_hunk.take() {
+                hunks.push(hunk);
+            }
+            let (old_start, new_start) = parse_hunk_starts(line);
+            old_line = old_start;
+            new_line = new_start;
+            current_hunk = Some(GitDiffHunk {
+                header: line.to_string(),
+                old_start,
+                new_start,
+                lines: Vec::new(),
+            });
+            continue;
+        }
+
+        let Some(hunk) = current_hunk.as_mut() else {
+            continue;
+        };
+        if line.starts_with("\\ No newline at end of file") {
+            continue;
+        }
+
+        let (kind, line_old, line_new, content) = if let Some(content) = line.strip_prefix('+') {
+            let current = new_line;
+            new_line += 1;
+            additions += 1;
+            ("addition", None, Some(current), content)
+        } else if let Some(content) = line.strip_prefix('-') {
+            let current = old_line;
+            old_line += 1;
+            deletions += 1;
+            ("deletion", Some(current), None, content)
+        } else {
+            let content = line.strip_prefix(' ').unwrap_or(line);
+            let current_old = old_line;
+            let current_new = new_line;
+            old_line += 1;
+            new_line += 1;
+            ("context", Some(current_old), Some(current_new), content)
+        };
+        hunk.lines.push(GitDiffLine {
+            kind: kind.to_string(),
+            old_line: line_old,
+            new_line: line_new,
+            content: content.to_string(),
+        });
+    }
+    if let Some(hunk) = current_hunk {
+        hunks.push(hunk);
+    }
+
+    GitReviewFile {
+        path: path.to_string(),
+        status: status.to_string(),
+        additions,
+        deletions,
+        hunks,
+    }
+}
+
+fn parse_hunk_starts(header: &str) -> (usize, usize) {
+    let mut parts = header.split_whitespace();
+    let _marker = parts.next();
+    let old_start = parts
+        .next()
+        .and_then(|part| part.trim_start_matches('-').split(',').next())
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    let new_start = parts
+        .next()
+        .and_then(|part| part.trim_start_matches('+').split(',').next())
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    (old_start, new_start)
+}
+
+fn worktree_file_status(root: &Path, path: &str) -> String {
+    let status = git_text(
+        root,
+        &["status", "--porcelain", "--untracked-files=all", "--", path],
+    )
+    .unwrap_or_default();
+    let code = status.get(..2).unwrap_or_default();
+    if code.contains('D') {
+        "deleted".to_string()
+    } else if code.contains('A') || code == "??" {
+        "added".to_string()
+    } else {
+        "modified".to_string()
+    }
 }
 
 fn discover_repository(request: &GitProjectRequest) -> Result<RepositoryContext, String> {
@@ -425,6 +649,15 @@ fn git_text_owned(root: &Path, args: &[String]) -> Result<String, String> {
     git_text(root, &refs)
 }
 
+fn git_raw_text_owned(root: &Path, args: &mut [String]) -> Result<String, String> {
+    let refs: Vec<_> = args.iter().map(String::as_str).collect();
+    let output = git_output(root, &refs)?;
+    if !output.status.success() {
+        return Err(git_error(&output));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 fn git_success(root: &Path, args: &[&str]) -> Result<(), String> {
     git_text(root, args).map(|_| ())
 }
@@ -495,6 +728,18 @@ mod tests {
         });
         assert_eq!(status.additions, 2);
         assert_eq!(status.deletions, 1);
+        let review = review_project(&GitProjectRequest {
+            project_path: request.project_path.clone(),
+            sidecar_path: request.sidecar_path.clone(),
+        })
+        .unwrap();
+        assert_eq!(review.files.len(), 2);
+        assert_eq!(review.additions, 2);
+        assert_eq!(review.deletions, 1);
+        assert_eq!(review.files[0].hunks[0].lines[0].kind, "deletion");
+        assert_eq!(review.files[0].hunks[0].lines[1].kind, "addition");
+        assert_eq!(review.files[1].status, "added");
+        assert_eq!(review.files[1].hunks[0].lines[0].new_line, Some(1));
         let report = commit_project(&request).unwrap();
         assert_eq!(
             report.committed_paths,
