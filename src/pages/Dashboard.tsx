@@ -2,7 +2,6 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   ArrowUpRight,
-  Check,
   ChevronDown,
   ChevronRight,
   CloudOff,
@@ -76,6 +75,7 @@ import {
   useProtocolEditor,
 } from '../features/protocol-editor';
 import { ProjectExportPage, useProjectExport } from '../features/project-export';
+import { SettingsPage } from '../features/settings';
 import {
   formatFrameId,
   parseFrameId,
@@ -84,7 +84,6 @@ import {
 } from '../features/realtime-data';
 import { SettingDataPage } from '../features/setting-data';
 import { UiCanvasPreview } from '../components/UiCanvasPreview';
-import { APP_VERSION } from '../constants/app';
 import { featureModules } from '../data/modules';
 import { getTestData, type TestDataType, testDataLabels } from '../data/test-data';
 import { useCanTestData } from '../hooks/useCanTestData';
@@ -172,12 +171,8 @@ const tableConfigTitles: Record<TableConfigKind, string> = {
   language: '多国语言',
 };
 
-const appVersion = APP_VERSION;
-
 const recentProjectsStorageKey = 'jc-custom-platform.recentProjects';
 const maxRecentProjects = 8;
-const languageCodePattern = /^[a-z][a-z0-9-]*$/i;
-
 function loadRecentProjects() {
   if (typeof window === 'undefined') return [];
   try {
@@ -253,8 +248,6 @@ const previewDocument = {
 
 export function Dashboard({
   activeModule,
-  health,
-  project,
   loadedProject,
   theme,
   onToggleTheme,
@@ -345,15 +338,6 @@ export function Dashboard({
     updateSetting: updateTranslationSetting,
     resetSettings: resetTranslationSettings,
   } = useTranslationSettings();
-  const [newLanguageCode, setNewLanguageCode] = useState('');
-  const [newLanguageLabel, setNewLanguageLabel] = useState('');
-  const [newLanguageInnerKey, setNewLanguageInnerKey] = useState('');
-  const [editingLanguageInnerKeys, setEditingLanguageInnerKeys] = useState<Record<number, string>>(
-    {},
-  );
-  const [editingLanguageCodes, setEditingLanguageCodes] = useState<Record<number, string>>({});
-  const [orphanLanguageKeys, setOrphanLanguageKeys] = useState<string[]>([]);
-  const [languageEditorError, setLanguageEditorError] = useState<string | null>(null);
   const gitRefreshGenerationRef = useRef(0);
   const pdoEditor = usePdoEditor({
     document: loadedProject?.document ?? null,
@@ -651,93 +635,6 @@ export function Dashboard({
     );
   }
 
-  function restoreLanguageCode(index: number) {
-    const document = languageDocument();
-    const baselineLanguage = baselineLanguageDocument();
-    if (!document || !baselineLanguage) return;
-
-    const baselineCode = baselineLanguage.list_code_language[index];
-    if (typeof baselineCode !== 'string') {
-      removeLanguageCode(index);
-      return;
-    }
-
-    const currentCode = document.list_code_language[index];
-    const listTranslate = Object.fromEntries(
-      document.list_inner.slice(document.list_code_language.length).map((key) => {
-        const values = {
-          ...((document.list_translate[key] as Record<string, string> | undefined) ?? {}),
-        };
-        const baselineValues =
-          (baselineLanguage.list_translate[key] as Record<string, string> | undefined) ?? {};
-        if (currentCode && currentCode !== baselineCode) delete values[currentCode];
-        values[baselineCode] = baselineValues[baselineCode] ?? '';
-        return [key, values];
-      }),
-    );
-    const nextLabels = { ...(document.language_labels ?? {}) };
-    if (currentCode && currentCode !== baselineCode) delete nextLabels[currentCode];
-    nextLabels[baselineCode] =
-      baselineLanguage.language_labels?.[baselineCode] ??
-      baselineLanguage.list_inner[index] ??
-      baselineCode;
-
-    updateLanguageDocument({
-      ...document,
-      list_code_language: document.list_code_language.map((code, currentIndex) =>
-        currentIndex === index ? baselineCode : code,
-      ),
-      language_labels: nextLabels,
-      list_translate: listTranslate,
-    });
-  }
-
-  function isLanguageValueModified(index: number, key: string, code: string) {
-    if (!baselineDocument) return false;
-    const baselineLanguage = baselineLanguageDocument();
-    const document = languageDocument();
-    if (!baselineLanguage || !document || index < document.list_code_language.length) return false;
-
-    if (isModifiedPath(['language_info', 'list_translate', key, code])) return true;
-    const baselineKey = baselineLanguage.list_inner[index];
-    if (typeof baselineKey !== 'string' || baselineKey === key) return false;
-
-    const currentValue =
-      (document.list_translate[key] as Record<string, string> | undefined)?.[code] ?? '';
-    const baselineValue =
-      (baselineLanguage.list_translate[baselineKey] as Record<string, string> | undefined)?.[
-        code
-      ] ?? '';
-    return !deepEqual(currentValue, baselineValue);
-  }
-
-  function restoreLanguageKey(index: number, key: string) {
-    const document = languageDocument();
-    const baselineLanguage = baselineLanguageDocument();
-    if (!document || !baselineLanguage) return;
-
-    const baselineKey = baselineLanguage.list_inner[index];
-    if (typeof baselineKey !== 'string') {
-      removeLanguageKey(index);
-      return;
-    }
-
-    const nextTranslate = { ...document.list_translate };
-    if (key !== baselineKey) delete nextTranslate[key];
-    nextTranslate[baselineKey] = cloneJson(
-      baselineLanguage.list_translate[baselineKey] ??
-        Object.fromEntries(document.list_code_language.map((code) => [code, ''])),
-    );
-
-    updateLanguageDocument({
-      ...document,
-      list_inner: document.list_inner.map((item, currentIndex) =>
-        currentIndex === index ? baselineKey : item,
-      ),
-      list_translate: nextTranslate,
-    });
-  }
-
   const modifiedSections = loadedProject
     ? trackedDocumentSections.filter((section) => dirtySections.has(section))
     : [];
@@ -754,7 +651,6 @@ export function Dashboard({
     (refactorOnlySections as readonly string[]).includes(section),
   );
   const effectiveProjectValid = compatibleMissingSections.length === 0;
-  const currentProjectPath = loadedProject?.summary.path ?? projectPath;
   const selectedRecentProjectPath = recentProjects.some((item) => item.path === projectPath)
     ? projectPath
     : '';
@@ -1077,18 +973,6 @@ export function Dashboard({
     const document = batteryMonitorDocument();
     if (!document) return;
     updateBatteryMonitorDocument({ ...document, [field]: value });
-  }
-
-  function currentBatteryFrames(): BatteryMonitorFrame[] {
-    return batteryProtocolDocument()?.frames ?? [];
-  }
-
-  function currentBatterySignals(): BatteryMonitorSignal[] {
-    return batteryProtocolDocument()?.signals ?? [];
-  }
-
-  function currentBatteryDefaultTimeout(): number {
-    return batteryProtocolDocument()?.default_timeout_ticks ?? 200;
   }
 
   function updateBatteryFrame(
@@ -1709,382 +1593,6 @@ export function Dashboard({
 
   function updateLanguageDocument(next: LanguageDocument) {
     updateProjectDocument('language_info', next);
-  }
-
-  function inferredLanguageLabels(document: LanguageDocument) {
-    return Object.fromEntries(
-      document.list_code_language.map((code, index) => [
-        code,
-        document.language_labels?.[code]?.trim() || document.list_inner[index] || `语言_${code}`,
-      ]),
-    );
-  }
-
-  function languageConfigLabel(document: LanguageDocument, code: string) {
-    return inferredLanguageLabels(document)[code] || `语言_${code}`;
-  }
-
-  function normalizeLanguageDocument(
-    document: LanguageDocument,
-    codes: string[],
-    labels = inferredLanguageLabels(document),
-  ): LanguageDocument {
-    const documentWithLabels = { ...document, language_labels: labels };
-    const configKeys = codes.map((code) => languageConfigLabel(documentWithLabels, code));
-    const existingConfigKeySet = new Set(
-      document.list_code_language.map((code) => languageConfigLabel(document, code)),
-    );
-    const customKeys = document.list_inner.filter(
-      (key, index) => index >= document.list_code_language.length || !existingConfigKeySet.has(key),
-    );
-    const listInner = [...configKeys, ...customKeys.filter((key) => !configKeys.includes(key))];
-    const listTranslate = { ...document.list_translate };
-    for (const key of configKeys) delete listTranslate[key];
-
-    return {
-      ...document,
-      list_code_language: codes,
-      list_inner: listInner,
-      list_translate: listTranslate,
-      language_labels: labels,
-    };
-  }
-
-  function updateLanguageLabel(index: number, value: string) {
-    const document = languageDocument();
-    if (!document) return;
-
-    const code = document.list_code_language[index];
-    const label = value.trim();
-    if (!label) {
-      setLanguageEditorError('语言显示名不能为空。');
-      return;
-    }
-
-    const nextLabels = { ...(document.language_labels ?? {}), [code]: label };
-    setLanguageEditorError(null);
-    updateLanguageDocument(
-      normalizeLanguageDocument(document, document.list_code_language, nextLabels),
-    );
-  }
-
-  function findOrphanLanguageKeys(document: LanguageDocument) {
-    const innerKeySet = new Set(document.list_inner);
-    return Object.keys(document.list_translate).filter((key) => !innerKeySet.has(key));
-  }
-
-  function validateLanguageCode(code: string, codes: string[], currentIndex?: number) {
-    const normalizedCode = code.trim();
-    if (!normalizedCode) return '语言代码不能为空。';
-    if (!languageCodePattern.test(normalizedCode))
-      return '语言代码只能使用字母、数字和连字符，并且必须以字母开头。';
-    if (
-      codes.some(
-        (item, index) =>
-          item.toLowerCase() === normalizedCode.toLowerCase() && index !== currentIndex,
-      )
-    )
-      return `语言代码 ${normalizedCode} 已存在。`;
-    return null;
-  }
-
-  function validateLanguageInnerKey(key: string, keys: string[], currentIndex?: number) {
-    const normalizedKey = key.trim();
-    if (!normalizedKey) return '语言内部键不能为空。';
-    if (keys.some((item, index) => item === normalizedKey && index !== currentIndex))
-      return `语言内部键 ${normalizedKey} 已存在。`;
-    return null;
-  }
-
-  function updateLanguageCode(index: number, value: string) {
-    const document = languageDocument();
-    if (!document) return;
-
-    const previousCode = document.list_code_language[index];
-    const nextCode = value.trim().toLowerCase();
-    if (previousCode === 'zh' && nextCode !== 'zh') {
-      setLanguageEditorError('中文 zh 是基础语言，不能重命名。');
-      return;
-    }
-    const error = validateLanguageCode(nextCode, document.list_code_language, index);
-    if (error) {
-      setLanguageEditorError(error);
-      return;
-    }
-
-    setLanguageEditorError(null);
-    const nextCodes = document.list_code_language.map((code, currentIndex) =>
-      currentIndex === index ? nextCode : code,
-    );
-    const nextLabels = { ...(document.language_labels ?? {}) };
-    if (previousCode !== nextCode) {
-      nextLabels[nextCode] =
-        nextLabels[previousCode] ?? languageConfigLabel(document, previousCode);
-      delete nextLabels[previousCode];
-    }
-    const nextTranslate = Object.fromEntries(
-      document.list_inner.slice(document.list_code_language.length).map((key) => {
-        const values = {
-          ...((document.list_translate[key] as Record<string, string> | undefined) ?? {}),
-        };
-        if (previousCode !== nextCode) {
-          values[nextCode] = values[previousCode] ?? '';
-          delete values[previousCode];
-        }
-        return [key, values];
-      }),
-    );
-
-    updateLanguageDocument(
-      normalizeLanguageDocument(
-        { ...document, list_translate: nextTranslate },
-        nextCodes,
-        nextLabels,
-      ),
-    );
-  }
-
-  function addLanguageCode() {
-    const document = languageDocument();
-    if (!document) return;
-
-    const nextCode = newLanguageCode.trim().toLowerCase();
-    const nextLabel = newLanguageLabel.trim();
-    const error = validateLanguageCode(nextCode, document.list_code_language);
-    if (error) {
-      setLanguageEditorError(error);
-      return;
-    }
-    if (!nextLabel) {
-      setLanguageEditorError('语言显示名不能为空。');
-      return;
-    }
-
-    const nextTranslate = Object.fromEntries(
-      document.list_inner.slice(document.list_code_language.length).map((key) => {
-        const values = {
-          ...((document.list_translate[key] as Record<string, string> | undefined) ?? {}),
-        };
-        values[nextCode] = '';
-        return [key, values];
-      }),
-    );
-
-    const nextLabels = { ...(document.language_labels ?? {}), [nextCode]: nextLabel };
-    setLanguageEditorError(null);
-    setNewLanguageCode('');
-    setNewLanguageLabel('');
-    updateLanguageDocument(
-      normalizeLanguageDocument(
-        { ...document, list_translate: nextTranslate },
-        [...document.list_code_language, nextCode],
-        nextLabels,
-      ),
-    );
-  }
-
-  function removeLanguageCode(index: number) {
-    const document = languageDocument();
-    if (!document) return;
-    if (document.list_code_language.length <= 1) {
-      setLanguageEditorError('至少需要保留一个语言列。');
-      return;
-    }
-
-    const removedCode = document.list_code_language[index];
-    if (removedCode === 'zh') {
-      setLanguageEditorError('中文 zh 是基础语言，不能删除。');
-      return;
-    }
-
-    const nextTranslate = Object.fromEntries(
-      document.list_inner.slice(document.list_code_language.length).map((key) => {
-        const values = {
-          ...((document.list_translate[key] as Record<string, string> | undefined) ?? {}),
-        };
-        delete values[removedCode];
-        return [key, values];
-      }),
-    );
-
-    const nextLabels = { ...(document.language_labels ?? {}) };
-    delete nextLabels[removedCode];
-    setLanguageEditorError(null);
-    updateLanguageDocument(
-      normalizeLanguageDocument(
-        { ...document, list_translate: nextTranslate },
-        document.list_code_language.filter((_, currentIndex) => currentIndex !== index),
-        nextLabels,
-      ),
-    );
-  }
-
-  function syncLanguageConfigKeys() {
-    const document = languageDocument();
-    if (!document) return;
-
-    setLanguageEditorError(null);
-    updateLanguageDocument(normalizeLanguageDocument(document, document.list_code_language));
-  }
-
-  function checkOrphanLanguageTranslations() {
-    const document = languageDocument();
-    if (!document) return;
-
-    const keys = findOrphanLanguageKeys(document);
-    setOrphanLanguageKeys(keys);
-    setLanguageEditorError(
-      keys.length > 0 ? `发现 ${keys.length} 个无主翻译条目。` : '未发现无主翻译条目。',
-    );
-  }
-
-  function cleanupOrphanLanguageTranslations() {
-    const document = languageDocument();
-    if (!document) return;
-
-    const keys = findOrphanLanguageKeys(document);
-    if (keys.length === 0) {
-      setOrphanLanguageKeys([]);
-      setLanguageEditorError('未发现无主翻译条目。');
-      return;
-    }
-
-    const listTranslate = { ...document.list_translate };
-    for (const key of keys) delete listTranslate[key];
-    setOrphanLanguageKeys([]);
-    setLanguageEditorError(`已清理 ${keys.length} 个无主翻译条目。`);
-    updateLanguageDocument({ ...document, list_translate: listTranslate });
-  }
-
-  function setLanguageInnerKeyDraft(index: number, value: string) {
-    setEditingLanguageInnerKeys((items) => ({ ...items, [index]: value }));
-  }
-
-  function clearLanguageInnerKeyDraft(index: number) {
-    setEditingLanguageInnerKeys((items) => {
-      const next = { ...items };
-      delete next[index];
-      return next;
-    });
-  }
-
-  function setLanguageCodeDraft(index: number, value: string) {
-    setEditingLanguageCodes((items) => ({ ...items, [index]: value }));
-  }
-
-  function clearLanguageCodeDraft(index: number) {
-    setEditingLanguageCodes((items) => {
-      const next = { ...items };
-      delete next[index];
-      return next;
-    });
-  }
-
-  function applyLanguageCodeDraft(index: number) {
-    const document = languageDocument();
-    if (!document) return;
-    const draft = editingLanguageCodes[index];
-    if (draft === undefined) return;
-    clearLanguageCodeDraft(index);
-    updateLanguageCode(index, draft);
-  }
-
-  function updateLanguageKey(index: number, value: string) {
-    const document = languageDocument();
-    if (!document) return;
-    if (index < document.list_code_language.length) {
-      setLanguageEditorError('开头语言配置段由语言列自动维护，不能手动改名。');
-      clearLanguageInnerKeyDraft(index);
-      return;
-    }
-
-    const previousKey = document.list_inner[index];
-    const nextKey = value.trim();
-    if (nextKey === previousKey) {
-      setLanguageEditorError(null);
-      clearLanguageInnerKeyDraft(index);
-      return;
-    }
-
-    const error = validateLanguageInnerKey(nextKey, document.list_inner, index);
-    if (error) {
-      setLanguageEditorError(error);
-      return;
-    }
-
-    setLanguageEditorError(null);
-    setOrphanLanguageKeys([]);
-    clearLanguageInnerKeyDraft(index);
-    const nextKeys = document.list_inner.map((key, currentIndex) =>
-      currentIndex === index ? nextKey : key,
-    );
-    const nextTranslate = { ...document.list_translate };
-    nextTranslate[nextKey] =
-      nextTranslate[previousKey] ??
-      Object.fromEntries(document.list_code_language.map((code) => [code, '']));
-    if (previousKey !== nextKey) delete nextTranslate[previousKey];
-
-    updateLanguageDocument({ ...document, list_inner: nextKeys, list_translate: nextTranslate });
-  }
-
-  function addLanguageKey() {
-    const document = languageDocument();
-    if (!document) return;
-
-    const nextKey = newLanguageInnerKey.trim();
-    const error = validateLanguageInnerKey(nextKey, document.list_inner);
-    if (error) {
-      setLanguageEditorError(error);
-      return;
-    }
-
-    setLanguageEditorError(null);
-    setOrphanLanguageKeys([]);
-    setNewLanguageInnerKey('');
-    updateLanguageDocument({
-      ...document,
-      list_inner: [...document.list_inner, nextKey],
-      list_translate: {
-        ...document.list_translate,
-        [nextKey]: Object.fromEntries(document.list_code_language.map((code) => [code, ''])),
-      },
-    });
-  }
-
-  function removeLanguageKey(index: number) {
-    const document = languageDocument();
-    if (!document) return;
-    if (index < document.list_code_language.length) {
-      setLanguageEditorError('开头语言配置段由语言列自动维护，不能删除。');
-      return;
-    }
-
-    const removedKey = document.list_inner[index];
-    const nextTranslate = { ...document.list_translate };
-    delete nextTranslate[removedKey];
-    setOrphanLanguageKeys([]);
-    clearLanguageInnerKeyDraft(index);
-    updateLanguageDocument({
-      ...document,
-      list_inner: document.list_inner.filter((_, currentIndex) => currentIndex !== index),
-      list_translate: nextTranslate,
-    });
-  }
-
-  function updateLanguageValue(key: string, code: string, value: string) {
-    const document = languageDocument();
-    if (!document) return;
-
-    updateLanguageDocument({
-      ...document,
-      list_translate: {
-        ...document.list_translate,
-        [key]: {
-          ...((document.list_translate[key] as Record<string, string> | undefined) ?? {}),
-          [code]: value,
-        },
-      },
-    });
   }
 
   async function handleCreateProject() {
@@ -3434,147 +2942,18 @@ export function Dashboard({
           </>
         ) : null}
         {activeModule.key === 'settings' ? (
-          <section className="project-open-card">
-            <div>
-              <h2>软件设置</h2>
-              <p>管理导出写入控制、外观主题等软件级偏好设置。</p>
-            </div>
-            <strong className="section-label--muted">导出写入控制</strong>
-            <div className="settings-option-grid">
-              <div className="settings-option-grid__head">配置项</div>
-              <div className="settings-option-grid__head">写入 ConfigUpdate.json</div>
-              <div className="settings-option-grid__head">写入 pdo_sdo_data.bin</div>
-              <div className="settings-option-info">
-                <span>锂电协议</span>
-                <small>控制 battery_protocol 是否随完整导出写入配置文件或设备 bin。</small>
-              </div>
-              <label className="settings-check">
-                <input
-                  checked={exportBatteryOptions.battery_protocol.config}
-                  onChange={(event) =>
-                    updateExportBatteryOption('battery_protocol', 'config', event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                <span>配置文件</span>
-              </label>
-              <label className="settings-check">
-                <input
-                  checked={exportBatteryOptions.battery_protocol.bin}
-                  onChange={(event) =>
-                    updateExportBatteryOption('battery_protocol', 'bin', event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                <span>bin 文件</span>
-              </label>
-              <div className="settings-option-info">
-                <span>锂电协议监控</span>
-                <small>
-                  控制 battery_monitor_info 是否写入导出清单描述和 battery monitor 二进制段。
-                </small>
-              </div>
-              <label className="settings-check">
-                <input
-                  checked={exportBatteryOptions.battery_monitor_info.config}
-                  onChange={(event) =>
-                    updateExportBatteryOption(
-                      'battery_monitor_info',
-                      'config',
-                      event.target.checked,
-                    )
-                  }
-                  type="checkbox"
-                />
-                <span>配置文件</span>
-              </label>
-              <label className="settings-check">
-                <input
-                  checked={exportBatteryOptions.battery_monitor_info.bin}
-                  onChange={(event) =>
-                    updateExportBatteryOption('battery_monitor_info', 'bin', event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                <span>bin 文件</span>
-              </label>
-              <div className="settings-option-info">
-                <span>故障码配置</span>
-                <small>控制 fault_code_info 是否写入导出清单描述和 fault code 二进制段。</small>
-              </div>
-              <label className="settings-check">
-                <input
-                  checked={exportBatteryOptions.fault_code_info.config}
-                  onChange={(event) =>
-                    updateExportBatteryOption('fault_code_info', 'config', event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                <span>配置文件</span>
-              </label>
-              <label className="settings-check">
-                <input
-                  checked={exportBatteryOptions.fault_code_info.bin}
-                  onChange={(event) =>
-                    updateExportBatteryOption('fault_code_info', 'bin', event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                <span>bin 文件</span>
-              </label>
-            </div>
-            <div className="settings-option-footer">
-              <span>该设置影响项目导出、二进制报告和 bin 对比。</span>
-              <button type="button" onClick={resetExportBatteryOptions}>
-                恢复默认
-              </button>
-            </div>
-            <strong className="section-label--muted">翻译服务</strong>
-            <div className="settings-service-panel">
-              <div className="settings-service-info">
-                <span>百度翻译</span>
-                <small>用于多国语言管理页的一键条目翻译。</small>
-              </div>
-              <label className="settings-field">
-                <span>App ID</span>
-                <input
-                  autoComplete="off"
-                  value={translationSettings.baiduAppId}
-                  onChange={(event) => updateTranslationSetting('baiduAppId', event.target.value)}
-                />
-              </label>
-              <label className="settings-field">
-                <span>API Key</span>
-                <input
-                  autoComplete="new-password"
-                  type="password"
-                  value={translationSettings.baiduAppKey}
-                  onChange={(event) => updateTranslationSetting('baiduAppKey', event.target.value)}
-                />
-              </label>
-              <div className="settings-option-footer settings-option-footer--compact">
-                <span>配置保存在本机软件设置中，不写入项目文件。</span>
-                <button type="button" onClick={resetTranslationSettings}>
-                  清空配置
-                </button>
-              </div>
-            </div>
-            <strong className="section-label--muted">外观</strong>
-            <div className="theme-toggle-row">
-              <div className="theme-toggle-info">
-                <span>主题模式</span>
-                <small>{theme === 'dark' ? '深色模式' : '浅色模式'}</small>
-              </div>
-              <button className="theme-toggle-btn" onClick={onToggleTheme} type="button">
-                <span
-                  className={`theme-toggle-track ${theme === 'dark' ? 'theme-toggle-track--dark' : ''}`}
-                >
-                  <span className="theme-toggle-thumb" />
-                </span>
-              </button>
-            </div>
-          </section>
+          <SettingsPage
+            exportOptions={exportBatteryOptions}
+            onUpdateExportOption={updateExportBatteryOption}
+            onResetExportOptions={resetExportBatteryOptions}
+            translationSettings={translationSettings}
+            onUpdateTranslationSetting={updateTranslationSetting}
+            onResetTranslationSettings={resetTranslationSettings}
+            theme={theme}
+            onToggleTheme={onToggleTheme}
+          />
         ) : null}
+
 
         {activeModule.key === 'export' ? (
           <ProjectExportPage controller={projectExport} />
