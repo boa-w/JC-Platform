@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react';
+import type { ConfirmDialogController } from '../hooks/useConfirmDialog';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 
 interface ConfirmDialogProps {
@@ -63,5 +64,17 @@ export function ConfirmDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+export function ConfirmDialogHost({ controller }: { controller: ConfirmDialogController }) {
+  if (!controller.request) return null;
+
+  return (
+    <ConfirmDialog
+      {...controller.request}
+      onCancel={controller.cancel}
+      onConfirm={controller.confirm}
+    />
   );
 }

@@ -406,6 +406,8 @@ export function Dashboard({
         modifiedSections={modifiedSections}
         confirmGenerateType={confirmGenerateType}
         showCloseConfirm={showCloseConfirm && hasUnsavedChanges}
+        discardConfirmation={projectLifecycle.discardConfirmation}
+        restoreConfirmation={projectGit.restoreConfirmation}
         onCancelSave={projectLifecycle.cancelSaveProject}
         onConfirmSave={projectLifecycle.confirmSaveProject}
         onCancelTestData={() => setConfirmGenerateType(null)}

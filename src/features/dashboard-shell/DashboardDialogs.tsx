@@ -1,6 +1,7 @@
 import { useId, useRef } from 'react';
-import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { ConfirmDialog, ConfirmDialogHost } from '../../components/ConfirmDialog';
 import { type TestDataType, testDataLabels } from '../../data/test-data';
+import type { ConfirmDialogController } from '../../hooks/useConfirmDialog';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { type DocumentSectionKey, modifiedSectionLabels } from '../../modules/documentSections';
 import type { LoadedProject } from '../../types/platform';
@@ -16,6 +17,8 @@ interface DashboardDialogsProps {
   modifiedSections: DocumentSectionKey[];
   confirmGenerateType: TestDataType | null;
   showCloseConfirm: boolean;
+  discardConfirmation: ConfirmDialogController;
+  restoreConfirmation: ConfirmDialogController;
   onCancelSave: () => void;
   onConfirmSave: () => void | Promise<void>;
   onCancelTestData: () => void;
@@ -35,6 +38,8 @@ export function DashboardDialogs({
   modifiedSections,
   confirmGenerateType,
   showCloseConfirm,
+  discardConfirmation,
+  restoreConfirmation,
   onCancelSave: cancelSaveProject,
   onConfirmSave: confirmSaveProject,
   onCancelTestData,
@@ -159,6 +164,9 @@ export function DashboardDialogs({
           title="放弃未保存修改？"
         />
       ) : null}
+
+      <ConfirmDialogHost controller={discardConfirmation} />
+      <ConfirmDialogHost controller={restoreConfirmation} />
     </>
   );
 }

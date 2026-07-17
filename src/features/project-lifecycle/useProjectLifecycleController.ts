@@ -11,7 +11,8 @@ import {
   saveProjectAs,
   validateProjectDocument,
 } from '../../api/commands';
-import { refactorOnlySections, type DocumentSectionKey } from '../../modules/documentSections';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { type DocumentSectionKey, refactorOnlySections } from '../../modules/documentSections';
 import type { LoadedProject, ProjectParseReport } from '../../types/platform';
 import { cloneJson } from '../../utils/projectDirty';
 
@@ -110,6 +111,7 @@ export function useProjectLifecycleController({
   const [refactorConfigStatus, setRefactorConfigStatus] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const operationGenerationRef = useRef(0);
+  const discardConfirmation = useConfirmDialog();
 
   useEffect(() => {
     const storedProjects = loadRecentProjects();
@@ -158,11 +160,15 @@ export function useProjectLifecycleController({
     updateRecentProjects(nextProject, fallbackPath);
   }
 
-  function confirmDiscardUnsavedChanges(action: string) {
-    return (
-      !hasUnsavedChanges ||
-      window.confirm(`当前项目存在未保存修改。${action}会放弃这些修改，确定继续吗？`)
-    );
+  async function confirmDiscardUnsavedChanges(action: string) {
+    if (!hasUnsavedChanges) return true;
+    return discardConfirmation.ask({
+      title: '放弃未保存修改？',
+      message: `当前项目存在未保存修改。${action}会放弃这些修改，且无法撤销。`,
+      confirmLabel: `放弃并${action}`,
+      cancelLabel: '继续编辑',
+      danger: true,
+    });
   }
 
   function refactorConfigDocument(document: unknown) {
@@ -217,7 +223,7 @@ export function useProjectLifecycleController({
 
   async function createNewProject() {
     setOpenError(null);
-    if (!confirmDiscardUnsavedChanges('创建新项目')) return;
+    if (!(await confirmDiscardUnsavedChanges('创建新项目'))) return;
     if (!isTauriRuntime()) {
       setOpenError('系统保存对话框只能在 Tauri 桌面应用中使用。');
       return;
@@ -251,7 +257,7 @@ export function useProjectLifecycleController({
   }
 
   async function openProject(path = projectPath, skipDiscardConfirmation = false) {
-    if (!skipDiscardConfirmation && !confirmDiscardUnsavedChanges('打开其他项目')) return;
+    if (!skipDiscardConfirmation && !(await confirmDiscardUnsavedChanges('打开其他项目'))) return;
     const generation = beginOpenOperation();
     try {
       const nextProject = await loadProject(path);
@@ -273,18 +279,13 @@ export function useProjectLifecycleController({
   async function reloadProject() {
     const reloadPath = loadedProject?.summary.path ?? projectPath;
     if (reloadPath.trim() === '') return;
-    if (
-      hasUnsavedChanges &&
-      !window.confirm('当前项目存在未保存修改，重新加载会丢弃这些修改。确定继续吗？')
-    ) {
-      return;
-    }
+    if (!(await confirmDiscardUnsavedChanges('重新加载项目'))) return;
     await openProject(reloadPath, true);
   }
 
   async function selectProjectFile() {
     setOpenError(null);
-    if (!confirmDiscardUnsavedChanges('打开其他项目')) return;
+    if (!(await confirmDiscardUnsavedChanges('打开其他项目'))) return;
     if (!isTauriRuntime()) {
       setOpenError('系统文件选择器只能在桌面应用中使用；也可以粘贴项目路径后打开。');
       return;
@@ -523,6 +524,7 @@ export function useProjectLifecycleController({
 
   return {
     clearRecentProjects,
+    discardConfirmation,
     confirmSaveProject,
     createNewProject,
     createRefactorConfig,

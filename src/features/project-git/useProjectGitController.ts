@@ -3,18 +3,19 @@ import {
   commitProjectGitVersion,
   loadProjectGitContext,
   loadProjectGitRevision,
+  revealItemInDir,
   reviewProjectGitChanges,
   reviewProjectGitRevision,
-  revealItemInDir,
 } from '../../api/commands';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { refactorOnlySections } from '../../modules/documentSections';
 import type {
   GitProjectRequest,
   GitProjectStatus,
-  GitRevision,
   GitReviewReport,
+  GitRevision,
   NavigationKey,
 } from '../../types/platform';
-import { refactorOnlySections } from '../../modules/documentSections';
 
 const defaultCommitMessage = '更新项目配置';
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -58,12 +59,11 @@ export function useProjectGitController({
   const refreshGenerationRef = useRef(0);
   const reviewGenerationRef = useRef(0);
   const projectSectionRef = useRef<HTMLDivElement | null>(null);
+  const restoreConfirmation = useConfirmDialog();
 
   const request = useMemo<GitProjectRequest | null>(
     () =>
-      projectPath
-        ? { project_path: projectPath, sidecar_path: sidecarPath ?? undefined }
-        : null,
+      projectPath ? { project_path: projectPath, sidecar_path: sidecarPath ?? undefined } : null,
     [projectPath, sidecarPath],
   );
   const previousRequestRef = useRef(request);
@@ -174,7 +174,13 @@ export function useProjectGitController({
     if (!request || !reviewRevision) return;
     if (
       hasUnsavedChanges &&
-      !window.confirm('当前项目存在未保存修改。继续恢复会用历史版本替换这些修改，是否继续？')
+      !(await restoreConfirmation.ask({
+        title: '放弃未保存修改？',
+        message: '恢复历史版本会替换当前未保存修改，且无法撤销。',
+        confirmLabel: '放弃并恢复',
+        cancelLabel: '继续编辑',
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -237,6 +243,7 @@ export function useProjectGitController({
     reviewBusy,
     reviewError,
     reviewRevision,
+    restoreConfirmation,
     revisions,
     showReview,
     status,

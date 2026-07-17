@@ -1,6 +1,8 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useMemo, useState } from 'react';
 import { loadTextFile, saveTextFile } from '../../api/commands';
+import { ConfirmDialogHost } from '../../components/ConfirmDialog';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import type {
   FaultCodeInfo,
   FaultCodeItem,
@@ -97,6 +99,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   const [batchTargetSourceKey, setBatchTargetSourceKey] = useState('');
   const [batchCopyI18nMode, setBatchCopyI18nMode] = useState<BatchCopyI18nMode>('independent');
   const [codeRowKeys, setCodeRowKeys] = useState(() => codes.map(createFaultCodeRowKey));
+  const deleteConfirmation = useConfirmDialog();
   const duplicateFaultCodes = useMemo(
     () => buildDuplicateFaultCodeHints(sources, codes),
     [sources, codes],
@@ -492,13 +495,19 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     setCsvStatus(`已${enabled ? '启用' : '禁用'}当前筛选范围 ${indexes.size} 条故障码`);
   }
 
-  function batchRemoveVisibleCodes() {
+  async function batchRemoveVisibleCodes() {
     const indexes = new Set(visibleCodeIndexes());
     if (indexes.size === 0) {
       setCsvStatus('当前筛选范围内没有故障码可删除');
       return;
     }
-    if (!window.confirm(`确定删除当前筛选范围内的 ${indexes.size} 条故障码吗？`)) {
+    const confirmed = await deleteConfirmation.ask({
+      title: '删除筛选结果？',
+      message: `将删除当前筛选范围内的 ${indexes.size} 条故障码。保存项目后此操作将无法撤销。`,
+      confirmLabel: `删除 ${indexes.size} 条`,
+      danger: true,
+    });
+    if (!confirmed) {
       return;
     }
     clearFaultCodeRowDrafts();
@@ -1266,6 +1275,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
           </table>
         </div>
       </section>
+      <ConfirmDialogHost controller={deleteConfirmation} />
     </section>
   );
 }
