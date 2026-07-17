@@ -19,6 +19,12 @@ export interface CheckUpdateOptions {
   timeout?: number;
 }
 
+export interface InstallUpdateOptions {
+  onBeforeRelaunch?: () => void;
+  onProgress?: (progress: UpdateProgress) => void;
+  onRelaunchError?: () => void;
+}
+
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export async function checkForAppUpdate(
@@ -54,9 +60,7 @@ export async function checkForAppUpdate(
   }
 }
 
-export async function installAppUpdate(
-  onProgress?: (progress: UpdateProgress) => void,
-): Promise<boolean> {
+export async function installAppUpdate(options: InstallUpdateOptions = {}): Promise<boolean> {
   if (!isTauriRuntime()) {
     throw new Error('当前环境不是 Tauri 桌面应用，无法安装更新。');
   }
@@ -80,12 +84,14 @@ export async function installAppUpdate(
         if (total !== null) downloaded = total;
       }
 
-      onProgress?.({ downloaded, total });
+      options.onProgress?.({ downloaded, total });
     });
 
+    options.onBeforeRelaunch?.();
     await relaunch();
     return true;
   } catch (error) {
+    options.onRelaunchError?.();
     throw new Error(normalizeUpdaterError(error));
   }
 }

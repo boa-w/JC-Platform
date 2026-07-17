@@ -144,6 +144,8 @@ interface DashboardProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onNavigate: (key: NavigationKey) => void;
+  onUnsavedChangesChange: (hasChanges: boolean) => void;
+  isUpdateRelaunchAuthorized: () => boolean;
   onProjectLoaded: (project: LoadedProject) => void;
 }
 
@@ -155,6 +157,8 @@ export function Dashboard({
   theme,
   onToggleTheme,
   onNavigate,
+  onUnsavedChangesChange,
+  isUpdateRelaunchAuthorized,
   onProjectLoaded,
 }: DashboardProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -313,9 +317,14 @@ export function Dashboard({
   }, [projectGit.refresh]);
 
   useEffect(() => {
+    onUnsavedChangesChange(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onUnsavedChangesChange]);
+
+  useEffect(() => {
     if (!hasUnsavedChanges) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isUpdateRelaunchAuthorized()) return;
       event.preventDefault();
       event.returnValue = '';
     };
@@ -323,6 +332,7 @@ export function Dashboard({
 
     const unlistenPromise = isTauriRuntime()
       ? getCurrentWindow().onCloseRequested((event) => {
+          if (isUpdateRelaunchAuthorized()) return;
           event.preventDefault();
           setShowCloseConfirm(true);
         })
@@ -332,7 +342,7 @@ export function Dashboard({
       window.removeEventListener('beforeunload', handleBeforeUnload);
       void unlistenPromise.then((unlisten) => unlisten());
     };
-  }, [hasUnsavedChanges]);
+  }, [hasUnsavedChanges, isUpdateRelaunchAuthorized]);
 
   function baselineLanguageDocument(): LanguageDocument | null {
     if (!baselineDocument) return null;

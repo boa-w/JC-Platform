@@ -110,8 +110,26 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
       transformCallback: () => 1,
       unregisterCallback: () => undefined,
       invoke: async (command: string) => {
+        const updateCalls = (window as unknown as { __UPDATE_CALLS__?: string[] }).__UPDATE_CALLS__;
+        if (command.startsWith('plugin:updater|') || command === 'plugin:process|restart') {
+          updateCalls?.push(command);
+        }
         if (command.startsWith('plugin:event|')) return 1;
         if (command === 'plugin:window|set_title') return null;
+        if (command === 'plugin:app|name') return '自定义开发平台';
+        if (command === 'plugin:app|version') return '0.1.0';
+        if (command === 'plugin:updater|check') {
+          return {
+            rid: 7,
+            currentVersion: '0.1.0',
+            version: '0.2.0',
+            date: '2026-07-18T00:00:00.000Z',
+            body: '安全更新测试',
+            rawJson: {},
+          };
+        }
+        if (command === 'plugin:updater|download_and_install') return null;
+        if (command === 'plugin:process|restart') return null;
         if (command === 'load_project') {
           return {
             summary: {
@@ -147,6 +165,7 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
         throw new Error(`Unexpected desktop command: ${command}`);
       },
     };
+    (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__ = [];
     (window as unknown as { __TAURI_INTERNALS__: typeof internals }).__TAURI_INTERNALS__ =
       internals;
   }, projectPath);
@@ -170,6 +189,62 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
   expect(
     await page.evaluate(() => localStorage.getItem('jc-custom-platform.projectRecoveryDraft')),
   ).not.toBeNull();
+
+  const beforeUpdateEventPrevented = await page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(beforeUpdateEventPrevented).toBe(true);
+
+  await page.getByRole('button', { name: '软件版本信息' }).click();
+  const aboutDialog = page.getByRole('dialog', { name: '版本信息' });
+  await aboutDialog.getByRole('button', { name: '检查更新' }).click();
+  const installButton = aboutDialog.getByRole('button', { name: '安装更新' });
+  await expect(installButton).toBeVisible();
+  await installButton.click();
+
+  const updateDialog = page.getByRole('dialog', { name: '安装并重启应用？' });
+  await expect(updateDialog).toContainText('当前项目存在未保存修改');
+  await expect(updateDialog.getByRole('button', { name: '返回保存' })).toBeFocused();
+  const updateDialogBox = await updateDialog.boundingBox();
+  expect(updateDialogBox).not.toBeNull();
+  expect((updateDialogBox?.x ?? 0) + (updateDialogBox?.width ?? 0)).toBeLessThanOrEqual(1024);
+  expect((updateDialogBox?.y ?? 0) + (updateDialogBox?.height ?? 0)).toBeLessThanOrEqual(720);
+  await updateDialog.getByRole('button', { name: '返回保存' }).click();
+  await expect(updateDialog).toBeHidden();
+  await expect(aboutDialog).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__.filter((command) =>
+          command.includes('download_and_install'),
+        ).length,
+    ),
+  ).toBe(0);
+
+  await aboutDialog.getByRole('button', { name: '安装更新' }).click();
+  await updateDialog.getByRole('button', { name: '继续更新' }).click();
+  await expect(aboutDialog.getByText('更新已安装，正在重启应用', { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__,
+    ),
+  ).toEqual(
+    expect.arrayContaining(['plugin:updater|download_and_install', 'plugin:process|restart']),
+  );
+  const authorizedUpdateEventPrevented = await page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(authorizedUpdateEventPrevented).toBe(false);
+  expect(
+    await page.evaluate(() => localStorage.getItem('jc-custom-platform.projectRecoveryDraft')),
+  ).not.toBeNull();
+
+  await page.keyboard.press('Escape');
+  await expect(aboutDialog).toBeHidden();
 
   await page.keyboard.press('Control+s');
   const saveDialog = page.getByRole('dialog', { name: '确认保存' });

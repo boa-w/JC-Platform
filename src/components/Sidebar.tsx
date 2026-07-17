@@ -35,6 +35,7 @@ import type {
   NavigationKey,
   ProjectSummary,
 } from '../types/platform';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface SidebarProps {
   modules: FeatureModule[];
@@ -44,6 +45,9 @@ interface SidebarProps {
   onToggleTheme: () => void;
   health: BackendHealth | null;
   project: ProjectSummary | null;
+  hasUnsavedChanges: boolean;
+  onBeforeUpdateRelaunch: () => void;
+  onUpdateRelaunchError: () => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }
@@ -87,6 +91,9 @@ export function Sidebar({
   onToggleTheme,
   health,
   project,
+  hasUnsavedChanges,
+  onBeforeUpdateRelaunch,
+  onUpdateRelaunchError,
   collapsed,
   onToggleCollapsed,
 }: SidebarProps) {
@@ -97,6 +104,7 @@ export function Sidebar({
   const activeGroupLabel = groupOfActive?.label ?? selectedGroupLabel;
 
   const [showPopup, setShowPopup] = useState(false);
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const versionPopupId = useId();
   const versionTitleId = useId();
   const popupRef = useRef<HTMLDivElement | null>(null);
@@ -115,7 +123,10 @@ export function Sidebar({
     error: updateError,
     checkUpdate,
     installUpdate,
-  } = useAppUpdate();
+  } = useAppUpdate({
+    onBeforeRelaunch: onBeforeUpdateRelaunch,
+    onRelaunchError: onUpdateRelaunchError,
+  });
   const diagnosticExport = useDiagnosticExport({
     activeModule: activeKey,
     health,
@@ -203,10 +214,22 @@ export function Sidebar({
 
   const handleUpdateAction = () => {
     if (updateStatus === 'available') {
-      void installUpdate();
+      setShowPopup(false);
+      setShowUpdateConfirm(true);
       return;
     }
     void checkUpdate();
+  };
+
+  const cancelUpdateInstall = () => {
+    setShowUpdateConfirm(false);
+    setShowPopup(true);
+  };
+
+  const confirmUpdateInstall = () => {
+    setShowUpdateConfirm(false);
+    setShowPopup(true);
+    void installUpdate();
   };
 
   return (
@@ -418,6 +441,20 @@ export function Sidebar({
           </div>
         </nav>
       )}
+      {showUpdateConfirm ? (
+        <ConfirmDialog
+          cancelLabel={hasUnsavedChanges ? '返回保存' : '取消'}
+          confirmLabel="继续更新"
+          message={
+            hasUnsavedChanges
+              ? '当前项目存在未保存修改。更新安装后应用将重启，修改会保留在恢复草稿中；建议先返回并保存项目。'
+              : '更新安装完成后应用将自动重启。是否继续下载并安装？'
+          }
+          onCancel={cancelUpdateInstall}
+          onConfirm={confirmUpdateInstall}
+          title="安装并重启应用？"
+        />
+      ) : null}
     </div>
   );
 }

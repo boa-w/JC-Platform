@@ -12,7 +12,12 @@ type UpdateStatus =
   | 'restarting'
   | 'error';
 
-export function useAppUpdate() {
+interface UseAppUpdateOptions {
+  onBeforeRelaunch?: () => void;
+  onRelaunchError?: () => void;
+}
+
+export function useAppUpdate({ onBeforeRelaunch, onRelaunchError }: UseAppUpdateOptions = {}) {
   const [status, setStatus] = useState<UpdateStatus>('idle');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
@@ -48,7 +53,11 @@ export function useAppUpdate() {
     setProgress(null);
 
     try {
-      const started = await installAppUpdate(setProgress);
+      const started = await installAppUpdate({
+        onBeforeRelaunch,
+        onProgress: setProgress,
+        onRelaunchError,
+      });
       if (!started) {
         setUpdateInfo(null);
         setStatus('up-to-date');
@@ -63,7 +72,7 @@ export function useAppUpdate() {
       setStatus('error');
       return false;
     }
-  }, []);
+  }, [onBeforeRelaunch, onRelaunchError]);
 
   return {
     status,
