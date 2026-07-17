@@ -1,23 +1,5 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import {
-  ArrowUpRight,
-  ChevronDown,
-  ChevronRight,
-  CloudOff,
-  FileDiff,
-  FolderOpen,
-  FolderGit2,
-  GitBranch,
-  GitCommitHorizontal,
-  History,
-  RefreshCw,
-  Save as SaveIcon,
-  SaveAll,
-  ScanSearch,
-  Undo2,
-  X,
-} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   addUiResourceOptionDocument,
@@ -67,6 +49,7 @@ import {
 import { CanTestDataPage } from '../features/can-test-data';
 import { CanopenExportPage } from '../features/canopen-export';
 import { FaultCodePage } from '../features/fault-code';
+import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
 import {
   PrivateProtocolPage,
   ProtocolMappingPage,
@@ -79,7 +62,7 @@ import { RealtimeDataPage, usePdoEditor } from '../features/realtime-data';
 import { SettingDataPage } from '../features/setting-data';
 import { UiCanvasPreview } from '../components/UiCanvasPreview';
 import { featureModules } from '../data/modules';
-import { getTestData, type TestDataType, testDataLabels } from '../data/test-data';
+import { getTestData, type TestDataType } from '../data/test-data';
 import { useCanTestData } from '../hooks/useCanTestData';
 import { useDocumentDirtySections } from '../hooks/useDocumentDirtySections';
 import {
@@ -88,7 +71,6 @@ import {
   type DocumentSectionKey,
   jsonEditorKeyForModule,
   legacyTableKindForModule,
-  modifiedSectionLabels,
   refactorOnlySections,
   restorePathsForEditor,
   trackedDocumentSections,
@@ -271,9 +253,6 @@ export function Dashboard({
   const [showGitReview, setShowGitReview] = useState(false);
   const [gitReviewBusy, setGitReviewBusy] = useState(false);
   const [gitReviewError, setGitReviewError] = useState<string | null>(null);
-  const [showGitSummary, setShowGitSummary] = useState(false);
-  const gitSummaryRef = useRef<HTMLDivElement | null>(null);
-  const gitSummaryTriggerRef = useRef<HTMLButtonElement | null>(null);
   const projectGitSectionRef = useRef<HTMLDivElement | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
@@ -369,34 +348,6 @@ export function Dashboard({
       void unlistenPromise.then((unlisten) => unlisten());
     };
   }, [hasUnsavedChanges]);
-
-  useEffect(() => {
-    if (!showGitSummary) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      if (
-        !gitSummaryRef.current?.contains(target) &&
-        !gitSummaryTriggerRef.current?.contains(target)
-      ) {
-        setShowGitSummary(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setShowGitSummary(false);
-        gitSummaryTriggerRef.current?.focus();
-      }
-    }
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [showGitSummary]);
 
   useEffect(() => {
     document.body.classList.toggle('git-review-open', showGitReview);
@@ -824,7 +775,6 @@ export function Dashboard({
   }
 
   function showProjectGitHistory() {
-    setShowGitSummary(false);
     onNavigate('project');
     window.setTimeout(
       () => projectGitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
@@ -851,7 +801,6 @@ export function Dashboard({
   }
 
   async function openGitReview() {
-    setShowGitSummary(false);
     setGitReviewRevision(null);
     setGitReview(null);
     setShowGitReview(true);
@@ -1505,349 +1454,47 @@ export function Dashboard({
 
   return (
     <main className={showGitReview ? 'workspace workspace--git-review' : 'workspace'}>
-      <div className="action-bar">
-        <div className="action-bar-left">
-          <div className="action-bar-command-center" title={loadedProject?.summary.path ?? ''}>
-            <span
-              className={`action-bar-dot ${
-                loadedProject
-                  ? hasUnsavedChanges
-                    ? 'action-bar-dot--dirty'
-                    : 'action-bar-dot--clean'
-                  : 'action-bar-dot--empty'
-              }`}
-            />
-            <span className="action-bar-project">
-              {loadedProject?.summary.name || '未打开项目'}
-            </span>
-            <span className="action-bar-module">{activeModule.title}</span>
-          </div>
-          {modifiedSections.length > 0 ? (
-            <div className="action-bar-pills">
-              {modifiedSections.map((section) => (
-                <button
-                  className="action-bar-pill"
-                  key={section}
-                  onClick={() => restoreModifiedPath([section])}
-                  type="button"
-                  title={`恢复 ${modifiedSectionLabels[section] ?? section}`}
-                >
-                  {modifiedSectionLabels[section] ?? section}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <div className="action-bar-right">
-          <button
-            aria-controls="git-summary-panel"
-            aria-expanded={showGitSummary}
-            className={
-              showGitSummary
-                ? 'action-bar-git-trigger action-bar-git-trigger--active'
-                : 'action-bar-git-trigger'
-            }
-            onClick={() => setShowGitSummary((visible) => !visible)}
-            ref={gitSummaryTriggerRef}
-            title="切换 Git 版本摘要"
-            type="button"
-          >
-            <GitBranch aria-hidden="true" size={14} strokeWidth={1.8} />
-            <span>{gitStatus?.branch ?? 'Git'}</span>
-            {gitStatus?.changed_paths.length ? (
-              <span className="action-bar-git-badge">{gitStatus.changed_paths.length}</span>
-            ) : null}
-            <ChevronDown aria-hidden="true" size={13} strokeWidth={1.8} />
-          </button>
-          <span className="action-bar-sep" />
-          <div className="action-bar-group">
-            <button
-              className="action-bar-btn action-bar-btn--ghost"
-              disabled={isOpening}
-              onClick={() => void handleSelectProjectFile()}
-              type="button"
-              title="打开项目文件"
-            >
-              <FolderOpen aria-hidden="true" size={14} strokeWidth={1.8} />
-              打开
-            </button>
-            <button
-              className="action-bar-btn action-bar-btn--ghost"
-              disabled={isOpening || !(loadedProject?.summary.path || projectPath.trim())}
-              onClick={() => void handleReloadProject()}
-              type="button"
-              title="重新加载当前项目"
-            >
-              <RefreshCw aria-hidden="true" size={14} strokeWidth={1.8} />
-              重载
-            </button>
-          </div>
-          <span className="action-bar-sep" />
-          <div className="action-bar-group">
-            <button
-              className="action-bar-btn action-bar-btn--ghost"
-              disabled={!hasUnsavedChanges || isSavingProject}
-              onClick={restoreAllChanges}
-              type="button"
-              title="恢复所有未保存修改"
-            >
-              <Undo2 aria-hidden="true" size={14} strokeWidth={1.8} />
-              恢复
-            </button>
-            <button
-              className="action-bar-btn action-bar-btn--ghost"
-              disabled={!loadedProject?.summary.path || isSavingProject}
-              onClick={() => void handleSaveProjectAs()}
-              type="button"
-            >
-              <SaveAll aria-hidden="true" size={14} strokeWidth={1.8} />
-              {savingProjectAction === 'saveAs' ? '另存中...' : '另存为...'}
-            </button>
-            <button
-              className="action-bar-btn action-bar-btn--save"
-              disabled={!hasUnsavedChanges || !loadedProject?.summary.path || isSavingProject}
-              onClick={requestSaveProject}
-              type="button"
-            >
-              <SaveIcon aria-hidden="true" size={14} strokeWidth={1.8} />
-              {savingProjectAction === 'save' ? '保存中...' : '保存'}
-            </button>
-          </div>
-          <span className="action-bar-sep" />
-          {currentLegacyTableKind ? (
-            <div className="action-bar-group">
-              <button
-                className="action-bar-btn action-bar-btn--secondary"
-                disabled={!loadedProject || isImportingTable}
-                onClick={() => void handleImportTableConfig(currentLegacyTableKind)}
-                type="button"
-                title="从 CSV/XLS/XLSX/XML 文件导入"
-              >
-                <span className="action-bar-icon">↓</span>
-                {isImportingTable ? '导入中...' : '导入'}
-              </button>
-              <button
-                className="action-bar-btn action-bar-btn--ghost"
-                disabled={!loadedProject || isExportingTable}
-                onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'csv')}
-                type="button"
-                title="导出为 CSV 格式"
-              >
-                CSV
-              </button>
-              <button
-                className="action-bar-btn action-bar-btn--ghost"
-                disabled={!loadedProject || isExportingTable}
-                onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'xml')}
-                type="button"
-                title="导出为 Excel XML 格式"
-              >
-                Excel
-              </button>
-            </div>
-          ) : null}
-          {(['realtime-data', 'battery-protocol', 'battery-monitor'] as string[]).includes(
-            activeModule.key,
-          ) ? (
-            <button
-              className="action-bar-btn action-bar-btn--secondary"
-              disabled={!loadedProject || generatingTestKey !== null}
-              onClick={() => {
-                if (!loadedProject) return;
-                const type: TestDataType =
-                  activeModule.key === 'realtime-data' && pdoEditor.mode === 'simple'
-                    ? 'pdo-simple'
-                    : activeModule.key === 'realtime-data'
-                      ? 'pdo-advanced'
-                      : activeModule.key === 'battery-protocol'
-                        ? 'battery-protocol'
-                        : 'battery-monitor';
-                setConfirmGenerateType(type);
-              }}
-              type="button"
-              title="自动构建当前页面的 CAN 测试数据"
-            >
-              <span className="action-bar-icon">⚡</span>
-              {generatingTestKey !== null ? '生成中...' : '生成测试数据'}
-            </button>
-          ) : null}
-          {activeModule.key === 'ui' ? (
-            <button
-              className={`action-bar-btn ${
-                showCanvasLabels ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'
-              }`}
-              onClick={() => setShowCanvasLabels((v) => !v)}
-              title={showCanvasLabels ? '隐藏画布上的资源文字标注' : '显示画布上的资源文字标注'}
-              type="button"
-            >
-              {showCanvasLabels ? '隐藏标注' : '显示标注'}
-            </button>
-          ) : null}
-          {(
-            [
-              'setting-data',
-              'realtime-data',
-              'battery-protocol',
-              'battery-monitor',
-              'language',
-              'signal-dictionary',
-              'private-protocol',
-              'protocol-mapping',
-            ] as string[]
-          ).includes(activeModule.key) ? (
-            <button
-              className={`action-bar-btn ${
-                showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'
-              }`}
-              disabled={!loadedProject}
-              onClick={() => setShowJsonEditor((v) => !v)}
-              type="button"
-              title="打开 JSON 编辑器"
-            >
-              {'{ }'}
-            </button>
-          ) : null}
-          {saveStatus ? (
-            <span aria-live="polite" className="action-bar-status" role="status">
-              {saveStatus}
-            </span>
-          ) : null}
-        </div>
-      </div>
+      <DashboardActionBar
+        activeModule={activeModule}
+        loadedProject={loadedProject}
+        projectPath={projectPath}
+        isOpening={isOpening}
+        hasUnsavedChanges={hasUnsavedChanges}
+        modifiedSections={modifiedSections}
+        isSavingProject={isSavingProject}
+        savingProjectAction={savingProjectAction}
+        saveStatus={saveStatus}
+        currentLegacyTableKind={currentLegacyTableKind}
+        isImportingTable={isImportingTable}
+        isExportingTable={isExportingTable}
+        generatingTestKey={generatingTestKey}
+        pdoMode={pdoEditor.mode}
+        showCanvasLabels={showCanvasLabels}
+        showJsonEditor={showJsonEditor}
+        gitStatus={gitStatus}
+        gitBusy={gitBusy}
+        gitError={gitError}
+        gitRevisions={gitRevisions}
+        gitRepositoryName={gitRepositoryName}
+        gitSummaryCommitDisabled={gitSummaryCommitDisabled}
+        onRestoreSection={(section) => restoreModifiedPath([section])}
+        onSelectProjectFile={handleSelectProjectFile}
+        onReloadProject={handleReloadProject}
+        onRestoreAllChanges={restoreAllChanges}
+        onSaveProjectAs={handleSaveProjectAs}
+        onRequestSave={requestSaveProject}
+        onImportTable={handleImportTableConfig}
+        onExportTable={handleExportTableConfig}
+        onRequestTestData={setConfirmGenerateType}
+        onToggleCanvasLabels={() => setShowCanvasLabels((visible) => !visible)}
+        onToggleJsonEditor={() => setShowJsonEditor((visible) => !visible)}
+        onRefreshGit={refreshProjectGit}
+        onOpenGitReview={openGitReview}
+        onOpenGitRepository={handleOpenGitRepository}
+        onShowGitHistory={showProjectGitHistory}
+        onCommitGitVersion={handleCommitProjectVersion}
+      />
 
-      {showGitSummary ? (
-        <div
-          aria-label="Git 版本摘要"
-          className="git-summary-popover"
-          id="git-summary-panel"
-          ref={gitSummaryRef}
-          role="dialog"
-        >
-          <div className="git-summary-header">
-            <span>版本摘要</span>
-            <div className="git-summary-header-actions">
-              <button
-                aria-label="刷新 Git 状态"
-                disabled={gitBusy || !loadedProject}
-                onClick={() => void refreshProjectGit()}
-                title="刷新 Git 状态"
-                type="button"
-              >
-                <RefreshCw aria-hidden="true" size={15} strokeWidth={1.8} />
-              </button>
-              <button
-                aria-label="关闭 Git 版本摘要"
-                onClick={() => setShowGitSummary(false)}
-                title="关闭"
-                type="button"
-              >
-                <X aria-hidden="true" size={16} strokeWidth={1.8} />
-              </button>
-            </div>
-          </div>
-
-          {!loadedProject ? (
-            <div className="git-summary-empty">
-              <FolderGit2 aria-hidden="true" size={18} strokeWidth={1.6} />
-              <span>未打开项目</span>
-            </div>
-          ) : gitStatus?.available ? (
-            <div className="git-summary-body">
-              <button
-                className="git-summary-row"
-                onClick={() => void openGitReview()}
-                type="button"
-              >
-                <FileDiff aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">变更</span>
-                <span className="git-summary-change-count">
-                  <strong>+{gitStatus.additions}</strong>
-                  <em>-{gitStatus.deletions}</em>
-                </span>
-              </button>
-
-              <button
-                className="git-summary-row"
-                onClick={() => void handleOpenGitRepository()}
-                title={gitStatus.repo_root ?? undefined}
-                type="button"
-              >
-                <FolderGit2 aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">本地</span>
-                <span className="git-summary-row-value">{gitRepositoryName}</span>
-                <ChevronRight aria-hidden="true" size={15} strokeWidth={1.7} />
-              </button>
-
-              <button className="git-summary-row" onClick={showProjectGitHistory} type="button">
-                <GitBranch aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">{gitStatus.branch}</span>
-                <span className="git-summary-row-value git-summary-hash">
-                  {gitStatus.head_short_hash ?? '尚无提交'}
-                </span>
-                <ChevronRight aria-hidden="true" size={15} strokeWidth={1.7} />
-              </button>
-
-              <div className="git-summary-divider" />
-
-              <button
-                className="git-summary-row"
-                disabled={gitStatus.changed_paths.length === 0}
-                onClick={() => void openGitReview()}
-                type="button"
-              >
-                <ScanSearch aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">审阅更改</span>
-                <span className="git-summary-row-value">
-                  {gitStatus.changed_paths.length} 个文件
-                </span>
-                <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.7} />
-              </button>
-
-              <button
-                className="git-summary-row"
-                disabled={gitSummaryCommitDisabled}
-                onClick={() => void handleCommitProjectVersion()}
-                title={
-                  hasUnsavedChanges
-                    ? '请先保存项目配置'
-                    : gitStatus.has_staged_changes
-                      ? '暂存区已有其他内容'
-                      : gitStatus.changed_paths.length === 0
-                        ? '没有可提交的配置修改'
-                        : '提交当前项目配置版本'
-                }
-                type="button"
-              >
-                <GitCommitHorizontal aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">
-                  {gitBusy ? '提交中...' : '提交项目版本'}
-                </span>
-              </button>
-
-              <div className="git-summary-row git-summary-row--muted">
-                <CloudOff aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">远程同步未接入</span>
-              </div>
-
-              <button className="git-summary-row" onClick={showProjectGitHistory} type="button">
-                <History aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">版本历史</span>
-                <span className="git-summary-row-value">{gitRevisions.length} 条</span>
-                <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.7} />
-              </button>
-
-              {gitStatus.warning || gitError ? (
-                <p className="git-summary-warning">{gitError ?? gitStatus.warning}</p>
-              ) : null}
-            </div>
-          ) : (
-            <div className="git-summary-empty git-summary-empty--stacked">
-              <FolderGit2 aria-hidden="true" size={18} strokeWidth={1.6} />
-              <span>{gitError ?? gitStatus?.warning ?? '正在读取 Git 状态'}</span>
-            </div>
-          )}
-        </div>
-      ) : null}
 
       {showGitReview ? (
         <GitReviewWorkspace
@@ -1866,83 +1513,21 @@ export function Dashboard({
           onClose={closeGitReview}
         />
       ) : null}
-      {showSaveModal && loadedProject ? (
-        <div className="modal-overlay">
-          <div
-            aria-labelledby="save-project-dialog-title"
-            aria-modal="true"
-            className="modal-box"
-            role="dialog"
-          >
-            <h3 id="save-project-dialog-title">确认保存</h3>
-            <p>将当前所有配置修改写入项目文件：</p>
-            <div className="modal-path">{loadedProject.summary.path}</div>
-            {isLegacyJcproProject && hasRefactorOnlyChanges ? (
-              <p className="project-open-warning">
-                {refactorConfigPath
-                  ? `检测到重构专属配置修改，将写回已挂载 JSON：${refactorConfigPath}；原 .jcpro 只保存兼容字段。`
-                  : '检测到重构专属配置修改，将创建独立 JSON sidecar；原 .jcpro 只保存兼容字段。'}
-              </p>
-            ) : null}
-            {modifiedSections.length > 0 ? (
-              <div className="action-bar-pills">
-                {modifiedSections.map((section) => (
-                  <span className="action-bar-pill" key={section}>
-                    {modifiedSectionLabels[section] ?? section}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            <div className="modal-actions">
-              <button
-                className="modal-btn-cancel"
-                disabled={isSavingProject}
-                onClick={cancelSaveProject}
-                type="button"
-              >
-                取消
-              </button>
-              <button
-                className="modal-btn-confirm"
-                disabled={isSavingProject}
-                onClick={() => void confirmSaveProject()}
-                type="button"
-              >
-                {savingProjectAction === 'save' ? '保存中...' : '确认保存'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {confirmGenerateType ? (
-        <div className="modal-overlay">
-          <div
-            aria-labelledby="generate-test-dialog-title"
-            aria-modal="true"
-            className="modal-box"
-            role="dialog"
-          >
-            <h3 id="generate-test-dialog-title">确认生成测试数据</h3>
-            <p>
-              将使用 <strong>{testDataLabels[confirmGenerateType]}</strong>{' '}
-              模板覆盖当前配置，是否继续？
-            </p>
-            <div className="modal-actions">
-              <button
-                className="modal-btn-cancel"
-                onClick={() => setConfirmGenerateType(null)}
-                type="button"
-              >
-                取消
-              </button>
-              <button className="modal-btn-confirm" onClick={confirmGenerateTestData} type="button">
-                确认生成
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <DashboardDialogs
+        loadedProject={loadedProject}
+        showSaveModal={showSaveModal}
+        isSavingProject={isSavingProject}
+        savingProjectAction={savingProjectAction}
+        isLegacyJcproProject={isLegacyJcproProject}
+        hasRefactorOnlyChanges={hasRefactorOnlyChanges}
+        refactorConfigPath={refactorConfigPath}
+        modifiedSections={modifiedSections}
+        confirmGenerateType={confirmGenerateType}
+        onCancelSave={cancelSaveProject}
+        onConfirmSave={confirmSaveProject}
+        onCancelTestData={() => setConfirmGenerateType(null)}
+        onConfirmTestData={confirmGenerateTestData}
+      />
 
       <JsonEditorPopup
         open={showJsonEditor && Boolean(loadedProject)}
