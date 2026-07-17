@@ -3,17 +3,19 @@
 本项目使用 Tauri v2 updater 插件进行应用内更新。前端版本弹层会检查
 GitHub Release 中的 `latest.json`，发现新版本后下载、安装并重启应用。
 
-当前 updater 会优先检查固定的 nightly release：
+正式版默认只检查 GitHub 的 latest stable release：
+
+```text
+https://github.com/boa-w/JC-Platform/releases/latest/download/latest.json
+```
+
+`main` 分支的 nightly 构建使用独立配置，只检查固定 nightly release：
 
 ```text
 https://github.com/boa-w/JC-Platform/releases/download/nightly/latest.json
 ```
 
-如果 nightly endpoint 不可用，再回退到 GitHub 的 latest stable release：
-
-```text
-https://github.com/boa-w/JC-Platform/releases/latest/download/latest.json
-```
+两个通道不会互相回退，避免稳定版用户被引导到预发布版本。
 
 ## 版本来源
 
@@ -69,8 +71,10 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD="你的私钥密码"
 npm run tauri:build -- --config src-tauri/tauri.updater.conf.json
 ```
 
-PR 构建只验证安装包构建。`main` 分支 push 和正式 Release 构建会额外使用
-`src-tauri/tauri.updater.conf.json`，生成并上传安装包、签名文件和 `latest.json`。
+PR 构建只验证应用构建。正式 Release 叠加
+`src-tauri/tauri.updater.conf.json`，继承 stable endpoint 并生成 updater 产物。
+`main` 分支 push 叠加 `src-tauri/tauri.nightly.conf.json`，切换为 nightly endpoint
+并生成签名文件和 `latest.json`。
 
 ## Nightly 发布
 

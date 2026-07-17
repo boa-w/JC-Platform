@@ -1,0 +1,12 @@
+{
+  "bundle": {
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/boa-w/JC-Platform/releases/download/nightly/latest.json"
+      ]
+    }
+  }
+}

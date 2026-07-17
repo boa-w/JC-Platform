@@ -1,6 +1,7 @@
 import { relaunch } from '@tauri-apps/plugin-process';
 import type { CheckOptions, DownloadEvent } from '@tauri-apps/plugin-updater';
 import { getCurrentAppInfo } from './appInfo';
+import { normalizeUpdaterError } from './updaterError';
 
 export interface UpdateInfo {
   currentVersion: string;
@@ -19,19 +20,6 @@ export interface CheckUpdateOptions {
 }
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
-function normalizeUpdaterError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  if (
-    message.includes('plugin updater not found') ||
-    message.includes('updater not found') ||
-    message.includes('REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY') ||
-    message.includes('invalid public key')
-  ) {
-    return '更新服务尚未完成配置：请替换 Tauri updater 公钥并发布 latest.json。';
-  }
-  return message || '检查更新失败';
-}
 
 export async function checkForAppUpdate(
   options: CheckUpdateOptions = {},
