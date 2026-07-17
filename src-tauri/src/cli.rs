@@ -461,7 +461,7 @@ fn run_ui(command: UiCommand, pretty: bool) -> Result<(), CliError> {
             let document = read_json_value(&document)?;
             if project_path.is_some() {
                 print_json(
-                    &commands::parse_ui_resources_with_project_path(UiResourceParseRequest {
+                    &commands::parse_ui_resources_for_project(UiResourceParseRequest {
                         project_path,
                         document,
                     }),

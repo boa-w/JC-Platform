@@ -53,6 +53,7 @@ use serde_json::json;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use tauri::Manager;
 
 /// 后端健康检查响应。
 #[derive(Debug, Serialize)]
@@ -228,8 +229,30 @@ pub fn parse_ui_resources(document: Value) -> UiResourceParseReport {
 
 #[tauri::command]
 pub fn parse_ui_resources_with_project_path(
+    app: tauri::AppHandle,
     request: UiResourceParseRequest,
-) -> UiResourceParseReport {
+) -> Result<UiResourceParseReport, String> {
+    let report = parse_ui_resources_for_project(request);
+    let scope = app.asset_protocol_scope();
+    for source in ui_resource_sources(&report) {
+        scope
+            .allow_file(source)
+            .map_err(|error| format!("无法授权 UI 资源预览 {}：{}", source, error))?;
+    }
+    Ok(report)
+}
+
+fn ui_resource_sources(report: &UiResourceParseReport) -> Vec<&str> {
+    report
+        .logo
+        .iter()
+        .chain(report.main_items.iter())
+        .flat_map(|resource| resource.options.iter())
+        .flat_map(|option| option.sources.iter().map(String::as_str))
+        .collect()
+}
+
+pub fn parse_ui_resources_for_project(request: UiResourceParseRequest) -> UiResourceParseReport {
     parse_ui_info(request.project_path.as_deref(), &request.document)
 }
 
@@ -890,4 +913,54 @@ pub fn generate_dbc_content(frames: Vec<Value>, signals: Vec<Value>) -> Result<S
 
     lines.extend(comments);
     Ok(lines.concat())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collects_every_resolved_ui_resource_source_for_asset_scope() {
+        let project_path = std::env::current_dir()
+            .unwrap()
+            .join("workspace")
+            .join("config")
+            .join("meter.jcpro");
+        let document = json!({
+            "ui_info": {
+                "logo": {
+                    "name": "logo",
+                    "handle": "show",
+                    "option": ["images/logo.png"]
+                },
+                "main": {
+                    "item": {
+                        "speed": {
+                            "name": "speed",
+                            "handle": "list",
+                            "option": [{ "list": ["images/speed-0.png", "images/speed-1.png"] }]
+                        }
+                    }
+                }
+            }
+        });
+        let report = parse_ui_resources_for_project(UiResourceParseRequest {
+            project_path: Some(project_path.to_string_lossy().into_owned()),
+            document,
+        });
+        let sources = ui_resource_sources(&report)
+            .into_iter()
+            .map(PathBuf::from)
+            .collect::<Vec<_>>();
+        let project_dir = project_path.parent().unwrap();
+
+        assert_eq!(
+            sources,
+            vec![
+                project_dir.join("images/logo.png"),
+                project_dir.join("images/speed-0.png"),
+                project_dir.join("images/speed-1.png"),
+            ]
+        );
+    }
 }

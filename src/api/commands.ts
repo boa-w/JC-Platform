@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { openPath } from '@tauri-apps/plugin-opener';
+import { revealItemInDir as revealPathInDir } from '@tauri-apps/plugin-opener';
 import type {
   BackendHealth,
   BaiduTranslateRequest,
@@ -333,7 +333,7 @@ export async function buildProjectBinaryReport(
 }
 
 export async function revealItemInDir(path: string): Promise<void> {
-  return openPath(path);
+  return revealPathInDir(path);
 }
 
 export async function generateCanTestData(
