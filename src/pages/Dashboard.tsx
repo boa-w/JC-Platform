@@ -1,11 +1,12 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { lazy, useEffect, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { parsePdoAdvancedProject, validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
 import { useBatteryLegacyController } from '../features/battery-legacy/useBatteryLegacyController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
+import { useProjectDocumentController } from '../features/project-document';
 import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
 import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
@@ -23,13 +24,10 @@ import {
 import { featureModules } from '../data/modules';
 import { getTestData, type TestDataType } from '../data/test-data';
 import { useCanTestData } from '../hooks/useCanTestData';
-import { useDocumentDirtySections } from '../hooks/useDocumentDirtySections';
 import {
   advancedConfigSections,
   configSectionForEditor,
-  type DocumentSectionKey,
   jsonEditorKeyForModule,
-  refactorOnlySections,
   restorePathsForEditor,
   trackedDocumentSections,
 } from '../modules/documentSections';
@@ -44,13 +42,6 @@ import type {
   PdoAdvancedParseReport,
   ProjectSummary,
 } from '../types/platform';
-import {
-  cloneJson,
-  deepEqual,
-  isPathModified,
-  type JsonPath,
-  restorePath,
-} from '../utils/projectDirty';
 
 const GitReviewWorkspace = lazy(() =>
   import('../components/git/GitReviewWorkspace').then((module) => ({
@@ -162,14 +153,6 @@ export function Dashboard({
   onNavigate,
   onProjectLoaded,
 }: DashboardProps) {
-  const [baselineDocument, setBaselineDocument] = useState<unknown | null>(null);
-  const {
-    clearDirtySections,
-    dirtySections,
-    recalculateDirtySections,
-    resetBaseline: resetDirtySectionBaseline,
-  } = useDocumentDirtySections();
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [configEditorText, setConfigEditorText] = useState('');
   const [configEditorError, setConfigEditorError] = useState<string | null>(null);
@@ -179,23 +162,30 @@ export function Dashboard({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
+  const documentStateChangeRef = useRef<(hasChanges: boolean) => void>(() => undefined);
   const projectGitRefreshRef = useRef<() => void | Promise<void>>(() => undefined);
-  const modifiedSections = loadedProject
-    ? trackedDocumentSections.filter((section) => dirtySections.has(section))
-    : [];
-  const hasRefactorOnlyChanges = modifiedSections.some((section) =>
-    (refactorOnlySections as readonly string[]).includes(section),
-  );
-  const isLegacyJcproProject =
-    loadedProject?.summary.path?.toLowerCase().endsWith('.jcpro') ?? false;
-  const projectMissingSections = loadedProject?.validation.missing_sections ?? [];
-  const compatibleMissingSections = projectMissingSections.filter(
-    (section) => !(refactorOnlySections as readonly string[]).includes(section),
-  );
-  const sidecarMissingSections = projectMissingSections.filter((section) =>
-    (refactorOnlySections as readonly string[]).includes(section),
-  );
-  const effectiveProjectValid = compatibleMissingSections.length === 0;
+  const projectDocument = useProjectDocumentController({
+    loadedProject,
+    onDocumentStateChange: (hasChanges) => documentStateChangeRef.current(hasChanges),
+    onProjectLoaded,
+  });
+  const {
+    applyLoadedProject,
+    baselineDocument,
+    compatibleMissingSections,
+    effectiveProjectValid,
+    hasRefactorOnlyChanges,
+    hasUnsavedChanges,
+    isLegacyJcproProject,
+    isModifiedPath,
+    modifiedSections,
+    restoreAllChanges,
+    restoreModifiedPath,
+    restoreProjectPaths,
+    sidecarMissingSections,
+    updateProjectDocument,
+    updateProjectSections,
+  } = projectDocument;
   const canTestData = useCanTestData();
   const {
     options: exportBatteryOptions,
@@ -271,6 +261,10 @@ export function Dashboard({
   });
 
   useEffect(() => {
+    documentStateChangeRef.current = projectLifecycle.markDocumentState;
+  }, [projectLifecycle.markDocumentState]);
+
+  useEffect(() => {
     projectGitRefreshRef.current = projectGit.refresh;
   }, [projectGit.refresh]);
 
@@ -298,6 +292,16 @@ export function Dashboard({
     };
   }, [hasUnsavedChanges]);
 
+  function activeJsonEditorKey() {
+    return jsonEditorKeyForModule(activeModule.key, { realtimeMode: pdoEditor.mode });
+  }
+
+  const currentConfigSection = useCallback(() => {
+    if (!loadedProject) return null;
+    const document = loadedProject.document as Record<string, unknown>;
+    return configSectionForEditor(document, activeModule.key, { realtimeMode: pdoEditor.mode });
+  }, [activeModule.key, loadedProject, pdoEditor.mode]);
+
   useEffect(() => {
     if (activeModule.key === 'fault-code') {
       setShowJsonEditor(false);
@@ -305,141 +309,17 @@ export function Dashboard({
     }
     setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2));
     setConfigEditorError(null);
-  }, [activeModule.key, loadedProject?.document]);
-
-  useEffect(() => {
-    if (!loadedProject) return;
-    const doc = loadedProject.document as Record<string, unknown>;
-    const defaults: Record<string, unknown> = {};
-    if (!doc.battery_protocol) {
-      defaults.battery_protocol = { default_timeout_ticks: 200, frames: [], signals: [] };
-    }
-    if (!doc.battery_monitor_info) {
-      defaults.battery_monitor_info = { enabled: true, page_size: 4, items: [] };
-    }
-    if (!doc.fault_code_info) {
-      defaults.fault_code_info = {
-        schema_version: 1,
-        enabled: true,
-        version: 1,
-        sources: [
-          {
-            source_key: 'traction',
-            source_id: 1,
-            type_char: 'T',
-            name: '牵引',
-            can_id: 648,
-            frame_type: 0,
-            code_byte: 2,
-            clear_code: 0,
-            invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
-            enabled: true,
-          },
-          {
-            source_key: 'pump',
-            source_id: 2,
-            type_char: 'P',
-            name: '油泵',
-            can_id: 660,
-            frame_type: 0,
-            code_byte: 2,
-            clear_code: 0,
-            invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
-            enabled: true,
-          },
-        ],
-        codes: [],
-      };
-    }
-    if (Object.keys(defaults).length > 0) {
-      const document = { ...doc, ...defaults };
-      const nextBaseline = cloneJson(document);
-      resetDirtySectionBaseline(nextBaseline);
-      applyLoadedProject({ ...loadedProject, document }, nextBaseline);
-    }
-  }, [loadedProject]);
-
-  function activeJsonEditorKey() {
-    return jsonEditorKeyForModule(activeModule.key, { realtimeMode: pdoEditor.mode });
-  }
-
-  function currentConfigSection() {
-    if (!loadedProject) return null;
-    const document = loadedProject.document as Record<string, unknown>;
-    return configSectionForEditor(document, activeModule.key, { realtimeMode: pdoEditor.mode });
-  }
-
-  function applyLoadedProject(
-    nextProject: LoadedProject,
-    baselineOverride?: unknown,
-    changedSections?: Iterable<DocumentSectionKey>,
-  ) {
-    const nextBaseline = baselineOverride ?? baselineDocument;
-    let nextDirtySections = new Set<DocumentSectionKey>();
-    if (nextBaseline) {
-      nextDirtySections = recalculateDirtySections(
-        nextProject.document,
-        changedSections,
-        baselineOverride !== undefined ? nextBaseline : undefined,
-      );
-    } else {
-      clearDirtySections();
-    }
-    if (baselineOverride !== undefined) setBaselineDocument(baselineOverride);
-    const nextHasChanges = nextBaseline
-      ? nextDirtySections.size > 0 || !deepEqual(nextProject.document, nextBaseline)
-      : true;
-    onProjectLoaded(nextProject);
-    setHasUnsavedChanges(nextHasChanges);
-    projectLifecycle.markDocumentState(nextHasChanges);
-  }
-
-  function isModifiedPath(path: JsonPath) {
-    if (path.length === 1 && typeof path[0] === 'string') {
-      const section = path[0] as DocumentSectionKey;
-      if ((trackedDocumentSections as readonly string[]).includes(section)) {
-        return dirtySections.has(section);
-      }
-    }
-    return loadedProject ? isPathModified(loadedProject.document, baselineDocument, path) : false;
-  }
-
-  function restoreModifiedPath(path: JsonPath) {
-    if (!loadedProject || !baselineDocument) return;
-    const document = restorePath(loadedProject.document, baselineDocument, path);
-    const changedSection =
-      typeof path[0] === 'string' &&
-      (trackedDocumentSections as readonly string[]).includes(path[0])
-        ? ([path[0] as DocumentSectionKey] as const)
-        : undefined;
-    applyLoadedProject({ ...loadedProject, document }, undefined, changedSection);
-  }
-
-  function restoreAllChanges() {
-    if (!loadedProject || !baselineDocument) return;
-    applyLoadedProject(
-      { ...loadedProject, document: cloneJson(baselineDocument) },
-      undefined,
-      trackedDocumentSections,
-    );
-  }
+  }, [activeModule.key, currentConfigSection]);
 
   function restoreCurrentConfigSection() {
-    if (!loadedProject || !baselineDocument) return;
-    let document = loadedProject.document;
-    for (const path of restorePathsForEditor(activeModule.key, { realtimeMode: pdoEditor.mode })) {
-      document = restorePath(document, baselineDocument, path as JsonPath);
-    }
-    applyLoadedProject(
-      { ...loadedProject, document },
-      undefined,
-      restorePathsForEditor(activeModule.key, { realtimeMode: pdoEditor.mode })
-        .map((path) => path[0])
-        .filter((section): section is DocumentSectionKey =>
-          (trackedDocumentSections as readonly string[]).includes(section),
-        ),
+    const document = restoreProjectPaths(
+      restorePathsForEditor(activeModule.key, { realtimeMode: pdoEditor.mode }),
     );
-    setConfigEditorText(JSON.stringify(currentConfigSection(), null, 2));
+    if (!document) return;
+    const section = configSectionForEditor(document as Record<string, unknown>, activeModule.key, {
+      realtimeMode: pdoEditor.mode,
+    });
+    setConfigEditorText(JSON.stringify(section, null, 2));
   }
 
   function baselineLanguageDocument(): LanguageDocument | null {
@@ -449,26 +329,6 @@ export function Dashboard({
         | LanguageDocument
         | undefined) ?? null
     );
-  }
-
-  function updateProjectDocument(section: string, value: unknown) {
-    if (!loadedProject) return;
-
-    const document = { ...(loadedProject.document as Record<string, unknown>), [section]: value };
-    const changedSection = (trackedDocumentSections as readonly string[]).includes(section)
-      ? [section as DocumentSectionKey]
-      : undefined;
-    applyLoadedProject({ ...loadedProject, document }, undefined, changedSection);
-  }
-
-  function updateProjectSections(sections: Record<string, unknown>) {
-    if (!loadedProject) return;
-
-    const document = { ...(loadedProject.document as Record<string, unknown>), ...sections };
-    const changedSections = Object.keys(sections).filter((section): section is DocumentSectionKey =>
-      (trackedDocumentSections as readonly string[]).includes(section),
-    );
-    applyLoadedProject({ ...loadedProject, document }, undefined, changedSections);
   }
 
   function applyConfigEditor() {
