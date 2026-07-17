@@ -15,7 +15,6 @@ interface SettingsPageProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
 }
-
 export function SettingsPage({
   exportOptions: exportBatteryOptions,
   onUpdateExportOption: updateExportBatteryOption,
@@ -169,4 +168,3 @@ export function SettingsPage({
           </section>
   );
 }
-

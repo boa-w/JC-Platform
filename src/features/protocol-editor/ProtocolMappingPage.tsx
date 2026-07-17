@@ -7,7 +7,6 @@ interface ProtocolMappingPageProps {
   controller: ProtocolEditorController;
   isModifiedPath: (path: JsonPath) => boolean;
 }
-
 export function ProtocolMappingPage({
   controller,
   isModifiedPath,
@@ -457,4 +456,3 @@ export function ProtocolMappingPage({
           </section>
   );
 }
-
