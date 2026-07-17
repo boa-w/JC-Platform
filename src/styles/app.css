@@ -1857,6 +1857,21 @@ body.git-review-open {
   white-space: nowrap;
 }
 
+.activity-status-dot {
+  position: absolute;
+  top: 5px;
+  right: 13px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--tb-bg);
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+
+.activity-icon--warning {
+  color: var(--color-danger);
+}
+
 .activity-spacer {
   flex: 1;
 }
@@ -2071,6 +2086,38 @@ body.git-review-open {
   color: var(--tb-text);
   font-weight: 500;
   word-break: break-all;
+}
+
+.version-popup-grid .core-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  word-break: normal;
+}
+
+.core-status > span {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--tb-text-muted);
+}
+
+.core-status--ready > span {
+  background: var(--color-success);
+}
+
+.core-status--preview > span {
+  background: var(--color-primary);
+}
+
+.version-popup-grid strong.core-status--error {
+  color: var(--color-danger);
+}
+
+.core-status--error > span {
+  background: var(--color-danger);
 }
 
 .version-update-panel {

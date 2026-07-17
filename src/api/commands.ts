@@ -58,8 +58,10 @@ const fallbackHealth: BackendHealth = {
   app_name: '自定义开发平台',
   version: '0.1.0',
   commit_hash: 'unknown',
-  core_status: 'ready',
+  core_status: 'browser-preview',
 };
+
+const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 const fallbackProject: ProjectSummary = {
   name: '未打开项目',
@@ -71,7 +73,7 @@ export async function getBackendHealth(): Promise<BackendHealth> {
   try {
     return await invoke<BackendHealth>('backend_health');
   } catch {
-    return fallbackHealth;
+    return isTauriRuntime() ? { ...fallbackHealth, core_status: 'unavailable' } : fallbackHealth;
   }
 }
 

@@ -69,6 +69,14 @@ function formatUpdateProgress(downloaded: number, total: number | null) {
   return `${downloadedMb} / ${(total / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function coreStatusPresentation(status?: string) {
+  if (status === 'ready') return { label: '已就绪', tone: 'ready' } as const;
+  if (status === 'browser-preview') return { label: '浏览器预览', tone: 'preview' } as const;
+  if (status === 'unavailable') return { label: '核心不可用', tone: 'error' } as const;
+  if (!status || status === 'loading') return { label: '检查中', tone: 'loading' } as const;
+  return { label: status, tone: 'loading' } as const;
+}
+
 export function Sidebar({
   modules,
   activeKey,
@@ -182,6 +190,8 @@ export function Sidebar({
           : updateStatus === 'restarting'
             ? '更新已安装，正在重启应用'
             : updateError;
+  const coreStatus = coreStatusPresentation(health?.core_status);
+  const coreUnavailable = coreStatus.tone === 'error';
 
   const handleUpdateAction = () => {
     if (updateStatus === 'available') {
@@ -223,11 +233,11 @@ export function Sidebar({
         <div className="activity-spacer" />
         {/* 版本信息 */}
         <button
-          className="activity-icon"
+          className={coreUnavailable ? 'activity-icon activity-icon--warning' : 'activity-icon'}
           type="button"
           onClick={() => setShowPopup((v) => !v)}
           title="软件版本信息"
-          aria-label="软件版本信息"
+          aria-label={coreUnavailable ? '软件版本信息，核心不可用' : '软件版本信息'}
           aria-controls={versionPopupId}
           aria-expanded={showPopup}
           ref={aboutTriggerRef}
@@ -235,6 +245,7 @@ export function Sidebar({
           <span className="activity-icon-glyph" aria-hidden="true">
             <Info size={18} strokeWidth={1.8} />
           </span>
+          {coreUnavailable ? <span className="activity-status-dot" aria-hidden="true" /> : null}
           <span className="activity-icon-label">关于</span>
         </button>
         {/* 主题切换 */}
@@ -288,7 +299,10 @@ export function Sidebar({
                 <span>提交哈希</span>
                 <strong>{health?.commit_hash ?? 'unknown'}</strong>
                 <span>核心状态</span>
-                <strong>{health?.core_status ?? 'loading'}</strong>
+                <strong className={`core-status core-status--${coreStatus.tone}`}>
+                  <span aria-hidden="true" />
+                  {coreStatus.label}
+                </strong>
               </div>
             </section>
             <section>
