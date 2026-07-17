@@ -1,0 +1,158 @@
+/* Dark theme component overrides load after the base component styles. */
+[data-theme="dark"] .config-table input,
+[data-theme="dark"] .config-table select,
+[data-theme="dark"] .structured-list input,
+[data-theme="dark"] .sdo-node-grid input,
+[data-theme="dark"] .pdo-frame-grid input,
+[data-theme="dark"] .pdo-frame-grid select,
+[data-theme="dark"] .ui-property-grid input,
+[data-theme="dark"] .ui-property-grid select,
+[data-theme="dark"] .ui-option-tools textarea,
+[data-theme="dark"] .project-open-form input,
+[data-theme="dark"] .project-create-grid input,
+[data-theme="dark"] .export-form input,
+[data-theme="dark"] .export-filename-grid input,
+[data-theme="dark"] .config-table-toolbar input,
+[data-theme="dark"] .lang-code-input,
+[data-theme="dark"] .lang-filter-input,
+[data-theme="dark"] .lang-editor-add input,
+[data-theme="dark"] .lang-add-form input {
+  background: #3c3c3c;
+  border-color: #3e3e3e;
+  color: #d4d4d4;
+}
+
+[data-theme="dark"] .config-table input:focus,
+[data-theme="dark"] .config-table select:focus,
+[data-theme="dark"] .structured-list input:focus,
+[data-theme="dark"] .sdo-node-grid input:focus,
+[data-theme="dark"] .pdo-frame-grid input:focus,
+[data-theme="dark"] .pdo-frame-grid select:focus,
+[data-theme="dark"] .ui-property-grid input:focus,
+[data-theme="dark"] .ui-property-grid select:focus,
+[data-theme="dark"] .ui-option-tools textarea:focus,
+[data-theme="dark"] .project-open-form input:focus,
+[data-theme="dark"] .project-create-grid input:focus,
+[data-theme="dark"] .export-form input:focus,
+[data-theme="dark"] .export-filename-grid input:focus,
+[data-theme="dark"] .config-table-toolbar input:focus,
+[data-theme="dark"] .lang-code-input:focus,
+[data-theme="dark"] .lang-filter-input:focus,
+[data-theme="dark"] .lang-editor-add input:focus,
+[data-theme="dark"] .lang-add-form input:focus {
+  border-color: var(--color-primary);
+  background: #3c3c3c;
+}
+
+[data-theme="dark"] .config-table th {
+  background: #2d2d2d;
+  color: #a0a0a0;
+}
+
+[data-theme="dark"] .config-table td {
+  background: #252526;
+}
+
+[data-theme="dark"] .config-table tbody tr:nth-child(even) td {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .config-table tbody tr:hover td {
+  background: rgba(55, 148, 255, 0.08);
+}
+
+[data-theme="dark"] .ui-canvas-frame {
+  background: #1e1e1e;
+}
+
+[data-theme="dark"] .ui-editor-btn--secondary {
+  background: #3c3c3c;
+  border-color: #3e3e3e;
+  color: #d4d4d4;
+}
+
+[data-theme="dark"] .ui-editor-btn--secondary:hover:not(:disabled) {
+  background: rgba(55, 148, 255, 0.1);
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+}
+
+[data-theme="dark"] .ui-option-card {
+  background: #2d2d2d;
+}
+
+[data-theme="dark"] .ui-option-card.selected {
+  background: rgba(55, 148, 255, 0.08);
+}
+
+[data-theme="dark"] .config-summary-strip article {
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .project-open-report article,
+[data-theme="dark"] .export-report article,
+[data-theme="dark"] .recent-project-list article {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .config-helper-text {
+  background: var(--color-surface-alt);
+  border-left-color: var(--color-primary-border);
+}
+
+[data-theme="dark"] .table-format-ref {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .table-format-chip {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .table-io-result {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .lang-code-input:hover {
+  border-color: var(--color-border);
+  background: #3c3c3c;
+}
+
+[data-theme="dark"] .lang-code-row:hover {
+  background: #2a2a2a;
+}
+
+[data-theme="dark"] .lang-code-row--zh {
+  background: rgba(55, 148, 255, 0.08);
+}
+
+[data-theme="dark"] .lang-code-row--zh:hover {
+  background: rgba(55, 148, 255, 0.14);
+}
+
+[data-theme="dark"] .lang-code-row--add,
+[data-theme="dark"] .lang-code-header,
+[data-theme="dark"] .modal-box {
+  background: #2d2d2d;
+}
+
+[data-theme="dark"] .lang-code-badge {
+  background: #3c3c3c;
+  border-color: #3e3e3e;
+  color: #d4d4d4;
+}
+
+[data-theme="dark"] .modal-box .modal-path {
+  background: #3c3c3c;
+  border-color: #3e3e3e;
+}
+
+[data-theme="dark"] .modal-actions .modal-btn-cancel {
+  background: #3c3c3c;
+  border-color: #3e3e3e;
+  color: #d4d4d4;
+}

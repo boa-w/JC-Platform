@@ -7,6 +7,7 @@ import { defaultNavigationKey } from './stores/navigation';
 import { useTheme } from './stores/theme';
 import type { BackendHealth, LoadedProject, NavigationKey, ProjectSummary } from './types/platform';
 import './styles/app.css';
+import './styles/theme-dark.css';
 
 export default function App() {
   const [activeKey, setActiveKey] = useState<NavigationKey>(defaultNavigationKey);
