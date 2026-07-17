@@ -15,6 +15,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { type DocumentSectionKey, refactorOnlySections } from '../../modules/documentSections';
 import type { LoadedProject, ProjectParseReport } from '../../types/platform';
 import { cloneJson } from '../../utils/projectDirty';
+import { runSystemDialog } from '../../utils/systemDialog';
 
 export interface RecentProject {
   path: string;
@@ -228,10 +229,14 @@ export function useProjectLifecycleController({
       setOpenError('系统保存对话框只能在 Tauri 桌面应用中使用。');
       return;
     }
-    const selected = await save({
-      defaultPath: `${newProjectName}.jcpro`,
-      filters: [{ name: '项目文件', extensions: ['jcpro'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        save({
+          defaultPath: `${newProjectName}.jcpro`,
+          filters: [{ name: '项目文件', extensions: ['jcpro'] }],
+        }),
+      setOpenError,
+    );
     if (!selected) return;
 
     const generation = beginOpenOperation();
@@ -370,10 +375,14 @@ export function useProjectLifecycleController({
         .split(/[\\/]/)
         .pop()
         ?.replace(/\.[^.]+$/, '') || 'project';
-    const selected = await save({
-      defaultPath: `${baseName}.refactor-config.json`,
-      filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        save({
+          defaultPath: `${baseName}.refactor-config.json`,
+          filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
+        }),
+      setSaveStatus,
+    );
     if (!selected) return false;
     await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
     setRefactorConfigPath(selected);
@@ -389,10 +398,14 @@ export function useProjectLifecycleController({
       setRefactorConfigStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
       return;
     }
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
+        }),
+      setRefactorConfigStatus,
+    );
     if (typeof selected !== 'string') return;
     try {
       const sidecar = await loadJsonFile(selected);
@@ -410,11 +423,15 @@ export function useProjectLifecycleController({
 
   async function createRefactorConfig() {
     if (!loadedProject) return;
-    const created = await saveRefactorConfigAsJson();
-    if (!created) return;
-    const validation = await validateProjectDocument(loadedProject.document);
-    const nextBaseline = cloneJson(loadedProject.document);
-    onApplyProject({ ...loadedProject, validation }, nextBaseline);
+    try {
+      const created = await saveRefactorConfigAsJson();
+      if (!created) return;
+      const validation = await validateProjectDocument(loadedProject.document);
+      const nextBaseline = cloneJson(loadedProject.document);
+      onApplyProject({ ...loadedProject, validation }, nextBaseline);
+    } catch (cause) {
+      setSaveStatus(cause instanceof Error ? cause.message : String(cause));
+    }
   }
 
   async function confirmSaveProject() {
@@ -469,14 +486,18 @@ export function useProjectLifecycleController({
     const currentName =
       sourcePath.split(/[\\/]/).pop() || `${loadedProject.summary.name || 'project'}.jcpro`;
     const isRefactorSidecarSave = isLegacyJcproProject && hasRefactorOnlyChanges;
-    const selected = await save({
-      defaultPath: isRefactorSidecarSave
-        ? currentName.replace(/\.[^.]+$/, '.refactor-config.json')
-        : currentName,
-      filters: isRefactorSidecarSave
-        ? [{ name: '重构配置 JSON', extensions: ['json'] }]
-        : [{ name: '项目文件', extensions: ['jcpro', 'json'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        save({
+          defaultPath: isRefactorSidecarSave
+            ? currentName.replace(/\.[^.]+$/, '.refactor-config.json')
+            : currentName,
+          filters: isRefactorSidecarSave
+            ? [{ name: '重构配置 JSON', extensions: ['json'] }]
+            : [{ name: '项目文件', extensions: ['jcpro', 'json'] }],
+        }),
+      setSaveStatus,
+    );
     if (!selected) return;
     if (!isRefactorSidecarSave && selected === sourcePath) {
       setSaveStatus('另存为目标不能与当前项目路径相同。');

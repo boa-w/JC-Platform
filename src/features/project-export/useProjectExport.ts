@@ -14,6 +14,7 @@ import type {
   ProjectExportReport,
   UiImageCopyReport,
 } from '../../types/platform';
+import { runSystemDialog } from '../../utils/systemDialog';
 
 interface UseProjectExportOptions {
   document: unknown;
@@ -74,10 +75,14 @@ export function useProjectExport({
       return;
     }
 
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '设备二进制', extensions: ['bin'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '设备二进制', extensions: ['bin'] }],
+        }),
+      setError,
+    );
     if (typeof selected !== 'string') return;
 
     try {
@@ -100,7 +105,10 @@ export function useProjectExport({
       setError('系统目录选择器只能在 Tauri 桌面应用中使用。');
       return;
     }
-    const selected = await open({ directory: true, multiple: false });
+    const selected = await runSystemDialog(
+      () => open({ directory: true, multiple: false }),
+      setError,
+    );
     if (typeof selected === 'string') setOutputDir(selected);
   }
 

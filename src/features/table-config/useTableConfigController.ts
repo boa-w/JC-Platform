@@ -25,6 +25,7 @@ import type {
   PdoSimpleImportReport,
   SdoImportReport,
 } from '../../types/platform';
+import { runSystemDialog } from '../../utils/systemDialog';
 
 export type TableConfigKind = Extract<LegacyTableKind, 'sdo' | 'pdoSimple' | 'language'>;
 export type TableImportReport = SdoImportReport | PdoSimpleImportReport | LanguageImportReport;
@@ -111,9 +112,15 @@ export function useTableConfigController({
 
     const targetProject = loadedProject;
     const operation = operationGuard.begin();
-    const path = await save({
-      filters: [{ name: format === 'csv' ? 'CSV 表格' : 'Excel XML 表格', extensions: [format] }],
-    });
+    const path = await runSystemDialog(
+      () =>
+        save({
+          filters: [
+            { name: format === 'csv' ? 'CSV 表格' : 'Excel XML 表格', extensions: [format] },
+          ],
+        }),
+      setExportStatus,
+    );
     if (!path) return;
     if (!operationGuard.isCurrent(operation)) return;
 
@@ -157,10 +164,14 @@ export function useTableConfigController({
 
     const targetProject = loadedProject;
     const operation = operationGuard.begin();
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '表格文件', extensions: ['csv', 'xls', 'xlsx', 'xml'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '表格文件', extensions: ['csv', 'xls', 'xlsx', 'xml'] }],
+        }),
+      setImportError,
+    );
     if (typeof selected !== 'string') return;
     if (!operationGuard.isCurrent(operation)) return;
 

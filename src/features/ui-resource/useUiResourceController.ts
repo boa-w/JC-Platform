@@ -12,6 +12,7 @@ import type {
   UiResourceParseReport,
   UiResourceUpdateRequest,
 } from '../../types/platform';
+import { runSystemDialog } from '../../utils/systemDialog';
 
 export const uiResourcePreviewDocument = {
   ui_info: {
@@ -173,10 +174,14 @@ export function useUiResourceController({
       setError('系统文件选择器只能在 Tauri 桌面应用中使用。');
       return [];
     }
-    const selected = await open({
-      multiple: true,
-      filters: [{ name: '图片资源', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: true,
+          filters: [{ name: '图片资源', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }],
+        }),
+      setError,
+    );
     if (Array.isArray(selected)) return selected;
     return typeof selected === 'string' ? [selected] : [];
   }

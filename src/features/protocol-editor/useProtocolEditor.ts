@@ -17,6 +17,7 @@ import type {
   SignalDictionary,
   UnifiedProtocolModel,
 } from '../../types/platform';
+import { runSystemDialog } from '../../utils/systemDialog';
 
 interface UseProtocolEditorOptions {
   activeModuleKey: NavigationKey;
@@ -249,7 +250,10 @@ export function useProtocolEditor({
       setPrivateProtocolExportStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
       return;
     }
-    const selected = await save({ filters: [{ name: '私有协议配置', extensions: ['json'] }] });
+    const selected = await runSystemDialog(
+      () => save({ filters: [{ name: '私有协议配置', extensions: ['json'] }] }),
+      setPrivateProtocolExportStatus,
+    );
     if (!selected) return;
 
     setIsExportingPrivateProtocol(true);
@@ -275,10 +279,14 @@ export function useProtocolEditor({
     }
     const targetDocument = document;
     const targetProjectPath = projectPath;
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '私有协议配置', extensions: ['json'] }],
-    });
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '私有协议配置', extensions: ['json'] }],
+        }),
+      setPrivateProtocolImportStatus,
+    );
     if (typeof selected !== 'string') return;
 
     setIsImportingPrivateProtocol(true);

@@ -2,6 +2,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useState } from 'react';
 import { exportCanopenPackage, revealItemInDir } from '../../api/commands';
 import type { CanopenConversionReport, LoadedProject } from '../../types/platform';
+import { runSystemDialog } from '../../utils/systemDialog';
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -25,7 +26,10 @@ export function useCanopenExport(loadedProject: LoadedProject | null) {
       return;
     }
 
-    const selected = await open({ directory: true, multiple: false });
+    const selected = await runSystemDialog(
+      () => open({ directory: true, multiple: false }),
+      setStatus,
+    );
     if (typeof selected !== 'string') return;
 
     setIsExporting(true);
