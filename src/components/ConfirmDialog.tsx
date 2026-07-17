@@ -1,5 +1,5 @@
 import { useId, useRef } from 'react';
-import { useDialogFocus } from '../../hooks/useDialogFocus';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 
 interface ConfirmDialogProps {
   title: string;

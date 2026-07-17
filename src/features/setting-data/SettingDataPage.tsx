@@ -1,6 +1,6 @@
 import { ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
-import { ConfirmDialog } from '../../components/language/ConfirmDialog';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import {
   settingColumnPresetOptions,
   settingColumnPresetStorageKey,

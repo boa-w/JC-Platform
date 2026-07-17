@@ -1,4 +1,4 @@
-export { ConfirmDialog } from './ConfirmDialog';
+export { ConfirmDialog } from '../ConfirmDialog';
 export { LanguageComparisonView } from './LanguageComparisonView';
 export { LanguagePage } from './LanguagePage';
 export { LanguageSidebar } from './LanguageSidebar';

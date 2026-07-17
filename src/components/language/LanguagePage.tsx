@@ -8,10 +8,10 @@ import {
   useState,
 } from 'react';
 import { translateBaiduText } from '../../api/commands';
-import { EmptyState } from '../EmptyState';
 import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog } from '../ConfirmDialog';
+import { EmptyState } from '../EmptyState';
 import { LanguageComparisonView } from './LanguageComparisonView';
 import { LanguageSidebar } from './LanguageSidebar';
 import {

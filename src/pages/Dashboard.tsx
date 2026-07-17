@@ -162,6 +162,7 @@ export function Dashboard({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const documentStateChangeRef = useRef<(hasChanges: boolean) => void>(() => undefined);
   const projectGitRefreshRef = useRef<() => void | Promise<void>>(() => undefined);
   const projectDocument = useProjectDocumentController({
@@ -279,11 +280,9 @@ export function Dashboard({
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     const unlistenPromise = isTauriRuntime()
-      ? getCurrentWindow().onCloseRequested(async (event) => {
+      ? getCurrentWindow().onCloseRequested((event) => {
           event.preventDefault();
-          if (window.confirm('当前项目存在未保存修改。确定关闭应用并放弃这些修改吗？')) {
-            await getCurrentWindow().destroy();
-          }
+          setShowCloseConfirm(true);
         })
       : Promise.resolve(() => undefined);
 
@@ -488,10 +487,16 @@ export function Dashboard({
         refactorConfigPath={projectLifecycle.refactorConfigPath}
         modifiedSections={modifiedSections}
         confirmGenerateType={confirmGenerateType}
+        showCloseConfirm={showCloseConfirm && hasUnsavedChanges}
         onCancelSave={projectLifecycle.cancelSaveProject}
         onConfirmSave={projectLifecycle.confirmSaveProject}
         onCancelTestData={() => setConfirmGenerateType(null)}
         onConfirmTestData={confirmGenerateTestData}
+        onCancelClose={() => setShowCloseConfirm(false)}
+        onConfirmClose={() => {
+          setShowCloseConfirm(false);
+          void getCurrentWindow().destroy();
+        }}
       />
 
       <FeatureBoundary fallback={null} resetKey={`json-${showJsonEditor}`}>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { LanguageDocument } from '../../types/platform';
-import { ConfirmDialog } from './ConfirmDialog';
+import { ConfirmDialog } from '../ConfirmDialog';
 import type { LanguageProgress } from './types';
 import type { LanguageIndex } from './useLanguageIndex';
 

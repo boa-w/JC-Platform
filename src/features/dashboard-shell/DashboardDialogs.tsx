@@ -1,7 +1,8 @@
 import { useId, useRef } from 'react';
-import { testDataLabels, type TestDataType } from '../../data/test-data';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { type TestDataType, testDataLabels } from '../../data/test-data';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
-import { modifiedSectionLabels, type DocumentSectionKey } from '../../modules/documentSections';
+import { type DocumentSectionKey, modifiedSectionLabels } from '../../modules/documentSections';
 import type { LoadedProject } from '../../types/platform';
 
 interface DashboardDialogsProps {
@@ -14,10 +15,13 @@ interface DashboardDialogsProps {
   refactorConfigPath: string | null;
   modifiedSections: DocumentSectionKey[];
   confirmGenerateType: TestDataType | null;
+  showCloseConfirm: boolean;
   onCancelSave: () => void;
   onConfirmSave: () => void | Promise<void>;
   onCancelTestData: () => void;
   onConfirmTestData: () => void;
+  onCancelClose: () => void;
+  onConfirmClose: () => void;
 }
 
 export function DashboardDialogs({
@@ -30,10 +34,13 @@ export function DashboardDialogs({
   refactorConfigPath,
   modifiedSections,
   confirmGenerateType,
+  showCloseConfirm,
   onCancelSave: cancelSaveProject,
   onConfirmSave: confirmSaveProject,
   onCancelTestData,
   onConfirmTestData: confirmGenerateTestData,
+  onCancelClose,
+  onConfirmClose,
 }: DashboardDialogsProps) {
   const saveDialogTitleId = useId();
   const testDialogTitleId = useId();
@@ -139,6 +146,18 @@ export function DashboardDialogs({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {showCloseConfirm ? (
+        <ConfirmDialog
+          cancelLabel="继续编辑"
+          confirmLabel="放弃并关闭"
+          danger
+          message="当前项目存在未保存修改。关闭应用将永久放弃这些修改。"
+          onCancel={onCancelClose}
+          onConfirm={onConfirmClose}
+          title="放弃未保存修改？"
+        />
       ) : null}
     </>
   );
