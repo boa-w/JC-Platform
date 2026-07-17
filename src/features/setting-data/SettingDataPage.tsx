@@ -320,6 +320,7 @@ export function SettingDataPage({
         />
         <aside
           className="legacy-drawer legacy-drawer--setting"
+          ref={settingData.settingDrawerRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="setting-editor-drawer-title"

@@ -5,6 +5,7 @@ interface UseDialogFocusOptions {
   containerRef: RefObject<HTMLElement | null>;
   initialFocusRef: RefObject<HTMLElement | null>;
   onEscape: () => void;
+  trapFocus?: boolean;
 }
 
 const focusableSelector = [
@@ -21,6 +22,7 @@ export function useDialogFocus({
   containerRef,
   initialFocusRef,
   onEscape,
+  trapFocus = true,
 }: UseDialogFocusOptions) {
   const onEscapeRef = useRef(onEscape);
   onEscapeRef.current = onEscape;
@@ -36,7 +38,7 @@ export function useDialogFocus({
         onEscapeRef.current();
         return;
       }
-      if (event.key !== 'Tab') return;
+      if (event.key !== 'Tab' || !trapFocus) return;
 
       const container = containerRef.current;
       if (!container) return;
@@ -66,5 +68,5 @@ export function useDialogFocus({
       document.removeEventListener('keydown', handleKeyDown);
       if (previouslyFocused?.isConnected) previouslyFocused.focus();
     };
-  }, [active, containerRef, initialFocusRef]);
+  }, [active, containerRef, initialFocusRef, trapFocus]);
 }

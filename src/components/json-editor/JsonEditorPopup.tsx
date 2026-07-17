@@ -1,5 +1,6 @@
-import { GripHorizontal } from 'lucide-react';
+import { GripHorizontal, X } from 'lucide-react';
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 interface JsonEditorPopupProps {
   open: boolean;
@@ -27,6 +28,16 @@ export function JsonEditorPopup({
   const [size, setSize] = useState({ w: 520, h: 420 });
   const [position, setPosition] = useState({ x: 0, y: 64 });
   const initialized = useRef(false);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  useDialogFocus({
+    active: open,
+    containerRef: popupRef,
+    initialFocusRef: editorRef,
+    onEscape: onClose,
+    trapFocus: false,
+  });
 
   useEffect(() => {
     if (open && !initialized.current) {
@@ -105,7 +116,10 @@ export function JsonEditorPopup({
   return (
     <>
       <div
+        aria-labelledby="json-editor-title"
         className="json-popup"
+        ref={popupRef}
+        role="dialog"
         style={{ left: position.x, top: position.y, width: size.w, height: size.h }}
       >
         <div className="json-popup-header">
@@ -134,7 +148,7 @@ export function JsonEditorPopup({
             >
               <GripHorizontal aria-hidden="true" size={16} />
             </button>
-            <strong>JSON 编辑器</strong>
+            <strong id="json-editor-title">JSON 编辑器</strong>
           </div>
           <div className="json-popup-actions">
             <button className="lang-btn" onClick={onFormat} type="button">
@@ -147,12 +161,13 @@ export function JsonEditorPopup({
               应用
             </button>
             <button
+              aria-label="关闭 JSON 编辑器"
               className="lang-btn lang-btn--icon"
               onClick={onClose}
-              title="关闭"
+              title="关闭 JSON 编辑器"
               type="button"
             >
-              ×
+              <X aria-hidden="true" size={15} />
             </button>
           </div>
         </div>
@@ -160,6 +175,7 @@ export function JsonEditorPopup({
           aria-label="JSON 配置内容"
           className="json-popup-editor"
           onChange={(event) => onTextChange(event.target.value)}
+          ref={editorRef}
           value={text}
         />
         {error ? (

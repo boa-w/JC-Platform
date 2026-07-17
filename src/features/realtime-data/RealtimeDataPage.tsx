@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import type { JsonPath } from '../../utils/projectDirty';
 import {
   formatFrameId,
@@ -69,36 +70,26 @@ export function RealtimeDataPage({
     'global',
   );
   const advancedPdoDrawerCloseRef = useRef<HTMLButtonElement | null>(null);
-  const advancedPdoDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
+  const advancedPdoDrawerRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    if (!advancedPdoDrawerOpen) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      setAdvancedPdoDrawerOpen(false);
-      window.setTimeout(() => advancedPdoDrawerReturnFocusRef.current?.focus(), 0);
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    window.setTimeout(() => advancedPdoDrawerCloseRef.current?.focus(), 0);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [advancedPdoDrawerOpen]);
+  useDialogFocus({
+    active: advancedPdoDrawerOpen,
+    containerRef: advancedPdoDrawerRef,
+    initialFocusRef: advancedPdoDrawerCloseRef,
+    onEscape: () => setAdvancedPdoDrawerOpen(false),
+  });
 
   useEffect(() => {
     if (realtimeMode !== 'advanced') setAdvancedPdoDrawerOpen(false);
   }, [realtimeMode]);
 
   function openAdvancedPdoDrawer(tab: 'global' | 'condition') {
-    advancedPdoDrawerReturnFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setAdvancedPdoDrawerTab(tab);
     setAdvancedPdoDrawerOpen(true);
   }
 
   function closeAdvancedPdoDrawer() {
     setAdvancedPdoDrawerOpen(false);
-    window.setTimeout(() => advancedPdoDrawerReturnFocusRef.current?.focus(), 0);
   }
 
   function renderAdvancedGlobalParamsPanel() {
@@ -277,6 +268,7 @@ export function RealtimeDataPage({
         />
         <aside
           className="legacy-drawer"
+          ref={advancedPdoDrawerRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="advanced-pdo-drawer-title"

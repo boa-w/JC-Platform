@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import type { SdoNodeDocument } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
 import { settingEditorSections, settingColumnWidthStorageKey } from './config';
@@ -16,7 +17,6 @@ import {
   saveSettingColumnWidths,
   sdoNodeByNumberPath,
   sdoNodeByPath,
-  sdoNodeDocumentPath,
   settingDataTypeSelectValue,
   settingPathNames,
   updateSdoNodeAtPath,
@@ -40,7 +40,7 @@ export function useSettingData({
   const [selectedSettingPath, setSelectedSettingPath] = useState<string | null>(null);
   const [editingSettingPath, setEditingSettingPath] = useState<number[] | null>(null);
   const settingDrawerCloseRef = useRef<HTMLButtonElement | null>(null);
-  const settingDrawerReturnFocusRef = useRef<HTMLElement | null>(null);
+  const settingDrawerRef = useRef<HTMLElement | null>(null);
   const [settingSearchQuery, setSettingSearchQuery] = useState('');
   const [settingColumnWidths, setSettingColumnWidths] = useState<Record<string, number>>(
     loadSettingColumnWidths,
@@ -56,15 +56,22 @@ export function useSettingData({
   }
 
   function openSettingEditorDrawer(path: number[]) {
-    settingDrawerReturnFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setEditingSettingPath(path);
   }
 
   function closeSettingEditorDrawer() {
     setEditingSettingPath(null);
-    window.setTimeout(() => settingDrawerReturnFocusRef.current?.focus(), 0);
   }
+
+  const settingEditorDrawerOpen = Boolean(
+    editingSettingPath && sdoNodeByNumberPath(sdoDocument(), editingSettingPath),
+  );
+  useDialogFocus({
+    active: settingEditorDrawerOpen,
+    containerRef: settingDrawerRef,
+    initialFocusRef: settingDrawerCloseRef,
+    onEscape: closeSettingEditorDrawer,
+  });
 
   useEffect(() => {
     if (!isActive) {
@@ -76,22 +83,6 @@ export function useSettingData({
     if (editingSettingPath && !sdoNodeByNumberPath(sdoDocument(), editingSettingPath)) {
       setEditingSettingPath(null);
     }
-  }, [editingSettingPath, loadedDocument]);
-
-  useEffect(() => {
-    const settingEditorDrawerOpen = Boolean(
-      editingSettingPath && sdoNodeByNumberPath(sdoDocument(), editingSettingPath),
-    );
-    if (!settingEditorDrawerOpen) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') closeSettingEditorDrawer();
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    window.setTimeout(() => settingDrawerCloseRef.current?.focus(), 0);
-
-    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editingSettingPath, loadedDocument]);
 
   function updateSdoNode(path: number[], field: SdoNodeField, value: string | number) {
@@ -360,6 +351,7 @@ export function useSettingData({
     setSettingSearchQuery,
     settingColumnWidth,
     settingDrawerCloseRef,
+    settingDrawerRef,
     settingEditorFieldValue,
     settingMenus,
     settingParameters,
