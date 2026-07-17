@@ -4,13 +4,15 @@ import { parsePdoAdvancedProject, validateProjectDocument } from '../api/command
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
+import { featureModules } from '../data/modules';
+import { getTestData, type TestDataType } from '../data/test-data';
 import { useBatteryLegacyController } from '../features/battery-legacy/useBatteryLegacyController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
 import { useProjectDocumentController } from '../features/project-document';
-import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
 import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
 import { useProjectLifecycleController } from '../features/project-lifecycle';
+import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
 import { usePdoEditor } from '../features/realtime-data/usePdoEditor';
 import {
   TableConfigStatusPanel,
@@ -21,8 +23,6 @@ import {
   uiResourcePreviewDocument,
   useUiResourceController,
 } from '../features/ui-resource/useUiResourceController';
-import { featureModules } from '../data/modules';
-import { getTestData, type TestDataType } from '../data/test-data';
 import { useCanTestData } from '../hooks/useCanTestData';
 import {
   advancedConfigSections,
@@ -186,7 +186,7 @@ export function Dashboard({
     updateProjectDocument,
     updateProjectSections,
   } = projectDocument;
-  const canTestData = useCanTestData();
+  const canTestData = useCanTestData(loadedProject?.document ?? null);
   const {
     options: exportBatteryOptions,
     updateOption: updateExportBatteryOption,
@@ -206,6 +206,7 @@ export function Dashboard({
   const protocolEditor = useProtocolEditor({
     activeModuleKey: activeModule.key,
     document: loadedProject?.document ?? null,
+    projectPath: loadedProject?.summary.path,
     updateProjectDocument,
     updateProjectSections,
     applyDocument: (document) => {

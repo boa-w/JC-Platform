@@ -71,6 +71,12 @@ interface UseUiResourceControllerOptions {
   applyLoadedProject: (project: LoadedProject) => void;
 }
 
+interface UiDocumentMutationResult {
+  valid: boolean;
+  errors: string[];
+  document: unknown;
+}
+
 export function useUiResourceController({
   loadedProject,
   applyLoadedProject,
@@ -81,6 +87,10 @@ export function useUiResourceController({
   const [isLoading, setIsLoading] = useState(false);
   const [showCanvasLabels, setShowCanvasLabels] = useState(true);
   const parseGenerationRef = useRef(0);
+  const mutationGenerationRef = useRef(0);
+  const loadedProjectRef = useRef(loadedProject);
+  const projectPath = loadedProject?.summary.path;
+  loadedProjectRef.current = loadedProject;
 
   const refreshPreview = useCallback(async (document: unknown, projectPath?: string) => {
     const generation = ++parseGenerationRef.current;
@@ -103,31 +113,58 @@ export function useUiResourceController({
   }, []);
 
   useEffect(() => {
-    void refreshPreview(uiResourcePreviewDocument);
-  }, [refreshPreview]);
+    parseGenerationRef.current += 1;
+    setReport(null);
+    setError(null);
+    setIsLoading(false);
+    if (!projectPath) void refreshPreview(uiResourcePreviewDocument);
+  }, [projectPath, refreshPreview]);
 
-  async function applyDocument(nextDocument: unknown) {
-    if (!loadedProject) return;
-    applyLoadedProject({ ...loadedProject, document: nextDocument });
-    await refreshPreview(nextDocument, loadedProject.summary.path);
-  }
+  useEffect(() => {
+    loadedProjectRef.current = loadedProject;
+    mutationGenerationRef.current += 1;
+    setIsApplying(false);
+  }, [loadedProject]);
 
-  async function applyResource(resource: Omit<UiResourceUpdateRequest, 'document'>) {
-    if (!loadedProject) return;
+  async function runDocumentMutation(
+    mutate: (document: unknown) => Promise<UiDocumentMutationResult>,
+    invalidMessage: string,
+  ) {
+    const targetProject = loadedProject;
+    if (!targetProject) return;
+
+    const targetDocument = targetProject.document;
+    const generation = ++mutationGenerationRef.current;
     setIsApplying(true);
     setError(null);
     try {
-      const next = await updateUiResourceDocument({ document: loadedProject.document, ...resource });
-      if (!next.valid) {
-        setError(next.errors.join('；') || 'UI 资源写回失败');
+      const next = await mutate(targetDocument);
+      if (
+        generation !== mutationGenerationRef.current ||
+        targetDocument !== loadedProjectRef.current?.document
+      ) {
         return;
       }
-      await applyDocument(next.document);
+      if (!next.valid) {
+        setError(next.errors.join('；') || invalidMessage);
+        return;
+      }
+      applyLoadedProject({ ...targetProject, document: next.document });
+      await refreshPreview(next.document, targetProject.summary.path);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (generation === mutationGenerationRef.current) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
     } finally {
-      setIsApplying(false);
+      if (generation === mutationGenerationRef.current) setIsApplying(false);
     }
+  }
+
+  async function applyResource(resource: Omit<UiResourceUpdateRequest, 'document'>) {
+    await runDocumentMutation(
+      (document) => updateUiResourceDocument({ document, ...resource }),
+      'UI 资源写回失败',
+    );
   }
 
   async function selectOptionSources() {
@@ -145,43 +182,17 @@ export function useUiResourceController({
   }
 
   async function addOption(key: string, sources: string[]) {
-    if (!loadedProject) return;
-    setIsApplying(true);
-    setError(null);
-    try {
-      const next = await addUiResourceOptionDocument({ document: loadedProject.document, key, sources });
-      if (!next.valid) {
-        setError(next.errors.join('；') || 'UI 资源选项新增失败');
-        return;
-      }
-      await applyDocument(next.document);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setIsApplying(false);
-    }
+    await runDocumentMutation(
+      (document) => addUiResourceOptionDocument({ document, key, sources }),
+      'UI 资源选项新增失败',
+    );
   }
 
   async function removeOption(key: string, optionIndex: number) {
-    if (!loadedProject) return;
-    setIsApplying(true);
-    setError(null);
-    try {
-      const next = await removeUiResourceOptionDocument({
-        document: loadedProject.document,
-        key,
-        option_index: optionIndex,
-      });
-      if (!next.valid) {
-        setError(next.errors.join('；') || 'UI 资源选项删除失败');
-        return;
-      }
-      await applyDocument(next.document);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setIsApplying(false);
-    }
+    await runDocumentMutation(
+      (document) => removeUiResourceOptionDocument({ document, key, option_index: optionIndex }),
+      'UI 资源选项删除失败',
+    );
   }
 
   return {

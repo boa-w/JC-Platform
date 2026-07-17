@@ -13,7 +13,9 @@ import type {
 } from './types';
 
 export function sdoNodeDocumentPath(path: number[]): JsonPath {
-  return path.reduce<JsonPath>((segments, index) => [...segments, 'children', index], ['sdo_info']);
+  const segments: JsonPath = ['sdo_info'];
+  for (const index of path) segments.push('children', index);
+  return segments;
 }
 
 export function optionsWithCurrentValue(options: SettingEditorOption[], value: string | number) {
@@ -289,7 +291,10 @@ export function sdoNodeByPath(root: SdoNodeDocument | null, path: string | null)
 
 export function pathStringToNumbers(path: string | null) {
   if (!path) return [];
-  return path.split('/').map((segment) => Number(segment)).filter((segment) => Number.isFinite(segment));
+  return path
+    .split('/')
+    .map((segment) => Number(segment))
+    .filter((segment) => Number.isFinite(segment));
 }
 
 export function sdoNodeByNumberPath(root: SdoNodeDocument | null, path: number[] | null) {
@@ -325,11 +330,12 @@ export function collectSettingParameters(
       const handle = parseHandleParam(current.handle_param);
       const isReadonly = current.control_rw === 0 || current.control_rw === undefined;
       const isBooleanMonitor = isBooleanMonitorParameter(current);
-      const usageHint = isReadonly && isBooleanMonitor
-        ? '只读监测项，0/1 表示开关状态；本页可编辑配置定义，不能直接写入运行状态。'
-        : isReadonly
-          ? '只读参数；本页可编辑配置定义，不能直接写入运行值。'
-          : '读写参数；可根据权限编辑配置定义。';
+      const usageHint =
+        isReadonly && isBooleanMonitor
+          ? '只读监测项，0/1 表示开关状态；本页可编辑配置定义，不能直接写入运行状态。'
+          : isReadonly
+            ? '只读参数；本页可编辑配置定义，不能直接写入运行值。'
+            : '读写参数；可根据权限编辑配置定义。';
       const row: SettingParameterRow = {
         index: rows.length + 1,
         path,
@@ -356,27 +362,30 @@ export function collectSettingParameters(
         isBooleanMonitor,
         usageHint,
       };
-      const searchText = normalizeSettingSearch([
-        row.name,
-        row.menuPath,
-        row.usageHint,
-        row.auth,
-        row.protocol,
-        row.frameId,
-        row.mainIndex,
-        row.subIndex,
-        row.access,
-        row.dataType,
-      ].join(' '));
+      const searchText = normalizeSettingSearch(
+        [
+          row.name,
+          row.menuPath,
+          row.usageHint,
+          row.auth,
+          row.protocol,
+          row.frameId,
+          row.mainIndex,
+          row.subIndex,
+          row.access,
+          row.dataType,
+        ].join(' '),
+      );
       if (!query || searchText.includes(query)) {
         row.index = rows.length + 1;
         rows.push(row);
       }
       return;
     }
-    const nextPathNames = current.type === 0
-      ? [...pathNames, sdoNodeName(current, `菜单${path[path.length - 1] + 1}`)]
-      : pathNames;
+    const nextPathNames =
+      current.type === 0
+        ? [...pathNames, sdoNodeName(current, `菜单${path[path.length - 1] + 1}`)]
+        : pathNames;
     (current.children ?? []).forEach((child, index) => {
       visit(child, [...path, index], nextPathNames);
     });
@@ -400,8 +409,8 @@ export function updateSdoNodeAtPath(
   const [index, ...rest] = path;
   return {
     ...node,
-    children: (node.children ?? []).map((child, currentIndex) => (
-      currentIndex === index ? updateSdoNodeAtPath(child, rest, updater) : child
-    )),
+    children: (node.children ?? []).map((child, currentIndex) =>
+      currentIndex === index ? updateSdoNodeAtPath(child, rest, updater) : child,
+    ),
   };
 }

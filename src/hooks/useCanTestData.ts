@@ -1,5 +1,5 @@
 import { open } from '@tauri-apps/plugin-dialog';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { generateCanTestData, loadJsonFile, saveJsonFile, saveTextFile } from '../api/commands';
 import type {
   CanTestCase,
@@ -11,9 +11,7 @@ import type {
   LoadedProject,
 } from '../types/platform';
 
-const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
-export function useCanTestData() {
+export function useCanTestData(sourceDocument: unknown | null) {
   const [canTestFrames, setCanTestFrames] = useState<CanTestFrame[]>([]);
   const [canTestSettingEntries, setCanTestSettingEntries] = useState<CanTestSettingEntry[]>([]);
   const [canTestCases, setCanTestCases] = useState<CanTestCase[]>([]);
@@ -24,6 +22,22 @@ export function useCanTestData() {
   const [canTestDefaultCycle, setCanTestDefaultCycle] = useState(100);
   const [canTestStatus, setCanTestStatus] = useState<string | null>(null);
   const [isGeneratingCanTest, setIsGeneratingCanTest] = useState(false);
+  const sourceDocumentRef = useRef(sourceDocument);
+  const generationRef = useRef(0);
+  sourceDocumentRef.current = sourceDocument;
+
+  useEffect(() => {
+    sourceDocumentRef.current = sourceDocument;
+    generationRef.current += 1;
+    setCanTestFrames([]);
+    setCanTestSettingEntries([]);
+    setCanTestCases([]);
+    setCanTestCoverage(null);
+    setCanTestWarnings([]);
+    setSelectedCanTestCaseIndex(0);
+    setCanTestStatus(null);
+    setIsGeneratingCanTest(false);
+  }, [sourceDocument]);
 
   function normalizeFrames(frames: CanTestFrame[]) {
     return frames.map((frame) => ({
@@ -64,10 +78,15 @@ export function useCanTestData() {
       setCanTestStatus('请先打开 .jcpro 项目。');
       return;
     }
+    const targetDocument = loadedProject.document;
+    const generation = ++generationRef.current;
     setIsGeneratingCanTest(true);
     setCanTestStatus(null);
     try {
-      const result = await generateCanTestData(loadedProject.document, canTestProfile);
+      const result = await generateCanTestData(targetDocument, canTestProfile);
+      if (generation !== generationRef.current || targetDocument !== sourceDocumentRef.current) {
+        return;
+      }
       const cases = (result.cases ?? []).map((testCase) => ({
         ...testCase,
         frames: normalizeFrames(testCase.frames),
@@ -86,9 +105,11 @@ export function useCanTestData() {
         `已生成 ${result.coverage?.caseCount ?? cases.length} 个测试用例，${result.coverage?.generatedFrameCount ?? result.frameCount} 帧次，${result.coverage?.generatedSettingEntryCount ?? settingEntries.length} 个设置条目`,
       );
     } catch (error) {
-      setCanTestStatus(error instanceof Error ? error.message : String(error));
+      if (generation === generationRef.current) {
+        setCanTestStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsGeneratingCanTest(false);
+      if (generation === generationRef.current) setIsGeneratingCanTest(false);
     }
   }
 

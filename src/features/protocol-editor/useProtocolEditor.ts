@@ -1,5 +1,5 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   flattenUnifiedProtocolDocument,
   loadJsonFile,
@@ -21,6 +21,7 @@ import type {
 interface UseProtocolEditorOptions {
   activeModuleKey: NavigationKey;
   document: unknown | null;
+  projectPath?: string;
   updateProjectDocument: (section: string, value: unknown) => void;
   updateProjectSections: (sections: Record<string, unknown>) => void;
   applyDocument: (document: unknown) => void;
@@ -31,6 +32,7 @@ const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS
 export function useProtocolEditor({
   activeModuleKey,
   document,
+  projectPath,
   updateProjectDocument,
   updateProjectSections,
   applyDocument,
@@ -47,51 +49,82 @@ export function useProtocolEditor({
     null,
   );
   const [isExportingPrivateProtocol, setIsExportingPrivateProtocol] = useState(false);
+  const refreshGenerationRef = useRef(0);
+  const documentRef = useRef(document);
+  const projectPathRef = useRef(projectPath);
+  documentRef.current = document;
+  projectPathRef.current = projectPath;
 
   const source = document as Record<string, unknown> | null;
   const signalDictionary =
     (source?.signal_dictionary as SignalDictionary | undefined) ?? ({ signals: [] } as const);
-  const privateProtocol =
-    (source?.private_protocol as { enabled: boolean; frames: PrivateFrame[] } | undefined) ?? {
-      enabled: false,
-      frames: [],
-    };
+  const privateProtocol = (source?.private_protocol as
+    | { enabled: boolean; frames: PrivateFrame[] }
+    | undefined) ?? {
+    enabled: false,
+    frames: [],
+  };
   const protocolMappings = (source?.protocol_mapping as ProtocolMapping[] | undefined) ?? [];
 
-  const refreshUnifiedProtocol = useCallback(async (documentOverride?: unknown) => {
-    const nextDocument = documentOverride ?? document;
-    if (!nextDocument) return null;
-
-    setIsParsingUnifiedProtocol(true);
+  useEffect(() => {
+    projectPathRef.current = projectPath;
+    refreshGenerationRef.current += 1;
+    setUnifiedProtocol(null);
     setUnifiedProtocolError(null);
-    try {
-      const report = await parseUnifiedProtocolProject(nextDocument);
-      setUnifiedProtocol(report);
-      if (!report.validation.valid) {
-        setUnifiedProtocolError(report.validation.errors.join('；') || '协议映射校验存在问题');
+    setProtocolFlattenStatus(null);
+    setPrivateProtocolImportStatus(null);
+    setPrivateProtocolExportStatus(null);
+    setIsParsingUnifiedProtocol(false);
+  }, [projectPath]);
+
+  const refreshUnifiedProtocol = useCallback(
+    async (documentOverride?: unknown) => {
+      const nextDocument = documentOverride ?? document;
+      if (!nextDocument) return null;
+
+      const generation = ++refreshGenerationRef.current;
+      setIsParsingUnifiedProtocol(true);
+      setUnifiedProtocolError(null);
+      try {
+        const report = await parseUnifiedProtocolProject(nextDocument);
+        if (generation !== refreshGenerationRef.current) return null;
+        setUnifiedProtocol(report);
+        if (!report.validation.valid) {
+          setUnifiedProtocolError(report.validation.errors.join('；') || '协议映射校验存在问题');
+        }
+        return report;
+      } catch (error) {
+        if (generation === refreshGenerationRef.current) {
+          setUnifiedProtocolError(error instanceof Error ? error.message : String(error));
+        }
+        return null;
+      } finally {
+        if (generation === refreshGenerationRef.current) setIsParsingUnifiedProtocol(false);
       }
-      return report;
-    } catch (error) {
-      setUnifiedProtocolError(error instanceof Error ? error.message : String(error));
-      return null;
-    } finally {
-      setIsParsingUnifiedProtocol(false);
-    }
-  }, [document]);
+    },
+    [document],
+  );
 
   useEffect(() => {
-    if (document && shouldRefreshUnifiedProtocol(activeModuleKey)) {
-      void refreshUnifiedProtocol(document);
+    refreshGenerationRef.current += 1;
+    setIsParsingUnifiedProtocol(false);
+    if (!document) {
+      setUnifiedProtocol(null);
+      setUnifiedProtocolError(null);
+      setIsParsingUnifiedProtocol(false);
+      return;
     }
-  }, [activeModuleKey, document, refreshUnifiedProtocol]);
+    if (!shouldRefreshUnifiedProtocol(activeModuleKey)) return;
 
-  function refreshAfterSectionUpdate(section: string, value: unknown) {
-    void refreshUnifiedProtocol({ ...source, [section]: value });
-  }
+    const timer = window.setTimeout(() => void refreshUnifiedProtocol(document), 180);
+    return () => {
+      window.clearTimeout(timer);
+      refreshGenerationRef.current += 1;
+    };
+  }, [activeModuleKey, document, refreshUnifiedProtocol]);
 
   function updateSignalDictionary(next: SignalDictionary) {
     updateProjectDocument('signal_dictionary', next);
-    refreshAfterSectionUpdate('signal_dictionary', next);
   }
 
   function updateSignalDefinition(
@@ -136,7 +169,6 @@ export function useProtocolEditor({
 
   function updatePrivateProtocol(next: { enabled: boolean; frames: PrivateFrame[] }) {
     updateProjectDocument('private_protocol', next);
-    refreshAfterSectionUpdate('private_protocol', next);
   }
 
   function updatePrivateFrame(index: number, updater: (frame: PrivateFrame) => PrivateFrame) {
@@ -241,6 +273,8 @@ export function useProtocolEditor({
       setPrivateProtocolImportStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
       return;
     }
+    const targetDocument = document;
+    const targetProjectPath = projectPath;
     const selected = await open({
       multiple: false,
       filters: [{ name: '私有协议配置', extensions: ['json'] }],
@@ -250,6 +284,9 @@ export function useProtocolEditor({
     setIsImportingPrivateProtocol(true);
     try {
       const data = (await loadJsonFile(selected)) as { enabled: boolean; frames: PrivateFrame[] };
+      if (targetDocument !== documentRef.current || targetProjectPath !== projectPathRef.current) {
+        return;
+      }
       if (!data || typeof data.enabled !== 'boolean' || !Array.isArray(data.frames)) {
         setPrivateProtocolImportStatus('无效的私有协议配置文件。');
         return;
@@ -265,7 +302,6 @@ export function useProtocolEditor({
 
   function updateProtocolMappings(next: ProtocolMapping[]) {
     updateProjectDocument('protocol_mapping', next);
-    refreshAfterSectionUpdate('protocol_mapping', next);
   }
 
   function updateProtocolMapping(
@@ -318,10 +354,15 @@ export function useProtocolEditor({
 
   async function flattenUnifiedProtocol() {
     if (!document) return;
+    const targetDocument = document;
+    const targetProjectPath = projectPath;
     setProtocolFlattenStatus(null);
     setUnifiedProtocolError(null);
     try {
-      const report = await flattenUnifiedProtocolDocument(document);
+      const report = await flattenUnifiedProtocolDocument(targetDocument);
+      if (targetDocument !== documentRef.current || targetProjectPath !== projectPathRef.current) {
+        return;
+      }
       if (!report.valid) {
         setUnifiedProtocolError(report.errors.join('；') || '生成旧版 PDO 段失败');
         return;

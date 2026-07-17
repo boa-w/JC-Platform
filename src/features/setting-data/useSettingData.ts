@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import type { SdoNodeDocument } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
-import { settingEditorSections, settingColumnWidthStorageKey } from './config';
-import type { SettingEditorField, SettingParameterColumn, SdoNodeField } from './types';
+import { settingColumnWidthStorageKey, settingEditorSections } from './config';
+import type { SdoNodeField, SettingEditorField, SettingParameterColumn } from './types';
 import {
   clampSettingColumnWidth,
   collectSettingMenus,
@@ -42,14 +42,12 @@ export function useSettingData({
   const settingDrawerCloseRef = useRef<HTMLButtonElement | null>(null);
   const settingDrawerRef = useRef<HTMLElement | null>(null);
   const [settingSearchQuery, setSettingSearchQuery] = useState('');
-  const [settingColumnWidths, setSettingColumnWidths] = useState<Record<string, number>>(
-    loadSettingColumnWidths,
-  );
+  const [settingColumnWidths, setSettingColumnWidths] =
+    useState<Record<string, number>>(loadSettingColumnWidths);
 
-  function sdoDocument(): SdoNodeDocument | null {
-    if (!loadedDocument) return null;
-    return loadedDocument.sdo_info as SdoNodeDocument;
-  }
+  const sdoDocument = loadedDocument
+    ? ((loadedDocument.sdo_info as SdoNodeDocument | undefined) ?? null)
+    : null;
 
   function updateSdoDocument(next: SdoNodeDocument) {
     updateProjectDocument('sdo_info', next);
@@ -64,7 +62,7 @@ export function useSettingData({
   }
 
   const settingEditorDrawerOpen = Boolean(
-    editingSettingPath && sdoNodeByNumberPath(sdoDocument(), editingSettingPath),
+    editingSettingPath && sdoNodeByNumberPath(sdoDocument, editingSettingPath),
   );
   useDialogFocus({
     active: settingEditorDrawerOpen,
@@ -80,13 +78,13 @@ export function useSettingData({
   }, [isActive]);
 
   useEffect(() => {
-    if (editingSettingPath && !sdoNodeByNumberPath(sdoDocument(), editingSettingPath)) {
+    if (editingSettingPath && !sdoNodeByNumberPath(sdoDocument, editingSettingPath)) {
       setEditingSettingPath(null);
     }
-  }, [editingSettingPath, loadedDocument]);
+  }, [editingSettingPath, sdoDocument]);
 
   function updateSdoNode(path: number[], field: SdoNodeField, value: string | number) {
-    const document = sdoDocument();
+    const document = sdoDocument;
     if (!document) return;
 
     updateSdoDocument(updateSdoNodeAtPath(document, path, (node) => ({ ...node, [field]: value })));
@@ -108,7 +106,9 @@ export function useSettingData({
       case 'offset_value':
         return node.pre_handle_offset ?? field.defaultValue;
       case 'decimals_value':
-        return node.pre_handle_decimal_name ?? String(node.pre_handle_decimal ?? field.defaultValue);
+        return (
+          node.pre_handle_decimal_name ?? String(node.pre_handle_decimal ?? field.defaultValue)
+        );
       default: {
         const rawValue = node[field.field];
         return (rawValue ?? field.defaultValue) as string | number;
@@ -116,8 +116,12 @@ export function useSettingData({
     }
   }
 
-  function updateSettingEditorField(path: number[], field: SettingEditorField, value: string | number) {
-    const document = sdoDocument();
+  function updateSettingEditorField(
+    path: number[],
+    field: SettingEditorField,
+    value: string | number,
+  ) {
+    const document = sdoDocument;
     if (!document) return;
 
     const nextNode = (current: SdoNodeDocument): SdoNodeDocument => {
@@ -131,9 +135,15 @@ export function useSettingData({
           };
         }
         case 'bit_start':
-          return { ...current, handle_param: formatHandleParamFromBitRange(current.handle_param, value, null) };
+          return {
+            ...current,
+            handle_param: formatHandleParamFromBitRange(current.handle_param, value, null),
+          };
         case 'bit_length':
-          return { ...current, handle_param: formatHandleParamFromBitRange(current.handle_param, null, value) };
+          return {
+            ...current,
+            handle_param: formatHandleParamFromBitRange(current.handle_param, null, value),
+          };
         case 'preprocess_label':
           return { ...current, pre_handle_name: String(value) };
         case 'scale_value':
@@ -142,7 +152,11 @@ export function useSettingData({
           return { ...current, pre_handle_offset: String(value) };
         case 'decimals_value': {
           const decimals = parseSettingBitNumber(value, current.pre_handle_decimal ?? 0);
-          return { ...current, pre_handle_decimal_name: String(value), pre_handle_decimal: decimals };
+          return {
+            ...current,
+            pre_handle_decimal_name: String(value),
+            pre_handle_decimal: decimals,
+          };
         }
         default:
           return { ...current, [field.field]: value };
@@ -201,14 +215,17 @@ export function useSettingData({
       .map((section) => ({
         ...section,
         fields: section.fields.filter(
-          (field) => field.visibleFor === undefined || field.visibleFor === 'all' || field.visibleFor === nodeKind,
+          (field) =>
+            field.visibleFor === undefined ||
+            field.visibleFor === 'all' ||
+            field.visibleFor === nodeKind,
         ),
       }))
       .filter((section) => section.fields.length > 0);
   }
 
   function addSdoMenu(parentPath: number[]) {
-    const document = sdoDocument();
+    const document = sdoDocument;
     if (!document) return;
 
     const parentNode = sdoNodeByNumberPath(document, parentPath);
@@ -232,7 +249,7 @@ export function useSettingData({
   }
 
   function addSdoParameter(parentPath: number[]) {
-    const document = sdoDocument();
+    const document = sdoDocument;
     if (!document) return;
 
     const parentNode = sdoNodeByNumberPath(document, parentPath);
@@ -273,7 +290,7 @@ export function useSettingData({
   }
 
   function removeSdoNode(path: number[]) {
-    const document = sdoDocument();
+    const document = sdoDocument;
     if (!document || path.length === 0) return;
 
     const parentPath = path.slice(0, -1);
@@ -287,10 +304,8 @@ export function useSettingData({
   }
 
   function removeSdoNodes(paths: number[][]) {
-    const document = sdoDocument();
-    const pathKeys = new Set(
-      paths.filter((path) => path.length > 0).map((path) => path.join('/')),
-    );
+    const document = sdoDocument;
+    const pathKeys = new Set(paths.filter((path) => path.length > 0).map((path) => path.join('/')));
     if (!document || pathKeys.size === 0) return;
 
     function removeFromNode(node: SdoNodeDocument, parentPath: number[]): SdoNodeDocument {
@@ -307,7 +322,7 @@ export function useSettingData({
     updateSdoDocument(removeFromNode(document, []));
   }
 
-  const currentSdoDocument = sdoDocument();
+  const currentSdoDocument = sdoDocument;
   const settingMenus = collectSettingMenus(currentSdoDocument, settingSearchQuery);
   const activeSettingPath = selectedSettingPath ?? settingMenus[0]?.key ?? null;
   const activeSettingPathNumbers = pathStringToNumbers(activeSettingPath);
@@ -320,7 +335,9 @@ export function useSettingData({
     settingSearchQuery,
   );
   const readonlySettingParameterCount = settingParameters.filter((row) => row.isReadonly).length;
-  const booleanMonitorParameterCount = settingParameters.filter((row) => row.isBooleanMonitor).length;
+  const booleanMonitorParameterCount = settingParameters.filter(
+    (row) => row.isBooleanMonitor,
+  ).length;
   const hasBooleanMonitorParameters = booleanMonitorParameterCount > 0;
   const editingSettingNode = sdoNodeByNumberPath(currentSdoDocument, editingSettingPath);
 
