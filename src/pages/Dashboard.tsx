@@ -1,7 +1,7 @@
-import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { FolderOpen } from 'lucide-react';
 import { lazy, useEffect, useRef, useState } from 'react';
-import { takePendingProjectPath, validateProjectDocument } from '../api/commands';
+import { validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
@@ -13,7 +13,10 @@ import { useProjectJsonEditor } from '../features/json-editor/useProjectJsonEdit
 import { useProjectDocumentController } from '../features/project-document';
 import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
-import { useProjectLifecycleController } from '../features/project-lifecycle';
+import {
+  useDesktopProjectIntegration,
+  useProjectLifecycleController,
+} from '../features/project-lifecycle';
 import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
 import { PdoAdvancedReportPanel } from '../features/realtime-data/PdoAdvancedReportPanel';
 import { usePdoAdvancedReport } from '../features/realtime-data/usePdoAdvancedReport';
@@ -156,8 +159,6 @@ export function Dashboard({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const documentStateChangeRef = useRef<(hasChanges: boolean) => void>(() => undefined);
   const projectGitRefreshRef = useRef<() => void | Promise<void>>(() => undefined);
-  const externalProjectOpenRef = useRef<(path: string) => void>(() => undefined);
-  const externalProjectStatusRef = useRef<(message: string) => void>(() => undefined);
   const projectDocument = useProjectDocumentController({
     loadedProject,
     onDocumentStateChange: (hasChanges) => documentStateChangeRef.current(hasChanges),
@@ -264,11 +265,16 @@ export function Dashboard({
     },
   });
 
-  externalProjectOpenRef.current = (path) => {
-    onNavigate('project');
-    void projectLifecycle.openProject(path);
-  };
-  externalProjectStatusRef.current = projectLifecycle.setSaveStatus;
+  const desktopProjectIntegration = useDesktopProjectIntegration({
+    projectName: loadedProject?.summary.name,
+    projectPath: loadedProject?.summary.path,
+    hasUnsavedChanges,
+    onOpenProject: (path) => {
+      onNavigate('project');
+      void projectLifecycle.openProject(path);
+    },
+    onStatusChange: projectLifecycle.setSaveStatus,
+  });
 
   useEffect(() => {
     documentStateChangeRef.current = projectLifecycle.markDocumentState;
@@ -277,49 +283,6 @@ export function Dashboard({
   useEffect(() => {
     projectGitRefreshRef.current = projectGit.refresh;
   }, [projectGit.refresh]);
-
-  useEffect(() => {
-    if (!isTauriRuntime()) return;
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-    let lastHandledPath = '';
-    let lastHandledAt = 0;
-
-    function openExternalProject(path: string) {
-      const normalizedPath = path.trim();
-      if (!normalizedPath) return;
-      const now = Date.now();
-      if (normalizedPath === lastHandledPath && now - lastHandledAt < 1000) return;
-      lastHandledPath = normalizedPath;
-      lastHandledAt = now;
-      externalProjectOpenRef.current(normalizedPath);
-    }
-
-    async function bindProjectOpenEvents() {
-      unlisten = await listen<string>('open-project', (event) =>
-        openExternalProject(event.payload),
-      );
-      if (disposed) {
-        unlisten();
-        return;
-      }
-      const pendingPath = await takePendingProjectPath();
-      if (!disposed && pendingPath) openExternalProject(pendingPath);
-    }
-
-    void bindProjectOpenEvents().catch((cause) => {
-      if (!disposed) {
-        externalProjectStatusRef.current(
-          `无法接收系统项目打开请求：${cause instanceof Error ? cause.message : String(cause)}`,
-        );
-      }
-    });
-
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -387,6 +350,13 @@ export function Dashboard({
 
   return (
     <main className={projectGit.showReview ? 'workspace workspace--git-review' : 'workspace'}>
+      {desktopProjectIntegration.isProjectDragActive ? (
+        <div aria-live="polite" className="project-drop-overlay" role="status">
+          <FolderOpen aria-hidden="true" size={28} strokeWidth={1.6} />
+          <strong>释放以打开项目</strong>
+          <span>当前未保存修改会在打开前请求确认</span>
+        </div>
+      ) : null}
       <DashboardActionBar
         activeModule={activeModule}
         loadedProject={loadedProject}
