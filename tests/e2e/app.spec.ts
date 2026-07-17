@@ -74,6 +74,11 @@ test('persists the selected theme across reloads', async ({ page }) => {
 test('surfaces desktop-only actions as accessible errors in browser preview', async ({ page }) => {
   await page.getByRole('button', { name: '创建项目', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveText('系统保存对话框只能在 Tauri 桌面应用中使用。');
+
+  await page.keyboard.press('Control+o');
+  await expect(page.getByRole('alert')).toHaveText(
+    '系统文件选择器只能在桌面应用中使用；也可以粘贴项目路径后打开。',
+  );
 });
 
 test('offers to restore an unsaved project draft', async ({ page }) => {
@@ -162,4 +167,10 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
   expect(
     await page.evaluate(() => localStorage.getItem('jc-custom-platform.projectRecoveryDraft')),
   ).not.toBeNull();
+
+  await page.keyboard.press('Control+s');
+  const saveDialog = page.getByRole('dialog', { name: '确认保存' });
+  await expect(saveDialog).toBeVisible();
+  await saveDialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(saveDialog).toBeHidden();
 });

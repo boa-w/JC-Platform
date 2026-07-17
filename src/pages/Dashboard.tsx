@@ -18,6 +18,7 @@ import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
 import {
   useDesktopProjectIntegration,
+  useDesktopProjectShortcuts,
   useProjectLifecycleController,
 } from '../features/project-lifecycle';
 import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
@@ -262,6 +263,14 @@ export function Dashboard({
       void uiResource.refreshPreview(document, loadedProject.summary.path);
       projectLifecycle.setSaveStatus('已恢复异常退出前的未保存修改。');
     },
+  });
+  useDesktopProjectShortcuts({
+    canSave: hasUnsavedChanges && Boolean(loadedProject?.summary.path),
+    canSaveAs: Boolean(loadedProject?.summary.path),
+    isBusy: projectLifecycle.isOpening || projectLifecycle.isSavingProject,
+    onOpen: () => void projectLifecycle.selectProjectFile(),
+    onSave: projectLifecycle.requestSaveProject,
+    onSaveAs: () => void projectLifecycle.saveProjectToNewPath(),
   });
   const projectGit = useProjectGitController({
     projectPath: loadedProject?.summary.path,
