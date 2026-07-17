@@ -1,22 +1,13 @@
-import { open, save } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  createProject,
-  loadJsonFile,
-  loadProject,
-  migrateProjectDocument,
   parsePdoAdvancedProject,
-  parseProjectDocument,
-  saveJsonFile,
-  saveProject,
-  saveProjectAs,
   validateProjectDocument,
 } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { GitReviewWorkspace } from '../components/git';
 import { JsonEditorPopup } from '../components/json-editor';
-import { ProjectManagementPage, type RecentProject } from '../components/project';
+import { ProjectManagementPage } from '../components/project';
 import { LanguagePage } from '../components/language';
 import {
   BatteryMonitorPage,
@@ -35,6 +26,7 @@ import {
 } from '../features/protocol-editor';
 import { ProjectExportPage, useProjectExport } from '../features/project-export';
 import { useProjectGitController } from '../features/project-git';
+import { useProjectLifecycleController } from '../features/project-lifecycle';
 import { SettingsPage } from '../features/settings';
 import { RealtimeDataPage, usePdoEditor } from '../features/realtime-data';
 import { SettingDataPage } from '../features/setting-data';
@@ -70,7 +62,6 @@ import type {
   LoadedProject,
   NavigationKey,
   PdoAdvancedParseReport,
-  ProjectParseReport,
   ProjectSummary,
 } from '../types/platform';
 import {
@@ -94,30 +85,6 @@ interface DashboardProps {
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-const recentProjectsStorageKey = 'jc-custom-platform.recentProjects';
-const maxRecentProjects = 8;
-function loadRecentProjects() {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = window.localStorage.getItem(recentProjectsStorageKey);
-    if (!stored) return [];
-    const parsed = JSON.parse(stored);
-    return Array.isArray(parsed)
-      ? parsed.filter((item): item is RecentProject => typeof item?.path === 'string')
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveRecentProjects(projects: RecentProject[]) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(
-    recentProjectsStorageKey,
-    JSON.stringify(projects.slice(0, maxRecentProjects)),
-  );
-}
-
 export function Dashboard({
   activeModule,
   loadedProject,
@@ -126,8 +93,6 @@ export function Dashboard({
   onNavigate,
   onProjectLoaded,
 }: DashboardProps) {
-  const [projectPath, setProjectPath] = useState('');
-  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [baselineDocument, setBaselineDocument] = useState<unknown | null>(null);
   const {
     clearDirtySections,
@@ -135,19 +100,7 @@ export function Dashboard({
     recalculateDirtySections,
     resetBaseline: resetDirtySectionBaseline,
   } = useDocumentDirtySections();
-  const [newProjectName, setNewProjectName] = useState('新建项目');
-  const [newResolutionW, setNewResolutionW] = useState(800);
-  const [newResolutionH, setNewResolutionH] = useState(480);
-  const [openError, setOpenError] = useState<string | null>(null);
-  const [projectParseReport, setProjectParseReport] = useState<ProjectParseReport | null>(null);
-  const [isOpening, setIsOpening] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [savingProjectAction, setSavingProjectAction] = useState<'save' | 'saveAs' | null>(null);
-  const isSavingProject = savingProjectAction !== null;
-  const [refactorConfigPath, setRefactorConfigPath] = useState<string | null>(null);
-  const [refactorConfigStatus, setRefactorConfigStatus] = useState<string | null>(null);
-  const [showSaveModal, setShowSaveModal] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [configEditorText, setConfigEditorText] = useState('');
   const [configEditorError, setConfigEditorError] = useState<string | null>(null);
@@ -157,6 +110,23 @@ export function Dashboard({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
+  const projectGitRefreshRef = useRef<() => void | Promise<void>>(() => undefined);
+  const modifiedSections = loadedProject
+    ? trackedDocumentSections.filter((section) => dirtySections.has(section))
+    : [];
+  const hasRefactorOnlyChanges = modifiedSections.some((section) =>
+    (refactorOnlySections as readonly string[]).includes(section),
+  );
+  const isLegacyJcproProject =
+    loadedProject?.summary.path?.toLowerCase().endsWith('.jcpro') ?? false;
+  const projectMissingSections = loadedProject?.validation.missing_sections ?? [];
+  const compatibleMissingSections = projectMissingSections.filter(
+    (section) => !(refactorOnlySections as readonly string[]).includes(section),
+  );
+  const sidecarMissingSections = projectMissingSections.filter((section) =>
+    (refactorOnlySections as readonly string[]).includes(section),
+  );
+  const effectiveProjectValid = compatibleMissingSections.length === 0;
   const canTestData = useCanTestData();
   const {
     options: exportBatteryOptions,
@@ -200,12 +170,22 @@ export function Dashboard({
     applyLoadedProject,
   });
   const uiResource = useUiResourceController({ loadedProject, applyLoadedProject });
+  const projectLifecycle = useProjectLifecycleController({
+    loadedProject,
+    hasUnsavedChanges,
+    hasRefactorOnlyChanges,
+    isLegacyJcproProject,
+    onApplyProject: applyLoadedProject,
+    onRefreshGit: () => projectGitRefreshRef.current(),
+    onRefreshProtocol: protocolEditor.refreshUnifiedProtocol,
+    onRefreshUi: uiResource.refreshPreview,
+  });
   const projectGit = useProjectGitController({
     projectPath: loadedProject?.summary.path,
-    sidecarPath: refactorConfigPath,
+    sidecarPath: projectLifecycle.refactorConfigPath,
     hasUnsavedChanges,
     onNavigate,
-    onStatusChange: setSaveStatus,
+    onStatusChange: projectLifecycle.setSaveStatus,
     onRestoreDocument: async (document, revision) => {
       if (!loadedProject) return;
       const validation = await validateProjectDocument(document);
@@ -215,15 +195,15 @@ export function Dashboard({
         trackedDocumentSections,
       );
       void uiResource.refreshPreview(document, loadedProject.summary.path);
-      setSaveStatus(`已载入 Git 版本 ${revision.short_hash}，保存后将形成新的修改。`);
+      projectLifecycle.setSaveStatus(
+        `已载入 Git 版本 ${revision.short_hash}，保存后将形成新的修改。`,
+      );
     },
   });
 
   useEffect(() => {
-    const storedProjects = loadRecentProjects();
-    setRecentProjects(storedProjects);
-    setProjectPath(storedProjects[0]?.path ?? '');
-  }, []);
+    projectGitRefreshRef.current = projectGit.refresh;
+  }, [projectGit.refresh]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -304,7 +284,9 @@ export function Dashboard({
     }
     if (Object.keys(defaults).length > 0) {
       const document = { ...doc, ...defaults };
-      acceptLoadedProject({ ...loadedProject, document }, projectPath);
+      const nextBaseline = cloneJson(document);
+      resetDirtySectionBaseline(nextBaseline);
+      applyLoadedProject({ ...loadedProject, document }, nextBaseline);
     }
   }, [loadedProject]);
 
@@ -316,32 +298,6 @@ export function Dashboard({
     if (!loadedProject) return null;
     const document = loadedProject.document as Record<string, unknown>;
     return configSectionForEditor(document, activeModule.key, { realtimeMode: pdoEditor.mode });
-  }
-
-  function updateRecentProjects(nextProject: LoadedProject, fallbackPath?: string) {
-    const path = nextProject.summary.path ?? fallbackPath;
-    if (!path) return;
-    setRecentProjects((current) => {
-      const next = [
-        { path, name: nextProject.summary.name, openedAt: new Date().toISOString() },
-        ...current.filter((item) => item.path !== path),
-      ].slice(0, maxRecentProjects);
-      saveRecentProjects(next);
-      return next;
-    });
-  }
-
-  function removeRecentProject(path: string) {
-    setRecentProjects((current) => {
-      const next = current.filter((item) => item.path !== path);
-      saveRecentProjects(next);
-      return next;
-    });
-  }
-
-  function clearRecentProjects() {
-    setRecentProjects([]);
-    saveRecentProjects([]);
   }
 
   function applyLoadedProject(
@@ -360,26 +316,13 @@ export function Dashboard({
     } else {
       clearDirtySections();
     }
+    if (baselineOverride !== undefined) setBaselineDocument(baselineOverride);
     const nextHasChanges = nextBaseline
       ? nextDirtySections.size > 0 || !deepEqual(nextProject.document, nextBaseline)
       : true;
     onProjectLoaded(nextProject);
     setHasUnsavedChanges(nextHasChanges);
-    setSaveStatus(nextHasChanges ? '存在未保存修改' : null);
-    if (nextHasChanges) setShowSaveModal(false);
-  }
-
-  function acceptLoadedProject(nextProject: LoadedProject, fallbackPath?: string) {
-    const nextPath = nextProject.summary.path ?? fallbackPath;
-    const nextBaseline = cloneJson(nextProject.document);
-    resetDirtySectionBaseline(nextBaseline);
-    setBaselineDocument(nextBaseline);
-    onProjectLoaded(nextProject);
-    setHasUnsavedChanges(false);
-    setShowSaveModal(false);
-    setSaveStatus(null);
-    if (nextPath) setProjectPath(nextPath);
-    updateRecentProjects(nextProject, fallbackPath);
+    projectLifecycle.markDocumentState(nextHasChanges);
   }
 
   function isModifiedPath(path: JsonPath) {
@@ -439,25 +382,6 @@ export function Dashboard({
     );
   }
 
-  const modifiedSections = loadedProject
-    ? trackedDocumentSections.filter((section) => dirtySections.has(section))
-    : [];
-  const hasRefactorOnlyChanges = modifiedSections.some((section) =>
-    (refactorOnlySections as readonly string[]).includes(section),
-  );
-  const isLegacyJcproProject =
-    loadedProject?.summary.path?.toLowerCase().endsWith('.jcpro') ?? false;
-  const projectMissingSections = loadedProject?.validation.missing_sections ?? [];
-  const compatibleMissingSections = projectMissingSections.filter(
-    (section) => !(refactorOnlySections as readonly string[]).includes(section),
-  );
-  const sidecarMissingSections = projectMissingSections.filter((section) =>
-    (refactorOnlySections as readonly string[]).includes(section),
-  );
-  const effectiveProjectValid = compatibleMissingSections.length === 0;
-  const selectedRecentProjectPath = recentProjects.some((item) => item.path === projectPath)
-    ? projectPath
-    : '';
   function updateProjectDocument(section: string, value: unknown) {
     if (!loadedProject) return;
 
@@ -476,69 +400,6 @@ export function Dashboard({
       (trackedDocumentSections as readonly string[]).includes(section),
     );
     applyLoadedProject({ ...loadedProject, document }, undefined, changedSections);
-  }
-
-  function stripRefactorOnlySections(document: unknown) {
-    const next = { ...((document as Record<string, unknown>) ?? {}) };
-    for (const section of refactorOnlySections) {
-      delete next[section];
-    }
-    return next;
-  }
-
-  function refactorConfigDocument(document: unknown) {
-    const source = (document as Record<string, unknown>) ?? {};
-    return {
-      config_version: '0.1.0-tauri-refactor-sidecar',
-      source_project: loadedProject?.summary.path ?? '',
-      project: source.project ?? null,
-      signal_dictionary: source.signal_dictionary ?? { signals: [] },
-      private_protocol: source.private_protocol ?? { enabled: false, frames: [] },
-      protocol_mapping: source.protocol_mapping ?? [],
-      battery_protocol: source.battery_protocol ?? null,
-      battery_monitor_info: source.battery_monitor_info ?? null,
-    };
-  }
-
-  function candidateRefactorConfigPaths(projectFilePath: string) {
-    const withoutExtension = projectFilePath.replace(/\.[^\\/\\.]+$/, '');
-    return [`${withoutExtension}.refactor-config.json`, `${withoutExtension}.json`];
-  }
-
-  function mergeRefactorConfigDocument(projectDocument: unknown, sidecarDocument: unknown) {
-    const projectObject = { ...((projectDocument as Record<string, unknown>) ?? {}) };
-    const sidecarObject = (sidecarDocument as Record<string, unknown>) ?? {};
-    for (const section of refactorOnlySections) {
-      if (section in sidecarObject && sidecarObject[section] !== null) {
-        projectObject[section] = sidecarObject[section];
-      }
-    }
-    return projectObject;
-  }
-
-  async function autoMountRefactorConfig(project: LoadedProject, projectFilePath: string) {
-    if (!projectFilePath.toLowerCase().endsWith('.jcpro')) {
-      setRefactorConfigPath(null);
-      setRefactorConfigStatus(null);
-      return project;
-    }
-
-    for (const candidatePath of candidateRefactorConfigPaths(projectFilePath)) {
-      try {
-        const sidecar = await loadJsonFile(candidatePath);
-        const document = mergeRefactorConfigDocument(project.document, sidecar);
-        const validation = await validateProjectDocument(document);
-        setRefactorConfigPath(candidatePath);
-        setRefactorConfigStatus(`已自动挂载：${candidatePath}`);
-        return { ...project, document, validation };
-      } catch {
-        // Candidate sidecar is optional.
-      }
-    }
-
-    setRefactorConfigPath(null);
-    setRefactorConfigStatus('未挂载重构配置 JSON；修改重构专属配置时会提示创建 sidecar。');
-    return project;
   }
 
   function applyConfigEditor() {
@@ -594,352 +455,6 @@ export function Dashboard({
     updateProjectDocument('language_info', next);
   }
 
-  async function handleCreateProject() {
-    setOpenError(null);
-
-    if (!confirmDiscardUnsavedChanges('创建新项目')) return;
-
-    if (!isTauriRuntime()) {
-      setOpenError('系统保存对话框只能在 Tauri 桌面应用中使用。');
-      return;
-    }
-
-    const selected = await save({
-      defaultPath: `${newProjectName}.jcpro`,
-      filters: [{ name: '项目文件', extensions: ['jcpro'] }],
-    });
-    if (!selected) return;
-
-    setIsOpening(true);
-
-    try {
-      const nextProject = await createProject({
-        path: selected,
-        name: newProjectName,
-        resolutionW: newResolutionW,
-        resolutionH: newResolutionH,
-      });
-      setRefactorConfigPath(null);
-      setRefactorConfigStatus(null);
-      acceptLoadedProject(nextProject, selected);
-      await uiResource.refreshPreview(
-        nextProject.document,
-        nextProject.summary.path ?? selected,
-      );
-    } catch (error) {
-      setOpenError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsOpening(false);
-    }
-  }
-
-  async function handleOpenProject(path = projectPath, skipDiscardConfirmation = false) {
-    if (!skipDiscardConfirmation && !confirmDiscardUnsavedChanges('打开其他项目')) return;
-    setIsOpening(true);
-    setOpenError(null);
-
-    try {
-      const nextProject = await loadProject(path);
-      const mountedProject = await autoMountRefactorConfig(
-        nextProject,
-        nextProject.summary.path ?? path,
-      );
-      acceptLoadedProject(mountedProject, path);
-      void uiResource.refreshPreview(mountedProject.document, mountedProject.summary.path ?? path);
-    } catch (error) {
-      setOpenError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsOpening(false);
-    }
-  }
-
-  async function handleReloadProject() {
-    const reloadPath = loadedProject?.summary.path ?? projectPath;
-    if (reloadPath.trim() === '') return;
-    if (
-      hasUnsavedChanges &&
-      !window.confirm('当前项目存在未保存修改，重新加载会丢弃这些修改。确定继续吗？')
-    ) {
-      return;
-    }
-    await handleOpenProject(reloadPath, true);
-  }
-
-  async function handleSelectProjectFile() {
-    setOpenError(null);
-
-    if (!confirmDiscardUnsavedChanges('打开其他项目')) return;
-
-    if (!isTauriRuntime()) {
-      setOpenError('系统文件选择器只能在桌面应用中使用；也可以粘贴项目路径后打开。');
-      return;
-    }
-
-    try {
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: '项目文件', extensions: ['jcpro'] }],
-      });
-
-      if (typeof selected === 'string') {
-        setProjectPath(selected);
-        await handleOpenProject(selected, true);
-      }
-    } catch (error) {
-      setOpenError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  function confirmDiscardUnsavedChanges(action: string) {
-    return (
-      !hasUnsavedChanges ||
-      window.confirm(`当前项目存在未保存修改。${action}会放弃这些修改，确定继续吗？`)
-    );
-  }
-
-  async function handleParseProject() {
-    if (!loadedProject) return;
-
-    setOpenError(null);
-    setIsOpening(true);
-
-    try {
-      const report = await parseProjectDocument(loadedProject.document);
-      setProjectParseReport(report);
-      if (!report.valid) {
-        setOpenError(report.errors.join('；') || '项目解析存在问题');
-      }
-    } catch (error) {
-      setOpenError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsOpening(false);
-    }
-  }
-
-  async function handleMigrateProject() {
-    if (!loadedProject) return;
-
-    setOpenError(null);
-    setIsOpening(true);
-
-    try {
-      const migrated = await migrateProjectDocument(loadedProject.document);
-      applyLoadedProject({
-        summary: { ...migrated.summary, path: loadedProject.summary.path },
-        validation: migrated.validation,
-        document: migrated.document,
-      });
-      await uiResource.refreshPreview(migrated.document, loadedProject.summary.path);
-      void protocolEditor.refreshUnifiedProtocol(migrated.document);
-      setSaveStatus(`已规范化：${migrated.migrated_version}`);
-    } catch (error) {
-      setOpenError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsOpening(false);
-    }
-  }
-
-  function requestSaveProject() {
-    if (!loadedProject?.summary.path) return;
-    setSaveStatus(null);
-    setShowSaveModal(true);
-  }
-
-  async function saveRefactorConfigAsJson() {
-    if (!loadedProject) return false;
-
-    if (refactorConfigPath) {
-      await saveJsonFile(refactorConfigPath, refactorConfigDocument(loadedProject.document));
-      setRefactorConfigStatus(`已写回重构配置：${refactorConfigPath}`);
-      setSaveStatus(`重构专属配置已写回：${refactorConfigPath}；原 .jcpro 不会写入这些字段。`);
-      return true;
-    }
-
-    if (!isTauriRuntime()) {
-      setSaveStatus(
-        '旧 .jcpro 的重构配置需要另存为 JSON；系统保存对话框只能在 Tauri 桌面应用中使用。',
-      );
-      return false;
-    }
-
-    const sourcePath = loadedProject.summary.path ?? loadedProject.summary.name ?? 'project';
-    const baseName =
-      sourcePath
-        .split(/[\\/]/)
-        .pop()
-        ?.replace(/\.[^.]+$/, '') || 'project';
-    const selected = await save({
-      defaultPath: `${baseName}.refactor-config.json`,
-      filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
-    });
-    if (!selected) return false;
-
-    await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
-    setRefactorConfigPath(selected);
-    setRefactorConfigStatus(`已挂载：${selected}`);
-    setSaveStatus(`重构专属配置已另存为：${selected}；原 .jcpro 不会写入这些字段。`);
-    return true;
-  }
-
-  async function handleMountRefactorConfig() {
-    if (!loadedProject) return;
-    setSaveStatus(null);
-
-    if (!isTauriRuntime()) {
-      setRefactorConfigStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
-      return;
-    }
-
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
-    });
-    if (typeof selected !== 'string') return;
-
-    try {
-      const sidecar = await loadJsonFile(selected);
-      const document = mergeRefactorConfigDocument(loadedProject.document, sidecar);
-      const validation = await validateProjectDocument(document);
-      const nextProject = { ...loadedProject, document, validation };
-      const nextBaseline = cloneJson(document);
-      setRefactorConfigPath(selected);
-      setRefactorConfigStatus(`已挂载：${selected}`);
-      setBaselineDocument(nextBaseline);
-      applyLoadedProject(nextProject, nextBaseline);
-      void protocolEditor.refreshUnifiedProtocol(document);
-    } catch (error) {
-      setRefactorConfigStatus(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleCreateRefactorConfig() {
-    if (!loadedProject) return;
-    const created = await saveRefactorConfigAsJson();
-    if (created) {
-      const validation = await validateProjectDocument(loadedProject.document);
-      const nextBaseline = cloneJson(loadedProject.document);
-      setBaselineDocument(nextBaseline);
-      applyLoadedProject({ ...loadedProject, validation }, nextBaseline);
-    }
-  }
-
-  async function confirmSaveProject() {
-    if (!loadedProject?.summary.path) return;
-
-    setSavingProjectAction('save');
-    setSaveStatus(null);
-
-    try {
-      if (isLegacyJcproProject && hasRefactorOnlyChanges) {
-        const exported = await saveRefactorConfigAsJson();
-        if (!exported) return;
-      }
-      const documentToSave = isLegacyJcproProject
-        ? stripRefactorOnlySections(loadedProject.document)
-        : loadedProject.document;
-      const savedProject = await saveProject({
-        path: loadedProject.summary.path,
-        document: documentToSave,
-      });
-      const validation = isLegacyJcproProject
-        ? await validateProjectDocument(loadedProject.document)
-        : savedProject.validation;
-      const nextBaseline = isLegacyJcproProject
-        ? cloneJson(loadedProject.document)
-        : cloneJson(savedProject.document);
-      setBaselineDocument(nextBaseline);
-      applyLoadedProject(
-        isLegacyJcproProject ? { ...loadedProject, validation } : savedProject,
-        nextBaseline,
-      );
-      updateRecentProjects(savedProject, loadedProject.summary.path);
-      setShowSaveModal(false);
-      setSaveStatus(
-        isLegacyJcproProject && hasRefactorOnlyChanges
-          ? '已保存 .jcpro 兼容段，并已导出重构专属 JSON。'
-          : '已保存',
-      );
-      void projectGit.refresh();
-    } catch (error) {
-      setSaveStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSavingProjectAction(null);
-    }
-  }
-
-  async function handleSaveProjectAs() {
-    const sourcePath = loadedProject?.summary.path;
-    if (!loadedProject || !sourcePath) return;
-
-    setSaveStatus(null);
-
-    if (!isTauriRuntime()) {
-      setSaveStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
-      return;
-    }
-
-    const currentName =
-      sourcePath.split(/[\\/]/).pop() || `${loadedProject.summary.name || 'project'}.jcpro`;
-    const isRefactorSidecarSave = isLegacyJcproProject && hasRefactorOnlyChanges;
-    const selected = await save({
-      defaultPath: isRefactorSidecarSave
-        ? currentName.replace(/\.[^.]+$/, '.refactor-config.json')
-        : currentName,
-      filters: isRefactorSidecarSave
-        ? [{ name: '重构配置 JSON', extensions: ['json'] }]
-        : [{ name: '项目文件', extensions: ['jcpro', 'json'] }],
-    });
-    if (!selected) return;
-
-    if (!isRefactorSidecarSave && selected === sourcePath) {
-      setSaveStatus('另存为目标不能与当前项目路径相同。');
-      return;
-    }
-
-    setSavingProjectAction('saveAs');
-
-    try {
-      if (isRefactorSidecarSave) {
-        await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
-        setRefactorConfigPath(selected);
-        setRefactorConfigStatus(`已挂载：${selected}`);
-        const validation = await validateProjectDocument(loadedProject.document);
-        const nextBaseline = cloneJson(loadedProject.document);
-        setBaselineDocument(nextBaseline);
-        applyLoadedProject({ ...loadedProject, validation }, nextBaseline);
-        setSaveStatus(`重构专属配置已另存为：${selected}；当前 .jcpro 未写入新字段。`);
-        return;
-      }
-      const report = await saveProjectAs({
-        source_path: sourcePath,
-        target_path: selected,
-        document: selected.toLowerCase().endsWith('.jcpro')
-          ? stripRefactorOnlySections(loadedProject.document)
-          : loadedProject.document,
-      });
-      acceptLoadedProject(report.project, selected);
-      if (!selected.toLowerCase().endsWith('.jcpro')) {
-        setRefactorConfigPath(null);
-        setRefactorConfigStatus(null);
-      }
-      await uiResource.refreshPreview(
-        report.project.document,
-        report.project.summary.path ?? selected,
-      );
-      const copiedText = `已复制 ${report.copied_resources.length} 个资源`;
-      const warningText = report.warnings.length > 0 ? `，${report.warnings.length} 个警告` : '';
-      setSaveStatus(`已另存为：${selected}（${copiedText}${warningText}）`);
-    } catch (error) {
-      setSaveStatus(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSavingProjectAction(null);
-    }
-  }
-
-  function cancelSaveProject() {
-    setShowSaveModal(false);
-  }
-
   async function handleParsePdoAdvanced() {
     setPdoAdvancedError(null);
     setPdoAdvancedReport(null);
@@ -976,13 +491,13 @@ export function Dashboard({
       <DashboardActionBar
         activeModule={activeModule}
         loadedProject={loadedProject}
-        projectPath={projectPath}
-        isOpening={isOpening}
+        projectPath={projectLifecycle.projectPath}
+        isOpening={projectLifecycle.isOpening}
         hasUnsavedChanges={hasUnsavedChanges}
         modifiedSections={modifiedSections}
-        isSavingProject={isSavingProject}
-        savingProjectAction={savingProjectAction}
-        saveStatus={saveStatus}
+        isSavingProject={projectLifecycle.isSavingProject}
+        savingProjectAction={projectLifecycle.savingProjectAction}
+        saveStatus={projectLifecycle.saveStatus}
         currentLegacyTableKind={tableConfig.currentKind}
         isImportingTable={tableConfig.isImporting}
         isExportingTable={tableConfig.isExporting}
@@ -997,11 +512,11 @@ export function Dashboard({
         gitRepositoryName={projectGit.repositoryName}
         gitSummaryCommitDisabled={projectGit.commitDisabled}
         onRestoreSection={(section) => restoreModifiedPath([section])}
-        onSelectProjectFile={handleSelectProjectFile}
-        onReloadProject={handleReloadProject}
+        onSelectProjectFile={projectLifecycle.selectProjectFile}
+        onReloadProject={projectLifecycle.reloadProject}
         onRestoreAllChanges={restoreAllChanges}
-        onSaveProjectAs={handleSaveProjectAs}
-        onRequestSave={requestSaveProject}
+        onSaveProjectAs={projectLifecycle.saveProjectToNewPath}
+        onRequestSave={projectLifecycle.requestSaveProject}
         onImportTable={tableConfig.importTable}
         onExportTable={tableConfig.exportTable}
         onRequestTestData={setConfirmGenerateType}
@@ -1034,16 +549,16 @@ export function Dashboard({
       ) : null}
       <DashboardDialogs
         loadedProject={loadedProject}
-        showSaveModal={showSaveModal}
-        isSavingProject={isSavingProject}
-        savingProjectAction={savingProjectAction}
+        showSaveModal={projectLifecycle.showSaveModal}
+        isSavingProject={projectLifecycle.isSavingProject}
+        savingProjectAction={projectLifecycle.savingProjectAction}
         isLegacyJcproProject={isLegacyJcproProject}
         hasRefactorOnlyChanges={hasRefactorOnlyChanges}
-        refactorConfigPath={refactorConfigPath}
+        refactorConfigPath={projectLifecycle.refactorConfigPath}
         modifiedSections={modifiedSections}
         confirmGenerateType={confirmGenerateType}
-        onCancelSave={cancelSaveProject}
-        onConfirmSave={confirmSaveProject}
+        onCancelSave={projectLifecycle.cancelSaveProject}
+        onConfirmSave={projectLifecycle.confirmSaveProject}
         onCancelTestData={() => setConfirmGenerateType(null)}
         onConfirmTestData={confirmGenerateTestData}
       />
@@ -1070,24 +585,24 @@ export function Dashboard({
         ) : null}
         {activeModule.key === 'project' ? (
           <ProjectManagementPage
-            projectPath={projectPath}
-            setProjectPath={setProjectPath}
-            isOpening={isOpening}
-            openError={openError}
-            recentProjects={recentProjects}
-            selectedRecentProjectPath={selectedRecentProjectPath}
-            clearRecentProjects={clearRecentProjects}
-            removeRecentProject={removeRecentProject}
-            newProjectName={newProjectName}
-            setNewProjectName={setNewProjectName}
-            newResolutionW={newResolutionW}
-            setNewResolutionW={setNewResolutionW}
-            newResolutionH={newResolutionH}
-            setNewResolutionH={setNewResolutionH}
+            projectPath={projectLifecycle.projectPath}
+            setProjectPath={projectLifecycle.setProjectPath}
+            isOpening={projectLifecycle.isOpening}
+            openError={projectLifecycle.openError}
+            recentProjects={projectLifecycle.recentProjects}
+            selectedRecentProjectPath={projectLifecycle.selectedRecentProjectPath}
+            clearRecentProjects={projectLifecycle.clearRecentProjects}
+            removeRecentProject={projectLifecycle.removeRecentProject}
+            newProjectName={projectLifecycle.newProjectName}
+            setNewProjectName={projectLifecycle.setNewProjectName}
+            newResolutionW={projectLifecycle.newResolutionW}
+            setNewResolutionW={projectLifecycle.setNewResolutionW}
+            newResolutionH={projectLifecycle.newResolutionH}
+            setNewResolutionH={projectLifecycle.setNewResolutionH}
             loadedProject={loadedProject}
             effectiveProjectValid={effectiveProjectValid}
-            refactorConfigPath={refactorConfigPath}
-            refactorConfigStatus={refactorConfigStatus}
+            refactorConfigPath={projectLifecycle.refactorConfigPath}
+            refactorConfigStatus={projectLifecycle.refactorConfigStatus}
             compatibleMissingSections={compatibleMissingSections}
             sidecarMissingSections={sidecarMissingSections}
             projectGitSectionRef={projectGit.projectSectionRef}
@@ -1098,14 +613,14 @@ export function Dashboard({
             hasUnsavedChanges={hasUnsavedChanges}
             gitRevisions={projectGit.revisions}
             gitError={projectGit.error}
-            projectParseReport={projectParseReport}
-            handleSelectProjectFile={handleSelectProjectFile}
-            handleOpenProject={handleOpenProject}
-            handleCreateProject={handleCreateProject}
-            handleParseProject={handleParseProject}
-            handleMigrateProject={handleMigrateProject}
-            handleMountRefactorConfig={handleMountRefactorConfig}
-            handleCreateRefactorConfig={handleCreateRefactorConfig}
+            projectParseReport={projectLifecycle.projectParseReport}
+            handleSelectProjectFile={projectLifecycle.selectProjectFile}
+            handleOpenProject={projectLifecycle.openProject}
+            handleCreateProject={projectLifecycle.createNewProject}
+            handleParseProject={projectLifecycle.parseProject}
+            handleMigrateProject={projectLifecycle.migrateProject}
+            handleMountRefactorConfig={projectLifecycle.mountRefactorConfig}
+            handleCreateRefactorConfig={projectLifecycle.createRefactorConfig}
             refreshProjectGit={projectGit.refresh}
             handleCommitProjectVersion={projectGit.commitVersion}
             handlePreviewProjectVersion={projectGit.previewVersion}
