@@ -75,3 +75,91 @@ test('surfaces desktop-only actions as accessible errors in browser preview', as
   await page.getByRole('button', { name: '创建项目', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveText('系统保存对话框只能在 Tauri 桌面应用中使用。');
 });
+
+test('offers to restore an unsaved project draft', async ({ page }) => {
+  const projectPath = 'D:\\projects\\recovery-fixture.jcpro';
+  await page.setViewportSize({ width: 1024, height: 720 });
+  await page.evaluate((path) => {
+    const baseDocument = {
+      project: { name: 'Recovery Fixture', revision: 1 },
+      battery_protocol: {},
+      battery_monitor_info: {},
+      fault_code_info: {},
+    };
+    localStorage.setItem(
+      'jc-custom-platform.projectRecoveryDraft',
+      JSON.stringify({
+        schemaVersion: 1,
+        projectPath: path,
+        projectName: 'Recovery Fixture',
+        savedAt: '2026-07-18T00:00:00.000Z',
+        document: { ...baseDocument, project: { name: 'Recovery Fixture', revision: 2 } },
+      }),
+    );
+
+    const internals = {
+      metadata: { currentWindow: { label: 'main' } },
+      transformCallback: () => 1,
+      unregisterCallback: () => undefined,
+      invoke: async (command: string) => {
+        if (command.startsWith('plugin:event|')) return 1;
+        if (command === 'plugin:window|set_title') return null;
+        if (command === 'load_project') {
+          return {
+            summary: {
+              name: 'Recovery Fixture',
+              version: '1.0.0',
+              path,
+              deviceResolution: '800×480',
+            },
+            validation: { valid: true, missing_sections: [], warnings: [] },
+            document: baseDocument,
+          };
+        }
+        if (command === 'load_json_file') throw new Error('optional sidecar not found');
+        if (command === 'validate_project_document') {
+          return { valid: true, missing_sections: [], warnings: [] };
+        }
+        if (command === 'parse_ui_resources_with_project_path') {
+          return { valid: true, logo: null, main_items: [], errors: [] };
+        }
+        if (command === 'load_project_git_context') {
+          return {
+            status: {
+              available: false,
+              managed_paths: [],
+              changed_paths: [],
+              additions: 0,
+              deletions: 0,
+              has_staged_changes: false,
+            },
+            revisions: [],
+          };
+        }
+        throw new Error(`Unexpected desktop command: ${command}`);
+      },
+    };
+    (window as unknown as { __TAURI_INTERNALS__: typeof internals }).__TAURI_INTERNALS__ =
+      internals;
+  }, projectPath);
+
+  await page.getByLabel('项目文件路径').fill(projectPath);
+  const openSection = page.locator('.project-section').filter({ hasText: '打开现有项目' });
+  await openSection.getByRole('button', { name: '打开', exact: true }).click();
+
+  const recoveryDialog = page.getByRole('dialog', { name: '恢复未保存修改' });
+  await expect(recoveryDialog).toBeVisible();
+  await expect(recoveryDialog.getByRole('button', { name: '稍后' })).toBeFocused();
+  const dialogBox = await recoveryDialog.boundingBox();
+  expect(dialogBox).not.toBeNull();
+  expect((dialogBox?.x ?? 0) + (dialogBox?.width ?? 0)).toBeLessThanOrEqual(1024);
+  expect((dialogBox?.y ?? 0) + (dialogBox?.height ?? 0)).toBeLessThanOrEqual(720);
+  await recoveryDialog.getByRole('button', { name: '恢复草稿' }).click();
+  await expect(recoveryDialog).toBeHidden();
+  await expect(
+    page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
+  ).toBeEnabled();
+  expect(
+    await page.evaluate(() => localStorage.getItem('jc-custom-platform.projectRecoveryDraft')),
+  ).not.toBeNull();
+});

@@ -10,7 +10,10 @@ import { getTestData, type TestDataType } from '../data/test-data';
 import { useBatteryLegacyController } from '../features/battery-legacy/useBatteryLegacyController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
 import { useProjectJsonEditor } from '../features/json-editor/useProjectJsonEditor';
-import { useProjectDocumentController } from '../features/project-document';
+import {
+  useProjectDocumentController,
+  useProjectRecoveryDraft,
+} from '../features/project-document';
 import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
 import {
@@ -244,6 +247,22 @@ export function Dashboard({
     onRefreshProtocol: protocolEditor.refreshUnifiedProtocol,
     onRefreshUi: uiResource.refreshPreview,
   });
+  const projectRecovery = useProjectRecoveryDraft({
+    loadedProject,
+    hasUnsavedChanges,
+    onPersistenceError: projectLifecycle.setSaveStatus,
+    onRestoreDocument: async (document) => {
+      if (!loadedProject) return;
+      const validation = await validateProjectDocument(document);
+      applyLoadedProject(
+        { ...loadedProject, document, validation },
+        undefined,
+        trackedDocumentSections,
+      );
+      void uiResource.refreshPreview(document, loadedProject.summary.path);
+      projectLifecycle.setSaveStatus('已恢复异常退出前的未保存修改。');
+    },
+  });
   const projectGit = useProjectGitController({
     projectPath: loadedProject?.summary.path,
     sidecarPath: projectLifecycle.refactorConfigPath,
@@ -430,6 +449,7 @@ export function Dashboard({
         showCloseConfirm={showCloseConfirm && hasUnsavedChanges}
         discardConfirmation={projectLifecycle.discardConfirmation}
         restoreConfirmation={projectGit.restoreConfirmation}
+        projectRecovery={projectRecovery}
         onCancelSave={projectLifecycle.cancelSaveProject}
         onConfirmSave={projectLifecycle.confirmSaveProject}
         onCancelTestData={() => setConfirmGenerateType(null)}
@@ -437,6 +457,7 @@ export function Dashboard({
         onCancelClose={() => setShowCloseConfirm(false)}
         onConfirmClose={() => {
           setShowCloseConfirm(false);
+          projectRecovery.clearCurrentDraft(loadedProject?.summary.path);
           void getCurrentWindow().destroy();
         }}
       />

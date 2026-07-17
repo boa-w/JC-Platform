@@ -5,6 +5,8 @@ import type { ConfirmDialogController } from '../../hooks/useConfirmDialog';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { type DocumentSectionKey, modifiedSectionLabels } from '../../modules/documentSections';
 import type { LoadedProject } from '../../types/platform';
+import type { ProjectRecoveryDraftController } from '../project-document';
+import { ProjectRecoveryDialog } from './ProjectRecoveryDialog';
 
 interface DashboardDialogsProps {
   loadedProject: LoadedProject | null;
@@ -19,6 +21,7 @@ interface DashboardDialogsProps {
   showCloseConfirm: boolean;
   discardConfirmation: ConfirmDialogController;
   restoreConfirmation: ConfirmDialogController;
+  projectRecovery: ProjectRecoveryDraftController;
   onCancelSave: () => void;
   onConfirmSave: () => void | Promise<void>;
   onCancelTestData: () => void;
@@ -40,6 +43,7 @@ export function DashboardDialogs({
   showCloseConfirm,
   discardConfirmation,
   restoreConfirmation,
+  projectRecovery,
   onCancelSave: cancelSaveProject,
   onConfirmSave: confirmSaveProject,
   onCancelTestData,
@@ -167,6 +171,7 @@ export function DashboardDialogs({
 
       <ConfirmDialogHost controller={discardConfirmation} />
       <ConfirmDialogHost controller={restoreConfirmation} />
+      <ProjectRecoveryDialog controller={projectRecovery} />
     </>
   );
 }
