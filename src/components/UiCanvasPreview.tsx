@@ -202,12 +202,13 @@ export function UiCanvasPreview({
             <strong>资源条目</strong>
             <span>{draftResources.length} 项</span>
           </div>
-          <div className="ui-resource-tree" role="tree">
-            <div className="ui-tree-group" role="treeitem" aria-expanded={isRootExpanded}>
+          <div className="ui-resource-tree">
+            <div className="ui-tree-group">
               <button
                 className="ui-tree-toggle"
                 onClick={() => toggleExpanded('root')}
                 type="button"
+                aria-expanded={isRootExpanded}
                 aria-label={isRootExpanded ? '折叠 UI资源' : '展开 UI资源'}
               >
                 {isRootExpanded ? '▾' : '▸'}
@@ -223,12 +224,11 @@ export function UiCanvasPreview({
             </div>
 
             {isRootExpanded ? (
-              <div className="ui-tree-children" role="group">
+              <div className="ui-tree-children">
                 {logoResource ? (
                   <button
                     className={`ui-tree-node ui-tree-node--resource ${selectedResourceKey === logoResource.key ? 'selected' : ''}`}
                     onClick={() => selectResource(logoResource.key)}
-                    role="treeitem"
                     type="button"
                   >
                     <span>{logoResource.name}</span>
@@ -238,11 +238,12 @@ export function UiCanvasPreview({
                   </button>
                 ) : null}
 
-                <div className="ui-tree-group" role="treeitem" aria-expanded={isMainExpanded}>
+                <div className="ui-tree-group">
                   <button
                     className="ui-tree-toggle"
                     onClick={() => toggleExpanded('main')}
                     type="button"
+                    aria-expanded={isMainExpanded}
                     aria-label={isMainExpanded ? '折叠 main' : '展开 main'}
                   >
                     {isMainExpanded ? '▾' : '▸'}
@@ -258,13 +259,12 @@ export function UiCanvasPreview({
                 </div>
 
                 {isMainExpanded ? (
-                  <div className="ui-tree-children ui-tree-children--nested" role="group">
+                  <div className="ui-tree-children ui-tree-children--nested">
                     {mainResources.map((resource) => (
                       <button
                         className={`ui-tree-node ui-tree-node--resource ${selectedResourceKey === resource.key ? 'selected' : ''}`}
                         key={resource.key}
                         onClick={() => selectResource(resource.key)}
-                        role="treeitem"
                         type="button"
                       >
                         <span>{resource.name}</span>

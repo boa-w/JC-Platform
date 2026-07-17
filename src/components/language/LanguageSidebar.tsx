@@ -208,7 +208,6 @@ export function LanguageSidebar({
                         if (e.key === 'Escape') setEditingLang(null);
                       }}
                       disabled={isZh}
-                      autoFocus
                     />
                     <input
                       className="lang-sidebar-edit-input lang-sidebar-edit-label"

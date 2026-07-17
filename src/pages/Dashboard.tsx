@@ -1,4 +1,5 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
   ArrowUpRight,
   Check,
@@ -9,14 +10,19 @@ import {
   Columns2,
   FileJson2,
   FileDiff,
+  FolderOpen,
   FolderGit2,
   GitBranch,
   GitCommitHorizontal,
+  GripHorizontal,
   History,
   RefreshCw,
   RotateCcw,
   Rows3,
+  Save as SaveIcon,
+  SaveAll,
   ScanSearch,
+  Undo2,
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -487,6 +493,30 @@ export function Dashboard({
     const timeout = window.setTimeout(() => void refreshProjectGit(), 100);
     return () => window.clearTimeout(timeout);
   }, [loadedProject?.summary.path, refactorConfigPath]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    const unlistenPromise = isTauriRuntime()
+      ? getCurrentWindow().onCloseRequested(async (event) => {
+          event.preventDefault();
+          if (window.confirm('当前项目存在未保存修改。确定关闭应用并放弃这些修改吗？')) {
+            await getCurrentWindow().destroy();
+          }
+        })
+      : Promise.resolve(() => undefined);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      void unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     if (!showGitSummary) return;
@@ -2979,6 +3009,8 @@ export function Dashboard({
   async function handleCreateProject() {
     setOpenError(null);
 
+    if (!confirmDiscardUnsavedChanges('创建新项目')) return;
+
     if (!isTauriRuntime()) {
       setOpenError('系统保存对话框只能在 Tauri 桌面应用中使用。');
       return;
@@ -3014,7 +3046,8 @@ export function Dashboard({
     }
   }
 
-  async function handleOpenProject(path = projectPath) {
+  async function handleOpenProject(path = projectPath, skipDiscardConfirmation = false) {
+    if (!skipDiscardConfirmation && !confirmDiscardUnsavedChanges('打开其他项目')) return;
     setIsOpening(true);
     setOpenError(null);
 
@@ -3044,11 +3077,13 @@ export function Dashboard({
     ) {
       return;
     }
-    await handleOpenProject(reloadPath);
+    await handleOpenProject(reloadPath, true);
   }
 
   async function handleSelectProjectFile() {
     setOpenError(null);
+
+    if (!confirmDiscardUnsavedChanges('打开其他项目')) return;
 
     if (!isTauriRuntime()) {
       setOpenError('系统文件选择器只能在桌面应用中使用；也可以粘贴项目路径后打开。');
@@ -3063,11 +3098,18 @@ export function Dashboard({
 
       if (typeof selected === 'string') {
         setProjectPath(selected);
-        await handleOpenProject(selected);
+        await handleOpenProject(selected, true);
       }
     } catch (error) {
       setOpenError(error instanceof Error ? error.message : String(error));
     }
+  }
+
+  function confirmDiscardUnsavedChanges(action: string) {
+    return (
+      !hasUnsavedChanges ||
+      window.confirm(`当前项目存在未保存修改。${action}会放弃这些修改，确定继续吗？`)
+    );
   }
 
   async function handleParseProject() {
@@ -3571,7 +3613,6 @@ export function Dashboard({
   }
 
   function handleJsonDragStart(event: React.MouseEvent) {
-    if ((event.target as HTMLElement).tagName === 'BUTTON') return;
     event.preventDefault();
     const startX = event.clientX;
     const startY = event.clientY;
@@ -4068,7 +4109,7 @@ export function Dashboard({
               type="button"
               title="打开项目文件"
             >
-              <span className="action-bar-icon">▣</span>
+              <FolderOpen aria-hidden="true" size={14} strokeWidth={1.8} />
               打开
             </button>
             <button
@@ -4078,7 +4119,7 @@ export function Dashboard({
               type="button"
               title="重新加载当前项目"
             >
-              <span className="action-bar-icon">↻</span>
+              <RefreshCw aria-hidden="true" size={14} strokeWidth={1.8} />
               重载
             </button>
           </div>
@@ -4091,7 +4132,7 @@ export function Dashboard({
               type="button"
               title="恢复所有未保存修改"
             >
-              <span className="action-bar-icon">↩</span>
+              <Undo2 aria-hidden="true" size={14} strokeWidth={1.8} />
               恢复
             </button>
             <button
@@ -4100,6 +4141,7 @@ export function Dashboard({
               onClick={() => void handleSaveProjectAs()}
               type="button"
             >
+              <SaveAll aria-hidden="true" size={14} strokeWidth={1.8} />
               {savingProjectAction === 'saveAs' ? '另存中...' : '另存为...'}
             </button>
             <button
@@ -4108,6 +4150,7 @@ export function Dashboard({
               onClick={requestSaveProject}
               type="button"
             >
+              <SaveIcon aria-hidden="true" size={14} strokeWidth={1.8} />
               {savingProjectAction === 'save' ? '保存中...' : '保存'}
             </button>
           </div>
@@ -4205,7 +4248,11 @@ export function Dashboard({
               {'{ }'}
             </button>
           ) : null}
-          {saveStatus ? <span className="action-bar-status">{saveStatus}</span> : null}
+          {saveStatus ? (
+            <span aria-live="polite" className="action-bar-status" role="status">
+              {saveStatus}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -4405,7 +4452,7 @@ export function Dashboard({
                 </p>
               </div>
               <div className="git-review-toolbar-actions">
-                <div aria-label="对比视图" className="git-review-view-switch" role="group">
+                <fieldset aria-label="对比视图" className="git-review-view-switch">
                   <button
                     aria-label="统一对比视图"
                     aria-pressed={gitReviewViewMode === 'unified'}
@@ -4426,7 +4473,7 @@ export function Dashboard({
                   >
                     <Columns2 aria-hidden="true" size={15} strokeWidth={1.7} />
                   </button>
-                </div>
+                </fieldset>
                 <button
                   aria-label="展开或折叠全部文件"
                   disabled={!gitReview?.files.length}
@@ -4615,9 +4662,14 @@ export function Dashboard({
       ) : null}
 
       {showSaveModal && loadedProject ? (
-        <div className="modal-overlay" onClick={cancelSaveProject}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h3>确认保存</h3>
+        <div className="modal-overlay">
+          <div
+            aria-labelledby="save-project-dialog-title"
+            aria-modal="true"
+            className="modal-box"
+            role="dialog"
+          >
+            <h3 id="save-project-dialog-title">确认保存</h3>
             <p>将当前所有配置修改写入项目文件：</p>
             <div className="modal-path">{loadedProject.summary.path}</div>
             {isLegacyJcproProject && hasRefactorOnlyChanges ? (
@@ -4659,9 +4711,14 @@ export function Dashboard({
       ) : null}
 
       {confirmGenerateType ? (
-        <div className="modal-overlay" onClick={() => setConfirmGenerateType(null)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h3>确认生成测试数据</h3>
+        <div className="modal-overlay">
+          <div
+            aria-labelledby="generate-test-dialog-title"
+            aria-modal="true"
+            className="modal-box"
+            role="dialog"
+          >
+            <h3 id="generate-test-dialog-title">确认生成测试数据</h3>
             <p>
               将使用 <strong>{testDataLabels[confirmGenerateType]}</strong>{' '}
               模板覆盖当前配置，是否继续？
@@ -4693,8 +4750,34 @@ export function Dashboard({
             height: jsonPopupSize.h,
           }}
         >
-          <div className="json-popup-header" onMouseDown={handleJsonDragStart}>
-            <strong>JSON 编辑器</strong>
+          <div className="json-popup-header">
+            <div className="json-popup-title">
+              <button
+                aria-label="拖动 JSON 编辑器"
+                className="json-popup-drag-handle"
+                onKeyDown={(event) => {
+                  const offsets: Record<string, [number, number]> = {
+                    ArrowLeft: [-10, 0],
+                    ArrowRight: [10, 0],
+                    ArrowUp: [0, -10],
+                    ArrowDown: [0, 10],
+                  };
+                  const offset = offsets[event.key];
+                  if (!offset) return;
+                  event.preventDefault();
+                  setJsonPopupPos((current) => ({
+                    x: Math.max(0, current.x + offset[0]),
+                    y: Math.max(0, current.y + offset[1]),
+                  }));
+                }}
+                onMouseDown={handleJsonDragStart}
+                title="拖动编辑器；聚焦后可使用方向键移动"
+                type="button"
+              >
+                <GripHorizontal aria-hidden="true" size={16} />
+              </button>
+              <strong>JSON 编辑器</strong>
+            </div>
             <div className="json-popup-actions">
               <button
                 className="lang-btn"
@@ -4730,14 +4813,40 @@ export function Dashboard({
               </button>
             </div>
           </div>
-          <textarea
+              <textarea
+                aria-label="JSON 配置内容"
             className="json-popup-editor"
             disabled={!loadedProject}
             onChange={(event) => setConfigEditorText(event.target.value)}
             value={configEditorText}
           />
-          {configEditorError ? <p className="json-popup-error">{configEditorError}</p> : null}
-          <div className="json-popup-resize-handle" onMouseDown={handleJsonResizeStart} />
+              {configEditorError ? (
+                <p className="json-popup-error" role="alert">
+                  {configEditorError}
+                </p>
+              ) : null}
+          <button
+            aria-label="调整 JSON 编辑器大小"
+            className="json-popup-resize-handle"
+            onKeyDown={(event) => {
+              const offsets: Record<string, [number, number]> = {
+                ArrowLeft: [-10, 0],
+                ArrowRight: [10, 0],
+                ArrowUp: [0, -10],
+                ArrowDown: [0, 10],
+              };
+              const offset = offsets[event.key];
+              if (!offset) return;
+              event.preventDefault();
+              setJsonPopupSize((current) => ({
+                w: Math.max(360, current.w + offset[0]),
+                h: Math.max(260, current.h + offset[1]),
+              }));
+            }}
+            onMouseDown={handleJsonResizeStart}
+            title="拖动调整大小；聚焦后可使用方向键调整"
+            type="button"
+          />
         </div>
       ) : null}
 
@@ -4762,8 +4871,13 @@ export function Dashboard({
           <section className="project-page">
             {/* Open project */}
             <div className="project-section">
+              <div className="project-section-header">
+                <strong>打开现有项目</strong>
+                <span className="project-section-hint">.jcpro</span>
+              </div>
               <div className="project-open-row">
                 <input
+                  aria-label="项目文件路径"
                   className="project-open-input"
                   placeholder="输入或粘贴 .jcpro 文件路径"
                   value={projectPath}
@@ -4789,17 +4903,13 @@ export function Dashboard({
                   >
                     打开
                   </button>
-                  <button
-                    className="project-open-btn project-open-btn--secondary"
-                    type="button"
-                    onClick={() => void handleReloadProject()}
-                    disabled={isOpening || currentProjectPath.trim() === ''}
-                  >
-                    重新加载
-                  </button>
                 </div>
               </div>
-              {openError ? <p className="project-open-error">{openError}</p> : null}
+              {openError ? (
+                <p className="project-open-error" role="alert">
+                  {openError}
+                </p>
+              ) : null}
             </div>
 
             {/* Recent projects */}
@@ -4818,6 +4928,7 @@ export function Dashboard({
                 </div>
                 <div className="project-recent-row">
                   <select
+                    aria-label="最近项目"
                     className="project-recent-select"
                     value={selectedRecentProjectPath}
                     onChange={(event) => setProjectPath(event.target.value)}
@@ -4840,7 +4951,7 @@ export function Dashboard({
                       onClick={() => void handleOpenProject(selectedRecentProjectPath)}
                       disabled={isOpening || selectedRecentProjectPath === ''}
                     >
-                      打开历史
+                      打开项目
                     </button>
                     <button
                       className="project-open-btn project-open-btn--secondary"
@@ -4862,6 +4973,7 @@ export function Dashboard({
               </div>
               <div className="project-create-form">
                 <input
+                  aria-label="新项目名称"
                   className="project-create-name"
                   placeholder="项目名称"
                   value={newProjectName}
@@ -4871,6 +4983,7 @@ export function Dashboard({
                   <div className="project-create-resolution">
                     <span className="project-create-label">分辨率</span>
                     <input
+                      aria-label="项目分辨率宽度"
                       className="project-create-num"
                       min="1"
                       type="number"
@@ -4879,6 +4992,7 @@ export function Dashboard({
                     />
                     <span className="project-create-x">×</span>
                     <input
+                      aria-label="项目分辨率高度"
                       className="project-create-num"
                       min="1"
                       type="number"

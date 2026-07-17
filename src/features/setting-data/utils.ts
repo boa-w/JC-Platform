@@ -269,9 +269,13 @@ export function collectSettingMenus(root: SdoNodeDocument | null, rawQuery = '')
         hasSearchMatchInChildren,
       });
     }
-    (node.children ?? []).forEach((child, index) => visit(child, [...path, index], level + 1, pathNames));
+    (node.children ?? []).forEach((child, index) => {
+      visit(child, [...path, index], level + 1, pathNames);
+    });
   }
-  (root.children ?? []).forEach((node, index) => visit(node, [index], 0, [root.name || '菜单']));
+  (root.children ?? []).forEach((node, index) => {
+    visit(node, [index], 0, [root.name || '菜单']);
+  });
   return rows;
 }
 
@@ -373,9 +377,13 @@ export function collectSettingParameters(
     const nextPathNames = current.type === 0
       ? [...pathNames, sdoNodeName(current, `菜单${path[path.length - 1] + 1}`)]
       : pathNames;
-    (current.children ?? []).forEach((child, index) => visit(child, [...path, index], nextPathNames));
+    (current.children ?? []).forEach((child, index) => {
+      visit(child, [...path, index], nextPathNames);
+    });
   }
-  (node.children ?? []).forEach((child, index) => visit(child, [...basePath, index], basePathNames));
+  (node.children ?? []).forEach((child, index) => {
+    visit(child, [...basePath, index], basePathNames);
+  });
   return rows;
 }
 

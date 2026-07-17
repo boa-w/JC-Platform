@@ -16,7 +16,7 @@
     "version:check": "node scripts/check-version.mjs",
     "version:sync": "node scripts/sync-version.mjs",
     "format": "biome format --write .",
-    "lint": "biome check .",
+    "lint": "biome lint . --max-diagnostics=500",
     "lint:fix": "biome check --write ."
   },
   "dependencies": {

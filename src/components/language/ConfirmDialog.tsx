@@ -17,13 +17,35 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const titleId = useId();
+  const messageId = useId();
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    cancelButtonRef.current?.focus();
+  }, []);
+
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        <h3>{title}</h3>
-        <p>{message}</p>
+    <div className="modal-overlay">
+      <div
+        aria-describedby={messageId}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="modal-box"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') onCancel();
+        }}
+        role="dialog"
+      >
+        <h3 id={titleId}>{title}</h3>
+        <p id={messageId}>{message}</p>
         <div className="modal-actions">
-          <button className="modal-btn-cancel" onClick={onCancel} type="button">
+          <button
+            className="modal-btn-cancel"
+            onClick={onCancel}
+            ref={cancelButtonRef}
+            type="button"
+          >
             {cancelLabel}
           </button>
           <button
@@ -38,3 +60,4 @@ export function ConfirmDialog({
     </div>
   );
 }
+import { useEffect, useId, useRef } from 'react';

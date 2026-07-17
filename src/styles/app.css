@@ -922,6 +922,7 @@ body.git-review-open {
   border-radius: 5px;
   padding: 2px;
   background: var(--color-surface-alt);
+  min-width: 0;
 }
 
 .git-review-toolbar-actions .git-review-view-switch button {
@@ -2470,6 +2471,12 @@ body.git-review-open {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.project-section-hint {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
 }
 
 .project-section-header strong {
@@ -4785,7 +4792,6 @@ body.git-review-open {
 }
 
 .pdo-frame-actions button {
-  border: 0;
   border-radius: var(--radius-sm);
   padding: 7px 12px;
   background: var(--color-surface);
@@ -4814,7 +4820,8 @@ body.git-review-open {
   border-color: #b91c1c;
 }
 
-.pdo-frame-grid label {
+.pdo-frame-grid label,
+.pdo-frame-field {
   display: grid;
   gap: 5px;
   color: var(--color-text-secondary);
@@ -5399,7 +5406,6 @@ body.git-review-open {
 }
 
 .battery-frame-actions button {
-  border: 0;
   border-radius: var(--radius-sm);
   padding: 5px 10px;
   background: var(--color-surface);
@@ -5752,7 +5758,34 @@ html {
   border-bottom: 1px solid var(--color-border-light);
   background: var(--color-surface-alt);
   user-select: none;
+}
+
+.json-popup-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.json-popup-drag-handle {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-muted);
   cursor: move;
+}
+
+.json-popup-drag-handle:hover,
+.json-popup-drag-handle:focus-visible {
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
 }
 
 .json-popup-header strong {
@@ -5789,6 +5822,9 @@ html {
   height: 16px;
   cursor: nwse-resize;
   z-index: 1;
+  border: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .json-popup-resize-handle::before,
@@ -5816,7 +5852,9 @@ html {
 }
 
 .json-popup-resize-handle:hover::before,
-.json-popup-resize-handle:hover::after {
+.json-popup-resize-handle:hover::after,
+.json-popup-resize-handle:focus-visible::before,
+.json-popup-resize-handle:focus-visible::after {
   background: var(--color-primary);
 }
 

@@ -1,4 +1,17 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
+import {
+  Database,
+  FolderKanban,
+  Globe2,
+  Info,
+  MonitorCog,
+  Moon,
+  PackageOpen,
+  PlugZap,
+  Settings2,
+  Sun,
+  type LucideIcon,
+} from 'lucide-react';
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APP_RELEASES_URL, APP_VERSION } from '../constants/app';
 import { findGroupForKey, navGroups } from '../data/navigation';
@@ -22,6 +35,16 @@ interface SidebarProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }
+
+const groupIcons: Record<string, LucideIcon> = {
+  项目: FolderKanban,
+  数据: Database,
+  协议: PlugZap,
+  配置: Settings2,
+  多国语言: Globe2,
+  输出: PackageOpen,
+  系统: MonitorCog,
+};
 
 function lifecycleLabel(lifecycle?: ModuleLifecycle) {
   if (lifecycle === 'experimental-deprecated') return '实验/废弃';
@@ -149,6 +172,7 @@ export function Sidebar({
       <div className="activity-bar">
         {navGroups.map((group) => {
           const isActive = group.label === activeGroupLabel;
+          const GroupIcon = groupIcons[group.label] ?? FolderKanban;
           return (
             <button
               className={isActive ? 'activity-icon active' : 'activity-icon'}
@@ -166,7 +190,7 @@ export function Sidebar({
               style={{ '--activity-accent': group.accent } as CSSProperties}
             >
               <span className="activity-icon-glyph" aria-hidden="true">
-                {group.icon}
+                <GroupIcon size={19} strokeWidth={1.8} />
               </span>
               <span className="activity-icon-label">{group.label}</span>
             </button>
@@ -183,7 +207,7 @@ export function Sidebar({
           aria-expanded={showPopup}
         >
           <span className="activity-icon-glyph" aria-hidden="true">
-            ℹ
+            <Info size={18} strokeWidth={1.8} />
           </span>
           <span className="activity-icon-label">关于</span>
         </button>
@@ -196,7 +220,7 @@ export function Sidebar({
           aria-label="切换主题"
         >
           <span className="activity-icon-glyph" aria-hidden="true">
-            {theme === 'dark' ? '☀' : '🌙'}
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </span>
           <span className="activity-icon-label">{theme === 'dark' ? '浅色' : '深色'}</span>
         </button>

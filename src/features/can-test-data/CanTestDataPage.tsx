@@ -229,15 +229,15 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                 <section className="pdo-frame-section" key={`${frame.id}-${frameIndex}`}>
                   <div className="pdo-frame-card">
                     <div className="pdo-frame-grid">
-                      <label>
+                      <div className="pdo-frame-field">
                         CAN ID
                         <code style={{ fontSize: '1.1em' }}>
                           0x{frame.id.toString(16).toUpperCase().padStart(3, '0')}
                         </code>
-                      </label>
-                      <label>
+                      </div>
+                      <div className="pdo-frame-field">
                         类型<span>{frame.frameType === 0 ? '标准帧' : '扩展帧'}</span>
-                      </label>
+                      </div>
                       <label>
                         名称
                         <input
@@ -245,15 +245,15 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                           onChange={(e) => canTestData.updateFrame(frameIndex, 'name', e.target.value)}
                         />
                       </label>
-                      <label>
+                      <div className="pdo-frame-field">
                         场景<span>{frame.scenario ?? 'manual'}</span>
-                      </label>
-                      <label>
+                      </div>
+                      <div className="pdo-frame-field">
                         来源<span>{frame.source ?? '-'}</span>
-                      </label>
-                      <label>
+                      </div>
+                      <div className="pdo-frame-field">
                         DLC<span>{frame.dlc}</span>
-                      </label>
+                      </div>
                       <label>
                         周期(ms)
                         <input
@@ -265,9 +265,9 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                           }
                         />
                       </label>
-                      <label>
+                      <div className="pdo-frame-field">
                         HEX<code style={{ fontSize: '0.85em' }}>{frame.data}</code>
-                      </label>
+                      </div>
                     </div>
                   </div>
                   {frame.signals.length > 0 ? (
