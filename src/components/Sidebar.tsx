@@ -1,6 +1,7 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   Database,
+  FileDown,
   FolderKanban,
   Globe2,
   Info,
@@ -25,6 +26,7 @@ import {
 import { APP_RELEASES_URL, APP_VERSION } from '../constants/app';
 import { findGroupForKey, navGroups } from '../data/navigation';
 import { useAppUpdate } from '../hooks/useAppUpdate';
+import { useDiagnosticExport } from '../hooks/useDiagnosticExport';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import type {
   BackendHealth,
@@ -114,6 +116,12 @@ export function Sidebar({
     checkUpdate,
     installUpdate,
   } = useAppUpdate();
+  const diagnosticExport = useDiagnosticExport({
+    activeModule: activeKey,
+    health,
+    project,
+    theme,
+  });
 
   const activeGroup = useMemo(
     () => navGroups.find((group) => group.label === activeGroupLabel) ?? navGroups[0],
@@ -345,6 +353,34 @@ export function Sidebar({
                 >
                   打开发布页面
                 </button>
+              </div>
+            </section>
+            <section>
+              <strong className="section-label--muted">诊断与支持</strong>
+              <div className="version-diagnostic-panel">
+                <div className="version-diagnostic-row">
+                  <span
+                    aria-live="polite"
+                    className={
+                      diagnosticExport.error
+                        ? 'version-diagnostic-status version-diagnostic-status--error'
+                        : 'version-diagnostic-status'
+                    }
+                    role={diagnosticExport.error ? 'alert' : 'status'}
+                  >
+                    {diagnosticExport.error ?? diagnosticExport.message ?? ''}
+                  </span>
+                  <button
+                    className="version-update-button version-diagnostic-button"
+                    disabled={diagnosticExport.isExporting}
+                    onClick={() => void diagnosticExport.exportDiagnostics()}
+                    type="button"
+                  >
+                    <FileDown aria-hidden="true" size={14} strokeWidth={1.8} />
+                    {diagnosticExport.isExporting ? '导出中' : '导出诊断报告'}
+                  </button>
+                </div>
+                <p className="version-diagnostic-privacy">项目配置内容不会写入报告。</p>
               </div>
             </section>
           </div>

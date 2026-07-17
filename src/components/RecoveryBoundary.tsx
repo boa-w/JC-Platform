@@ -1,5 +1,6 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Component, type ErrorInfo, type ReactNode, Suspense } from 'react';
+import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics';
 
 interface RecoveryBoundaryProps {
   children: ReactNode;
@@ -18,6 +19,7 @@ class RecoveryBoundary extends Component<RecoveryBoundaryProps, RecoveryBoundary
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    recordRuntimeDiagnostic('error', `react.${this.props.scope}`, error, info.componentStack);
     console.error('Unhandled application error', error, info.componentStack);
   }
 

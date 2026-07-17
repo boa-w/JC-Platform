@@ -51,6 +51,9 @@ test('keeps the About dialog above the workspace and restores focus', async ({ p
   await expect(dialog).toHaveCSS('position', 'fixed');
   await expect(dialog).toHaveCSS('z-index', '100');
 
+  await dialog.getByRole('button', { name: '导出诊断报告' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('诊断报告只能在 Tauri 桌面应用中导出。');
+
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();

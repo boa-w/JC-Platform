@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics';
 import type { UpdateInfo, UpdateProgress } from '../lib/updater';
 import { checkForAppUpdate, installAppUpdate } from '../lib/updater';
 
@@ -34,6 +35,7 @@ export function useAppUpdate() {
       setStatus('up-to-date');
       return false;
     } catch (caught) {
+      recordRuntimeDiagnostic('error', 'updater.check', caught);
       setError(caught instanceof Error ? caught.message : String(caught));
       setStatus('error');
       return false;
@@ -56,6 +58,7 @@ export function useAppUpdate() {
       setStatus('restarting');
       return true;
     } catch (caught) {
+      recordRuntimeDiagnostic('error', 'updater.install', caught);
       setError(caught instanceof Error ? caught.message : String(caught));
       setStatus('error');
       return false;
