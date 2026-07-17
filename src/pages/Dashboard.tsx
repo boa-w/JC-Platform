@@ -219,6 +219,7 @@ export function Dashboard({
   });
   const batteryLegacyController = useBatteryLegacyController({
     document: loadedProject?.document ?? null,
+    projectPath: loadedProject?.summary.path,
     updateProjectDocument,
     isModifiedPath,
     restoreModifiedPath,

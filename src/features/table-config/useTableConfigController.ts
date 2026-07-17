@@ -14,6 +14,7 @@ import {
   pdoSimpleDocumentTable,
   sdoDocumentTable,
 } from '../../api/commands';
+import { useOperationGuard } from '../../hooks/useOperationGuard';
 import { legacyTableKindForModule } from '../../modules/documentSections';
 import type {
   LanguageImportReport,
@@ -60,6 +61,18 @@ export function useTableConfigController({
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const currentKind = legacyTableKindForModule(activeModuleKey) as TableConfigKind | null;
+  const projectDocument = loadedProject?.document ?? null;
+  const operationGuard = useOperationGuard(projectDocument);
+
+  useEffect(() => {
+    if (!projectDocument) {
+      setImportReport(null);
+      setImportError(null);
+      setExportStatus(null);
+    }
+    setIsImporting(false);
+    setIsExporting(false);
+  }, [projectDocument]);
 
   useEffect(() => {
     let active = true;
@@ -96,22 +109,29 @@ export function useTableConfigController({
       return;
     }
 
+    const targetProject = loadedProject;
+    const operation = operationGuard.begin();
     const path = await save({
       filters: [{ name: format === 'csv' ? 'CSV 表格' : 'Excel XML 表格', extensions: [format] }],
     });
     if (!path) return;
+    if (!operationGuard.isCurrent(operation)) return;
 
     setIsExporting(true);
     try {
-      const document = (loadedProject.document as Record<string, unknown>)[tableConfigSections[kind]];
+      const document = (targetProject.document as Record<string, unknown>)[
+        tableConfigSections[kind]
+      ];
       const table = await exportableDocument(kind, document);
       if (format === 'csv') await exportTableCsv({ path, document: table });
       else await exportTableWorkbook({ path, document: table });
-      setExportStatus(`已导出：${path}`);
+      if (operationGuard.isCurrent(operation)) setExportStatus(`已导出：${path}`);
     } catch (error) {
-      setExportStatus(error instanceof Error ? error.message : String(error));
+      if (operationGuard.isCurrent(operation)) {
+        setExportStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsExporting(false);
+      if (operationGuard.isCurrent(operation)) setIsExporting(false);
     }
   }
 
@@ -135,16 +155,20 @@ export function useTableConfigController({
       return;
     }
 
+    const targetProject = loadedProject;
+    const operation = operationGuard.begin();
     const selected = await open({
       multiple: false,
       filters: [{ name: '表格文件', extensions: ['csv', 'xls', 'xlsx', 'xml'] }],
     });
     if (typeof selected !== 'string') return;
+    if (!operationGuard.isCurrent(operation)) return;
 
     setIsImporting(true);
     try {
       const extension = selected.split('.').pop()?.toLowerCase();
       const report = await importTableDocument(kind, selected, extension === 'csv');
+      if (!operationGuard.isCurrent(operation)) return;
       setImportReport(report);
       if (!report.valid || !report.document) {
         setImportError(report.errors.join('；') || '表格导入失败');
@@ -152,16 +176,18 @@ export function useTableConfigController({
       }
 
       applyLoadedProject({
-        ...loadedProject,
+        ...targetProject,
         document: {
-          ...(loadedProject.document as Record<string, unknown>),
+          ...(targetProject.document as Record<string, unknown>),
           [tableConfigSections[kind]]: report.document,
         },
       });
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : String(error));
+      if (operationGuard.isCurrent(operation)) {
+        setImportError(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsImporting(false);
+      if (operationGuard.isCurrent(operation)) setIsImporting(false);
     }
   }
 

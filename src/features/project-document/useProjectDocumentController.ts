@@ -93,10 +93,12 @@ export function useProjectDocumentController({
   const [baselineDocument, setBaselineDocument] = useState<unknown | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const baselineDocumentRef = useRef<unknown | null>(null);
+  const loadedProjectRef = useRef(loadedProject);
   const onDocumentStateChangeRef = useRef(onDocumentStateChange);
   const onProjectLoadedRef = useRef(onProjectLoaded);
   onDocumentStateChangeRef.current = onDocumentStateChange;
   onProjectLoadedRef.current = onProjectLoaded;
+  loadedProjectRef.current = loadedProject;
 
   const { clearDirtySections, dirtySections, recalculateDirtySections } =
     useDocumentDirtySections();
@@ -198,27 +200,29 @@ export function useProjectDocumentController({
 
   const updateProjectDocument = useCallback(
     (section: string, value: unknown) => {
-      if (!loadedProject) return;
-      const document = { ...(loadedProject.document as Record<string, unknown>), [section]: value };
+      const project = loadedProjectRef.current;
+      if (!project) return;
+      const document = { ...(project.document as Record<string, unknown>), [section]: value };
       const changedSection = (trackedDocumentSections as readonly string[]).includes(section)
         ? [section as DocumentSectionKey]
         : undefined;
-      applyLoadedProject({ ...loadedProject, document }, undefined, changedSection);
+      applyLoadedProject({ ...project, document }, undefined, changedSection);
     },
-    [applyLoadedProject, loadedProject],
+    [applyLoadedProject],
   );
 
   const updateProjectSections = useCallback(
     (sections: Record<string, unknown>) => {
-      if (!loadedProject) return;
-      const document = { ...(loadedProject.document as Record<string, unknown>), ...sections };
+      const project = loadedProjectRef.current;
+      if (!project) return;
+      const document = { ...(project.document as Record<string, unknown>), ...sections };
       const changedSections = Object.keys(sections).filter(
         (section): section is DocumentSectionKey =>
           (trackedDocumentSections as readonly string[]).includes(section),
       );
-      applyLoadedProject({ ...loadedProject, document }, undefined, changedSections);
+      applyLoadedProject({ ...project, document }, undefined, changedSections);
     },
-    [applyLoadedProject, loadedProject],
+    [applyLoadedProject],
   );
 
   const modifiedSections = loadedProject

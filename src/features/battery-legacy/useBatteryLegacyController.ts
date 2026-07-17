@@ -1,5 +1,5 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   exportDbc,
   generateDbcContent,
@@ -9,6 +9,7 @@ import {
   saveJsonFile,
   saveTextFile,
 } from '../../api/commands';
+import { useOperationGuard } from '../../hooks/useOperationGuard';
 import type {
   BatteryMonitorFrame,
   BatteryMonitorInfo,
@@ -16,7 +17,6 @@ import type {
   BatteryMonitorSignal,
   BatteryProtocol,
 } from '../../types/platform';
-import type { JsonPath } from '../../utils/projectDirty';
 import {
   csvToFrames,
   csvToItems,
@@ -25,10 +25,12 @@ import {
   itemsToCsv,
   signalsToCsv,
 } from '../../utils/batteryCsv';
+import type { JsonPath } from '../../utils/projectDirty';
 import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
 
 interface UseBatteryLegacyControllerOptions {
   document: unknown | null;
+  projectPath?: string;
   updateProjectDocument: (section: string, value: unknown) => void;
   isModifiedPath: (path: JsonPath) => boolean;
   restoreModifiedPath: (path: JsonPath) => void;
@@ -38,13 +40,18 @@ const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS
 
 export function useBatteryLegacyController({
   document,
+  projectPath,
   updateProjectDocument,
   isModifiedPath,
   restoreModifiedPath,
 }: UseBatteryLegacyControllerOptions) {
   const loadedProject = document ? { document } : null;
-  const [batteryProtocolImportStatus, setBatteryProtocolImportStatus] = useState<string | null>(null);
-  const [batteryProtocolExportStatus, setBatteryProtocolExportStatus] = useState<string | null>(null);
+  const [batteryProtocolImportStatus, setBatteryProtocolImportStatus] = useState<string | null>(
+    null,
+  );
+  const [batteryProtocolExportStatus, setBatteryProtocolExportStatus] = useState<string | null>(
+    null,
+  );
   const [isExportingBatteryProtocol, setIsExportingBatteryProtocol] = useState(false);
   const [isImportingBatteryProtocol, setIsImportingBatteryProtocol] = useState(false);
   const [batteryCsvStatus, setBatteryCsvStatus] = useState<string | null>(null);
@@ -57,8 +64,42 @@ export function useBatteryLegacyController({
   const [isImportingBatteryMonitor, setIsImportingBatteryMonitor] = useState(false);
   const [batteryMonitorExportStatus, setBatteryMonitorExportStatus] = useState<string | null>(null);
   const [isExportingBatteryMonitor, setIsExportingBatteryMonitor] = useState(false);
+  const projectPathRef = useRef(projectPath);
+  const documentGuard = useOperationGuard(document);
+  const projectGuard = useOperationGuard(projectPath);
   const currentBatteryProtocolDocument = batteryProtocolDocument();
   const currentBatteryMonitorDocument = batteryMonitorDocument();
+
+  useEffect(() => {
+    projectPathRef.current = projectPath;
+    setBatteryProtocolImportStatus(null);
+    setBatteryProtocolExportStatus(null);
+    setBatteryCsvStatus(null);
+    setBatteryDbcStatus(null);
+    setBatteryMonitorImportStatus(null);
+    setBatteryMonitorExportStatus(null);
+    setIsExportingBatteryProtocol(false);
+    setIsImportingBatteryProtocol(false);
+    setIsExportingBatteryCsv(false);
+    setIsImportingBatteryCsv(false);
+    setIsExportingBatteryDbc(false);
+    setIsImportingBatteryDbc(false);
+    setIsImportingBatteryMonitor(false);
+    setIsExportingBatteryMonitor(false);
+  }, [projectPath]);
+
+  useEffect(() => {
+    setIsImportingBatteryProtocol(false);
+    setIsImportingBatteryMonitor(false);
+    setIsImportingBatteryCsv(false);
+    setIsImportingBatteryDbc(false);
+    if (!document) {
+      setBatteryProtocolImportStatus(null);
+      setBatteryMonitorImportStatus(null);
+      setBatteryCsvStatus(null);
+      setBatteryDbcStatus(null);
+    }
+  }, [document]);
 
   function batteryProtocolDocument(): BatteryProtocol {
     if (!loadedProject) return { default_timeout_ticks: 200, frames: [], signals: [] };
@@ -70,16 +111,18 @@ export function useBatteryLegacyController({
   }
 
   async function updateBatteryProtocolDocument(next: BatteryProtocol) {
+    const operation = projectGuard.begin();
+    updateProjectDocument('battery_protocol', next);
     if (next.frames.length > 0 || next.signals.length > 0) {
       try {
         const dbc = await generateDbcContent(next.frames, next.signals);
-        updateProjectDocument('battery_protocol', { ...next, dbc_content: dbc });
-        return;
+        if (projectGuard.isCurrent(operation)) {
+          updateProjectDocument('battery_protocol', { ...next, dbc_content: dbc });
+        }
       } catch {
-        /* fall through */
+        /* The editable protocol was already applied; DBC refresh is best-effort. */
       }
     }
-    updateProjectDocument('battery_protocol', next);
   }
 
   function updateBatteryProtocolField(field: keyof BatteryProtocol, value: unknown) {
@@ -377,15 +420,18 @@ export function useBatteryLegacyController({
       return;
     }
 
+    const operation = documentGuard.begin();
     const selected = await open({
       multiple: false,
       filters: [{ name: '锂电协议', extensions: ['json'] }],
     });
     if (typeof selected !== 'string') return;
+    if (!documentGuard.isCurrent(operation)) return;
 
     setIsImportingBatteryProtocol(true);
     try {
       const data = (await loadJsonFile(selected)) as BatteryProtocol;
+      if (!documentGuard.isCurrent(operation)) return;
       if (!data || !Array.isArray(data.frames) || !Array.isArray(data.signals)) {
         setBatteryProtocolImportStatus('无效的锂电协议配置文件。');
         return;
@@ -395,9 +441,11 @@ export function useBatteryLegacyController({
         `已导入 ${data.frames.length} 帧 / ${data.signals.length} 信号`,
       );
     } catch (error) {
-      setBatteryProtocolImportStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation)) {
+        setBatteryProtocolImportStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsImportingBatteryProtocol(false);
+      if (documentGuard.isCurrent(operation)) setIsImportingBatteryProtocol(false);
     }
   }
 
@@ -412,15 +460,18 @@ export function useBatteryLegacyController({
       return;
     }
 
+    const operation = documentGuard.begin();
     const selected = await open({
       multiple: false,
       filters: [{ name: '锂电监控配置', extensions: ['json'] }],
     });
     if (typeof selected !== 'string') return;
+    if (!documentGuard.isCurrent(operation)) return;
 
     setIsImportingBatteryMonitor(true);
     try {
       const data = (await loadJsonFile(selected)) as BatteryMonitorInfo;
+      if (!documentGuard.isCurrent(operation)) return;
       if (!data || !Array.isArray(data.items)) {
         setBatteryMonitorImportStatus('无效的锂电监控显示配置文件。');
         return;
@@ -428,9 +479,11 @@ export function useBatteryLegacyController({
       updateBatteryMonitorDocument(data);
       setBatteryMonitorImportStatus(`已导入 ${data.items.length} 显示项`);
     } catch (error) {
-      setBatteryMonitorImportStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation)) {
+        setBatteryMonitorImportStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsImportingBatteryMonitor(false);
+      if (documentGuard.isCurrent(operation)) setIsImportingBatteryMonitor(false);
     }
   }
 
@@ -473,15 +526,18 @@ export function useBatteryLegacyController({
       return;
     }
 
+    const operation = documentGuard.begin();
     const selected = await open({
       multiple: false,
       filters: [{ name: '帧 CSV', extensions: ['csv'] }],
     });
     if (typeof selected !== 'string') return;
+    if (!documentGuard.isCurrent(operation)) return;
 
     setIsImportingBatteryCsv(true);
     try {
       const text = await loadTextFile(selected);
+      if (!documentGuard.isCurrent(operation)) return;
       const { frames, errors } = csvToFrames(text);
       if (errors.length > 0) {
         setBatteryCsvStatus(`导入帧 CSV 出错：${errors.join('；')}`);
@@ -492,9 +548,11 @@ export function useBatteryLegacyController({
       updateBatteryProtocolDocument({ ...document, frames });
       setBatteryCsvStatus(`已导入 ${frames.length} 帧`);
     } catch (error) {
-      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation)) {
+        setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsImportingBatteryCsv(false);
+      if (documentGuard.isCurrent(operation)) setIsImportingBatteryCsv(false);
     }
   }
 
@@ -537,15 +595,18 @@ export function useBatteryLegacyController({
       return;
     }
 
+    const operation = documentGuard.begin();
     const selected = await open({
       multiple: false,
       filters: [{ name: '信号 CSV', extensions: ['csv'] }],
     });
     if (typeof selected !== 'string') return;
+    if (!documentGuard.isCurrent(operation)) return;
 
     setIsImportingBatteryCsv(true);
     try {
       const text = await loadTextFile(selected);
+      if (!documentGuard.isCurrent(operation)) return;
       const { signals, errors } = csvToSignals(text);
       if (errors.length > 0) {
         setBatteryCsvStatus(`导入信号 CSV 出错：${errors.join('；')}`);
@@ -556,9 +617,11 @@ export function useBatteryLegacyController({
       updateBatteryProtocolDocument({ ...document, signals });
       setBatteryCsvStatus(`已导入 ${signals.length} 信号`);
     } catch (error) {
-      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation)) {
+        setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsImportingBatteryCsv(false);
+      if (documentGuard.isCurrent(operation)) setIsImportingBatteryCsv(false);
     }
   }
 
@@ -601,15 +664,18 @@ export function useBatteryLegacyController({
       return;
     }
 
+    const operation = documentGuard.begin();
     const selected = await open({
       multiple: false,
       filters: [{ name: '显示项 CSV', extensions: ['csv'] }],
     });
     if (typeof selected !== 'string') return;
+    if (!documentGuard.isCurrent(operation)) return;
 
     setIsImportingBatteryCsv(true);
     try {
       const text = await loadTextFile(selected);
+      if (!documentGuard.isCurrent(operation)) return;
       const { items, errors } = csvToItems(text);
       if (errors.length > 0) {
         setBatteryCsvStatus(`导入显示项 CSV 出错：${errors.join('；')}`);
@@ -620,9 +686,11 @@ export function useBatteryLegacyController({
       updateBatteryMonitorDocument({ ...document, items });
       setBatteryCsvStatus(`已导入 ${items.length} 显示项`);
     } catch (error) {
-      setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation)) {
+        setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsImportingBatteryCsv(false);
+      if (documentGuard.isCurrent(operation)) setIsImportingBatteryCsv(false);
     }
   }
 
@@ -637,15 +705,18 @@ export function useBatteryLegacyController({
       return;
     }
 
+    const operation = documentGuard.begin();
     const selected = await open({
       multiple: false,
       filters: [{ name: 'DBC 文件', extensions: ['dbc'] }],
     });
     if (typeof selected !== 'string') return;
+    if (!documentGuard.isCurrent(operation)) return;
 
     setIsImportingBatteryDbc(true);
     try {
       const report = await importDbc(selected);
+      if (!documentGuard.isCurrent(operation)) return;
       if (report.errors.length > 0) {
         setBatteryDbcStatus(`导入 DBC 出错：${report.errors.join('；')}`);
         return;
@@ -660,6 +731,7 @@ export function useBatteryLegacyController({
       } catch {
         /* non-critical */
       }
+      if (!documentGuard.isCurrent(operation)) return;
       const document = batteryProtocolDocument();
       updateBatteryProtocolDocument({
         ...document,
@@ -669,9 +741,11 @@ export function useBatteryLegacyController({
       });
       setBatteryDbcStatus(`已导入 ${report.frames.length} 帧 / ${report.signals.length} 信号`);
     } catch (error) {
-      setBatteryDbcStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation)) {
+        setBatteryDbcStatus(error instanceof Error ? error.message : String(error));
+      }
     } finally {
-      setIsImportingBatteryDbc(false);
+      if (documentGuard.isCurrent(operation)) setIsImportingBatteryDbc(false);
     }
   }
 
