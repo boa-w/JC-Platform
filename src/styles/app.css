@@ -5654,6 +5654,103 @@ body.git-review-open {
   line-height: 1.5;
 }
 
+.recovery-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 240px;
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--color-text);
+}
+
+.recovery-boundary--app {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.recovery-boundary--feature {
+  width: 100%;
+}
+
+.recovery-boundary-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, var(--color-border));
+  border-radius: 50%;
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.recovery-boundary-copy h1,
+.recovery-boundary-copy h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.recovery-boundary-copy p {
+  max-width: 420px;
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.recovery-boundary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: white;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.recovery-boundary-action:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.recovery-boundary-action:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.recovery-boundary-details {
+  max-width: min(560px, 100%);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.recovery-boundary-details summary {
+  cursor: pointer;
+}
+
+.recovery-boundary-details code {
+  display: block;
+  max-height: 96px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
 /* ── Animations ── */
 
 @keyframes fadeIn {

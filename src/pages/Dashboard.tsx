@@ -1,8 +1,9 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import { parsePdoAdvancedProject, validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
+import { FeatureBoundary } from '../components/RecoveryBoundary';
 import { useBatteryLegacyController } from '../features/battery-legacy/useBatteryLegacyController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
 import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
@@ -597,7 +598,7 @@ export function Dashboard({
         onCommitGitVersion={projectGit.commitVersion}
       />
 
-      <Suspense fallback={<WorkspaceLoading />}>
+      <FeatureBoundary fallback={<WorkspaceLoading />} resetKey={`git-${projectGit.showReview}`}>
         {projectGit.showReview ? (
           <GitReviewWorkspace
             report={projectGit.review}
@@ -615,7 +616,7 @@ export function Dashboard({
             onClose={projectGit.closeReview}
           />
         ) : null}
-      </Suspense>
+      </FeatureBoundary>
       <DashboardDialogs
         loadedProject={loadedProject}
         showSaveModal={projectLifecycle.showSaveModal}
@@ -632,7 +633,7 @@ export function Dashboard({
         onConfirmTestData={confirmGenerateTestData}
       />
 
-      <Suspense fallback={null}>
+      <FeatureBoundary fallback={null} resetKey={`json-${showJsonEditor}`}>
         {showJsonEditor && loadedProject ? (
           <JsonEditorPopup
             open
@@ -646,7 +647,7 @@ export function Dashboard({
             onClose={() => setShowJsonEditor(false)}
           />
         ) : null}
-      </Suspense>
+      </FeatureBoundary>
 
       <div className={showJsonEditor && loadedProject ? 'workspace-json-active' : undefined}>
         {activeModule.key !== 'project' ? (
@@ -656,7 +657,7 @@ export function Dashboard({
             onNavigate={onNavigate}
           />
         ) : null}
-        <Suspense fallback={<WorkspaceLoading />}>
+        <FeatureBoundary fallback={<WorkspaceLoading />} resetKey={activeModule.key}>
           {activeModule.key === 'project' ? (
             <ProjectManagementPage
               projectPath={projectLifecycle.projectPath}
@@ -840,7 +841,7 @@ export function Dashboard({
           ) : null}
 
           {activeModule.key === 'export' ? <ProjectExportPage controller={projectExport} /> : null}
-        </Suspense>
+        </FeatureBoundary>
       </div>
     </main>
   );
