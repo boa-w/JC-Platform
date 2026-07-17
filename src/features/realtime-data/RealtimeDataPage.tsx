@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useId, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import type { JsonPath } from '../../utils/projectDirty';
 import {
@@ -71,6 +71,7 @@ export function RealtimeDataPage({
   );
   const advancedPdoDrawerCloseRef = useRef<HTMLButtonElement | null>(null);
   const advancedPdoDrawerRef = useRef<HTMLElement | null>(null);
+  const advancedPdoDrawerTitleId = useId();
 
   useDialogFocus({
     active: advancedPdoDrawerOpen,
@@ -271,11 +272,11 @@ export function RealtimeDataPage({
           ref={advancedPdoDrawerRef}
           role="dialog"
           aria-modal="true"
-          aria-labelledby="advanced-pdo-drawer-title"
+          aria-labelledby={advancedPdoDrawerTitleId}
         >
           <div className="legacy-drawer-header">
             <div>
-              <strong id="advanced-pdo-drawer-title">高级 CANopen 参数</strong>
+              <strong id={advancedPdoDrawerTitleId}>高级 CANopen 参数</strong>
               <p>编辑全局变量和条件表，同时保留主区域的帧/协议上下文。</p>
             </div>
             <button

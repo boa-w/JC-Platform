@@ -329,7 +329,7 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                 </section>
               ))}
             </>
-          ) : canTestData.canTestStatus && canTestData.canTestStatus.startsWith('已生成') ? null : (
+          ) : canTestData.canTestStatus?.startsWith('已生成') ? null : (
             <div className="empty-state">
               <div className="empty-state-icon">📂</div>
               <p>点击「⚡ 生成」从项目配置中构建 CAN 测试数据</p>

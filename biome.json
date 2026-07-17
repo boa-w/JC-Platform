@@ -21,7 +21,8 @@
       "correctness": {
         "noUnusedImports": "warn",
         "noUnusedVariables": "warn",
-        "useExhaustiveDependencies": "warn"
+        "useExhaustiveDependencies": "warn",
+        "useUniqueElementIds": "error"
       },
       "style": {
         "noNonNullAssertion": "off"

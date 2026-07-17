@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import { testDataLabels, type TestDataType } from '../../data/test-data';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { modifiedSectionLabels, type DocumentSectionKey } from '../../modules/documentSections';
@@ -35,6 +35,8 @@ export function DashboardDialogs({
   onCancelTestData,
   onConfirmTestData: confirmGenerateTestData,
 }: DashboardDialogsProps) {
+  const saveDialogTitleId = useId();
+  const testDialogTitleId = useId();
   const saveCancelRef = useRef<HTMLButtonElement | null>(null);
   const testCancelRef = useRef<HTMLButtonElement | null>(null);
   const saveDialogRef = useRef<HTMLDivElement | null>(null);
@@ -60,13 +62,13 @@ export function DashboardDialogs({
       {showSaveModal && loadedProject ? (
         <div className="modal-overlay">
           <div
-            aria-labelledby="save-project-dialog-title"
+            aria-labelledby={saveDialogTitleId}
             aria-modal="true"
             className="modal-box"
             ref={saveDialogRef}
             role="dialog"
           >
-            <h3 id="save-project-dialog-title">确认保存</h3>
+            <h3 id={saveDialogTitleId}>确认保存</h3>
             <p>将当前所有配置修改写入项目文件：</p>
             <div className="modal-path">{loadedProject.summary.path}</div>
             {isLegacyJcproProject && hasRefactorOnlyChanges ? (
@@ -111,13 +113,13 @@ export function DashboardDialogs({
       {confirmGenerateType ? (
         <div className="modal-overlay">
           <div
-            aria-labelledby="generate-test-dialog-title"
+            aria-labelledby={testDialogTitleId}
             aria-modal="true"
             className="modal-box"
             ref={testDialogRef}
             role="dialog"
           >
-            <h3 id="generate-test-dialog-title">确认生成测试数据</h3>
+            <h3 id={testDialogTitleId}>确认生成测试数据</h3>
             <p>
               将使用 <strong>{testDataLabels[confirmGenerateType]}</strong>{' '}
               模板覆盖当前配置，是否继续？

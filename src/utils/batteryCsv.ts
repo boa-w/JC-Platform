@@ -75,7 +75,7 @@ export function csvToFrames(text: string): { frames: BatteryMonitorFrame[]; erro
       continue;
     }
     const canId = parseInt(row[1], 16);
-    if (isNaN(canId)) {
+    if (Number.isNaN(canId)) {
       errors.push(`第 ${i + 1} 行帧 ID 无效：${row[1]}`);
       continue;
     }

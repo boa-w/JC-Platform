@@ -453,7 +453,7 @@ export function useBatteryLegacyController({
     setIsExportingBatteryCsv(true);
     try {
       const csv = framesToCsv(currentBatteryProtocolDocument?.frames ?? []);
-      await saveTextFile(selected, '\uFEFF' + csv);
+      await saveTextFile(selected, `\uFEFF${csv}`);
       setBatteryCsvStatus(`帧 CSV 已导出：${selected}`);
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
@@ -517,7 +517,7 @@ export function useBatteryLegacyController({
     setIsExportingBatteryCsv(true);
     try {
       const csv = signalsToCsv(currentBatteryProtocolDocument?.signals ?? []);
-      await saveTextFile(selected, '\uFEFF' + csv);
+      await saveTextFile(selected, `\uFEFF${csv}`);
       setBatteryCsvStatus(`信号 CSV 已导出：${selected}`);
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
@@ -581,7 +581,7 @@ export function useBatteryLegacyController({
     setIsExportingBatteryCsv(true);
     try {
       const csv = itemsToCsv(currentBatteryMonitorDocument?.items ?? []);
-      await saveTextFile(selected, '\uFEFF' + csv);
+      await saveTextFile(selected, `\uFEFF${csv}`);
       setBatteryCsvStatus(`显示项 CSV 已导出：${selected}`);
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
@@ -760,4 +760,3 @@ export function useBatteryLegacyController({
 }
 
 export type BatteryLegacyController = ReturnType<typeof useBatteryLegacyController>;
-

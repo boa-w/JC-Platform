@@ -16,7 +16,7 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { modifiedSectionLabels, type DocumentSectionKey } from '../../modules/documentSections';
 import type {
   FeatureModule,
@@ -109,6 +109,7 @@ export function DashboardActionBar({
   onShowGitHistory,
   onCommitGitVersion: handleCommitProjectVersion,
 }: DashboardActionBarProps) {
+  const gitSummaryId = useId();
   const [showGitSummary, setShowGitSummary] = useState(false);
   const gitSummaryRef = useRef<HTMLDivElement | null>(null);
   const gitSummaryTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -209,7 +210,7 @@ export function DashboardActionBar({
         </div>
         <div className="action-bar-right">
           <button
-            aria-controls="git-summary-panel"
+            aria-controls={gitSummaryId}
             aria-expanded={showGitSummary}
             className={
               showGitSummary
@@ -377,7 +378,7 @@ export function DashboardActionBar({
         <div
           aria-label="Git 版本摘要"
           className="git-summary-popover"
-          id="git-summary-panel"
+          id={gitSummaryId}
           ref={gitSummaryRef}
           role="dialog"
         >

@@ -13,7 +13,15 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { APP_RELEASES_URL, APP_VERSION } from '../constants/app';
 import { findGroupForKey, navGroups } from '../data/navigation';
 import { useAppUpdate } from '../hooks/useAppUpdate';
@@ -79,6 +87,8 @@ export function Sidebar({
   const activeGroupLabel = groupOfActive?.label ?? selectedGroupLabel;
 
   const [showPopup, setShowPopup] = useState(false);
+  const versionPopupId = useId();
+  const versionTitleId = useId();
   const popupRef = useRef<HTMLDivElement | null>(null);
   const aboutTriggerRef = useRef<HTMLButtonElement | null>(null);
   const popupCloseRef = useRef<HTMLButtonElement | null>(null);
@@ -218,7 +228,7 @@ export function Sidebar({
           onClick={() => setShowPopup((v) => !v)}
           title="软件版本信息"
           aria-label="软件版本信息"
-          aria-controls="version-info-popup"
+          aria-controls={versionPopupId}
           aria-expanded={showPopup}
           ref={aboutTriggerRef}
         >
@@ -244,14 +254,14 @@ export function Sidebar({
 
       {showPopup ? (
         <div
-          aria-labelledby="version-info-title"
+          aria-labelledby={versionTitleId}
           className="version-popup"
-          id="version-info-popup"
+          id={versionPopupId}
           ref={popupRef}
           role="dialog"
         >
           <div className="version-popup-header">
-            <span className="version-popup-title" id="version-info-title">
+            <span className="version-popup-title" id={versionTitleId}>
               版本信息
             </span>
             <button

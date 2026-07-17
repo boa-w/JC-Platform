@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/language/ConfirmDialog';
 import {
   settingColumnPresetOptions,
@@ -48,6 +48,8 @@ export function SettingDataPage({
   isModifiedPath,
   restoreModifiedPath,
 }: SettingDataPageProps) {
+  const settingDrawerTitleId = useId();
+  const settingDrawerDescriptionId = useId();
   const settingData = useSettingData({
     loadedDocument: loadedProject ? (loadedProject.document as Record<string, unknown>) : null,
     isActive,
@@ -323,16 +325,16 @@ export function SettingDataPage({
           ref={settingData.settingDrawerRef}
           role="dialog"
           aria-modal="true"
-          aria-labelledby="setting-editor-drawer-title"
-          aria-describedby="setting-editor-drawer-desc"
+          aria-labelledby={settingDrawerTitleId}
+          aria-describedby={settingDrawerDescriptionId}
         >
           <div className="legacy-drawer-header">
             <div>
-              <strong id="setting-editor-drawer-title">
+              <strong id={settingDrawerTitleId}>
                 {isMenu ? '菜单编辑' : '参数编辑'}：
                 {settingData.editingSettingNode.name || '未命名'}
               </strong>
-              <p id="setting-editor-drawer-desc">编辑设置数据定义，不写入设备当前运行状态。</p>
+              <p id={settingDrawerDescriptionId}>编辑设置数据定义，不写入设备当前运行状态。</p>
             </div>
             <button
               ref={settingData.settingDrawerCloseRef}

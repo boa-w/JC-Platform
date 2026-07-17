@@ -1,5 +1,5 @@
 import { GripHorizontal, X } from 'lucide-react';
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 interface JsonEditorPopupProps {
@@ -28,6 +28,7 @@ export function JsonEditorPopup({
   const [size, setSize] = useState({ w: 520, h: 420 });
   const [position, setPosition] = useState({ x: 0, y: 64 });
   const initialized = useRef(false);
+  const titleId = useId();
   const popupRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
@@ -116,7 +117,7 @@ export function JsonEditorPopup({
   return (
     <>
       <div
-        aria-labelledby="json-editor-title"
+        aria-labelledby={titleId}
         className="json-popup"
         ref={popupRef}
         role="dialog"
@@ -148,7 +149,7 @@ export function JsonEditorPopup({
             >
               <GripHorizontal aria-hidden="true" size={16} />
             </button>
-            <strong id="json-editor-title">JSON 编辑器</strong>
+            <strong id={titleId}>JSON 编辑器</strong>
           </div>
           <div className="json-popup-actions">
             <button className="lang-btn" onClick={onFormat} type="button">
