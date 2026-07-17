@@ -1,19 +1,13 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  commitProjectGitVersion,
   createProject,
   loadJsonFile,
   loadProject,
-  loadProjectGitContext,
-  loadProjectGitRevision,
   migrateProjectDocument,
   parsePdoAdvancedProject,
   parseProjectDocument,
-  reviewProjectGitChanges,
-  reviewProjectGitRevision,
-  revealItemInDir,
   saveJsonFile,
   saveProject,
   saveProjectAs,
@@ -40,6 +34,7 @@ import {
   useProtocolEditor,
 } from '../features/protocol-editor';
 import { ProjectExportPage, useProjectExport } from '../features/project-export';
+import { useProjectGitController } from '../features/project-git';
 import { SettingsPage } from '../features/settings';
 import { RealtimeDataPage, usePdoEditor } from '../features/realtime-data';
 import { SettingDataPage } from '../features/setting-data';
@@ -71,10 +66,6 @@ import { useTranslationSettings } from '../stores/translationSettings';
 import type {
   BackendHealth,
   FeatureModule,
-  GitProjectRequest,
-  GitProjectStatus,
-  GitRevision,
-  GitReviewReport,
   LanguageDocument,
   LoadedProject,
   NavigationKey,
@@ -156,17 +147,6 @@ export function Dashboard({
   const isSavingProject = savingProjectAction !== null;
   const [refactorConfigPath, setRefactorConfigPath] = useState<string | null>(null);
   const [refactorConfigStatus, setRefactorConfigStatus] = useState<string | null>(null);
-  const [gitStatus, setGitStatus] = useState<GitProjectStatus | null>(null);
-  const [gitRevisions, setGitRevisions] = useState<GitRevision[]>([]);
-  const [gitMessage, setGitMessage] = useState('更新项目配置');
-  const [gitError, setGitError] = useState<string | null>(null);
-  const [gitBusy, setGitBusy] = useState(false);
-  const [gitReview, setGitReview] = useState<GitReviewReport | null>(null);
-  const [gitReviewRevision, setGitReviewRevision] = useState<GitRevision | null>(null);
-  const [showGitReview, setShowGitReview] = useState(false);
-  const [gitReviewBusy, setGitReviewBusy] = useState(false);
-  const [gitReviewError, setGitReviewError] = useState<string | null>(null);
-  const projectGitSectionRef = useRef<HTMLDivElement | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
   const [configEditorText, setConfigEditorText] = useState('');
@@ -188,7 +168,6 @@ export function Dashboard({
     updateSetting: updateTranslationSetting,
     resetSettings: resetTranslationSettings,
   } = useTranslationSettings();
-  const gitRefreshGenerationRef = useRef(0);
   const pdoEditor = usePdoEditor({
     document: loadedProject?.document ?? null,
     isActive: activeModule.key === 'realtime-data',
@@ -221,17 +200,30 @@ export function Dashboard({
     applyLoadedProject,
   });
   const uiResource = useUiResourceController({ loadedProject, applyLoadedProject });
+  const projectGit = useProjectGitController({
+    projectPath: loadedProject?.summary.path,
+    sidecarPath: refactorConfigPath,
+    hasUnsavedChanges,
+    onNavigate,
+    onStatusChange: setSaveStatus,
+    onRestoreDocument: async (document, revision) => {
+      if (!loadedProject) return;
+      const validation = await validateProjectDocument(document);
+      applyLoadedProject(
+        { ...loadedProject, document, validation },
+        undefined,
+        trackedDocumentSections,
+      );
+      void uiResource.refreshPreview(document, loadedProject.summary.path);
+      setSaveStatus(`已载入 Git 版本 ${revision.short_hash}，保存后将形成新的修改。`);
+    },
+  });
 
   useEffect(() => {
     const storedProjects = loadRecentProjects();
     setRecentProjects(storedProjects);
     setProjectPath(storedProjects[0]?.path ?? '');
   }, []);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => void refreshProjectGit(), 100);
-    return () => window.clearTimeout(timeout);
-  }, [loadedProject?.summary.path, refactorConfigPath]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -256,11 +248,6 @@ export function Dashboard({
       void unlistenPromise.then((unlisten) => unlisten());
     };
   }, [hasUnsavedChanges]);
-
-  useEffect(() => {
-    document.body.classList.toggle('git-review-open', showGitReview);
-    return () => document.body.classList.remove('git-review-open');
-  }, [showGitReview]);
 
   useEffect(() => {
     if (activeModule.key === 'fault-code') {
@@ -471,15 +458,6 @@ export function Dashboard({
   const selectedRecentProjectPath = recentProjects.some((item) => item.path === projectPath)
     ? projectPath
     : '';
-  const gitRepositoryName =
-    gitStatus?.repo_root?.split(/[\\/]/).filter(Boolean).pop() ?? '本地仓库';
-  const gitSummaryCommitDisabled =
-    !gitStatus?.available ||
-    gitBusy ||
-    hasUnsavedChanges ||
-    gitStatus.has_staged_changes ||
-    gitStatus.changed_paths.length === 0;
-
   function updateProjectDocument(section: string, value: unknown) {
     if (!loadedProject) return;
 
@@ -561,154 +539,6 @@ export function Dashboard({
     setRefactorConfigPath(null);
     setRefactorConfigStatus('未挂载重构配置 JSON；修改重构专属配置时会提示创建 sidecar。');
     return project;
-  }
-
-  function currentProjectGitRequest(): GitProjectRequest | null {
-    const path = loadedProject?.summary.path;
-    if (!path) return null;
-    return {
-      project_path: path,
-      sidecar_path: refactorConfigPath ?? undefined,
-    };
-  }
-
-  async function refreshProjectGit() {
-    const generation = ++gitRefreshGenerationRef.current;
-    const request = currentProjectGitRequest();
-    if (!request || !isTauriRuntime()) {
-      setGitStatus(null);
-      setGitRevisions([]);
-      setGitError(null);
-      return;
-    }
-
-    try {
-      const context = await loadProjectGitContext(request, 20);
-      if (generation !== gitRefreshGenerationRef.current) return;
-      setGitStatus(context.status);
-      setGitError(null);
-      setGitRevisions(context.revisions);
-    } catch (error) {
-      if (generation !== gitRefreshGenerationRef.current) return;
-      setGitStatus(null);
-      setGitRevisions([]);
-      setGitError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  async function handleCommitProjectVersion() {
-    const request = currentProjectGitRequest();
-    if (!request) return;
-    if (hasUnsavedChanges) {
-      setGitError('请先保存当前项目配置，再创建 Git 版本。');
-      return;
-    }
-
-    setGitBusy(true);
-    setGitError(null);
-    try {
-      const report = await commitProjectGitVersion({ ...request, message: gitMessage });
-      setGitMessage('更新项目配置');
-      setSaveStatus(`已保存 Git 版本 ${report.short_hash}：${report.subject}`);
-      await refreshProjectGit();
-      if (showGitReview) await refreshGitReview();
-    } catch (error) {
-      setGitError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setGitBusy(false);
-    }
-  }
-
-  async function handlePreviewProjectVersion(revision: GitRevision) {
-    const request = currentProjectGitRequest();
-    if (!request) return;
-    setGitReviewRevision(revision);
-    setGitReview(null);
-    setShowGitReview(true);
-    await refreshGitReview(revision);
-  }
-
-  async function handleRestoreProjectVersion() {
-    const request = currentProjectGitRequest();
-    if (!loadedProject || !gitReviewRevision || !request) return;
-    if (
-      hasUnsavedChanges &&
-      !window.confirm('当前项目存在未保存修改。继续恢复会用历史版本替换这些修改，是否继续？')
-    ) {
-      return;
-    }
-    setGitBusy(true);
-    setGitReviewError(null);
-    try {
-      const snapshot = await loadProjectGitRevision(request, gitReviewRevision.hash);
-      const document = snapshot.sidecar_document
-        ? mergeRefactorConfigDocument(snapshot.project_document, snapshot.sidecar_document)
-        : snapshot.project_document;
-      const validation = await validateProjectDocument(document);
-      applyLoadedProject(
-        { ...loadedProject, document, validation },
-        undefined,
-        trackedDocumentSections,
-      );
-      void uiResource.refreshPreview(document, loadedProject.summary.path);
-      closeGitReview();
-      setSaveStatus(
-        `已载入 Git 版本 ${snapshot.revision.short_hash}，保存后将形成新的修改。`,
-      );
-    } catch (error) {
-      setGitReviewError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setGitBusy(false);
-    }
-  }
-
-  async function handleOpenGitRepository() {
-    if (!gitStatus?.repo_root) return;
-    try {
-      await revealItemInDir(gitStatus.repo_root);
-    } catch (error) {
-      setGitError(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  function showProjectGitHistory() {
-    onNavigate('project');
-    window.setTimeout(
-      () => projectGitSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
-      0,
-    );
-  }
-
-  async function refreshGitReview(revision: GitRevision | null = gitReviewRevision) {
-    const request = currentProjectGitRequest();
-    if (!request) return;
-    setGitReviewBusy(true);
-    setGitReviewError(null);
-    try {
-      const report = revision
-        ? await reviewProjectGitRevision(request, revision.hash)
-        : await reviewProjectGitChanges(request);
-      setGitReview(report);
-    } catch (error) {
-      setGitReview(null);
-      setGitReviewError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setGitReviewBusy(false);
-    }
-  }
-
-  async function openGitReview() {
-    setGitReviewRevision(null);
-    setGitReview(null);
-    setShowGitReview(true);
-    await refreshGitReview(null);
-  }
-
-  function closeGitReview() {
-    setShowGitReview(false);
-    setGitReviewRevision(null);
-    setGitReview(null);
-    setGitReviewError(null);
   }
 
   function applyConfigEditor() {
@@ -1029,7 +859,7 @@ export function Dashboard({
           ? '已保存 .jcpro 兼容段，并已导出重构专属 JSON。'
           : '已保存',
       );
-      void refreshProjectGit();
+      void projectGit.refresh();
     } catch (error) {
       setSaveStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -1142,7 +972,7 @@ export function Dashboard({
   const currentLanguageDocument = languageDocument();
 
   return (
-    <main className={showGitReview ? 'workspace workspace--git-review' : 'workspace'}>
+    <main className={projectGit.showReview ? 'workspace workspace--git-review' : 'workspace'}>
       <DashboardActionBar
         activeModule={activeModule}
         loadedProject={loadedProject}
@@ -1160,12 +990,12 @@ export function Dashboard({
         pdoMode={pdoEditor.mode}
         showCanvasLabels={uiResource.showCanvasLabels}
         showJsonEditor={showJsonEditor}
-        gitStatus={gitStatus}
-        gitBusy={gitBusy}
-        gitError={gitError}
-        gitRevisions={gitRevisions}
-        gitRepositoryName={gitRepositoryName}
-        gitSummaryCommitDisabled={gitSummaryCommitDisabled}
+        gitStatus={projectGit.status}
+        gitBusy={projectGit.busy}
+        gitError={projectGit.error}
+        gitRevisions={projectGit.revisions}
+        gitRepositoryName={projectGit.repositoryName}
+        gitSummaryCommitDisabled={projectGit.commitDisabled}
         onRestoreSection={(section) => restoreModifiedPath([section])}
         onSelectProjectFile={handleSelectProjectFile}
         onReloadProject={handleReloadProject}
@@ -1177,29 +1007,29 @@ export function Dashboard({
         onRequestTestData={setConfirmGenerateType}
         onToggleCanvasLabels={uiResource.toggleCanvasLabels}
         onToggleJsonEditor={() => setShowJsonEditor((visible) => !visible)}
-        onRefreshGit={refreshProjectGit}
-        onOpenGitReview={openGitReview}
-        onOpenGitRepository={handleOpenGitRepository}
-        onShowGitHistory={showProjectGitHistory}
-        onCommitGitVersion={handleCommitProjectVersion}
+        onRefreshGit={projectGit.refresh}
+        onOpenGitReview={projectGit.openReview}
+        onOpenGitRepository={projectGit.openRepository}
+        onShowGitHistory={projectGit.showHistory}
+        onCommitGitVersion={projectGit.commitVersion}
       />
 
 
-      {showGitReview ? (
+      {projectGit.showReview ? (
         <GitReviewWorkspace
-          report={gitReview}
-          revision={gitReviewRevision}
-          statusBranch={gitStatus?.branch}
-          busy={gitReviewBusy}
-          error={gitReviewError}
-          commitBusy={gitBusy}
-          commitDisabled={gitSummaryCommitDisabled}
-          message={gitMessage}
-          onMessageChange={setGitMessage}
-          onCommit={() => void handleCommitProjectVersion()}
-          onRestore={() => void handleRestoreProjectVersion()}
-          onRefresh={() => void refreshGitReview()}
-          onClose={closeGitReview}
+          report={projectGit.review}
+          revision={projectGit.reviewRevision}
+          statusBranch={projectGit.status?.branch}
+          busy={projectGit.reviewBusy}
+          error={projectGit.reviewError}
+          commitBusy={projectGit.busy}
+          commitDisabled={projectGit.commitDisabled}
+          message={projectGit.message}
+          onMessageChange={projectGit.setMessage}
+          onCommit={() => void projectGit.commitVersion()}
+          onRestore={() => void projectGit.restoreVersion()}
+          onRefresh={() => void projectGit.refreshReview()}
+          onClose={projectGit.closeReview}
         />
       ) : null}
       <DashboardDialogs
@@ -1260,14 +1090,14 @@ export function Dashboard({
             refactorConfigStatus={refactorConfigStatus}
             compatibleMissingSections={compatibleMissingSections}
             sidecarMissingSections={sidecarMissingSections}
-            projectGitSectionRef={projectGitSectionRef}
-            gitBusy={gitBusy}
-            gitStatus={gitStatus}
-            gitMessage={gitMessage}
-            setGitMessage={setGitMessage}
+            projectGitSectionRef={projectGit.projectSectionRef}
+            gitBusy={projectGit.busy}
+            gitStatus={projectGit.status}
+            gitMessage={projectGit.message}
+            setGitMessage={projectGit.setMessage}
             hasUnsavedChanges={hasUnsavedChanges}
-            gitRevisions={gitRevisions}
-            gitError={gitError}
+            gitRevisions={projectGit.revisions}
+            gitError={projectGit.error}
             projectParseReport={projectParseReport}
             handleSelectProjectFile={handleSelectProjectFile}
             handleOpenProject={handleOpenProject}
@@ -1276,9 +1106,9 @@ export function Dashboard({
             handleMigrateProject={handleMigrateProject}
             handleMountRefactorConfig={handleMountRefactorConfig}
             handleCreateRefactorConfig={handleCreateRefactorConfig}
-            refreshProjectGit={refreshProjectGit}
-            handleCommitProjectVersion={handleCommitProjectVersion}
-            handlePreviewProjectVersion={handlePreviewProjectVersion}
+            refreshProjectGit={projectGit.refresh}
+            handleCommitProjectVersion={projectGit.commitVersion}
+            handlePreviewProjectVersion={projectGit.previewVersion}
           />
         ) : null}
 
