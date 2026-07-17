@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { testDataLabels, type TestDataType } from '../../data/test-data';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { modifiedSectionLabels, type DocumentSectionKey } from '../../modules/documentSections';
 import type { LoadedProject } from '../../types/platform';
 
@@ -36,30 +37,23 @@ export function DashboardDialogs({
 }: DashboardDialogsProps) {
   const saveCancelRef = useRef<HTMLButtonElement | null>(null);
   const testCancelRef = useRef<HTMLButtonElement | null>(null);
+  const saveDialogRef = useRef<HTMLDivElement | null>(null);
+  const testDialogRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (showSaveModal && loadedProject) saveCancelRef.current?.focus();
-    else if (confirmGenerateType) testCancelRef.current?.focus();
-  }, [confirmGenerateType, loadedProject, showSaveModal]);
-
-  useEffect(() => {
-    if (!showSaveModal && !confirmGenerateType) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
-      if (confirmGenerateType) onCancelTestData();
-      else if (!isSavingProject) cancelSaveProject();
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [
-    cancelSaveProject,
-    confirmGenerateType,
-    isSavingProject,
-    onCancelTestData,
-    showSaveModal,
-  ]);
+  useDialogFocus({
+    active: showSaveModal && Boolean(loadedProject),
+    containerRef: saveDialogRef,
+    initialFocusRef: saveCancelRef,
+    onEscape: () => {
+      if (!isSavingProject) cancelSaveProject();
+    },
+  });
+  useDialogFocus({
+    active: Boolean(confirmGenerateType),
+    containerRef: testDialogRef,
+    initialFocusRef: testCancelRef,
+    onEscape: onCancelTestData,
+  });
 
   return (
     <>
@@ -69,6 +63,7 @@ export function DashboardDialogs({
             aria-labelledby="save-project-dialog-title"
             aria-modal="true"
             className="modal-box"
+            ref={saveDialogRef}
             role="dialog"
           >
             <h3 id="save-project-dialog-title">确认保存</h3>
@@ -119,6 +114,7 @@ export function DashboardDialogs({
             aria-labelledby="generate-test-dialog-title"
             aria-modal="true"
             className="modal-box"
+            ref={testDialogRef}
             role="dialog"
           >
             <h3 id="generate-test-dialog-title">确认生成测试数据</h3>

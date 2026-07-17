@@ -1,4 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   ParsedResourceOption,
@@ -211,7 +212,11 @@ export function UiCanvasPreview({
                 aria-expanded={isRootExpanded}
                 aria-label={isRootExpanded ? '折叠 UI资源' : '展开 UI资源'}
               >
-                {isRootExpanded ? '▾' : '▸'}
+                {isRootExpanded ? (
+                  <ChevronDown aria-hidden="true" size={14} />
+                ) : (
+                  <ChevronRight aria-hidden="true" size={14} />
+                )}
               </button>
               <button
                 className="ui-tree-node ui-tree-node--group"
@@ -246,7 +251,11 @@ export function UiCanvasPreview({
                     aria-expanded={isMainExpanded}
                     aria-label={isMainExpanded ? '折叠 main' : '展开 main'}
                   >
-                    {isMainExpanded ? '▾' : '▸'}
+                    {isMainExpanded ? (
+                      <ChevronDown aria-hidden="true" size={14} />
+                    ) : (
+                      <ChevronRight aria-hidden="true" size={14} />
+                    )}
                   </button>
                   <button
                     className="ui-tree-node ui-tree-node--group"
@@ -374,12 +383,14 @@ export function UiCanvasPreview({
                           ) : null}
                         </div>
                         <button
+                          aria-label={`删除 ${optionTitle(option, index)}`}
                           className="ui-option-delete"
                           disabled={!canApply || isApplying || !onRemoveOption}
                           onClick={() => void removeOption(index)}
+                          title={`删除 ${optionTitle(option, index)}`}
                           type="button"
                         >
-                          ✕
+                          <Trash2 aria-hidden="true" size={14} />
                         </button>
                       </article>
                     );

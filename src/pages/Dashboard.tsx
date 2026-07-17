@@ -2,7 +2,6 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useRef, useState } from 'react';
 import {
-  addUiResourceOptionDocument,
   commitProjectGitVersion,
   createProject,
   loadJsonFile,
@@ -12,16 +11,12 @@ import {
   migrateProjectDocument,
   parsePdoAdvancedProject,
   parseProjectDocument,
-  parseUiResources,
-  parseUiResourcesWithProjectPath,
-  removeUiResourceOptionDocument,
   reviewProjectGitChanges,
   reviewProjectGitRevision,
   revealItemInDir,
   saveJsonFile,
   saveProject,
   saveProjectAs,
-  updateUiResourceDocument,
   validateProjectDocument,
 } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
@@ -53,7 +48,11 @@ import {
   TableFormatReference,
   useTableConfigController,
 } from '../features/table-config';
-import { UiCanvasPreview } from '../components/UiCanvasPreview';
+import {
+  UiResourcePage,
+  uiResourcePreviewDocument,
+  useUiResourceController,
+} from '../features/ui-resource';
 import { featureModules } from '../data/modules';
 import { getTestData, type TestDataType } from '../data/test-data';
 import { useCanTestData } from '../hooks/useCanTestData';
@@ -82,8 +81,6 @@ import type {
   PdoAdvancedParseReport,
   ProjectParseReport,
   ProjectSummary,
-  UiResourceParseReport,
-  UiResourceUpdateRequest,
 } from '../types/platform';
 import {
   cloneJson,
@@ -130,57 +127,6 @@ function saveRecentProjects(projects: RecentProject[]) {
   );
 }
 
-const previewDocument = {
-  ui_info: {
-    logo: {
-      name: 'logo',
-      x: 0,
-      y: 0,
-      w: 240,
-      h: 80,
-      handle: 'show',
-      default_option: 0,
-      dest: 'logo',
-      option: ['image/logo.png'],
-    },
-    main: {
-      item: {
-        speed: {
-          name: '速度表',
-          x: 64,
-          y: 96,
-          w: 180,
-          h: 120,
-          handle: 'list',
-          default_option: 0,
-          dest: ['speed_0', 'speed_1'],
-          option: [{ list: ['image/main/speed_0.png', 'image/main/speed_1.png'] }],
-        },
-        gear: {
-          name: '档位动画',
-          x: 300,
-          y: 104,
-          w: 160,
-          h: 96,
-          handle: 'anim',
-          default_option: 0,
-          dest: 'gear',
-          option: [
-            { base_name: 'image/anim/gear_', start_index: 0, total: 6, reserved: 2, type: 'png' },
-          ],
-        },
-      },
-    },
-  },
-  pdo_simple_send_recv: { pdo_send: [], pdo_recv: [] },
-  pdo_global_param: [],
-  pdo_condition: [],
-  pdo_recv: [],
-  pdo_send: [],
-  sdo_info: { type: 0, user_auth: 0, name_index: 0, name: 'root', children: [] },
-  language_info: { list_code_language: ['zh'], list_inner: [], list_translate: {} },
-};
-
 export function Dashboard({
   activeModule,
   loadedProject,
@@ -189,7 +135,6 @@ export function Dashboard({
   onNavigate,
   onProjectLoaded,
 }: DashboardProps) {
-  const [uiPreview, setUiPreview] = useState<UiResourceParseReport | null>(null);
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [baselineDocument, setBaselineDocument] = useState<unknown | null>(null);
@@ -205,9 +150,6 @@ export function Dashboard({
   const [openError, setOpenError] = useState<string | null>(null);
   const [projectParseReport, setProjectParseReport] = useState<ProjectParseReport | null>(null);
   const [isOpening, setIsOpening] = useState(false);
-  const [uiApplyError, setUiApplyError] = useState<string | null>(null);
-  const [isApplyingUi, setIsApplyingUi] = useState(false);
-  const [showCanvasLabels, setShowCanvasLabels] = useState(true);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [savingProjectAction, setSavingProjectAction] = useState<'save' | 'saveAs' | null>(null);
@@ -263,7 +205,7 @@ export function Dashboard({
     },
   });
   const projectExport = useProjectExport({
-    document: loadedProject?.document ?? previewDocument,
+    document: loadedProject?.document ?? uiResourcePreviewDocument,
     projectPath: loadedProject?.summary.path,
     exportOptions: exportBatteryOptions,
   });
@@ -278,9 +220,9 @@ export function Dashboard({
     loadedProject,
     applyLoadedProject,
   });
+  const uiResource = useUiResourceController({ loadedProject, applyLoadedProject });
 
   useEffect(() => {
-    void parseUiPreview(previewDocument).then(setUiPreview);
     const storedProjects = loadRecentProjects();
     setRecentProjects(storedProjects);
     setProjectPath(storedProjects[0]?.path ?? '');
@@ -378,13 +320,6 @@ export function Dashboard({
       acceptLoadedProject({ ...loadedProject, document }, projectPath);
     }
   }, [loadedProject]);
-
-  function parseUiPreview(document: unknown, path?: string) {
-    if (path) {
-      return parseUiResourcesWithProjectPath({ project_path: path, document });
-    }
-    return parseUiResources(document);
-  }
 
   function activeJsonEditorKey() {
     return jsonEditorKeyForModule(activeModule.key, { realtimeMode: pdoEditor.mode });
@@ -715,7 +650,7 @@ export function Dashboard({
         undefined,
         trackedDocumentSections,
       );
-      void parseUiPreview(document, loadedProject.summary.path).then(setUiPreview);
+      void uiResource.refreshPreview(document, loadedProject.summary.path);
       closeGitReview();
       setSaveStatus(
         `已载入 Git 版本 ${snapshot.revision.short_hash}，保存后将形成新的修改。`,
@@ -857,11 +792,10 @@ export function Dashboard({
       setRefactorConfigPath(null);
       setRefactorConfigStatus(null);
       acceptLoadedProject(nextProject, selected);
-      const nextPreview = await parseUiPreview(
+      await uiResource.refreshPreview(
         nextProject.document,
         nextProject.summary.path ?? selected,
       );
-      setUiPreview(nextPreview);
     } catch (error) {
       setOpenError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -881,9 +815,7 @@ export function Dashboard({
         nextProject.summary.path ?? path,
       );
       acceptLoadedProject(mountedProject, path);
-      void parseUiPreview(mountedProject.document, mountedProject.summary.path ?? path).then(
-        setUiPreview,
-      );
+      void uiResource.refreshPreview(mountedProject.document, mountedProject.summary.path ?? path);
     } catch (error) {
       setOpenError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -967,8 +899,7 @@ export function Dashboard({
         validation: migrated.validation,
         document: migrated.document,
       });
-      const nextPreview = await parseUiPreview(migrated.document, loadedProject.summary.path);
-      setUiPreview(nextPreview);
+      await uiResource.refreshPreview(migrated.document, loadedProject.summary.path);
       void protocolEditor.refreshUnifiedProtocol(migrated.document);
       setSaveStatus(`已规范化：${migrated.migrated_version}`);
     } catch (error) {
@@ -1161,11 +1092,10 @@ export function Dashboard({
         setRefactorConfigPath(null);
         setRefactorConfigStatus(null);
       }
-      const nextPreview = await parseUiPreview(
+      await uiResource.refreshPreview(
         report.project.document,
         report.project.summary.path ?? selected,
       );
-      setUiPreview(nextPreview);
       const copiedText = `已复制 ${report.copied_resources.length} 个资源`;
       const warningText = report.warnings.length > 0 ? `，${report.warnings.length} 个警告` : '';
       setSaveStatus(`已另存为：${selected}（${copiedText}${warningText}）`);
@@ -1204,106 +1134,6 @@ export function Dashboard({
     }
   }
 
-  async function applyUiResourceDocument(nextDocument: unknown) {
-    if (!loadedProject) return;
-
-    const nextProject = { ...loadedProject, document: nextDocument };
-    applyLoadedProject(nextProject);
-    const nextPreview = await parseUiPreview(nextDocument, loadedProject.summary.path);
-    setUiPreview(nextPreview);
-  }
-
-  async function handleApplyUiResource(resource: Omit<UiResourceUpdateRequest, 'document'>) {
-    if (!loadedProject) return;
-
-    setIsApplyingUi(true);
-    setUiApplyError(null);
-
-    try {
-      const report = await updateUiResourceDocument({
-        document: loadedProject.document,
-        ...resource,
-      });
-
-      if (!report.valid) {
-        setUiApplyError(report.errors.join('；') || 'UI 资源写回失败');
-        return;
-      }
-
-      await applyUiResourceDocument(report.document);
-    } catch (error) {
-      setUiApplyError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsApplyingUi(false);
-    }
-  }
-
-  async function handleSelectUiOptionSources(): Promise<string[]> {
-    setUiApplyError(null);
-
-    if (!isTauriRuntime()) {
-      setUiApplyError('系统文件选择器只能在 Tauri 桌面应用中使用。');
-      return [];
-    }
-
-    const selected = await open({
-      multiple: true,
-      filters: [{ name: '图片资源', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }],
-    });
-
-    if (Array.isArray(selected)) return selected;
-    if (typeof selected === 'string') return [selected];
-    return [];
-  }
-
-  async function handleAddUiOption(key: string, sources: string[]) {
-    if (!loadedProject) return;
-
-    setIsApplyingUi(true);
-    setUiApplyError(null);
-
-    try {
-      const report = await addUiResourceOptionDocument({
-        document: loadedProject.document,
-        key,
-        sources,
-      });
-      if (!report.valid) {
-        setUiApplyError(report.errors.join('；') || 'UI 资源选项新增失败');
-        return;
-      }
-      await applyUiResourceDocument(report.document);
-    } catch (error) {
-      setUiApplyError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsApplyingUi(false);
-    }
-  }
-
-  async function handleRemoveUiOption(key: string, optionIndex: number) {
-    if (!loadedProject) return;
-
-    setIsApplyingUi(true);
-    setUiApplyError(null);
-
-    try {
-      const report = await removeUiResourceOptionDocument({
-        document: loadedProject.document,
-        key,
-        option_index: optionIndex,
-      });
-      if (!report.valid) {
-        setUiApplyError(report.errors.join('；') || 'UI 资源选项删除失败');
-        return;
-      }
-      await applyUiResourceDocument(report.document);
-    } catch (error) {
-      setUiApplyError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setIsApplyingUi(false);
-    }
-  }
-
   function handleJumpToPdo(pdoParamIndex: number) {
     pdoEditor.focusPdoParam(pdoParamIndex);
     onNavigate('realtime-data');
@@ -1328,7 +1158,7 @@ export function Dashboard({
         isExportingTable={tableConfig.isExporting}
         generatingTestKey={generatingTestKey}
         pdoMode={pdoEditor.mode}
-        showCanvasLabels={showCanvasLabels}
+        showCanvasLabels={uiResource.showCanvasLabels}
         showJsonEditor={showJsonEditor}
         gitStatus={gitStatus}
         gitBusy={gitBusy}
@@ -1345,7 +1175,7 @@ export function Dashboard({
         onImportTable={tableConfig.importTable}
         onExportTable={tableConfig.exportTable}
         onRequestTestData={setConfirmGenerateType}
-        onToggleCanvasLabels={() => setShowCanvasLabels((visible) => !visible)}
+        onToggleCanvasLabels={uiResource.toggleCanvasLabels}
         onToggleJsonEditor={() => setShowJsonEditor((visible) => !visible)}
         onRefreshGit={refreshProjectGit}
         onOpenGitReview={openGitReview}
@@ -1579,20 +1409,11 @@ export function Dashboard({
         ) : null}
 
         {activeModule.key === 'ui' ? (
-          <>
-            <UiCanvasPreview
-              canApply={Boolean(loadedProject)}
-              isApplying={isApplyingUi}
-              showCanvasLabels={showCanvasLabels}
-              onAddOption={handleAddUiOption}
-              onApply={handleApplyUiResource}
-              onJumpToPdo={handleJumpToPdo}
-              onRemoveOption={handleRemoveUiOption}
-              onSelectOptionSources={handleSelectUiOptionSources}
-              report={uiPreview}
-            />
-            {uiApplyError ? <p className="ui-preview-errors">{uiApplyError}</p> : null}
-          </>
+          <UiResourcePage
+            controller={uiResource}
+            loadedProject={loadedProject}
+            onJumpToPdo={handleJumpToPdo}
+          />
         ) : null}
         {activeModule.key === 'settings' ? (
           <SettingsPage

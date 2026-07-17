@@ -2182,6 +2182,25 @@ body.git-review-open {
   color: var(--color-primary);
 }
 
+.breadcrumb-group--link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.breadcrumb-group--link:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-group--link:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .breadcrumb-sep {
   color: var(--color-text-muted);
   opacity: 0.5;

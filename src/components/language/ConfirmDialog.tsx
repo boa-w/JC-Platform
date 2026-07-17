@@ -1,3 +1,6 @@
+import { useId, useRef } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
+
 interface ConfirmDialogProps {
   title: string;
   message: string;
@@ -20,10 +23,14 @@ export function ConfirmDialog({
   const titleId = useId();
   const messageId = useId();
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    cancelButtonRef.current?.focus();
-  }, []);
+  useDialogFocus({
+    active: true,
+    containerRef: dialogRef,
+    initialFocusRef: cancelButtonRef,
+    onEscape: onCancel,
+  });
 
   return (
     <div className="modal-overlay">
@@ -32,9 +39,7 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
         aria-modal="true"
         className="modal-box"
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') onCancel();
-        }}
+        ref={dialogRef}
         role="dialog"
       >
         <h3 id={titleId}>{title}</h3>
@@ -60,4 +65,3 @@ export function ConfirmDialog({
     </div>
   );
 }
-import { useEffect, useId, useRef } from 'react';

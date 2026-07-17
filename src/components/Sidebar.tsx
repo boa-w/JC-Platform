@@ -10,12 +10,14 @@ import {
   PlugZap,
   Settings2,
   Sun,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APP_RELEASES_URL, APP_VERSION } from '../constants/app';
 import { findGroupForKey, navGroups } from '../data/navigation';
 import { useAppUpdate } from '../hooks/useAppUpdate';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import type {
   BackendHealth,
   FeatureModule,
@@ -78,6 +80,14 @@ export function Sidebar({
 
   const [showPopup, setShowPopup] = useState(false);
   const popupRef = useRef<HTMLDivElement | null>(null);
+  const aboutTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const popupCloseRef = useRef<HTMLButtonElement | null>(null);
+  useDialogFocus({
+    active: showPopup,
+    containerRef: popupRef,
+    initialFocusRef: popupCloseRef,
+    onEscape: () => setShowPopup(false),
+  });
   const {
     status: updateStatus,
     updateInfo,
@@ -118,7 +128,11 @@ export function Sidebar({
   }
 
   const handleClickOutside = useCallback((event: MouseEvent) => {
-    if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+    if (
+      popupRef.current &&
+      !popupRef.current.contains(event.target as Node) &&
+      !aboutTriggerRef.current?.contains(event.target as Node)
+    ) {
       setShowPopup(false);
     }
   }, []);
@@ -204,7 +218,9 @@ export function Sidebar({
           onClick={() => setShowPopup((v) => !v)}
           title="软件版本信息"
           aria-label="软件版本信息"
+          aria-controls="version-info-popup"
           aria-expanded={showPopup}
+          ref={aboutTriggerRef}
         >
           <span className="activity-icon-glyph" aria-hidden="true">
             <Info size={18} strokeWidth={1.8} />
@@ -227,16 +243,26 @@ export function Sidebar({
       </div>
 
       {showPopup ? (
-        <div className="version-popup" ref={popupRef}>
+        <div
+          aria-labelledby="version-info-title"
+          className="version-popup"
+          id="version-info-popup"
+          ref={popupRef}
+          role="dialog"
+        >
           <div className="version-popup-header">
-            <span className="version-popup-title">版本信息</span>
+            <span className="version-popup-title" id="version-info-title">
+              版本信息
+            </span>
             <button
               className="version-popup-close"
               type="button"
               onClick={() => setShowPopup(false)}
-              aria-label="关闭"
+              aria-label="关闭版本信息"
+              ref={popupCloseRef}
+              title="关闭版本信息"
             >
-              ✕
+              <X aria-hidden="true" size={16} />
             </button>
           </div>
           <div className="version-popup-body">

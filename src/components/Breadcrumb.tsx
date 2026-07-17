@@ -19,12 +19,25 @@ export function Breadcrumb({ activeKey, modules, onNavigate }: BreadcrumbProps) 
   if (!group) return null;
 
   const currentModule = modules.find((m) => m.key === activeKey);
+  const groupEntryKey = group.keys[0];
 
   return (
     <nav className="breadcrumb" aria-label="导航路径">
-      <span className="breadcrumb-group">{group.label}</span>
+      {groupEntryKey === activeKey ? (
+        <span className="breadcrumb-group">{group.label}</span>
+      ) : (
+        <button
+          className="breadcrumb-group breadcrumb-group--link"
+          onClick={() => onNavigate(groupEntryKey)}
+          type="button"
+        >
+          {group.label}
+        </button>
+      )}
       <span className="breadcrumb-sep">/</span>
-      <span className="breadcrumb-current">{currentModule?.title ?? activeKey}</span>
+      <span aria-current="page" className="breadcrumb-current">
+        {currentModule?.title ?? activeKey}
+      </span>
       {lifecycleLabel(currentModule?.lifecycle) ? (
         <span
           className={`module-lifecycle-badge module-lifecycle-badge--${currentModule?.lifecycle}`}
