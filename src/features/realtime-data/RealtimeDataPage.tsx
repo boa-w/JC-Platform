@@ -1,6 +1,7 @@
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useId, useRef, useState } from 'react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
+import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { JsonPath } from '../../utils/projectDirty';
 import { formatFrameId, formatFrameIdPadded, type PdoEditorController } from './usePdoEditor';
 
@@ -69,6 +70,31 @@ export function RealtimeDataPage({
   const advancedPdoDrawerCloseRef = useRef<HTMLButtonElement | null>(null);
   const advancedPdoDrawerRef = useRef<HTMLElement | null>(null);
   const advancedPdoDrawerTitleId = useId();
+  const stableKeys = useStableCollectionKeys();
+  const globalParamKeys = stableKeys(
+    'pdo-global-params',
+    currentPdoAdvancedDocument?.pdo_global_param ?? [],
+  );
+  const conditionKeys = stableKeys(
+    'pdo-conditions',
+    currentPdoAdvancedDocument?.pdo_condition ?? [],
+  );
+  const simpleFrameKeys = stableKeys(
+    `pdo-simple-frames-${selectedRealtimeKind}`,
+    realtimeFrames(selectedRealtimeKind),
+  );
+  const simpleSignalKeys = stableKeys(
+    `pdo-simple-signals-${selectedRealtimeKind}-${selectedRealtimeFrameId ?? 'none'}`,
+    activeRealtimeFrame?.data ?? [],
+  );
+  const advancedFrameKeys = stableKeys(
+    `pdo-advanced-frames-${selectedRealtimeKind}`,
+    advancedFrames(selectedRealtimeKind),
+  );
+  const advancedSignalKeys = stableKeys(
+    `pdo-advanced-signals-${selectedRealtimeKind}-${selectedAdvancedFrameId ?? 'none'}`,
+    activeAdvancedFrame?.data ?? [],
+  );
 
   useDialogFocus({
     active: advancedPdoDrawerOpen,
@@ -121,7 +147,7 @@ export function RealtimeDataPage({
                       ? 'config-entry-modified'
                       : undefined
                   }
-                  key={`global-${index}`}
+                  key={globalParamKeys[index]}
                 >
                   <td>{index + 1}</td>
                   <td>
@@ -198,57 +224,61 @@ export function RealtimeDataPage({
             新增
           </button>
         </div>
-        {(currentPdoAdvancedDocument?.pdo_condition ?? []).map((condition, conditionIndex) => (
-          <div className="legacy-condition-row" key={`condition-${conditionIndex}`}>
-            <label>
-              参数 ID
-              <input
-                value={condition.param_id}
-                onChange={(event) =>
-                  updatePdoCondition(conditionIndex, 'param_id', event.target.value)
-                }
-              />
-            </label>
-            <label>
-              处理方式
-              <input
-                type="number"
-                value={condition.process}
-                onChange={(event) =>
-                  updatePdoCondition(conditionIndex, 'process', Number(event.target.value))
-                }
-              />
-            </label>
-            <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">
-              新增输入
-            </button>
-            <button
-              className="danger"
-              onClick={() => removePdoCondition(conditionIndex)}
-              type="button"
-            >
-              删除条件
-            </button>
-            {condition.data.map((input, inputIndex) => (
-              <label key={`condition-input-${conditionIndex}-${inputIndex}`}>
-                输入参数
+        {(currentPdoAdvancedDocument?.pdo_condition ?? []).map((condition, conditionIndex) => {
+          const conditionKey = conditionKeys[conditionIndex];
+          const inputKeys = stableKeys(`pdo-condition-inputs-${conditionKey}`, condition.data);
+          return (
+            <div className="legacy-condition-row" key={conditionKey}>
+              <label>
+                参数 ID
                 <input
-                  value={input.param_id}
+                  value={condition.param_id}
                   onChange={(event) =>
-                    updatePdoConditionInput(conditionIndex, inputIndex, event.target.value)
+                    updatePdoCondition(conditionIndex, 'param_id', event.target.value)
                   }
                 />
-                <button
-                  className="danger"
-                  onClick={() => removePdoConditionInput(conditionIndex, inputIndex)}
-                  type="button"
-                >
-                  删除
-                </button>
               </label>
-            ))}
-          </div>
-        ))}
+              <label>
+                处理方式
+                <input
+                  type="number"
+                  value={condition.process}
+                  onChange={(event) =>
+                    updatePdoCondition(conditionIndex, 'process', Number(event.target.value))
+                  }
+                />
+              </label>
+              <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">
+                新增输入
+              </button>
+              <button
+                className="danger"
+                onClick={() => removePdoCondition(conditionIndex)}
+                type="button"
+              >
+                删除条件
+              </button>
+              {condition.data.map((input, inputIndex) => (
+                <label key={inputKeys[inputIndex]}>
+                  输入参数
+                  <input
+                    value={input.param_id}
+                    onChange={(event) =>
+                      updatePdoConditionInput(conditionIndex, inputIndex, event.target.value)
+                    }
+                  />
+                  <button
+                    className="danger"
+                    onClick={() => removePdoConditionInput(conditionIndex, inputIndex)}
+                    type="button"
+                  >
+                    删除
+                  </button>
+                </label>
+              ))}
+            </div>
+          );
+        })}
       </section>
     );
   }
@@ -518,7 +548,7 @@ export function RealtimeDataPage({
                     return (
                       <tr
                         className={isModifiedPath(framePath) ? 'config-entry-modified' : undefined}
-                        key={`${selectedRealtimeKind}-frame-${index}`}
+                        key={simpleFrameKeys[index]}
                       >
                         <td>{index + 1}</td>
                         <td>
@@ -618,7 +648,7 @@ export function RealtimeDataPage({
                             .filter(Boolean)
                             .join(' ') || undefined
                         }
-                        key={`${activeRealtimeFrame.id}-${index}`}
+                        key={simpleSignalKeys[index]}
                         ref={
                           isJumpTarget
                             ? (element) => {
@@ -773,7 +803,7 @@ export function RealtimeDataPage({
                             ? 'config-entry-modified'
                             : undefined
                         }
-                        key={`advanced-frame-${selectedRealtimeKind}-${index}`}
+                        key={advancedFrameKeys[index]}
                       >
                         <td>{index + 1}</td>
                         <td>
@@ -863,7 +893,7 @@ export function RealtimeDataPage({
                             ? 'config-entry-modified'
                             : undefined
                         }
-                        key={`advanced-signal-${index}`}
+                        key={advancedSignalKeys[index]}
                       >
                         <td>{index + 1}</td>
                         <td>

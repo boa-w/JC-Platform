@@ -1,6 +1,7 @@
-import type { SignalDefinition } from '../../types/platform';
 import { ListTree } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
+import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
+import type { SignalDefinition } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
 import type { ProtocolEditorController } from './useProtocolEditor';
 
@@ -23,6 +24,8 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
     removeSignalDefinition,
     restoreSignalDictionaryFromUnified,
   } = controller;
+  const stableKeys = useStableCollectionKeys();
+  const signalKeys = stableKeys('signal-dictionary', currentSignalDictionary.signals);
 
   return (
     <section className="project-open-card">
@@ -107,7 +110,7 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
                         ? 'config-entry-modified'
                         : undefined
                     }
-                    key={`${signal.signal_id}-${signalIndex}`}
+                    key={signalKeys[signalIndex]}
                   >
                     <td>
                       <input

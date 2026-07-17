@@ -1,5 +1,6 @@
-import type { LoadedProject } from '../../types/platform';
 import { EmptyState } from '../../components/EmptyState';
+import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
+import type { LoadedProject } from '../../types/platform';
 import type { BatteryLegacyController } from './useBatteryLegacyController';
 
 interface BatteryLegacyPageProps {
@@ -40,6 +41,15 @@ export function BatteryProtocolPage({ loadedProject, controller }: BatteryLegacy
     isModifiedPath,
     restoreModifiedPath,
   } = controller;
+  const stableKeys = useStableCollectionKeys();
+  const frameKeys = stableKeys(
+    'battery-protocol-frames',
+    currentBatteryProtocolDocument?.frames ?? [],
+  );
+  const signalKeys = stableKeys(
+    'battery-protocol-signals',
+    currentBatteryProtocolDocument?.signals ?? [],
+  );
 
   return (
     <section className="table-spec-card">
@@ -158,7 +168,7 @@ export function BatteryProtocolPage({ loadedProject, controller }: BatteryLegacy
                     ? 'pdo-frame-card battery-frame-card config-entry-modified'
                     : 'pdo-frame-card battery-frame-card'
                 }
-                key={`${frame.frame_key}-${frameIndex}`}
+                key={frameKeys[frameIndex]}
               >
                 <div className="battery-frame-grid">
                   <label title="帧的唯一标识键名，用于信号和显示项引用">
@@ -273,7 +283,7 @@ export function BatteryProtocolPage({ loadedProject, controller }: BatteryLegacy
                           ? 'config-entry-modified'
                           : undefined
                       }
-                      key={`${signal.signal_key}-${signalIndex}`}
+                      key={signalKeys[signalIndex]}
                     >
                       <td>
                         <input
@@ -475,6 +485,8 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryLegacyP
     isModifiedPath,
     restoreModifiedPath,
   } = controller;
+  const stableKeys = useStableCollectionKeys();
+  const itemKeys = stableKeys('battery-monitor-items', currentBatteryMonitorDocument?.items ?? []);
 
   return (
     <section className="table-spec-card">
@@ -599,7 +611,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryLegacyP
                           ? 'config-entry-modified'
                           : undefined
                       }
-                      key={`${item.item_key}-${itemIndex}`}
+                      key={itemKeys[itemIndex]}
                     >
                       <td>
                         <input

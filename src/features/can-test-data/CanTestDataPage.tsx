@@ -1,6 +1,7 @@
 import { FileDown, FileUp, WandSparkles } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
 import type { useCanTestData } from '../../hooks/useCanTestData';
+import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { CanTestProfile, LoadedProject } from '../../types/platform';
 
 type CanTestDataController = ReturnType<typeof useCanTestData>;
@@ -11,6 +12,13 @@ interface CanTestDataPageProps {
 }
 
 export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageProps) {
+  const stableKeys = useStableCollectionKeys();
+  const settingEntryKeys = stableKeys(
+    'can-test-setting-entries',
+    canTestData.canTestSettingEntries,
+  );
+  const frameKeys = stableKeys('can-test-frames', canTestData.canTestFrames);
+
   return (
     <section className="table-spec-card">
       <div>
@@ -167,7 +175,7 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                     </thead>
                     <tbody>
                       {canTestData.canTestSettingEntries.map((entry, entryIndex) => (
-                        <tr key={`${entry.index}-${entry.subindex}-${entry.role}-${entryIndex}`}>
+                        <tr key={settingEntryKeys[entryIndex]}>
                           <td>{entry.name}</td>
                           <td>{entry.menuPath || '-'}</td>
                           <td>
@@ -232,111 +240,115 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                   全 FF
                 </button>
               </div>
-              {canTestData.canTestFrames.map((frame, frameIndex) => (
-                <section className="pdo-frame-section" key={`${frame.id}-${frameIndex}`}>
-                  <div className="pdo-frame-card">
-                    <div className="pdo-frame-grid">
-                      <div className="pdo-frame-field">
-                        CAN ID
-                        <code style={{ fontSize: '1.1em' }}>
-                          0x{frame.id.toString(16).toUpperCase().padStart(3, '0')}
-                        </code>
-                      </div>
-                      <div className="pdo-frame-field">
-                        类型<span>{frame.frameType === 0 ? '标准帧' : '扩展帧'}</span>
-                      </div>
-                      <label>
-                        名称
-                        <input
-                          value={frame.name}
-                          onChange={(e) =>
-                            canTestData.updateFrame(frameIndex, 'name', e.target.value)
-                          }
-                        />
-                      </label>
-                      <div className="pdo-frame-field">
-                        场景<span>{frame.scenario ?? 'manual'}</span>
-                      </div>
-                      <div className="pdo-frame-field">
-                        来源<span>{frame.source ?? '-'}</span>
-                      </div>
-                      <div className="pdo-frame-field">
-                        DLC<span>{frame.dlc}</span>
-                      </div>
-                      <label>
-                        周期(ms)
-                        <input
-                          type="number"
-                          style={{ width: 80 }}
-                          value={frame.cycleMs}
-                          onChange={(e) =>
-                            canTestData.updateFrame(frameIndex, 'cycleMs', Number(e.target.value))
-                          }
-                        />
-                      </label>
-                      <div className="pdo-frame-field">
-                        HEX<code style={{ fontSize: '0.85em' }}>{frame.data}</code>
+              {canTestData.canTestFrames.map((frame, frameIndex) => {
+                const frameKey = frameKeys[frameIndex];
+                const signalKeys = stableKeys(`can-test-signals-${frameKey}`, frame.signals);
+                return (
+                  <section className="pdo-frame-section" key={frameKey}>
+                    <div className="pdo-frame-card">
+                      <div className="pdo-frame-grid">
+                        <div className="pdo-frame-field">
+                          CAN ID
+                          <code style={{ fontSize: '1.1em' }}>
+                            0x{frame.id.toString(16).toUpperCase().padStart(3, '0')}
+                          </code>
+                        </div>
+                        <div className="pdo-frame-field">
+                          类型<span>{frame.frameType === 0 ? '标准帧' : '扩展帧'}</span>
+                        </div>
+                        <label>
+                          名称
+                          <input
+                            value={frame.name}
+                            onChange={(e) =>
+                              canTestData.updateFrame(frameIndex, 'name', e.target.value)
+                            }
+                          />
+                        </label>
+                        <div className="pdo-frame-field">
+                          场景<span>{frame.scenario ?? 'manual'}</span>
+                        </div>
+                        <div className="pdo-frame-field">
+                          来源<span>{frame.source ?? '-'}</span>
+                        </div>
+                        <div className="pdo-frame-field">
+                          DLC<span>{frame.dlc}</span>
+                        </div>
+                        <label>
+                          周期(ms)
+                          <input
+                            type="number"
+                            style={{ width: 80 }}
+                            value={frame.cycleMs}
+                            onChange={(e) =>
+                              canTestData.updateFrame(frameIndex, 'cycleMs', Number(e.target.value))
+                            }
+                          />
+                        </label>
+                        <div className="pdo-frame-field">
+                          HEX<code style={{ fontSize: '0.85em' }}>{frame.data}</code>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  {frame.signals.length > 0 ? (
-                    <div className="config-table-frame" style={{ marginTop: 6 }}>
-                      <table className="config-table">
-                        <thead>
-                          <tr>
-                            <th>信号名称</th>
-                            <th>值</th>
-                            <th>单位</th>
-                            <th>位置</th>
-                            <th>长度</th>
-                            <th>缩放</th>
-                            <th>偏移</th>
-                            <th>范围</th>
-                            <th>角色</th>
-                            <th>原始值</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {frame.signals.map((sig, sigIndex) => (
-                            <tr key={`${sig.name}-${sigIndex}`}>
-                              <td>{sig.name}</td>
-                              <td>
-                                <input
-                                  type="number"
-                                  step={sig.scaleDen > 1 ? 1 / sig.scaleDen : 'any'}
-                                  style={{ width: 90 }}
-                                  value={sig.displayValue}
-                                  onChange={(e) =>
-                                    canTestData.updateSignalDisplayValue(
-                                      frameIndex,
-                                      sigIndex,
-                                      Number(e.target.value),
-                                    )
-                                  }
-                                />
-                              </td>
-                              <td>{sig.unit}</td>
-                              <td>{sig.pos}</td>
-                              <td>{sig.len}</td>
-                              <td>
-                                {sig.scaleNum}/{sig.scaleDen}
-                              </td>
-                              <td>{sig.offset}</td>
-                              <td>
-                                {sig.minValue ?? '-'} / {sig.maxValue ?? '-'}
-                              </td>
-                              <td>{sig.testRole ?? 'manual'}</td>
-                              <td>
-                                <code>0x{sig.rawValue.toString(16).toUpperCase()}</code>
-                              </td>
+                    {frame.signals.length > 0 ? (
+                      <div className="config-table-frame" style={{ marginTop: 6 }}>
+                        <table className="config-table">
+                          <thead>
+                            <tr>
+                              <th>信号名称</th>
+                              <th>值</th>
+                              <th>单位</th>
+                              <th>位置</th>
+                              <th>长度</th>
+                              <th>缩放</th>
+                              <th>偏移</th>
+                              <th>范围</th>
+                              <th>角色</th>
+                              <th>原始值</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                </section>
-              ))}
+                          </thead>
+                          <tbody>
+                            {frame.signals.map((sig, sigIndex) => (
+                              <tr key={signalKeys[sigIndex]}>
+                                <td>{sig.name}</td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    step={sig.scaleDen > 1 ? 1 / sig.scaleDen : 'any'}
+                                    style={{ width: 90 }}
+                                    value={sig.displayValue}
+                                    onChange={(e) =>
+                                      canTestData.updateSignalDisplayValue(
+                                        frameIndex,
+                                        sigIndex,
+                                        Number(e.target.value),
+                                      )
+                                    }
+                                  />
+                                </td>
+                                <td>{sig.unit}</td>
+                                <td>{sig.pos}</td>
+                                <td>{sig.len}</td>
+                                <td>
+                                  {sig.scaleNum}/{sig.scaleDen}
+                                </td>
+                                <td>{sig.offset}</td>
+                                <td>
+                                  {sig.minValue ?? '-'} / {sig.maxValue ?? '-'}
+                                </td>
+                                <td>{sig.testRole ?? 'manual'}</td>
+                                <td>
+                                  <code>0x{sig.rawValue.toString(16).toUpperCase()}</code>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+                  </section>
+                );
+              })}
             </>
           ) : canTestData.canTestStatus?.startsWith('已生成') ? null : (
             <EmptyState icon={WandSparkles}>

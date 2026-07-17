@@ -1,6 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useStableCollectionKeys } from '../hooks/useStableCollectionKeys';
 import type {
   ParsedResourceOption,
   ParsedUiResource,
@@ -87,6 +88,11 @@ export function UiCanvasPreview({
   const logoResource = draftResources.find((resource) => resource.key === parsedLogoKey) ?? null;
   const mainResources = draftResources.filter((resource) => parsedMainKeys.has(resource.key));
   const selected = draftResources.find((resource) => resource.key === selectedResourceKey) ?? null;
+  const stableKeys = useStableCollectionKeys();
+  const selectedOptionKeys = stableKeys(
+    `ui-resource-options-${selectedResourceKey ?? 'none'}`,
+    selected?.options ?? [],
+  );
   const width = Math.max(480, ...draftResources.map((item) => item.x + item.width));
   const height = Math.max(272, ...draftResources.map((item) => item.y + item.height));
   const scale = Math.min(1, 760 / width);
@@ -358,7 +364,7 @@ export function UiCanvasPreview({
                     return (
                       <article
                         className={`ui-option-card ${isSelectedOption ? 'selected' : ''}`}
-                        key={`${selected.key}-${index}`}
+                        key={selectedOptionKeys[index]}
                       >
                         <button
                           className="ui-option-preview"
@@ -464,7 +470,7 @@ export function UiCanvasPreview({
                         value={selected.default_option}
                       >
                         {selected.options.map((option, index) => (
-                          <option key={`${selected.key}-select-${index}`} value={index}>
+                          <option key={selectedOptionKeys[index]} value={index}>
                             {optionTitle(option, index)}
                           </option>
                         ))}

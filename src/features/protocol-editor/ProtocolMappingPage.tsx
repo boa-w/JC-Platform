@@ -1,5 +1,6 @@
 import { Workflow } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
+import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { ProtocolMappingTarget } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
 import { formatFrameId } from '../realtime-data/usePdoEditor';
@@ -23,6 +24,14 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
     applyUnifiedTopology,
     flattenUnifiedProtocol: handleFlattenUnifiedProtocol,
   } = controller;
+  const stableKeys = useStableCollectionKeys();
+  const mappingKeys = stableKeys('protocol-mappings', currentProtocolMappings);
+  const pdoOverviewFrames = unifiedProtocol
+    ? [...unifiedProtocol.canopen.pdo_recv, ...unifiedProtocol.canopen.pdo_send]
+    : [];
+  const pdoOverviewKeys = stableKeys('protocol-overview-pdo', pdoOverviewFrames);
+  const privateOverviewFrames = unifiedProtocol?.private_protocol.frames ?? [];
+  const privateOverviewKeys = stableKeys('protocol-overview-private', privateOverviewFrames);
 
   return (
     <section className="project-open-card">
@@ -134,7 +143,7 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
                           ? 'config-entry-modified'
                           : undefined
                       }
-                      key={`protocol-mapping-${mappingIndex}`}
+                      key={mappingKeys[mappingIndex]}
                     >
                       <td>
                         <input
@@ -335,12 +344,14 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
             <div className="config-table-toolbar">
               <strong>CANopen PDO</strong>
             </div>
-            {[...unifiedProtocol.canopen.pdo_recv, ...unifiedProtocol.canopen.pdo_send].map(
-              (frame, frameIndex) => (
-                <article
-                  className="pdo-frame-card"
-                  key={`overview-pdo-${frame.direction}-${frame.frame_id}-${frameIndex}`}
-                >
+            {pdoOverviewFrames.map((frame, frameIndex) => {
+              const frameKey = pdoOverviewKeys[frameIndex];
+              const frameMappingKeys = stableKeys(
+                `protocol-overview-pdo-${frameKey}`,
+                frame.mappings,
+              );
+              return (
+                <article className="pdo-frame-card" key={frameKey}>
                   <div className="pdo-frame-grid">
                     <label>
                       方向
@@ -367,9 +378,7 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
                       </thead>
                       <tbody>
                         {frame.mappings.map((mapping, mappingIndex) => (
-                          <tr
-                            key={`pdo-map-${frame.frame_id}-${mapping.signal_id}-${mappingIndex}`}
-                          >
+                          <tr key={frameMappingKeys[mappingIndex]}>
                             <td>
                               <code>{mapping.signal_id}</code>
                             </td>
@@ -382,60 +391,62 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
                     </table>
                   </div>
                 </article>
-              ),
-            )}
+              );
+            })}
           </section>
           <section className="pdo-frame-section">
             <div className="config-table-toolbar">
               <strong>私有协议帧</strong>
             </div>
-            {unifiedProtocol.private_protocol.frames.map((frame, frameIndex) => (
-              <article
-                className="pdo-frame-card"
-                key={`overview-private-${frame.frame_key}-${frameIndex}`}
-              >
-                <div className="pdo-frame-grid">
-                  <label>
-                    帧 Key
-                    <input readOnly value={frame.frame_key || '-'} />
-                  </label>
-                  <label>
-                    帧 ID
-                    <input readOnly value={formatFrameId(frame.frame_id)} />
-                  </label>
-                  <label>
-                    名称
-                    <input readOnly value={frame.name || '-'} />
-                  </label>
-                </div>
-                <div className="config-table-frame">
-                  <table className="config-table">
-                    <thead>
-                      <tr>
-                        <th>Signal ID</th>
-                        <th>Bit Offset</th>
-                        <th>Bit Length</th>
-                        <th>字节序</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {frame.payload.map((mapping, mappingIndex) => (
-                        <tr
-                          key={`private-map-${frame.frame_key}-${mapping.signal_id}-${mappingIndex}`}
-                        >
-                          <td>
-                            <code>{mapping.signal_id}</code>
-                          </td>
-                          <td>{mapping.bit_offset}</td>
-                          <td>{mapping.bit_length}</td>
-                          <td>{mapping.byte_order}</td>
+            {privateOverviewFrames.map((frame, frameIndex) => {
+              const frameKey = privateOverviewKeys[frameIndex];
+              const payloadKeys = stableKeys(
+                `protocol-overview-private-${frameKey}`,
+                frame.payload,
+              );
+              return (
+                <article className="pdo-frame-card" key={frameKey}>
+                  <div className="pdo-frame-grid">
+                    <label>
+                      帧 Key
+                      <input readOnly value={frame.frame_key || '-'} />
+                    </label>
+                    <label>
+                      帧 ID
+                      <input readOnly value={formatFrameId(frame.frame_id)} />
+                    </label>
+                    <label>
+                      名称
+                      <input readOnly value={frame.name || '-'} />
+                    </label>
+                  </div>
+                  <div className="config-table-frame">
+                    <table className="config-table">
+                      <thead>
+                        <tr>
+                          <th>Signal ID</th>
+                          <th>Bit Offset</th>
+                          <th>Bit Length</th>
+                          <th>字节序</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
-            ))}
+                      </thead>
+                      <tbody>
+                        {frame.payload.map((mapping, mappingIndex) => (
+                          <tr key={payloadKeys[mappingIndex]}>
+                            <td>
+                              <code>{mapping.signal_id}</code>
+                            </td>
+                            <td>{mapping.bit_offset}</td>
+                            <td>{mapping.bit_length}</td>
+                            <td>{mapping.byte_order}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </article>
+              );
+            })}
           </section>
         </>
       ) : (

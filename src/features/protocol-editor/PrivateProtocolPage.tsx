@@ -1,7 +1,8 @@
 import { RadioTower } from 'lucide-react';
 import { EmptyState } from '../../components/EmptyState';
-import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
+import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { JsonPath } from '../../utils/projectDirty';
+import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
 import type { ProtocolEditorController } from './useProtocolEditor';
 
 interface PrivateProtocolPageProps {
@@ -32,6 +33,8 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
     importPrivateProtocol: handleImportPrivateProtocol,
     restorePrivateProtocolFromUnified,
   } = controller;
+  const stableKeys = useStableCollectionKeys();
+  const frameKeys = stableKeys('private-protocol-frames', currentPrivateProtocol.frames);
 
   return (
     <section className="project-open-card">
@@ -121,215 +124,217 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
               <strong>{unifiedProtocol.validation.valid ? '通过' : '存在错误'}</strong>
             </article>
           </div>
-          {currentPrivateProtocol.frames.map((frame, frameIndex) => (
-            <article
-              className={
-                isModifiedPath(['private_protocol', 'frames', frameIndex])
-                  ? 'pdo-frame-card config-entry-modified'
-                  : 'pdo-frame-card'
-              }
-              key={`private-protocol-${frame.frame_key}-${frameIndex}`}
-            >
-              <div className="pdo-frame-header">
-                <div className="pdo-frame-grid">
-                  <label>
-                    帧 Key
-                    <input
-                      value={frame.frame_key || ''}
-                      onChange={(event) =>
-                        updatePrivateFrame(frameIndex, (item) => ({
-                          ...item,
-                          frame_key: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    帧 ID
-                    <input
-                      inputMode="text"
-                      value={formatFrameId(frame.frame_id)}
-                      onChange={(event) => {
-                        const nextId = parseFrameId(event.target.value);
-                        if (nextId !== null)
+          {currentPrivateProtocol.frames.map((frame, frameIndex) => {
+            const frameKey = frameKeys[frameIndex];
+            const payloadKeys = stableKeys(`private-protocol-payload-${frameKey}`, frame.payload);
+            return (
+              <article
+                className={
+                  isModifiedPath(['private_protocol', 'frames', frameIndex])
+                    ? 'pdo-frame-card config-entry-modified'
+                    : 'pdo-frame-card'
+                }
+                key={frameKey}
+              >
+                <div className="pdo-frame-header">
+                  <div className="pdo-frame-grid">
+                    <label>
+                      帧 Key
+                      <input
+                        value={frame.frame_key || ''}
+                        onChange={(event) =>
                           updatePrivateFrame(frameIndex, (item) => ({
                             ...item,
-                            frame_id: nextId,
-                          }));
-                      }}
-                    />
-                  </label>
+                            frame_key: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      帧 ID
+                      <input
+                        inputMode="text"
+                        value={formatFrameId(frame.frame_id)}
+                        onChange={(event) => {
+                          const nextId = parseFrameId(event.target.value);
+                          if (nextId !== null)
+                            updatePrivateFrame(frameIndex, (item) => ({
+                              ...item,
+                              frame_id: nextId,
+                            }));
+                        }}
+                      />
+                    </label>
+                    <label>
+                      名称
+                      <input
+                        value={frame.name || ''}
+                        onChange={(event) =>
+                          updatePrivateFrame(frameIndex, (item) => ({
+                            ...item,
+                            name: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="pdo-frame-actions">
+                    <button
+                      className="danger"
+                      onClick={() => removePrivateFrame(frameIndex)}
+                      type="button"
+                    >
+                      删除帧
+                    </button>
+                  </div>
+                </div>
+                <div className="private-frame-props">
                   <label>
-                    名称
-                    <input
-                      value={frame.name || ''}
+                    帧类型
+                    <select
+                      value={frame.frame_type}
                       onChange={(event) =>
                         updatePrivateFrame(frameIndex, (item) => ({
                           ...item,
-                          name: event.target.value,
+                          frame_type: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="standard">标准帧</option>
+                      <option value="extended">扩展帧</option>
+                    </select>
+                  </label>
+                  <label>
+                    周期/超时
+                    <input
+                      type="number"
+                      value={frame.cycle_ms}
+                      onChange={(event) =>
+                        updatePrivateFrame(frameIndex, (item) => ({
+                          ...item,
+                          cycle_ms: Number(event.target.value),
                         }))
                       }
                     />
                   </label>
+                  <label>
+                    校验
+                    <select
+                      value={frame.checksum}
+                      onChange={(event) =>
+                        updatePrivateFrame(frameIndex, (item) => ({
+                          ...item,
+                          checksum: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="none">无</option>
+                      <option value="crc">CRC</option>
+                      <option value="xor">XOR</option>
+                    </select>
+                  </label>
+                  <label>
+                    字节序
+                    <select
+                      value={frame.byte_order}
+                      onChange={(event) =>
+                        updatePrivateFrame(frameIndex, (item) => ({
+                          ...item,
+                          byte_order: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="little">Little-Endian</option>
+                      <option value="big">Big-Endian</option>
+                    </select>
+                  </label>
                 </div>
-                <div className="pdo-frame-actions">
-                  <button
-                    className="danger"
-                    onClick={() => removePrivateFrame(frameIndex)}
-                    type="button"
-                  >
-                    删除帧
+                <div className="config-table-toolbar">
+                  <span>载荷 Signal（{frame.payload.length}）</span>
+                  <button onClick={() => addPrivatePayload(frameIndex)} type="button">
+                    新增载荷
                   </button>
                 </div>
-              </div>
-              <div className="private-frame-props">
-                <label>
-                  帧类型
-                  <select
-                    value={frame.frame_type}
-                    onChange={(event) =>
-                      updatePrivateFrame(frameIndex, (item) => ({
-                        ...item,
-                        frame_type: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="standard">标准帧</option>
-                    <option value="extended">扩展帧</option>
-                  </select>
-                </label>
-                <label>
-                  周期/超时
-                  <input
-                    type="number"
-                    value={frame.cycle_ms}
-                    onChange={(event) =>
-                      updatePrivateFrame(frameIndex, (item) => ({
-                        ...item,
-                        cycle_ms: Number(event.target.value),
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  校验
-                  <select
-                    value={frame.checksum}
-                    onChange={(event) =>
-                      updatePrivateFrame(frameIndex, (item) => ({
-                        ...item,
-                        checksum: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="none">无</option>
-                    <option value="crc">CRC</option>
-                    <option value="xor">XOR</option>
-                  </select>
-                </label>
-                <label>
-                  字节序
-                  <select
-                    value={frame.byte_order}
-                    onChange={(event) =>
-                      updatePrivateFrame(frameIndex, (item) => ({
-                        ...item,
-                        byte_order: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="little">Little-Endian</option>
-                    <option value="big">Big-Endian</option>
-                  </select>
-                </label>
-              </div>
-              <div className="config-table-toolbar">
-                <span>载荷 Signal（{frame.payload.length}）</span>
-                <button onClick={() => addPrivatePayload(frameIndex)} type="button">
-                  新增载荷
-                </button>
-              </div>
-              <div className="config-table-frame">
-                <table className="config-table">
-                  <thead>
-                    <tr>
-                      <th>Signal ID</th>
-                      <th>Bit Offset</th>
-                      <th>Bit Length</th>
-                      <th>字节序</th>
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {frame.payload.map((mapping, mappingIndex) => (
-                      <tr
-                        key={`private-payload-${frame.frame_key}-${mapping.signal_id}-${mappingIndex}`}
-                      >
-                        <td>
-                          <input
-                            value={mapping.signal_id}
-                            onChange={(event) =>
-                              updatePrivatePayload(frameIndex, mappingIndex, (item) => ({
-                                ...item,
-                                signal_id: event.target.value,
-                              }))
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={mapping.bit_offset}
-                            onChange={(event) =>
-                              updatePrivatePayload(frameIndex, mappingIndex, (item) => ({
-                                ...item,
-                                bit_offset: Number(event.target.value),
-                              }))
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            value={mapping.bit_length}
-                            onChange={(event) =>
-                              updatePrivatePayload(frameIndex, mappingIndex, (item) => ({
-                                ...item,
-                                bit_length: Number(event.target.value),
-                              }))
-                            }
-                          />
-                        </td>
-                        <td>
-                          <select
-                            value={mapping.byte_order}
-                            onChange={(event) =>
-                              updatePrivatePayload(frameIndex, mappingIndex, (item) => ({
-                                ...item,
-                                byte_order: event.target.value,
-                              }))
-                            }
-                          >
-                            <option value="little">little</option>
-                            <option value="big">big</option>
-                          </select>
-                        </td>
-                        <td>
-                          <button
-                            className="danger"
-                            onClick={() => removePrivatePayload(frameIndex, mappingIndex)}
-                            type="button"
-                          >
-                            删除
-                          </button>
-                        </td>
+                <div className="config-table-frame">
+                  <table className="config-table">
+                    <thead>
+                      <tr>
+                        <th>Signal ID</th>
+                        <th>Bit Offset</th>
+                        <th>Bit Length</th>
+                        <th>字节序</th>
+                        <th>操作</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </article>
-          ))}
+                    </thead>
+                    <tbody>
+                      {frame.payload.map((mapping, mappingIndex) => (
+                        <tr key={payloadKeys[mappingIndex]}>
+                          <td>
+                            <input
+                              value={mapping.signal_id}
+                              onChange={(event) =>
+                                updatePrivatePayload(frameIndex, mappingIndex, (item) => ({
+                                  ...item,
+                                  signal_id: event.target.value,
+                                }))
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              value={mapping.bit_offset}
+                              onChange={(event) =>
+                                updatePrivatePayload(frameIndex, mappingIndex, (item) => ({
+                                  ...item,
+                                  bit_offset: Number(event.target.value),
+                                }))
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              value={mapping.bit_length}
+                              onChange={(event) =>
+                                updatePrivatePayload(frameIndex, mappingIndex, (item) => ({
+                                  ...item,
+                                  bit_length: Number(event.target.value),
+                                }))
+                              }
+                            />
+                          </td>
+                          <td>
+                            <select
+                              value={mapping.byte_order}
+                              onChange={(event) =>
+                                updatePrivatePayload(frameIndex, mappingIndex, (item) => ({
+                                  ...item,
+                                  byte_order: event.target.value,
+                                }))
+                              }
+                            >
+                              <option value="little">little</option>
+                              <option value="big">big</option>
+                            </select>
+                          </td>
+                          <td>
+                            <button
+                              className="danger"
+                              onClick={() => removePrivatePayload(frameIndex, mappingIndex)}
+                              type="button"
+                            >
+                              删除
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            );
+          })}
         </>
       ) : (
         <EmptyState icon={RadioTower}>请先打开项目并刷新私有协议。</EmptyState>
