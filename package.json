@@ -17,7 +17,10 @@
     "version:sync": "node scripts/sync-version.mjs",
     "format": "biome format --write .",
     "lint": "biome lint . --max-diagnostics=500",
-    "lint:fix": "biome check --write ."
+    "lint:fix": "biome check --write .",
+    "test:frontend": "node --test --experimental-strip-types tests/useStableCollectionKeys.test.ts",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "verify": "npm run lint && npm run test:frontend && npm run build && npm run test:rust"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",

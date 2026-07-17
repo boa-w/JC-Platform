@@ -22,8 +22,37 @@ env:
   NIGHTLY_TAG: nightly
 
 jobs:
+  quality:
+    name: Quality gate
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Verify application
+        run: npm run verify
+
   prepare-nightly:
     name: Prepare nightly release
+    needs:
+      - quality
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     outputs:
@@ -76,8 +105,9 @@ jobs:
   build:
     name: Build (${{ matrix.label }})
     needs:
+      - quality
       - prepare-nightly
-    if: always() && (github.event_name != 'push' || github.ref == 'refs/heads/main')
+    if: always() && needs.quality.result == 'success' && (github.event_name != 'push' || github.ref == 'refs/heads/main')
     strategy:
       fail-fast: false
       matrix:
@@ -111,7 +141,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Setup Rust
