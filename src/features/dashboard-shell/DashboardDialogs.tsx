@@ -27,7 +27,7 @@ interface DashboardDialogsProps {
   onCancelTestData: () => void;
   onConfirmTestData: () => void;
   onCancelClose: () => void;
-  onConfirmClose: () => void;
+  onConfirmClose: () => void | Promise<void>;
 }
 
 export function DashboardDialogs({

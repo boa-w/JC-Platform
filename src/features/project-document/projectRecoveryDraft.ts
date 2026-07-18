@@ -1,3 +1,5 @@
+import type { ProjectRecoveryDraft } from '../../types/platform';
+
 const recoveryDraftStorageKey = 'jc-custom-platform.projectRecoveryDraft';
 const recoveryDraftSchemaVersion = 1;
 
@@ -5,14 +7,6 @@ export interface RecoveryDraftStorage {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
   removeItem: (key: string) => void;
-}
-
-export interface ProjectRecoveryDraft {
-  schemaVersion: number;
-  projectPath: string;
-  projectName: string;
-  savedAt: string;
-  document: unknown;
 }
 
 function browserStorage(): RecoveryDraftStorage | null {
@@ -42,20 +36,23 @@ export function readProjectRecoveryDraft(storage = browserStorage()) {
   }
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as Partial<ProjectRecoveryDraft>;
-    if (
-      parsed.schemaVersion !== recoveryDraftSchemaVersion ||
-      typeof parsed.projectPath !== 'string' ||
-      typeof parsed.projectName !== 'string' ||
-      typeof parsed.savedAt !== 'string' ||
-      !('document' in parsed)
-    ) {
-      return null;
-    }
-    return parsed as ProjectRecoveryDraft;
+    const parsed: unknown = JSON.parse(raw);
+    return isProjectRecoveryDraft(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+export function isProjectRecoveryDraft(value: unknown): value is ProjectRecoveryDraft {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const draft = value as Partial<ProjectRecoveryDraft>;
+  return (
+    draft.schemaVersion === recoveryDraftSchemaVersion &&
+    typeof draft.projectPath === 'string' &&
+    typeof draft.projectName === 'string' &&
+    typeof draft.savedAt === 'string' &&
+    'document' in draft
+  );
 }
 
 export function writeProjectRecoveryDraft(

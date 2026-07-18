@@ -14,3 +14,4 @@ pub mod csv_excel;
 pub mod file_system;
 pub mod git;
 pub mod json_store;
+pub mod recovery;

@@ -34,6 +34,7 @@ import type {
   PdoSimpleImportReport,
   ProjectExportReport,
   ProjectParseReport,
+  ProjectRecoveryDraft,
   ProjectSummary,
   ProjectValidationReport,
   ProtocolCompatibilityReport,
@@ -310,6 +311,18 @@ export async function saveTranslationCredentials(
 
 export async function clearTranslationCredentials(): Promise<void> {
   return invoke<void>('clear_translation_credentials');
+}
+
+export async function loadProjectRecoveryDraft(): Promise<ProjectRecoveryDraft | null> {
+  return invoke<ProjectRecoveryDraft | null>('load_project_recovery_draft');
+}
+
+export async function saveProjectRecoveryDraft(draft: ProjectRecoveryDraft): Promise<void> {
+  return invoke<void>('save_project_recovery_draft', { draft });
+}
+
+export async function clearProjectRecoveryDraft(projectPath?: string): Promise<boolean> {
+  return invoke<boolean>('clear_project_recovery_draft', { projectPath: projectPath ?? null });
 }
 
 export async function pdoSimpleDocumentTable(document: unknown): Promise<TableDocument> {

@@ -17,6 +17,13 @@ https://github.com/boa-w/JC-Platform/releases/download/nightly/latest.json
 
 两个通道不会互相回退，避免稳定版用户被引导到预发布版本。
 
+## 未保存修改保护
+
+桌面端会把未保存项目的恢复草稿写入 Tauri 应用数据目录下的
+`recovery/project-draft.json`，不受 WebView `localStorage` 容量限制。草稿通过同目录临时文件
+原子替换，且在更新重启前强制等待最新草稿落盘；写入失败时取消重启。
+旧版保存在 `localStorage` 的草稿会在项目首次打开时自动迁移并删除明文副本。
+
 ## 版本来源
 
 `package.json` 是版本号的主来源。发布前先修改 `package.json` 的 `version`，

@@ -545,6 +545,14 @@ export interface SaveTranslationCredentialsRequest {
   appKey: string | null;
 }
 
+export interface ProjectRecoveryDraft {
+  schemaVersion: number;
+  projectPath: string;
+  projectName: string;
+  savedAt: string;
+  document: unknown;
+}
+
 export interface BaiduTranslateResponse {
   translations: string[];
 }

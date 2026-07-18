@@ -1,5 +1,5 @@
+export type { ProjectRecoveryDraft } from '../../types/platform';
 export {
-  type ProjectRecoveryDraft,
   readProjectRecoveryDraft,
   removeProjectRecoveryDraft,
   sameProjectPath,

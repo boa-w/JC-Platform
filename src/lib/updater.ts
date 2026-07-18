@@ -20,7 +20,7 @@ export interface CheckUpdateOptions {
 }
 
 export interface InstallUpdateOptions {
-  onBeforeRelaunch?: () => void;
+  onBeforeRelaunch?: () => void | Promise<void>;
   onProgress?: (progress: UpdateProgress) => void;
   onRelaunchError?: () => void;
 }
@@ -87,7 +87,7 @@ export async function installAppUpdate(options: InstallUpdateOptions = {}): Prom
       options.onProgress?.({ downloaded, total });
     });
 
-    options.onBeforeRelaunch?.();
+    await options.onBeforeRelaunch?.();
     await relaunch();
     return true;
   } catch (error) {

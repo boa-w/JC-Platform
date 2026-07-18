@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  isProjectRecoveryDraft,
   type RecoveryDraftStorage,
   readProjectRecoveryDraft,
   removeProjectRecoveryDraft,
@@ -69,6 +70,17 @@ test('rejects malformed drafts and normalizes path separators', () => {
   assert.equal(sameProjectPath('D:\\projects\\meter.jcpro', 'D:/projects/meter.jcpro'), true);
   assert.equal(sameProjectPath('D:\\Projects\\METER.jcpro', 'd:/projects/meter.jcpro'), true);
   assert.equal(sameProjectPath('/Projects/Meter.jcpro', '/projects/meter.jcpro'), false);
+  assert.equal(isProjectRecoveryDraft({ schemaVersion: 0 }), false);
+  assert.equal(
+    isProjectRecoveryDraft({
+      schemaVersion: 1,
+      projectPath: '/projects/meter.jcpro',
+      projectName: 'Meter',
+      savedAt: '2026-07-18T00:00:00.000Z',
+      document: {},
+    }),
+    true,
+  );
 });
 
 test('degrades safely when recovery storage is unavailable', () => {

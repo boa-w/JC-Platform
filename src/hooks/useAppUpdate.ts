@@ -13,7 +13,7 @@ type UpdateStatus =
   | 'error';
 
 interface UseAppUpdateOptions {
-  onBeforeRelaunch?: () => void;
+  onBeforeRelaunch?: () => void | Promise<void>;
   onRelaunchError?: () => void;
 }
 

@@ -20,14 +20,15 @@ export function ProjectRecoveryDialog({
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const dismissRef = useRef<HTMLButtonElement | null>(null);
-  const { candidate, isRestoring, restoreError } = controller;
+  const { candidate, isDiscarding, isRestoring, restoreError } = controller;
+  const isBusy = isDiscarding || isRestoring;
 
   useDialogFocus({
     active: Boolean(candidate),
     containerRef: dialogRef,
     initialFocusRef: dismissRef,
     onEscape: () => {
-      if (!isRestoring) controller.dismissCandidate();
+      if (!isBusy) controller.dismissCandidate();
     },
   });
 
@@ -57,7 +58,7 @@ export function ProjectRecoveryDialog({
         <div className="modal-actions">
           <button
             className="modal-btn-cancel"
-            disabled={isRestoring}
+            disabled={isBusy}
             onClick={controller.dismissCandidate}
             ref={dismissRef}
             type="button"
@@ -66,15 +67,15 @@ export function ProjectRecoveryDialog({
           </button>
           <button
             className="modal-btn-confirm modal-btn-danger"
-            disabled={isRestoring}
-            onClick={controller.discardCandidate}
+            disabled={isBusy}
+            onClick={() => void controller.discardCandidate()}
             type="button"
           >
-            放弃草稿
+            {isDiscarding ? '删除中...' : '放弃草稿'}
           </button>
           <button
             className="modal-btn-confirm"
-            disabled={isRestoring}
+            disabled={isBusy}
             onClick={() => void controller.restoreCandidate()}
             type="button"
           >

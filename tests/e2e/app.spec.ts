@@ -156,7 +156,7 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
       metadata: { currentWindow: { label: 'main' } },
       transformCallback: () => 1,
       unregisterCallback: () => undefined,
-      invoke: async (command: string) => {
+      invoke: async (command: string, args?: Record<string, unknown>) => {
         const updateCalls = (window as unknown as { __UPDATE_CALLS__?: string[] }).__UPDATE_CALLS__;
         if (command.startsWith('plugin:updater|') || command === 'plugin:process|restart') {
           updateCalls?.push(command);
@@ -177,6 +177,26 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
         }
         if (command === 'plugin:updater|download_and_install') return null;
         if (command === 'plugin:process|restart') return null;
+        if (command === 'load_project_recovery_draft') {
+          return (window as unknown as { __RECOVERY_DRAFT__: Record<string, unknown> | null })
+            .__RECOVERY_DRAFT__;
+        }
+        if (command === 'save_project_recovery_draft') {
+          updateCalls?.push(command);
+          if ((window as unknown as { __FAIL_RECOVERY_SAVE__: boolean }).__FAIL_RECOVERY_SAVE__) {
+            throw new Error('recovery storage unavailable');
+          }
+          (
+            window as unknown as { __RECOVERY_DRAFT__: Record<string, unknown> | null }
+          ).__RECOVERY_DRAFT__ = (args?.draft as Record<string, unknown>) ?? null;
+          return null;
+        }
+        if (command === 'clear_project_recovery_draft') {
+          (
+            window as unknown as { __RECOVERY_DRAFT__: Record<string, unknown> | null }
+          ).__RECOVERY_DRAFT__ = null;
+          return true;
+        }
         if (command === 'load_project') {
           return {
             summary: {
@@ -213,6 +233,10 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
       },
     };
     (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__ = [];
+    (window as unknown as { __FAIL_RECOVERY_SAVE__: boolean }).__FAIL_RECOVERY_SAVE__ = false;
+    (
+      window as unknown as { __RECOVERY_DRAFT__: Record<string, unknown> | null }
+    ).__RECOVERY_DRAFT__ = null;
     (window as unknown as { __TAURI_INTERNALS__: typeof internals }).__TAURI_INTERNALS__ =
       internals;
   }, projectPath);
@@ -235,7 +259,17 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
   ).toBeEnabled();
   expect(
     await page.evaluate(() => localStorage.getItem('jc-custom-platform.projectRecoveryDraft')),
-  ).not.toBeNull();
+  ).toBeNull();
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __RECOVERY_DRAFT__: { document?: { project?: { revision?: number } } } | null;
+          }
+        ).__RECOVERY_DRAFT__?.document?.project?.revision,
+    ),
+  ).toBe(2);
 
   const beforeUpdateEventPrevented = await page.evaluate(() => {
     const event = new Event('beforeunload', { cancelable: true });
@@ -271,6 +305,25 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
   ).toBe(0);
 
   await aboutDialog.getByRole('button', { name: '安装更新' }).click();
+  await page.evaluate(() => {
+    (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__ = [];
+    (window as unknown as { __FAIL_RECOVERY_SAVE__: boolean }).__FAIL_RECOVERY_SAVE__ = true;
+  });
+  await updateDialog.getByRole('button', { name: '继续更新' }).click();
+  await expect(aboutDialog.getByText('无法安全保存恢复草稿，更新重启已取消。')).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__,
+    ),
+  ).not.toContain('plugin:process|restart');
+
+  await page.evaluate(() => {
+    (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__ = [];
+    (window as unknown as { __FAIL_RECOVERY_SAVE__: boolean }).__FAIL_RECOVERY_SAVE__ = false;
+  });
+  await aboutDialog.getByRole('button', { name: '检查更新' }).click();
+  await expect(installButton).toBeVisible();
+  await installButton.click();
   await updateDialog.getByRole('button', { name: '继续更新' }).click();
   await expect(aboutDialog.getByText('更新已安装，正在重启应用', { exact: true })).toBeVisible();
   expect(
@@ -278,7 +331,17 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
       () => (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__,
     ),
   ).toEqual(
-    expect.arrayContaining(['plugin:updater|download_and_install', 'plugin:process|restart']),
+    expect.arrayContaining([
+      'plugin:updater|download_and_install',
+      'save_project_recovery_draft',
+      'plugin:process|restart',
+    ]),
+  );
+  const updateCalls = await page.evaluate(
+    () => (window as unknown as { __UPDATE_CALLS__: string[] }).__UPDATE_CALLS__,
+  );
+  expect(updateCalls.lastIndexOf('save_project_recovery_draft')).toBeLessThan(
+    updateCalls.indexOf('plugin:process|restart'),
   );
   const authorizedUpdateEventPrevented = await page.evaluate(() => {
     const event = new Event('beforeunload', { cancelable: true });
@@ -288,7 +351,7 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
   expect(authorizedUpdateEventPrevented).toBe(false);
   expect(
     await page.evaluate(() => localStorage.getItem('jc-custom-platform.projectRecoveryDraft')),
-  ).not.toBeNull();
+  ).toBeNull();
 
   await page.keyboard.press('Escape');
   await expect(aboutDialog).toBeHidden();

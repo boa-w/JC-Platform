@@ -46,7 +46,7 @@ interface SidebarProps {
   health: BackendHealth | null;
   project: ProjectSummary | null;
   hasUnsavedChanges: boolean;
-  onBeforeUpdateRelaunch: () => void;
+  onBeforeUpdateRelaunch: () => void | Promise<void>;
   onUpdateRelaunchError: () => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;

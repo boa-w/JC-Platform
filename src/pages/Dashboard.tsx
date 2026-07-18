@@ -146,6 +146,7 @@ interface DashboardProps {
   onToggleTheme: () => void;
   onNavigate: (key: NavigationKey) => void;
   onUnsavedChangesChange: (hasChanges: boolean) => void;
+  onRecoveryDraftFlushChange: (handler: () => Promise<boolean>) => void;
   isUpdateRelaunchAuthorized: () => boolean;
   onProjectLoaded: (project: LoadedProject) => void;
 }
@@ -160,6 +161,7 @@ export function Dashboard({
   onToggleTheme,
   onNavigate,
   onUnsavedChangesChange,
+  onRecoveryDraftFlushChange,
   isUpdateRelaunchAuthorized,
   onProjectLoaded,
 }: DashboardProps) {
@@ -267,6 +269,11 @@ export function Dashboard({
       projectLifecycle.setSaveStatus('已恢复异常退出前的未保存修改。');
     },
   });
+
+  useEffect(() => {
+    onRecoveryDraftFlushChange(projectRecovery.persistCurrentDraft);
+    return () => onRecoveryDraftFlushChange(async () => true);
+  }, [onRecoveryDraftFlushChange, projectRecovery.persistCurrentDraft]);
   useDesktopProjectShortcuts({
     canSave: hasUnsavedChanges && Boolean(loadedProject?.summary.path),
     canSaveAs: Boolean(loadedProject?.summary.path),
@@ -481,10 +488,10 @@ export function Dashboard({
         onCancelTestData={() => setConfirmGenerateType(null)}
         onConfirmTestData={confirmGenerateTestData}
         onCancelClose={() => setShowCloseConfirm(false)}
-        onConfirmClose={() => {
+        onConfirmClose={async () => {
           setShowCloseConfirm(false);
-          projectRecovery.clearCurrentDraft(loadedProject?.summary.path);
-          void getCurrentWindow().destroy();
+          const cleared = await projectRecovery.clearCurrentDraft(loadedProject?.summary.path);
+          if (cleared !== null) await getCurrentWindow().destroy();
         }}
       />
 

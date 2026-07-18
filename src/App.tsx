@@ -17,6 +17,7 @@ export default function App() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const updateRelaunchAuthorizedRef = useRef(false);
+  const recoveryDraftFlushRef = useRef<() => Promise<boolean>>(async () => true);
   const workspaceId = useId();
   const [, startNavigationTransition] = useTransition();
   const { theme, toggleTheme } = useTheme();
@@ -35,8 +36,16 @@ export default function App() {
     startNavigationTransition(() => setActiveKey(key));
   }
 
-  const authorizeUpdateRelaunch = useCallback(() => {
+  const authorizeUpdateRelaunch = useCallback(async () => {
+    const persisted = await recoveryDraftFlushRef.current();
+    if (!persisted) {
+      throw new Error('无法安全保存恢复草稿，更新重启已取消。');
+    }
     updateRelaunchAuthorizedRef.current = true;
+  }, []);
+
+  const updateRecoveryDraftFlush = useCallback((handler: () => Promise<boolean>) => {
+    recoveryDraftFlushRef.current = handler;
   }, []);
 
   const clearUpdateRelaunchAuthorization = useCallback(() => {
@@ -74,6 +83,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
         onNavigate={navigate}
         onUnsavedChangesChange={setHasUnsavedChanges}
+        onRecoveryDraftFlushChange={updateRecoveryDraftFlush}
         isUpdateRelaunchAuthorized={isUpdateRelaunchAuthorized}
         onProjectLoaded={(nextProject) => {
           setLoadedProject(nextProject);

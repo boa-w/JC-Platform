@@ -50,6 +50,7 @@ use crate::infrastructure::git::{
     GitProjectStatus, GitReviewReport, GitRevision, GitRevisionSnapshot,
 };
 use crate::infrastructure::json_store;
+use crate::infrastructure::recovery::{self, ProjectRecoveryDraft};
 use can_dbc::{ByteOrder, Dbc, MessageId, NumericValue, ValueType};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -543,6 +544,53 @@ pub async fn clear_translation_credentials() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(credentials::clear_translation_credentials)
         .await
         .map_err(|error| format!("清空翻译凭据任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn load_project_recovery_draft(
+    app: tauri::AppHandle,
+) -> Result<Option<ProjectRecoveryDraft>, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve application data directory: {error}"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        recovery::load_project_recovery_draft(&app_data_dir)
+    })
+    .await
+    .map_err(|error| format!("Recovery draft read task failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn save_project_recovery_draft(
+    app: tauri::AppHandle,
+    draft: ProjectRecoveryDraft,
+) -> Result<(), String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve application data directory: {error}"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        recovery::save_project_recovery_draft(&app_data_dir, draft)
+    })
+    .await
+    .map_err(|error| format!("Recovery draft write task failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn clear_project_recovery_draft(
+    app: tauri::AppHandle,
+    project_path: Option<String>,
+) -> Result<bool, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve application data directory: {error}"))?;
+    tauri::async_runtime::spawn_blocking(move || {
+        recovery::clear_project_recovery_draft(&app_data_dir, project_path.as_deref())
+    })
+    .await
+    .map_err(|error| format!("Recovery draft cleanup task failed: {error}"))?
 }
 
 #[tauri::command]
