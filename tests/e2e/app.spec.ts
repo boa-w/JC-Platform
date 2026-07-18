@@ -46,6 +46,7 @@ test('navigates core workspaces without runtime errors', async ({ page }) => {
 });
 
 test('meets the serious accessibility baseline across primary surfaces', async ({ page }) => {
+  test.setTimeout(60_000);
   await expectNoSeriousAccessibilityViolations(page, '默认工作区');
 
   await page.getByRole('button', { name: '系统', exact: true }).click();
@@ -64,6 +65,84 @@ test('meets the serious accessibility baseline across primary surfaces', async (
   await page.getByRole('button', { name: '软件版本信息' }).click();
   await expect(page.getByRole('dialog', { name: '版本信息' })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, '深色版本信息弹层');
+});
+
+test('meets the serious accessibility baseline across every workspace', async ({ page }) => {
+  test.setTimeout(180_000);
+  const workspaceGroups = [
+    {
+      group: '项目',
+      modules: ['项目管理'],
+    },
+    {
+      group: '数据',
+      modules: ['设置数据', '实时数据'],
+    },
+    {
+      group: '协议',
+      modules: [
+        '业务信号字典',
+        '私有协议 实验/废弃',
+        '协议映射 实验',
+        'CANopen 导出 实验',
+        '锂电协议 实验/废弃',
+      ],
+    },
+    {
+      group: '配置',
+      modules: ['UI 资源编辑', '锂电监控显示 实验/废弃', '故障代码'],
+    },
+    {
+      group: '多国语言',
+      modules: ['多国语言'],
+    },
+    {
+      group: '输出',
+      modules: ['项目导出', 'CAN 测试数据构建'],
+    },
+    {
+      group: '系统',
+      modules: ['软件设置'],
+    },
+  ] as const;
+
+  for (const theme of ['light', 'dark'] as const) {
+    if ((await page.locator('html').getAttribute('data-theme')) !== theme) {
+      await page.getByRole('button', { name: '切换主题' }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    }
+
+    for (const { group, modules } of workspaceGroups) {
+      const groupButton = page.getByRole('button', { name: group, exact: true });
+      if ((await groupButton.getAttribute('aria-expanded')) !== 'true') {
+        await groupButton.click();
+      }
+      const navigation = page.getByRole('navigation', { name: `${group} 功能` });
+
+      for (const accessibleName of modules) {
+        await navigation.getByRole('button', { name: accessibleName, exact: true }).click();
+        const title = accessibleName.replace(/ (实验\/废弃|实验)$/, '');
+        await expect(page.getByRole('main', { name: title })).toBeVisible();
+        await expectNoSeriousAccessibilityViolations(
+          page,
+          `${theme === 'dark' ? '深色' : '浅色'}${title}工作区`,
+        );
+      }
+    }
+  }
+});
+
+test('honors the reduced motion preference', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.getByRole('button', { name: '系统', exact: true }).click();
+  await page.getByRole('button', { name: '恢复默认' }).click();
+
+  const dialog = page.getByRole('dialog', { name: '恢复导出默认设置？' });
+  await expect(dialog.locator('..')).toHaveCSS('animation-duration', '0.001s');
+  await expect(dialog.getByRole('button', { name: '取消' })).toHaveCSS(
+    'transition-duration',
+    '0.001s',
+  );
 });
 
 test('keeps the About dialog above the workspace and restores focus', async ({ page }) => {

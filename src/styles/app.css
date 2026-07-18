@@ -9,12 +9,14 @@
   --color-text-muted: #5b6b80;
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
+  --color-primary-solid: #2563eb;
+  --color-primary-solid-hover: #1d4ed8;
   --color-primary-light: #eff6ff;
   --color-primary-border: #bfdbfe;
   --color-accent: #0ea5e9;
   --color-success: #059669;
   --color-success-light: #ecfdf5;
-  --color-warning: #d97706;
+  --color-warning: #92400e;
   --color-warning-light: #fffbeb;
   --color-danger: #dc2626;
   --color-danger-light: #fef2f2;
@@ -41,7 +43,7 @@
   --tb-accent: #2563eb;
   --tb-accent-hover: #1d4ed8;
   --tb-success: #059669;
-  --tb-warning: #d97706;
+  --tb-warning: #92400e;
 
   color: var(--color-text);
   background: var(--color-bg);
@@ -62,6 +64,8 @@
   --color-text-muted: #a3a3a3;
   --color-primary: #409cff;
   --color-primary-hover: #5ba3ff;
+  --color-primary-solid: #0e639c;
+  --color-primary-solid-hover: #1177bb;
   --color-primary-light: rgba(55, 148, 255, 0.1);
   --color-primary-border: rgba(55, 148, 255, 0.25);
   --color-accent: #3794ff;
@@ -98,6 +102,23 @@ body {
   margin: 0;
   min-width: 1024px;
   min-height: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preferences must override component effects. */
+    animation-duration: 0.001s !important;
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preferences must override component effects. */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preferences must override component effects. */
+    scroll-behavior: auto !important;
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preferences must override component effects. */
+    transition-delay: 0s !important;
+    /* biome-ignore lint/complexity/noImportantStyles: User motion preferences must override component effects. */
+    transition-duration: 0.001s !important;
+  }
 }
 
 button {
@@ -894,10 +915,10 @@ body.git-review-open {
   align-items: center;
   gap: 5px;
   height: 32px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-primary-solid);
   border-radius: 5px;
   padding: 0 11px;
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: white;
   font-size: 12px;
   font-weight: 600;
@@ -905,7 +926,7 @@ body.git-review-open {
 }
 
 .git-review-commit-bar button:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
 }
 
 .git-review-commit-bar button:disabled {
@@ -1322,14 +1343,14 @@ body.git-review-open {
 }
 
 .lang-btn--primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-primary-solid);
+  border-color: var(--color-primary-solid);
   color: white;
 }
 
 .lang-btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
+  border-color: var(--color-primary-solid-hover);
   color: white;
 }
 
@@ -1488,8 +1509,8 @@ body.git-review-open {
 }
 
 .lang-code-badge--zh {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-primary-solid);
+  border-color: var(--color-primary-solid);
   color: white;
 }
 
@@ -1665,12 +1686,12 @@ body.git-review-open {
 }
 
 .modal-actions .modal-btn-confirm {
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: white;
 }
 
 .modal-actions .modal-btn-confirm:hover {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
 }
 
 .modal-actions .modal-btn-danger {
@@ -1893,11 +1914,11 @@ body.git-review-open {
 .module-lifecycle-badge {
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(232, 171, 83, 0.38);
+  border: 1px solid var(--color-primary-border);
   border-radius: 999px;
   padding: 0 5px;
-  color: var(--tb-warning);
-  background: rgba(232, 171, 83, 0.12);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
   font-size: 10px;
   line-height: 16px;
   font-weight: 500;
@@ -1905,16 +1926,20 @@ body.git-review-open {
 }
 
 .module-lifecycle-badge--experimental {
-  border-color: rgba(74, 144, 226, 0.35);
-  color: #4a90e2;
-  background: rgba(74, 144, 226, 0.12);
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+[data-theme="dark"] .module-lifecycle-badge--experimental {
+  color: #75b7ff;
 }
 
 .module-lifecycle-badge--deprecated,
 .module-lifecycle-badge--experimental-deprecated {
   border-color: rgba(232, 171, 83, 0.38);
-  color: var(--tb-warning);
-  background: rgba(232, 171, 83, 0.12);
+  color: var(--color-warning);
+  background: var(--color-warning-light);
 }
 
 /* ── Version Popup ── */
@@ -2361,7 +2386,7 @@ body.git-review-open {
   border: 0;
   border-radius: var(--radius-sm);
   padding: 7px 14px;
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: white;
   cursor: pointer;
   font-weight: 600;
@@ -2374,7 +2399,7 @@ body.git-review-open {
 .path-open-button:hover,
 .export-form button:hover,
 .recent-projects-panel button:hover {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
 }
 
 .sample-actions button {
@@ -2542,14 +2567,14 @@ body.git-review-open {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: white;
   white-space: nowrap;
   transition: background 0.15s;
 }
 
 .project-open-btn:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
 }
 
 .project-open-btn:disabled {
@@ -3471,14 +3496,14 @@ body.git-review-open {
 }
 
 .ui-editor-btn--primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-primary-solid);
+  border-color: var(--color-primary-solid);
   color: white;
 }
 
 .ui-editor-btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
+  border-color: var(--color-primary-solid-hover);
 }
 
 .ui-editor-btn--secondary {
@@ -3631,7 +3656,7 @@ body.git-review-open {
   border: 0;
   border-radius: var(--radius-sm);
   padding: 6px 12px;
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: white;
   cursor: pointer;
   font-weight: 600;
@@ -3642,7 +3667,7 @@ body.git-review-open {
 .config-table-toolbar button:hover,
 .structured-list button:hover,
 .config-table button:hover {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
 }
 
 /* ── Structured List ── */
@@ -4686,7 +4711,7 @@ body.git-review-open {
 
 [data-theme="dark"] .legacy-menu-item.active {
   background: rgba(55, 148, 255, 0.18);
-  color: var(--color-primary);
+  color: var(--color-primary-hover);
 }
 
 [data-theme="dark"] .legacy-menu-item.setting-menu-match:not(.active) {
@@ -5090,7 +5115,7 @@ body.git-review-open {
 }
 
 .fault-code-batch-mode button.active {
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: #ffffff;
 }
 
@@ -5182,7 +5207,7 @@ body.git-review-open {
 }
 
 [data-theme="dark"] .fault-code-batch-mode button.active {
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: #ffffff;
 }
 
@@ -5699,9 +5724,9 @@ body.git-review-open {
   gap: 7px;
   min-height: 34px;
   padding: 0 14px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-primary-solid);
   border-radius: var(--radius-sm);
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: white;
   font: inherit;
   font-size: 13px;
@@ -5710,8 +5735,8 @@ body.git-review-open {
 }
 
 .recovery-boundary-action:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
+  border-color: var(--color-primary-solid-hover);
 }
 
 .recovery-boundary-action:focus-visible {
@@ -6174,14 +6199,14 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border-color: var(--color-primary);
-  background: var(--color-primary);
+  border-color: var(--color-primary-solid);
+  background: var(--color-primary-solid);
   color: white;
 }
 
 .settings-credential-actions .settings-primary-action:hover:not(:disabled) {
-  border-color: var(--color-primary-hover);
-  background: var(--color-primary-hover);
+  border-color: var(--color-primary-solid-hover);
+  background: var(--color-primary-solid-hover);
   color: white;
 }
 
@@ -7103,12 +7128,12 @@ html {
 }
 
 .lang-btn--primary {
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: white;
 }
 
 .lang-btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-solid-hover);
 }
 
 .lang-btn--primary:disabled {
@@ -7274,7 +7299,7 @@ html {
 }
 
 .lang-view-toggle-btn.active {
-  background: var(--color-primary);
+  background: var(--color-primary-solid);
   color: white;
 }
 
