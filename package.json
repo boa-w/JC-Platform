@@ -24,6 +24,7 @@
     "lint:fix": "biome check --write .",
     "test:frontend": "node --test --experimental-strip-types tests/*.test.ts",
     "test:e2e": "playwright test",
+    "test:installer:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows-installer.ps1",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "verify": "npm run lint && npm run test:frontend && npm run build && npm run test:rust"
   },

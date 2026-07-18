@@ -227,6 +227,14 @@ jobs:
           updaterJsonPreferNsis: ${{ github.event_name != 'pull_request' }}
           args: --target ${{ matrix.target }} ${{ github.event_name == 'pull_request' && '--no-bundle' || '' }} ${{ github.event_name == 'push' && '--config src-tauri/tauri.nightly.conf.json' || '' }} ${{ github.event_name == 'release' && '--config src-tauri/tauri.updater.conf.json' || '' }}
 
+      - name: Smoke test Windows installer
+        if: startsWith(matrix.label, 'windows') && github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe" |
+            Select-Object -First 1 -ExpandProperty FullName
+          ./scripts/test-windows-installer.ps1 -InstallerPath $installer
+
       - name: Upload Windows workflow artifacts
         if: startsWith(matrix.label, 'windows') && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4

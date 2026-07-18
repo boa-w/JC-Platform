@@ -46,3 +46,13 @@ test('selects the matching updater config in the release workflow', () => {
   );
   assert.match(workflow, /APPLE_CERTIFICATE: \$\{\{ secrets\.APPLE_CERTIFICATE \}\}/);
 });
+
+test('smoke tests bundled Windows installers before publishing artifacts', () => {
+  const workflow = readFileSync('.github/workflows/build.yml', 'utf8');
+  assert.match(workflow, /- name: Smoke test Windows installer/);
+  assert.match(
+    workflow,
+    /if: startsWith\(matrix\.label, 'windows'\) && github\.event_name != 'pull_request'/,
+  );
+  assert.match(workflow, /\.\/scripts\/test-windows-installer\.ps1 -InstallerPath \$installer/);
+});
