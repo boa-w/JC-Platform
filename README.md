@@ -81,12 +81,20 @@ npm run test:installer:windows
 ```
 
 该测试会在临时目录静默安装应用，确认主进程能启动，然后静默卸载并校验安装目录已清理。
+如果 `previous-installer` 目录中有上一版 NSIS 安装包，可运行：
+
+```powershell
+npm run test:upgrade:windows
+```
+
+升级测试会验证旧版安装、新版覆盖升级、主程序替换和启动，并确认外部
+`.jcpro` 项目与 app-data 恢复草稿在升级和卸载后保持不变。
 
 ## CI 构建产物
 
 GitHub Actions 会构建 Windows 与 macOS 桌面应用：
 
-- Windows：冒烟验证 NSIS 安装、启动和卸载后，上传 `.msi` / `.exe` 安装包。
+- Windows：冒烟验证 NSIS 安装、启动和卸载；存在上一版 nightly 时追加跨版本升级回归，然后上传 `.msi` / `.exe` 安装包。
 - macOS：上传 `.dmg` / `.app` 产物。
 
 macOS CI 产物当前未签名，首次打开可能受 Gatekeeper 限制；正式分发前需要 Developer ID 签名和 notarization。

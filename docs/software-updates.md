@@ -110,10 +110,12 @@ App Store Connect API key 形式的 notarization 凭据。
    - 例如当前版本 `0.1.0`
    - nightly 版本会构建为 `0.1.1-<run_number>`
    - Windows MSI 要求预发布标识只能是 `0..65535` 的数字，因此 nightly 版本不使用 `nightly.<run_number>` 这种带字母的格式。
-2. 删除并重建固定 tag/release：`nightly`。
-3. 使用 updater 签名私钥构建 Windows/macOS 安装包。
-4. 由 `tauri-apps/tauri-action` 上传安装包和 `.sig`。
-5. `Normalize nightly assets` job 会把 action 上传的 `_0.1.1-xx_...` 资产重命名为
+2. 在删除旧 nightly 前保留上一版 Windows NSIS 安装包。
+3. 删除并重建固定 tag/release：`nightly`。
+4. 使用 updater 签名私钥构建 Windows/macOS 安装包。
+5. Windows 依次执行安装冒烟测试；有历史包时追加跨版本升级和数据保留回归。
+6. 由 `tauri-apps/tauri-action` 上传安装包和 `.sig`。
+7. `Normalize nightly assets` job 会把 action 上传的 `_0.1.1-xx_...` 资产重命名为
    `JC-Platform_0.1.1-xx_...`，并生成可用于 Tauri updater 的 `latest.json`。
 
 `latest.json` 必须包含当前平台的下载 URL 和 `.sig` 文件内容，Tauri updater

@@ -55,4 +55,16 @@ test('smoke tests bundled Windows installers before publishing artifacts', () =>
     /if: startsWith\(matrix\.label, 'windows'\) && github\.event_name != 'pull_request'/,
   );
   assert.match(workflow, /\.\/scripts\/test-windows-installer\.ps1 -InstallerPath \$installer/);
+  assert.match(workflow, /- name: Preserve previous Windows nightly installer/);
+  assert.match(workflow, /- name: Smoke test Windows cross-version upgrade/);
+  assert.match(workflow, /\.\/scripts\/test-windows-upgrade\.ps1/);
+  assert.match(workflow, /needs\.prepare-nightly\.outputs\.has_previous_windows == 'true'/);
+  assert.ok(
+    workflow.indexOf('- name: Preserve previous Windows nightly installer') <
+      workflow.indexOf('- name: Recreate nightly release'),
+  );
+  assert.ok(
+    workflow.indexOf('- name: Download previous Windows nightly installer') <
+      workflow.indexOf('- name: Smoke test Windows cross-version upgrade'),
+  );
 });

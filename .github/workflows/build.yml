@@ -73,6 +73,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     outputs:
+      has_previous_windows: ${{ steps.previous_windows.outputs.found }}
       release_id: ${{ steps.release.outputs.release_id }}
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -97,6 +98,33 @@ jobs:
           )
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Nightly version: $VERSION"
+
+      - name: Preserve previous Windows nightly installer
+        id: previous_windows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          mkdir -p previous-installer
+          if gh release download "$NIGHTLY_TAG" \
+            --repo "$REPO" \
+            --pattern '*_x64-setup.exe' \
+            --dir previous-installer; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No previous Windows nightly installer is available."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload previous Windows nightly installer
+        if: steps.previous_windows.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: previous-nightly-windows-installer
+          path: previous-installer/*_x64-setup.exe
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Recreate nightly release
         id: release
@@ -227,6 +255,13 @@ jobs:
           updaterJsonPreferNsis: ${{ github.event_name != 'pull_request' }}
           args: --target ${{ matrix.target }} ${{ github.event_name == 'pull_request' && '--no-bundle' || '' }} ${{ github.event_name == 'push' && '--config src-tauri/tauri.nightly.conf.json' || '' }} ${{ github.event_name == 'release' && '--config src-tauri/tauri.updater.conf.json' || '' }}
 
+      - name: Download previous Windows nightly installer
+        if: startsWith(matrix.label, 'windows') && github.event_name == 'push' && needs.prepare-nightly.outputs.has_previous_windows == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: previous-nightly-windows-installer
+          path: previous-installer
+
       - name: Smoke test Windows installer
         if: startsWith(matrix.label, 'windows') && github.event_name != 'pull_request'
         shell: pwsh
@@ -234,6 +269,18 @@ jobs:
           $installer = Get-ChildItem "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe" |
             Select-Object -First 1 -ExpandProperty FullName
           ./scripts/test-windows-installer.ps1 -InstallerPath $installer
+
+      - name: Smoke test Windows cross-version upgrade
+        if: startsWith(matrix.label, 'windows') && github.event_name == 'push' && needs.prepare-nightly.outputs.has_previous_windows == 'true'
+        shell: pwsh
+        run: |
+          $previous = Get-ChildItem "previous-installer/*-setup.exe" |
+            Select-Object -First 1 -ExpandProperty FullName
+          $current = Get-ChildItem "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe" |
+            Select-Object -First 1 -ExpandProperty FullName
+          ./scripts/test-windows-upgrade.ps1 `
+            -PreviousInstallerPath $previous `
+            -CurrentInstallerPath $current
 
       - name: Upload Windows workflow artifacts
         if: startsWith(matrix.label, 'windows') && github.event_name != 'pull_request'
