@@ -175,11 +175,11 @@ export function Sidebar({
   }, []);
 
   useEffect(() => {
-    if (showPopup) {
+    if (showPopup && !showUpdateConfirm) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [showPopup, handleClickOutside]);
+  }, [showPopup, showUpdateConfirm, handleClickOutside]);
 
   const progressPercent =
     progress?.total && progress.total > 0
@@ -214,7 +214,6 @@ export function Sidebar({
 
   const handleUpdateAction = () => {
     if (updateStatus === 'available') {
-      setShowPopup(false);
       setShowUpdateConfirm(true);
       return;
     }
@@ -223,12 +222,10 @@ export function Sidebar({
 
   const cancelUpdateInstall = () => {
     setShowUpdateConfirm(false);
-    setShowPopup(true);
   };
 
   const confirmUpdateInstall = () => {
     setShowUpdateConfirm(false);
-    setShowPopup(true);
     void installUpdate();
   };
 
@@ -296,7 +293,9 @@ export function Sidebar({
 
       {showPopup ? (
         <div
+          aria-hidden={showUpdateConfirm || undefined}
           aria-labelledby={versionTitleId}
+          aria-modal={showUpdateConfirm ? undefined : 'true'}
           className="version-popup"
           id={versionPopupId}
           ref={popupRef}

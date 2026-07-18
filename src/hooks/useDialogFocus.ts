@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useLayoutEffect, useRef } from 'react';
 
 interface UseDialogFocusOptions {
   active: boolean;
@@ -17,6 +17,8 @@ const focusableSelector = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
+const activeDialogStack: symbol[] = [];
+
 export function useDialogFocus({
   active,
   containerRef,
@@ -25,14 +27,18 @@ export function useDialogFocus({
   trapFocus = true,
 }: UseDialogFocusOptions) {
   const onEscapeRef = useRef(onEscape);
+  const dialogTokenRef = useRef(Symbol('dialog'));
   onEscapeRef.current = onEscape;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
+    const dialogToken = dialogTokenRef.current;
+    activeDialogStack.push(dialogToken);
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => initialFocusRef.current?.focus());
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (activeDialogStack[activeDialogStack.length - 1] !== dialogToken) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         onEscapeRef.current();
@@ -66,6 +72,8 @@ export function useDialogFocus({
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener('keydown', handleKeyDown);
+      const stackIndex = activeDialogStack.lastIndexOf(dialogToken);
+      if (stackIndex >= 0) activeDialogStack.splice(stackIndex, 1);
       if (previouslyFocused?.isConnected) previouslyFocused.focus();
     };
   }, [active, containerRef, initialFocusRef, trapFocus]);

@@ -313,6 +313,7 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
 
   await page.getByRole('button', { name: '软件版本信息' }).click();
   const aboutDialog = page.getByRole('dialog', { name: '版本信息' });
+  const aboutPanel = page.locator('.version-popup');
   await aboutDialog.getByRole('button', { name: '检查更新' }).click();
   const installButton = aboutDialog.getByRole('button', { name: '安装更新' });
   await expect(installButton).toBeVisible();
@@ -320,14 +321,18 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
 
   const updateDialog = page.getByRole('dialog', { name: '安装并重启应用？' });
   await expect(updateDialog).toContainText('当前项目存在未保存修改');
+  await expect(aboutPanel).toHaveAttribute('aria-hidden', 'true');
+  await expect(updateDialog.locator('..')).toHaveCSS('z-index', '200');
   await expect(updateDialog.getByRole('button', { name: '返回保存' })).toBeFocused();
   const updateDialogBox = await updateDialog.boundingBox();
   expect(updateDialogBox).not.toBeNull();
   expect((updateDialogBox?.x ?? 0) + (updateDialogBox?.width ?? 0)).toBeLessThanOrEqual(1024);
   expect((updateDialogBox?.y ?? 0) + (updateDialogBox?.height ?? 0)).toBeLessThanOrEqual(720);
-  await updateDialog.getByRole('button', { name: '返回保存' }).click();
+  await page.keyboard.press('Escape');
   await expect(updateDialog).toBeHidden();
   await expect(aboutDialog).toBeVisible();
+  await expect(aboutPanel).not.toHaveAttribute('aria-hidden', 'true');
+  await expect(installButton).toBeFocused();
   expect(
     await page.evaluate(
       () =>
