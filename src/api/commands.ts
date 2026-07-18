@@ -40,10 +40,12 @@ import type {
   SaveProjectAsReport,
   SaveProjectAsRequest,
   SaveProjectRequest,
+  SaveTranslationCredentialsRequest,
   SdoImportReport,
   TableDocument,
   TableFileRequest,
   TableValidationReport,
+  TranslationCredentialStatus,
   UiImageCopyReport,
   UiResourceOptionAddRequest,
   UiResourceOptionRemoveRequest,
@@ -294,6 +296,20 @@ export async function translateBaiduText(
   request: BaiduTranslateRequest,
 ): Promise<BaiduTranslateResponse> {
   return invoke<BaiduTranslateResponse>('translate_baidu_text', { request });
+}
+
+export async function getTranslationCredentialStatus(): Promise<TranslationCredentialStatus> {
+  return invoke<TranslationCredentialStatus>('translation_credentials_status');
+}
+
+export async function saveTranslationCredentials(
+  request: SaveTranslationCredentialsRequest,
+): Promise<TranslationCredentialStatus> {
+  return invoke<TranslationCredentialStatus>('save_translation_credentials', { request });
+}
+
+export async function clearTranslationCredentials(): Promise<void> {
+  return invoke<void>('clear_translation_credentials');
 }
 
 export async function pdoSimpleDocumentTable(document: unknown): Promise<TableDocument> {

@@ -6093,6 +6093,16 @@ html {
   color: var(--color-primary);
 }
 
+.settings-option-footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.settings-option-footer button:disabled:hover {
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
 .settings-service-panel {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr);
@@ -6138,7 +6148,48 @@ html {
 
 .settings-option-footer--compact {
   grid-column: 1 / -1;
+  align-items: flex-start;
   padding-top: 4px;
+}
+
+.settings-credential-status {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.5;
+}
+
+.settings-credential-status--error {
+  color: var(--color-danger);
+}
+
+.settings-credential-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.settings-credential-actions .settings-primary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
+}
+
+.settings-credential-actions .settings-primary-action:hover:not(:disabled) {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+  color: white;
+}
+
+.settings-credential-privacy {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 /* ── Theme Toggle ── */

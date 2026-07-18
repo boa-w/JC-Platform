@@ -198,11 +198,7 @@ export function Dashboard({
     updateOption: updateExportBatteryOption,
     resetOptions: resetExportBatteryOptions,
   } = useExportBatteryOptions();
-  const {
-    settings: translationSettings,
-    updateSetting: updateTranslationSetting,
-    resetSettings: resetTranslationSettings,
-  } = useTranslationSettings();
+  const translationSettings = useTranslationSettings();
   const pdoEditor = usePdoEditor({
     document: loadedProject?.document ?? null,
     isActive: activeModule.key === 'realtime-data',
@@ -615,6 +611,7 @@ export function Dashboard({
               }
               baseline={baselineLanguageDocument()}
               loaded={!!loadedProject}
+              translationConfigured={translationSettings.isConfigured}
               onUpdate={updateLanguageDocument}
             />
           ) : null}
@@ -655,9 +652,7 @@ export function Dashboard({
               exportOptions={exportBatteryOptions}
               onUpdateExportOption={updateExportBatteryOption}
               onResetExportOptions={resetExportBatteryOptions}
-              translationSettings={translationSettings}
-              onUpdateTranslationSetting={updateTranslationSetting}
-              onResetTranslationSettings={resetTranslationSettings}
+              translationController={translationSettings}
               theme={theme}
               onToggleTheme={onToggleTheme}
             />

@@ -9,6 +9,7 @@
 //! | `json_store` | JSON 文件的读取与序列化写入 |
 
 pub mod binary_writer;
+pub mod credentials;
 pub mod csv_excel;
 pub mod file_system;
 pub mod git;

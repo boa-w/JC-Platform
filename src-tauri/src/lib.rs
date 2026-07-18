@@ -17,11 +17,12 @@ mod infrastructure;
 
 use commands::{
     add_ui_resource_option_document, analyze_canopen_conversion, backend_health,
-    build_project_binary_report, build_project_export_plan, commit_project_git_version,
-    compare_project_binary_report, copy_ui_resource_images, create_project, export_canopen_package,
-    export_dbc, export_project_package_command, export_table_csv, export_table_workbook,
-    flatten_unified_protocol_document, generate_can_test_data, generate_dbc_content, import_dbc,
-    import_language_csv, import_language_table, import_language_workbook, import_pdo_simple_csv,
+    build_project_binary_report, build_project_export_plan, clear_translation_credentials,
+    commit_project_git_version, compare_project_binary_report, copy_ui_resource_images,
+    create_project, export_canopen_package, export_dbc, export_project_package_command,
+    export_table_csv, export_table_workbook, flatten_unified_protocol_document,
+    generate_can_test_data, generate_dbc_content, import_dbc, import_language_csv,
+    import_language_table, import_language_workbook, import_pdo_simple_csv,
     import_pdo_simple_table, import_pdo_simple_workbook, import_sdo_csv, import_sdo_table,
     import_sdo_workbook, inspect_project_git, language_document_table, legacy_table_spec,
     list_project_git_revisions, load_json_file, load_project, load_project_git_context,
@@ -31,9 +32,10 @@ use commands::{
     parse_ui_resources_with_project_path, parse_unified_protocol_project,
     pdo_simple_document_table, project_summary, remove_ui_resource_option_document,
     review_project_git_changes, review_project_git_revision, save_json_file, save_project,
-    save_project_as, save_text_file, sdo_document_table, take_pending_project_path,
-    translate_baidu_text, update_ui_resource_document, validate_project_document,
-    validate_table_headers, PendingProjectPath,
+    save_project_as, save_text_file, save_translation_credentials, sdo_document_table,
+    take_pending_project_path, translate_baidu_text, translation_credentials_status,
+    update_ui_resource_document, validate_project_document, validate_table_headers,
+    PendingProjectPath,
 };
 use tauri::{Emitter, Manager};
 
@@ -123,6 +125,9 @@ pub fn run() {
             export_table_csv,
             export_table_workbook,
             language_document_table,
+            translation_credentials_status,
+            save_translation_credentials,
+            clear_translation_credentials,
             translate_baidu_text,
             pdo_simple_document_table,
             sdo_document_table,

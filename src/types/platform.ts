@@ -530,11 +530,19 @@ export interface LanguageDocument {
 }
 
 export interface BaiduTranslateRequest {
-  appId: string;
-  appKey: string;
   from: string;
   to: string;
   texts: string[];
+}
+
+export interface TranslationCredentialStatus {
+  appId: string;
+  hasAppKey: boolean;
+}
+
+export interface SaveTranslationCredentialsRequest {
+  appId: string;
+  appKey: string | null;
 }
 
 export interface BaiduTranslateResponse {

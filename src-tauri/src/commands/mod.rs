@@ -30,12 +30,15 @@ use crate::domain::protocol_manager::{
 };
 use crate::domain::sdo::{parse_sdo_table, sdo_document_to_table, SdoImportReport};
 use crate::domain::translation::{
-    translate_with_baidu, BaiduTranslateRequest, BaiduTranslateResponse,
+    translate_with_baidu, BaiduTranslateCredentials, BaiduTranslateRequest, BaiduTranslateResponse,
 };
 use crate::domain::ui_resource::{
     add_ui_resource_option, parse_ui_info, remove_ui_resource_option, update_ui_resource,
     UiResourceOptionAddRequest, UiResourceOptionRemoveRequest, UiResourceParseReport,
     UiResourceUpdateReport, UiResourceUpdateRequest,
+};
+use crate::infrastructure::credentials::{
+    self, SaveTranslationCredentialsRequest, TranslationCredentialStatus,
 };
 use crate::infrastructure::csv_excel::{
     read_csv, read_workbook, validate_headers, validate_language_headers, write_csv,
@@ -505,7 +508,41 @@ pub fn language_document_table(document: Value) -> TableDocument {
 pub async fn translate_baidu_text(
     request: BaiduTranslateRequest,
 ) -> Result<BaiduTranslateResponse, String> {
-    translate_with_baidu(request).await
+    let stored = tauri::async_runtime::spawn_blocking(credentials::load_translation_credentials)
+        .await
+        .map_err(|error| format!("读取翻译凭据任务失败：{error}"))??
+        .ok_or_else(|| "请先在软件设置中保存百度翻译凭据。".to_string())?;
+    translate_with_baidu(
+        request,
+        BaiduTranslateCredentials {
+            app_id: stored.app_id,
+            app_key: stored.app_key,
+        },
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn translation_credentials_status() -> Result<TranslationCredentialStatus, String> {
+    tauri::async_runtime::spawn_blocking(credentials::translation_credential_status)
+        .await
+        .map_err(|error| format!("读取翻译凭据任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn save_translation_credentials(
+    request: SaveTranslationCredentialsRequest,
+) -> Result<TranslationCredentialStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || credentials::save_translation_credentials(request))
+        .await
+        .map_err(|error| format!("保存翻译凭据任务失败：{error}"))?
+}
+
+#[tauri::command]
+pub async fn clear_translation_credentials() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(credentials::clear_translation_credentials)
+        .await
+        .map_err(|error| format!("清空翻译凭据任务失败：{error}"))?
 }
 
 #[tauri::command]

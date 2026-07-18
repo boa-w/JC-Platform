@@ -97,6 +97,17 @@ test('supports keyboard navigation and named settings controls', async ({ page }
     (await page.locator('html').getAttribute('data-theme')) === 'dark' ? 'true' : 'false',
   );
 
+  await main.getByRole('textbox', { name: 'App ID' }).fill('browser-preview-app');
+  await main.getByRole('textbox', { name: 'API Key' }).fill('browser-preview-secret');
+  expect(
+    await page.evaluate(() =>
+      Object.keys(localStorage)
+        .map((key) => localStorage.getItem(key) ?? '')
+        .join('\n'),
+    ),
+  ).not.toContain('browser-preview-secret');
+  await expect(main.getByRole('button', { name: '保存凭据' })).toBeDisabled();
+
   await main.getByRole('button', { name: '恢复默认' }).click();
   const resetDialog = page.getByRole('dialog', { name: '恢复导出默认设置？' });
   await expect(resetDialog.getByRole('button', { name: '取消' })).toBeFocused();

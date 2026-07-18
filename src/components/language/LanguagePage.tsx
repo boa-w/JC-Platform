@@ -8,7 +8,6 @@ import {
   useState,
 } from 'react';
 import { translateBaiduText } from '../../api/commands';
-import { useTranslationSettings } from '../../stores/translationSettings';
 import type { LanguageDocument } from '../../types/platform';
 import { getStorageItem, removeStorageItem, setStorageItem } from '../../utils/safeStorage';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -31,6 +30,7 @@ interface LanguagePageProps {
   document: LanguageDocument;
   baseline: LanguageDocument | null;
   loaded: boolean;
+  translationConfigured: boolean;
   onUpdate: (document: LanguageDocument) => void;
 }
 
@@ -178,7 +178,13 @@ function normalizeDocument(
   };
 }
 
-export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguagePageProps) {
+export function LanguagePage({
+  document,
+  baseline,
+  loaded,
+  translationConfigured,
+  onUpdate,
+}: LanguagePageProps) {
   const langMainRef = useRef<HTMLDivElement | null>(null);
   const scrollTopButtonRef = useRef<HTMLButtonElement | null>(null);
   const scrollTopDragRef = useRef<FloatingButtonDragState | null>(null);
@@ -220,12 +226,10 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
   const [selectedTranslationKeys, setSelectedTranslationKeys] = useState<Set<string>>(
     () => new Set(),
   );
-  const { settings: translationSettings } = useTranslationSettings();
   const languageIndex = useLanguageIndex(document);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  const isBaiduTranslateConfigured =
-    translationSettings.baiduAppId.trim() !== '' && translationSettings.baiduAppKey.trim() !== '';
+  const isBaiduTranslateConfigured = translationConfigured;
   const languageOptions = useMemo(
     () =>
       document.list_code_language.map((code) => ({
@@ -654,8 +658,6 @@ export function LanguagePage({ document, baseline, loaded, onUpdate }: LanguageP
 
         try {
           const response = await translateBaiduText({
-            appId: translationSettings.baiduAppId.trim(),
-            appKey: translationSettings.baiduAppKey.trim(),
             from: translateSourceLanguage,
             to: selectedLanguage,
             texts: [sourceText],

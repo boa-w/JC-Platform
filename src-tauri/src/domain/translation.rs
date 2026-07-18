@@ -7,11 +7,14 @@ const BAIDU_TRANSLATE_URL: &str = "https://fanyi-api.baidu.com/api/trans/vip/tra
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BaiduTranslateRequest {
-    pub app_id: String,
-    pub app_key: String,
     pub from: String,
     pub to: String,
     pub texts: Vec<String>,
+}
+
+pub struct BaiduTranslateCredentials {
+    pub app_id: String,
+    pub app_key: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,9 +36,10 @@ struct BaiduTranslationItem {
 
 pub async fn translate_with_baidu(
     request: BaiduTranslateRequest,
+    credentials: BaiduTranslateCredentials,
 ) -> Result<BaiduTranslateResponse, String> {
-    let app_id = request.app_id.trim();
-    let app_key = request.app_key.trim();
+    let app_id = credentials.app_id.trim();
+    let app_key = credentials.app_key.trim();
     if app_id.is_empty() || app_key.is_empty() {
         return Err("请先填写百度翻译 App ID 和 API Key".to_string());
     }
