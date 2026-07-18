@@ -25,12 +25,12 @@ test('navigates core workspaces without runtime errors', async ({ page }) => {
   await page.getByRole('button', { name: '输出', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '输出 功能' })).toBeVisible();
   await page.getByRole('button', { name: 'CAN 测试数据构建', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'CAN 测试数据构建' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'CAN 测试数据构建' })).toBeVisible();
 
   await page.getByRole('button', { name: '协议', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '协议 功能' })).toBeVisible();
   await page.getByRole('button', { name: '业务信号字典', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '业务信号字典' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: '业务信号字典' })).toBeVisible();
 });
 
 test('keeps the About dialog above the workspace and restores focus', async ({ page }) => {
@@ -72,6 +72,42 @@ test('persists the selected theme across reloads', async ({ page }) => {
 
   await page.getByRole('button', { name: '切换主题' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', originalTheme ?? 'light');
+});
+
+test('supports keyboard navigation and named settings controls', async ({ page }) => {
+  const skipLink = page.getByRole('link', { name: '跳转到主要内容' });
+  await page.keyboard.press('Tab');
+  await expect(skipLink).toBeFocused();
+  await skipLink.press('Enter');
+  await expect(page.getByRole('main')).toBeFocused();
+
+  await page.getByRole('button', { name: '系统', exact: true }).click();
+  const settingsButton = page.getByRole('button', { name: '软件设置', exact: true });
+  await expect(settingsButton).toHaveAttribute('aria-current', 'page');
+  const main = page.getByRole('main', { name: '软件设置' });
+  await expect(main).toBeVisible();
+  await expect(main.getByRole('heading', { level: 1, name: '软件设置' })).toBeAttached();
+
+  await expect(
+    main.getByRole('checkbox', { name: '锂电协议：写入 ConfigUpdate.json' }),
+  ).toBeVisible();
+  const themeSwitch = main.getByRole('switch', { name: '深色模式' });
+  await expect(themeSwitch).toHaveAttribute(
+    'aria-checked',
+    (await page.locator('html').getAttribute('data-theme')) === 'dark' ? 'true' : 'false',
+  );
+
+  await main.getByRole('button', { name: '恢复默认' }).click();
+  const resetDialog = page.getByRole('dialog', { name: '恢复导出默认设置？' });
+  await expect(resetDialog.getByRole('button', { name: '取消' })).toBeFocused();
+  await resetDialog.getByRole('button', { name: '取消' }).click();
+  await expect(resetDialog).toBeHidden();
+
+  await main.getByRole('button', { name: '清空配置' }).click();
+  const clearDialog = page.getByRole('dialog', { name: '清空翻译配置？' });
+  await expect(clearDialog).toContainText('此操作无法撤销');
+  await clearDialog.getByRole('button', { name: '取消' }).click();
+  await expect(clearDialog).toBeHidden();
 });
 
 test('surfaces desktop-only actions as accessible errors in browser preview', async ({ page }) => {

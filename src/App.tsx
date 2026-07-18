@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
 import { getBackendHealth, getProjectSummary } from './api/commands';
 import { Sidebar } from './components/Sidebar';
 import { featureModules } from './data/modules';
@@ -17,6 +17,7 @@ export default function App() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const updateRelaunchAuthorizedRef = useRef(false);
+  const workspaceId = useId();
   const [, startNavigationTransition] = useTransition();
   const { theme, toggleTheme } = useTheme();
 
@@ -46,6 +47,9 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href={`#${workspaceId}`}>
+        跳转到主要内容
+      </a>
       <Sidebar
         modules={featureModules}
         activeKey={activeKey}
@@ -62,6 +66,7 @@ export default function App() {
       />
       <Dashboard
         activeModule={activeModule}
+        workspaceId={workspaceId}
         health={health}
         project={project}
         loadedProject={loadedProject}

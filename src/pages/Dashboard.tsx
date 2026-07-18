@@ -1,6 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { FolderOpen } from 'lucide-react';
-import { lazy, useEffect, useRef, useState } from 'react';
+import { lazy, useEffect, useId, useRef, useState } from 'react';
 import { validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
@@ -138,6 +138,7 @@ function WorkspaceLoading() {
 
 interface DashboardProps {
   activeModule: FeatureModule;
+  workspaceId: string;
   health: BackendHealth | null;
   project: ProjectSummary | null;
   loadedProject: LoadedProject | null;
@@ -153,6 +154,7 @@ const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS
 
 export function Dashboard({
   activeModule,
+  workspaceId,
   loadedProject,
   theme,
   onToggleTheme,
@@ -161,6 +163,7 @@ export function Dashboard({
   isUpdateRelaunchAuthorized,
   onProjectLoaded,
 }: DashboardProps) {
+  const workspaceTitleId = useId();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
@@ -387,7 +390,15 @@ export function Dashboard({
   const currentLanguageDocument = languageDocument();
 
   return (
-    <main className={projectGit.showReview ? 'workspace workspace--git-review' : 'workspace'}>
+    <main
+      aria-labelledby={workspaceTitleId}
+      className={projectGit.showReview ? 'workspace workspace--git-review' : 'workspace'}
+      id={workspaceId}
+      tabIndex={-1}
+    >
+      <h1 className="visually-hidden" id={workspaceTitleId}>
+        {activeModule.title}
+      </h1>
       {desktopProjectIntegration.isProjectDragActive ? (
         <div aria-live="polite" className="project-drop-overlay" role="status">
           <FolderOpen aria-hidden="true" size={28} strokeWidth={1.6} />

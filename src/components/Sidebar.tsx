@@ -421,6 +421,7 @@ export function Sidebar({
               const label = lifecycleLabel(module.lifecycle);
               return (
                 <button
+                  aria-current={module.key === activeKey ? 'page' : undefined}
                   className={module.key === activeKey ? 'activity-item active' : 'activity-item'}
                   key={module.key}
                   type="button"
