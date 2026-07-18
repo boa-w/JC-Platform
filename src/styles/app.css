@@ -6,7 +6,7 @@
   --color-border-light: #f1f5f9;
   --color-text: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
+  --color-text-muted: #5b6b80;
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
   --color-primary-light: #eff6ff;
@@ -33,7 +33,7 @@
   --tb-bg: #f3f3f3;
   --tb-bg-alt: #f9f9f9;
   --tb-text: #333333;
-  --tb-text-muted: #888888;
+  --tb-text-muted: #666666;
   --tb-border: #f3f3f3;
   --tb-hover: rgba(0, 0, 0, 0.06);
   --tb-active: rgba(0, 0, 0, 0.08);
@@ -59,8 +59,8 @@
   --color-border-light: #333333;
   --color-text: #d4d4d4;
   --color-text-secondary: #a0a0a0;
-  --color-text-muted: #6e6e6e;
-  --color-primary: #3794ff;
+  --color-text-muted: #a3a3a3;
+  --color-primary: #409cff;
   --color-primary-hover: #5ba3ff;
   --color-primary-light: rgba(55, 148, 255, 0.1);
   --color-primary-border: rgba(55, 148, 255, 0.25);
@@ -2108,13 +2108,13 @@ body.git-review-open {
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--tb-accent);
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: 600;
 }
 
 .version-update-link:hover {
-  color: var(--tb-accent-hover);
+  color: var(--color-primary-hover);
   text-decoration: underline;
 }
 

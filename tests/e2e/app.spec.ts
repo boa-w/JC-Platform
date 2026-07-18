@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 
 function captureRuntimeErrors(page: Page) {
@@ -10,6 +11,17 @@ function captureRuntimeErrors(page: Page) {
 }
 
 const runtimeErrorsByPage = new WeakMap<Page, string[]>();
+
+async function expectNoSeriousAccessibilityViolations(page: Page, context: string) {
+  const result = await new AxeBuilder({ page }).analyze();
+  const violations = result.violations.filter(
+    (violation) => violation.impact === 'critical' || violation.impact === 'serious',
+  );
+  expect(
+    violations,
+    `${context} accessibility violations:\n${JSON.stringify(violations, null, 2)}`,
+  ).toEqual([]);
+}
 
 test.beforeEach(async ({ page }) => {
   runtimeErrorsByPage.set(page, captureRuntimeErrors(page));
@@ -31,6 +43,27 @@ test('navigates core workspaces without runtime errors', async ({ page }) => {
   await expect(page.getByRole('navigation', { name: '协议 功能' })).toBeVisible();
   await page.getByRole('button', { name: '业务信号字典', exact: true }).click();
   await expect(page.getByRole('heading', { level: 2, name: '业务信号字典' })).toBeVisible();
+});
+
+test('meets the serious accessibility baseline across primary surfaces', async ({ page }) => {
+  await expectNoSeriousAccessibilityViolations(page, '默认工作区');
+
+  await page.getByRole('button', { name: '系统', exact: true }).click();
+  await expect(page.getByRole('main', { name: '软件设置' })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '软件设置');
+
+  await page.getByRole('button', { name: '软件版本信息' }).click();
+  await expect(page.getByRole('dialog', { name: '版本信息' })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '版本信息弹层');
+
+  await page.getByRole('button', { name: '关闭版本信息' }).click();
+  await page.getByRole('button', { name: '切换主题' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expectNoSeriousAccessibilityViolations(page, '深色软件设置');
+
+  await page.getByRole('button', { name: '软件版本信息' }).click();
+  await expect(page.getByRole('dialog', { name: '版本信息' })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '深色版本信息弹层');
 });
 
 test('keeps the About dialog above the workspace and restores focus', async ({ page }) => {

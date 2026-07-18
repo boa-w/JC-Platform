@@ -41,6 +41,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@biomejs/biome": "^2.5.1",
     "@playwright/test": "^1.61.1",
     "@tauri-apps/cli": "^2.0.0",
