@@ -1,6 +1,8 @@
 param(
     [string]$InstallerPath,
-    [int]$StartupTimeoutSeconds = 5
+    [int]$StartupTimeoutSeconds = 5,
+    [switch]$RequireSignature,
+    [string[]]$AdditionalSignaturePath = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,7 +31,25 @@ $installDir = Join-Path $tempRoot "jc-platform-installer-smoke-$([guid]::NewGuid
 $appProcess = $null
 $uninstaller = Join-Path $installDir 'uninstall.exe'
 
+function Assert-ValidAuthenticodeSignature([string]$Path) {
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
+        throw "Authenticode validation failed for $Path`: $($signature.StatusMessage)"
+    }
+    Write-Host "Valid Authenticode signature: $($signature.SignerCertificate.Subject)"
+}
+
 try {
+    if ($RequireSignature) {
+        Assert-ValidAuthenticodeSignature $InstallerPath
+        foreach ($path in $AdditionalSignaturePath) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+                throw "Signed release artifact was not found: $path"
+            }
+            Assert-ValidAuthenticodeSignature (Resolve-Path -LiteralPath $path).Path
+        }
+    }
+
     Write-Host "Installing $InstallerPath"
     $install = Start-Process `
         -FilePath $InstallerPath `
@@ -48,6 +68,9 @@ try {
     }
     if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) {
         throw "Uninstaller was not found in $installDir."
+    }
+    if ($RequireSignature) {
+        Assert-ValidAuthenticodeSignature $appExecutable.FullName
     }
 
     Write-Host "Starting $($appExecutable.FullName)"

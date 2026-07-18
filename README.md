@@ -95,6 +95,7 @@ npm run test:upgrade:windows
 GitHub Actions 会构建 Windows 与 macOS 桌面应用：
 
 - Windows：冒烟验证 NSIS 安装、启动和卸载；存在上一版 nightly 时追加跨版本升级回归，然后上传 `.msi` / `.exe` 安装包。
-- macOS：上传 `.dmg` / `.app` 产物。
+- macOS：挂载 DMG，验证 Bundle 元数据、主程序启动和 app-data 保留后，上传 `.dmg` / `.app` 产物。
 
-macOS CI 产物当前未签名，首次打开可能受 Gatekeeper 限制；正式分发前需要 Developer ID 签名和 notarization。
+nightly macOS 产物可以未签名；stable Release 必须通过 Developer ID 签名、Gatekeeper
+评估和 notarization ticket 验证，否则流水线不会上传产物。

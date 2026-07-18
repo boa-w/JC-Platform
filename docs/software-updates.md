@@ -114,9 +114,16 @@ App Store Connect API key 形式的 notarization 凭据。
 3. 删除并重建固定 tag/release：`nightly`。
 4. 使用 updater 签名私钥构建 Windows/macOS 安装包。
 5. Windows 依次执行安装冒烟测试；有历史包时追加跨版本升级和数据保留回归。
-6. 由 `tauri-apps/tauri-action` 上传安装包和 `.sig`。
-7. `Normalize nightly assets` job 会把 action 上传的 `_0.1.1-xx_...` 资产重命名为
+6. macOS 挂载 DMG 并验证 Bundle 标识、主程序启动和 app-data 草稿保留。
+7. 所有平台验收通过后，独立 publish job 才会整理安装包、`.sig`、`latest.json`
+   和 `SHA256SUMS` 并上传。
+8. `Normalize nightly assets` job 会把 action 上传的 `_0.1.1-xx_...` 资产重命名为
    `JC-Platform_0.1.1-xx_...`，并生成可用于 Tauri updater 的 `latest.json`。
 
 `latest.json` 必须包含当前平台的下载 URL 和 `.sig` 文件内容，Tauri updater
 会先校验签名再安装更新。不要手动把 `.sig` 文件路径写进 JSON。
+
+stable macOS 构建在上传前还会强制执行 `codesign --verify`、`spctl --assess`
+和 `xcrun stapler validate`，确保用户从网络下载后能通过 Gatekeeper。
+同一阶段会对 Windows NSIS、MSI 和安装后主程序执行 Authenticode 实体校验。
+构建 job 不直接写入 GitHub Release，避免在冒烟测试失败前已经公开未验证产物。

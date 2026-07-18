@@ -47,14 +47,20 @@ test('selects the matching updater config in the release workflow', () => {
   assert.match(workflow, /APPLE_CERTIFICATE: \$\{\{ secrets\.APPLE_CERTIFICATE \}\}/);
 });
 
-test('smoke tests bundled Windows installers before publishing artifacts', () => {
+test('smoke tests bundled installers before publishing artifacts', () => {
   const workflow = readFileSync('.github/workflows/build.yml', 'utf8');
+  const buildStep = workflow.slice(
+    workflow.indexOf('- name: Build Tauri app'),
+    workflow.indexOf('- name: Download previous Windows nightly installer'),
+  );
   assert.match(workflow, /- name: Smoke test Windows installer/);
   assert.match(
     workflow,
     /if: startsWith\(matrix\.label, 'windows'\) && github\.event_name != 'pull_request'/,
   );
   assert.match(workflow, /\.\/scripts\/test-windows-installer\.ps1 -InstallerPath \$installer/);
+  assert.match(workflow, /-RequireSignature/);
+  assert.match(workflow, /-AdditionalSignaturePath \$msi/);
   assert.match(workflow, /- name: Preserve previous Windows nightly installer/);
   assert.match(workflow, /- name: Smoke test Windows cross-version upgrade/);
   assert.match(workflow, /\.\/scripts\/test-windows-upgrade\.ps1/);
@@ -66,5 +72,31 @@ test('smoke tests bundled Windows installers before publishing artifacts', () =>
   assert.ok(
     workflow.indexOf('- name: Download previous Windows nightly installer') <
       workflow.indexOf('- name: Smoke test Windows cross-version upgrade'),
+  );
+  assert.match(workflow, /- name: Smoke test macOS bundle/);
+  assert.match(workflow, /bash \.\/scripts\/test-macos-bundle\.sh/);
+  assert.match(workflow, /args\+=\(--require-signature\)/);
+  assert.ok(
+    workflow.indexOf('- name: Build Tauri app') <
+      workflow.indexOf('- name: Smoke test macOS bundle'),
+  );
+  assert.ok(
+    workflow.indexOf('- name: Smoke test macOS bundle') <
+      workflow.indexOf('- name: Upload macOS workflow artifacts'),
+  );
+  assert.match(workflow, /publish-release-assets:/);
+  assert.match(workflow, /node scripts\/prepare-release-assets\.mjs/);
+  assert.match(workflow, /gh release upload "\$tag"/);
+  const binaryUpload = workflow.search(/gh release upload "\$tag" "\$\{assets\[@\]\}"/);
+  const manifestUpload = workflow.search(/gh release upload "\$tag" "\$manifest"/);
+  assert.ok(binaryUpload >= 0 && binaryUpload < manifestUpload);
+  assert.doesNotMatch(workflow, /^\s+releaseId:/m);
+  assert.doesNotMatch(workflow, /^\s+tagName:/m);
+  assert.doesNotMatch(buildStep, /GITHUB_TOKEN/);
+  assert.match(workflow, /permissions:\s+contents: read/);
+  assert.equal(workflow.match(/contents: write/g)?.length, 2);
+  assert.ok(
+    workflow.indexOf('- name: Smoke test macOS bundle') <
+      workflow.indexOf('publish-release-assets:'),
   );
 });
