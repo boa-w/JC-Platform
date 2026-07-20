@@ -335,6 +335,40 @@ test('supports accessible Git review and comparison views', async ({ page }) => 
   await gitReview.getByRole('button', { name: '关闭审阅' }).click();
 });
 
+test('keeps loaded-project workspaces accessible in dark mode', async ({ page }) => {
+  test.setTimeout(120_000);
+  await openRichProject(page);
+  await page.getByRole('button', { name: '切换主题' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+  const surfaces = [
+    { group: '数据', module: '设置数据' },
+    { group: '数据', module: '实时数据' },
+    { group: '配置', module: '故障代码' },
+    { group: '多国语言', module: '多国语言' },
+  ] as const;
+
+  for (const surface of surfaces) {
+    const groupButton = page.getByRole('button', { name: surface.group, exact: true });
+    if ((await groupButton.getAttribute('aria-expanded')) !== 'true') {
+      await groupButton.click();
+    }
+    await page
+      .getByRole('navigation', { name: `${surface.group} 功能` })
+      .getByRole('button', { name: surface.module, exact: true })
+      .click();
+    await expect(page.getByRole('main', { name: surface.module })).toBeVisible();
+    await expectNoSeriousAccessibilityViolations(page, `深色数据态${surface.module}工作区`);
+  }
+
+  await page.locator('.action-bar-git-trigger').click();
+  const gitSummary = page.getByRole('dialog', { name: 'Git 版本摘要' });
+  await gitSummary.getByRole('button', { name: /审阅更改/ }).click();
+  const gitReview = page.getByRole('region', { name: 'Git 更改审阅' });
+  await expect(gitReview).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '深色 Git 更改审阅工作区');
+});
+
 test('offers to restore an unsaved project draft', async ({ page }) => {
   const projectPath = 'D:\\projects\\recovery-fixture.jcpro';
   await page.setViewportSize({ width: 1024, height: 720 });
