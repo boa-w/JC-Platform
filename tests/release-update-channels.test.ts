@@ -98,6 +98,11 @@ test('smoke tests bundled installers before publishing artifacts', () => {
   assert.match(workflow, /args\+=\(--require-signature\)/);
   assert.match(workflow, /- name: Verify macOS updater artifacts/);
   assert.match(workflow, /-name '\*\.app\.tar\.gz'/);
+  const macVerificationStep = workflow.slice(
+    workflow.indexOf('- name: Verify macOS updater artifacts'),
+    workflow.indexOf('- name: Upload Windows workflow artifacts'),
+  );
+  assert.doesNotMatch(macVerificationStep, /mapfile/);
   assert.doesNotMatch(workflow, /bundle\/macos\/\*\.app/);
   assert.ok(
     workflow.indexOf('- name: Build Tauri app') <

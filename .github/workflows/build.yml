@@ -314,19 +314,21 @@ jobs:
         run: |
           set -euo pipefail
           bundle_root="src-tauri/target/${{ matrix.target }}/release/bundle"
-          mapfile -d '' archives < <(find "$bundle_root" -type f -name '*.app.tar.gz' -print0)
-          if [ "${#archives[@]}" -ne 1 ]; then
-            echo "Expected exactly one macOS updater archive, found ${#archives[@]}." >&2
+          archive_list=$(find "$bundle_root" -type f -name '*.app.tar.gz' -print)
+          archive_count=$(printf '%s\n' "$archive_list" | sed '/^$/d' | wc -l | tr -d ' ')
+          if [ "$archive_count" -ne 1 ]; then
+            echo "Expected exactly one macOS updater archive, found $archive_count." >&2
             find "$bundle_root" -maxdepth 3 -type f -print | sort >&2
             exit 1
           fi
-          signature="${archives[0]}.sig"
+          archive="$archive_list"
+          signature="${archive}.sig"
           if [ ! -s "$signature" ]; then
             echo "Missing or empty macOS updater signature: $signature" >&2
             find "$bundle_root" -maxdepth 3 -type f -print | sort >&2
             exit 1
           fi
-          echo "Verified macOS updater archive: ${archives[0]}"
+          echo "Verified macOS updater archive: $archive"
 
       - name: Upload Windows workflow artifacts
         if: startsWith(matrix.label, 'windows') && github.event_name != 'pull_request'
