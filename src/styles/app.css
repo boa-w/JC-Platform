@@ -1,99 +1,10 @@
 :root {
-  --color-bg: #f5f5f5;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f8fafc;
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
-  --color-text: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #5b6b80;
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-solid: #2563eb;
-  --color-primary-solid-hover: #1d4ed8;
-  --color-primary-light: #eff6ff;
-  --color-primary-border: #bfdbfe;
-  --color-accent: #0ea5e9;
-  --color-success: #047857;
-  --color-success-light: #ecfdf5;
-  --color-warning: #92400e;
-  --color-warning-light: #fffbeb;
-  --color-danger: #dc2626;
-  --color-danger-text: #b91c1c;
-  --color-danger-light: #fef2f2;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.1);
-  --font-sans: Inter, "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
-  --font-mono: "Cascadia Code", Consolas, "Courier New", monospace;
-  --app-toolbar-height: 36px;
-
-  /* Toolbar (light theme) */
-  --tb-bg: #f3f3f3;
-  --tb-bg-alt: #f9f9f9;
-  --tb-text: #333333;
-  --tb-text-muted: #666666;
-  --tb-border: #f3f3f3;
-  --tb-hover: rgba(0, 0, 0, 0.06);
-  --tb-active: rgba(0, 0, 0, 0.08);
-  --tb-sep: rgba(0, 0, 0, 0.08);
-  --tb-accent: #2563eb;
-  --tb-accent-hover: #1d4ed8;
-  --tb-success: #059669;
-  --tb-warning: #92400e;
-
-  color: var(--color-text);
-  background: var(--color-bg);
+  color: var(--text-primary);
+  background: var(--surface-canvas);
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-}
-
-[data-theme="dark"] {
-  --color-bg: #1e1e1e;
-  --color-surface: #252526;
-  --color-surface-alt: #2d2d2d;
-  --color-border: #3e3e3e;
-  --color-border-light: #333333;
-  --color-text: #d4d4d4;
-  --color-text-secondary: #a0a0a0;
-  --color-text-muted: #a3a3a3;
-  --color-primary: #409cff;
-  --color-primary-hover: #5ba3ff;
-  --color-primary-solid: #0e639c;
-  --color-primary-solid-hover: #1177bb;
-  --color-primary-light: rgba(55, 148, 255, 0.1);
-  --color-primary-border: rgba(55, 148, 255, 0.25);
-  --color-accent: #3794ff;
-  --color-success: #4ec9b0;
-  --color-success-light: rgba(78, 201, 176, 0.1);
-  --color-warning: #e8ab53;
-  --color-warning-light: rgba(232, 171, 83, 0.1);
-  --color-danger: #f44747;
-  --color-danger-text: #ff6b6b;
-  --color-danger-light: rgba(244, 71, 71, 0.1);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.3);
-
-  /* Toolbar (dark theme) */
-  --tb-bg: #1e1e1e;
-  --tb-bg-alt: #252526;
-  --tb-text: #cccccc;
-  --tb-text-muted: #969696;
-  --tb-border: #1e1e1e;
-  --tb-hover: rgba(255, 255, 255, 0.06);
-  --tb-active: rgba(255, 255, 255, 0.08);
-  --tb-sep: rgba(255, 255, 255, 0.08);
-  --tb-accent: #0e639c;
-  --tb-accent-hover: #1177bb;
-  --tb-success: #4ec9b0;
-  --tb-warning: #e8ab53;
 }
 
 * {
@@ -138,7 +49,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--action-primary);
   outline-offset: 2px;
 }
 
@@ -162,10 +73,10 @@ textarea:focus-visible {
   top: 8px;
   left: 8px;
   padding: 8px 12px;
-  border: 1px solid var(--color-primary-border);
+  border: 1px solid var(--action-primary-border);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-primary);
+  background: var(--surface-panel);
+  color: var(--action-primary);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
@@ -206,9 +117,9 @@ textarea:focus-visible {
   justify-content: center;
   gap: 8px;
   min-height: 240px;
-  color: var(--color-primary);
-  background: rgba(239, 246, 255, 0.96);
-  border: 2px dashed var(--color-primary);
+  color: var(--action-primary);
+  background: var(--drop-zone-surface);
+  border: 2px dashed var(--action-primary);
   border-radius: 8px;
   box-shadow: var(--shadow-lg);
   pointer-events: none;
@@ -219,12 +130,12 @@ textarea:focus-visible {
 }
 
 .project-drop-overlay span {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
 [data-theme="dark"] .project-drop-overlay {
-  background: rgba(37, 37, 38, 0.96);
+  background: var(--drop-zone-surface-dark);
 }
 
 /* ── Action Bar (VSCode tab bar style) ── */
@@ -240,8 +151,8 @@ textarea:focus-visible {
   gap: 8px;
   height: var(--app-toolbar-height);
   padding: 4px 10px;
-  background: var(--tb-bg);
-  border-bottom: 1px solid var(--tb-border);
+  background: var(--toolbar-bg);
+  border-bottom: 1px solid var(--toolbar-border);
   flex-shrink: 0;
   flex-wrap: nowrap;
   justify-content: flex-start;
@@ -272,16 +183,16 @@ textarea:focus-visible {
   max-width: min(42vw, 480px);
   height: 26px;
   padding: 0 10px;
-  border: 1px solid var(--tb-sep);
+  border: 1px solid var(--toolbar-separator);
   border-radius: 4px;
-  background: var(--tb-bg-alt);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  background: var(--toolbar-bg-alt);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-on-accent) 2%, transparent);
 }
 
 .action-bar-project {
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--tb-text);
+  color: var(--toolbar-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -290,7 +201,7 @@ textarea:focus-visible {
 
 .action-bar-module {
   overflow: hidden;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -299,7 +210,7 @@ textarea:focus-visible {
 .action-bar-project + .action-bar-module::before {
   content: "/";
   margin-right: 7px;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
 }
 
 .action-bar-dot {
@@ -310,16 +221,16 @@ textarea:focus-visible {
 }
 
 .action-bar-dot--clean {
-  background: var(--tb-success);
+  background: var(--toolbar-success);
 }
 
 .action-bar-dot--dirty {
-  background: var(--tb-warning);
+  background: var(--toolbar-warning);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .action-bar-dot--empty {
-  background: var(--tb-text-muted);
+  background: var(--toolbar-text-muted);
 }
 
 .action-bar-pills {
@@ -330,11 +241,11 @@ textarea:focus-visible {
 }
 
 .action-bar-pill {
-  border: 1px solid rgba(232, 171, 83, 0.35);
+  border: 1px solid var(--warning-border);
   border-radius: 2px;
   padding: 0 5px;
-  background: rgba(232, 171, 83, 0.1);
-  color: var(--tb-warning);
+  background: var(--warning-surface-soft);
+  color: var(--toolbar-warning);
   font-size: 10.5px;
   font-weight: 500;
   cursor: pointer;
@@ -344,14 +255,14 @@ textarea:focus-visible {
 }
 
 .action-bar-pill:hover {
-  background: rgba(232, 171, 83, 0.2);
-  border-color: rgba(232, 171, 83, 0.5);
+  background: var(--warning-surface-active);
+  border-color: var(--warning-border-strong);
 }
 
 .action-bar-sep {
   width: 1px;
   height: 18px;
-  background: var(--tb-sep);
+  background: var(--toolbar-separator);
   flex-shrink: 0;
   margin: 0 2px;
 }
@@ -384,38 +295,38 @@ textarea:focus-visible {
 }
 
 .action-bar-btn--save {
-  background: var(--tb-accent);
-  color: #ffffff;
+  background: var(--toolbar-accent);
+  color: var(--text-on-accent);
 }
 
 .action-bar-btn--save:hover:not(:disabled) {
-  background: var(--tb-accent-hover);
+  background: var(--toolbar-accent-hover);
 }
 
 .action-bar-btn--secondary {
-  background: var(--tb-active);
-  color: var(--tb-text);
+  background: var(--toolbar-active);
+  color: var(--toolbar-text);
 }
 
 .action-bar-btn--secondary:hover:not(:disabled) {
-  background: var(--tb-hover);
-  color: var(--tb-text);
+  background: var(--toolbar-hover);
+  color: var(--toolbar-text);
 }
 
 .action-bar-btn--ghost {
   background: transparent;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
 }
 
 .action-bar-btn--ghost:hover:not(:disabled) {
-  color: var(--tb-text);
-  background: var(--tb-hover);
+  color: var(--toolbar-text);
+  background: var(--toolbar-hover);
 }
 
 .action-bar-status {
   max-width: 260px;
   overflow: hidden;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -430,7 +341,7 @@ textarea:focus-visible {
   border-radius: 5px;
   padding: 0 7px;
   background: transparent;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 11.5px;
   cursor: pointer;
   white-space: nowrap;
@@ -438,9 +349,9 @@ textarea:focus-visible {
 
 .action-bar-git-trigger:hover,
 .action-bar-git-trigger--active {
-  border-color: var(--tb-sep);
-  background: var(--tb-hover);
-  color: var(--tb-text);
+  border-color: var(--toolbar-separator);
+  background: var(--toolbar-hover);
+  color: var(--toolbar-text);
 }
 
 .action-bar-git-badge {
@@ -450,8 +361,8 @@ textarea:focus-visible {
   height: 17px;
   border-radius: 9px;
   padding: 0 4px;
-  background: rgba(232, 171, 83, 0.16);
-  color: var(--tb-warning);
+  background: var(--warning-surface-strong);
+  color: var(--toolbar-warning);
   font-size: 10px;
   font-weight: 700;
 }
@@ -463,11 +374,11 @@ textarea:focus-visible {
   z-index: 110;
   width: min(360px, calc(100vw - 20px));
   overflow: hidden;
-  border: 1px solid var(--tb-sep);
+  border: 1px solid var(--toolbar-separator);
   border-radius: 8px;
-  background: var(--tb-bg-alt);
-  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.38);
-  color: var(--tb-text);
+  background: var(--toolbar-bg-alt);
+  box-shadow: var(--shadow-popover);
+  color: var(--toolbar-text);
 }
 
 .git-summary-header {
@@ -479,7 +390,7 @@ textarea:focus-visible {
 }
 
 .git-summary-header > span {
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -498,13 +409,13 @@ textarea:focus-visible {
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   cursor: pointer;
 }
 
 .git-summary-header-actions button:hover:not(:disabled) {
-  background: var(--tb-hover);
-  color: var(--tb-text);
+  background: var(--toolbar-hover);
+  color: var(--toolbar-text);
 }
 
 .git-summary-header-actions button:disabled {
@@ -529,7 +440,7 @@ textarea:focus-visible {
 
 .git-summary-loading {
   margin: 2px 6px 5px;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -545,7 +456,7 @@ textarea:focus-visible {
   border-radius: 5px;
   padding: 4px 8px;
   background: transparent;
-  color: var(--tb-text);
+  color: var(--toolbar-text);
   text-align: left;
 }
 
@@ -554,12 +465,12 @@ button.git-summary-row {
 }
 
 button.git-summary-row:hover:not(:disabled) {
-  background: var(--tb-hover);
+  background: var(--toolbar-hover);
 }
 
 button.git-summary-row:disabled,
 .git-summary-row--muted {
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   cursor: default;
   opacity: 0.55;
 }
@@ -580,7 +491,7 @@ button.git-summary-row:disabled,
 .git-summary-row-value {
   min-width: 0;
   overflow: hidden;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 12px;
   text-align: right;
   text-overflow: ellipsis;
@@ -601,26 +512,26 @@ button.git-summary-row:disabled,
 }
 
 .git-summary-change-count strong {
-  color: var(--color-success);
+  color: var(--status-success);
   font-weight: 500;
 }
 
 .git-summary-change-count em {
-  color: var(--color-danger-text);
+  color: var(--status-danger-text);
   font-style: normal;
 }
 
 .git-summary-divider {
   height: 1px;
   margin: 5px 9px;
-  background: var(--tb-sep);
+  background: var(--toolbar-separator);
 }
 
 .git-summary-warning {
   margin: 7px 9px 2px;
-  border-top: 1px solid var(--tb-sep);
+  border-top: 1px solid var(--toolbar-separator);
   padding-top: 9px;
-  color: var(--tb-warning);
+  color: var(--toolbar-warning);
   font-size: 11.5px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -631,9 +542,9 @@ button.git-summary-row:disabled,
   align-items: center;
   gap: 9px;
   min-height: 64px;
-  border-top: 1px solid var(--tb-sep);
+  border-top: 1px solid var(--toolbar-separator);
   padding: 12px 16px;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 12px;
 }
 
@@ -658,19 +569,19 @@ button.git-summary-row:disabled,
 .section-label {
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .section-label--muted {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .section-desc {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -681,7 +592,7 @@ button.git-summary-row:disabled,
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 5px 12px;
   font-size: 12px;
@@ -689,15 +600,15 @@ button.git-summary-row:disabled,
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
 .lang-btn:hover:not(:disabled) {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 .lang-btn:disabled {
@@ -706,26 +617,26 @@ button.git-summary-row:disabled,
 }
 
 .lang-btn--primary {
-  background: var(--color-primary-solid);
-  border-color: var(--color-primary-solid);
+  background: var(--action-primary-solid);
+  border-color: var(--action-primary-solid);
   color: white;
 }
 
 .lang-btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-solid-hover);
-  border-color: var(--color-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
+  border-color: var(--action-primary-solid-hover);
   color: white;
 }
 
 .lang-btn--ghost {
   background: transparent;
   border-color: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .lang-btn--ghost:hover:not(:disabled) {
-  color: var(--color-text-secondary);
-  background: var(--color-surface-alt);
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
   border-color: transparent;
 }
 
@@ -737,35 +648,35 @@ button.git-summary-row:disabled,
 }
 
 .lang-btn--restore {
-  background: var(--color-warning);
-  border-color: var(--color-warning);
+  background: var(--status-warning);
+  border-color: var(--status-warning);
   color: white;
 }
 
 .lang-btn--restore:hover:not(:disabled) {
-  background: #b45309;
-  border-color: #b45309;
+  background: var(--status-warning-strong);
+  border-color: var(--status-warning-strong);
   color: white;
 }
 
 .lang-btn--danger {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .lang-btn--danger:hover:not(:disabled) {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  background: var(--color-danger-light);
+  border-color: var(--status-danger);
+  color: var(--status-danger);
+  background: var(--status-danger-surface);
 }
 
 /* Code list - compact table-like rows */
 .lang-code-list {
   display: grid;
   gap: 0;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .lang-code-row {
@@ -773,7 +684,7 @@ button.git-summary-row:disabled,
   grid-template-columns: 54px 1fr 1fr auto;
   gap: 0;
   align-items: center;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
   transition: background 0.1s;
 }
 
@@ -782,24 +693,24 @@ button.git-summary-row:disabled,
 }
 
 .lang-code-row:hover {
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
 }
 
 .lang-code-row--zh {
-  background: var(--color-primary-light);
+  background: var(--action-primary-subtle);
 }
 
 .lang-code-row--zh:hover {
-  background: #dbeafe;
+  background: var(--selection-highlight);
 }
 
 .lang-code-row--add {
-  background: var(--color-surface-alt);
-  border-top: 1px solid var(--color-border);
+  background: var(--surface-subtle);
+  border-top: 1px solid var(--border-default);
 }
 
 .lang-code-row--add:hover {
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .lang-code-cell {
@@ -812,14 +723,14 @@ button.git-summary-row:disabled,
 
 .lang-code-cell--badge {
   justify-content: center;
-  border-right: 1px solid var(--color-border-light);
+  border-right: 1px solid var(--border-subtle);
 }
 
 .lang-code-cell--actions {
   justify-content: flex-end;
   gap: 4px;
   padding-right: 10px;
-  border-left: 1px solid var(--color-border-light);
+  border-left: 1px solid var(--border-subtle);
 }
 
 .lang-code-input {
@@ -829,24 +740,24 @@ button.git-summary-row:disabled,
   padding: 4px 8px;
   font-size: 13px;
   background: transparent;
-  color: var(--color-text);
+  color: var(--text-primary);
   transition: all 0.15s;
 }
 
 .lang-code-input:hover {
-  border-color: var(--color-border);
+  border-color: var(--border-default);
   background: white;
 }
 
 .lang-code-input:focus {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: var(--action-primary);
   background: white;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .lang-code-input:disabled {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: default;
 }
 
@@ -862,18 +773,18 @@ button.git-summary-row:disabled,
   width: 36px;
   padding: 2px 0;
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--text-primary);
   text-transform: lowercase;
 }
 
 .lang-code-badge--zh {
-  background: var(--color-primary-solid);
-  border-color: var(--color-primary-solid);
+  background: var(--action-primary-solid);
+  border-color: var(--action-primary-solid);
   color: white;
 }
 
@@ -886,11 +797,11 @@ button.git-summary-row:disabled,
   display: grid;
   grid-template-columns: 54px 1fr 1fr auto;
   gap: 0;
-  background: var(--color-surface-alt);
-  border-bottom: 1px solid var(--color-border);
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border-default);
   font-size: 11px;
   font-weight: 700;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -903,11 +814,11 @@ button.git-summary-row:disabled,
 
 .lang-code-header span:first-child {
   justify-content: center;
-  border-right: 1px solid var(--color-border-light);
+  border-right: 1px solid var(--border-subtle);
 }
 
 .lang-code-header span:last-child {
-  border-left: 1px solid var(--color-border-light);
+  border-left: 1px solid var(--border-subtle);
   justify-content: flex-end;
   padding-right: 10px;
 }
@@ -930,37 +841,37 @@ button.git-summary-row:disabled,
   flex: 1;
   min-width: 180px;
   max-width: 260px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
   font-size: 13px;
   background: white;
-  color: var(--color-text);
+  color: var(--text-primary);
   transition: border-color 0.15s;
 }
 
 .lang-filter-input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 /* Table key cell */
 .lang-table-key-cell {
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
 .lang-table-key-cell--config {
-  color: var(--color-primary);
+  color: var(--action-primary);
   font-style: italic;
 }
 
 .lang-table-empty {
   text-align: center;
   padding: 32px 16px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -980,7 +891,7 @@ button.git-summary-row:disabled,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
   animation: fadeIn 0.15s ease-out;
 }
@@ -992,8 +903,8 @@ button.git-summary-row:disabled,
   width: 90%;
   padding: 24px;
   border-radius: var(--radius-xl);
-  background: var(--color-surface);
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-overlay);
   animation: fadeIn 0.15s ease-out;
 }
 
@@ -1005,7 +916,7 @@ button.git-summary-row:disabled,
 
 .modal-box p {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.6;
   word-break: break-all;
@@ -1014,10 +925,10 @@ button.git-summary-row:disabled,
 .modal-box .modal-path {
   padding: 8px 12px;
   border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-default);
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   word-break: break-all;
   font-family: var(--font-mono);
 }
@@ -1039,31 +950,31 @@ button.git-summary-row:disabled,
 }
 
 .modal-actions .modal-btn-cancel {
-  background: var(--color-surface-alt);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
 }
 
 .modal-actions .modal-btn-cancel:hover {
-  background: var(--color-border-light);
+  background: var(--border-subtle);
 }
 
 .modal-actions .modal-btn-confirm {
-  background: var(--color-primary-solid);
+  background: var(--action-primary-solid);
   color: white;
 }
 
 .modal-actions .modal-btn-confirm:hover {
-  background: var(--color-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
 }
 
 .modal-actions .modal-btn-danger {
-  background: var(--color-danger);
+  background: var(--status-danger);
   color: white;
 }
 
 .modal-actions .modal-btn-danger:hover {
-  background: #b91c1c;
+  background: var(--status-danger-text);
 }
 
 /* ── Activity Bar + Secondary List (VSCode-style) ── */
@@ -1086,9 +997,9 @@ button.git-summary-row:disabled,
   width: 64px;
   flex-shrink: 0;
   padding: 4px 0;
-  background: var(--tb-bg);
-  color: var(--tb-text);
-  border-right: 1px solid var(--tb-sep);
+  background: var(--toolbar-bg);
+  color: var(--toolbar-text);
+  border-right: 1px solid var(--toolbar-separator);
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -1106,7 +1017,7 @@ button.git-summary-row:disabled,
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   cursor: pointer;
   transition:
     color 0.1s,
@@ -1115,13 +1026,13 @@ button.git-summary-row:disabled,
 }
 
 .activity-icon:hover {
-  color: var(--tb-text);
-  background: var(--tb-hover);
+  color: var(--toolbar-text);
+  background: var(--toolbar-hover);
 }
 
 .activity-icon.active {
-  color: var(--tb-text);
-  background: var(--tb-active);
+  color: var(--toolbar-text);
+  background: var(--toolbar-active);
 }
 
 .activity-icon.active::before {
@@ -1132,8 +1043,8 @@ button.git-summary-row:disabled,
   left: -2px;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: var(--activity-accent, var(--tb-accent));
-  box-shadow: 0 0 8px color-mix(in srgb, var(--activity-accent, var(--tb-accent)) 55%, transparent);
+  background: var(--activity-accent, var(--toolbar-accent));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--activity-accent, var(--toolbar-accent)) 55%, transparent);
 }
 
 .activity-icon-glyph {
@@ -1160,13 +1071,13 @@ button.git-summary-row:disabled,
   right: 13px;
   width: 7px;
   height: 7px;
-  border: 2px solid var(--tb-bg);
+  border: 2px solid var(--toolbar-bg);
   border-radius: 50%;
-  background: var(--color-danger);
+  background: var(--status-danger);
 }
 
 .activity-icon--warning {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 .activity-spacer {
@@ -1178,9 +1089,9 @@ button.git-summary-row:disabled,
   flex-direction: column;
   width: 180px;
   flex-shrink: 0;
-  background: var(--tb-bg-alt);
-  color: var(--tb-text);
-  border-right: 1px solid var(--tb-sep);
+  background: var(--toolbar-bg-alt);
+  color: var(--toolbar-text);
+  border-right: 1px solid var(--toolbar-separator);
   overflow: hidden;
   transition:
     width 0.16s ease,
@@ -1197,7 +1108,7 @@ button.git-summary-row:disabled,
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   flex-shrink: 0;
 }
 
@@ -1208,8 +1119,8 @@ button.git-summary-row:disabled,
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: var(--tb-active);
-  color: var(--tb-text);
+  background: var(--toolbar-active);
+  color: var(--toolbar-text);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0;
@@ -1233,7 +1144,7 @@ button.git-summary-row:disabled,
   border-radius: 5px;
   padding: 7px 10px;
   background: transparent;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   cursor: pointer;
   text-align: left;
   width: 100%;
@@ -1246,13 +1157,13 @@ button.git-summary-row:disabled,
 }
 
 .activity-item:hover {
-  color: var(--tb-text);
-  background: var(--tb-hover);
+  color: var(--toolbar-text);
+  background: var(--toolbar-hover);
 }
 
 .activity-item.active {
-  color: var(--tb-text);
-  background: var(--tb-active);
+  color: var(--toolbar-text);
+  background: var(--toolbar-active);
 }
 
 .activity-item.active::before {
@@ -1263,7 +1174,7 @@ button.git-summary-row:disabled,
   left: 2px;
   width: 2px;
   border-radius: 1px;
-  background: var(--tb-accent);
+  background: var(--toolbar-accent);
 }
 
 .activity-item-label {
@@ -1277,11 +1188,11 @@ button.git-summary-row:disabled,
 .module-lifecycle-badge {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--color-primary-border);
+  border: 1px solid var(--action-primary-border);
   border-radius: 999px;
   padding: 0 5px;
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
   font-size: 10px;
   line-height: 16px;
   font-weight: 500;
@@ -1289,20 +1200,20 @@ button.git-summary-row:disabled,
 }
 
 .module-lifecycle-badge--experimental {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 [data-theme="dark"] .module-lifecycle-badge--experimental {
-  color: #75b7ff;
+  color: var(--text-link-on-dark);
 }
 
 .module-lifecycle-badge--deprecated,
 .module-lifecycle-badge--experimental-deprecated {
-  border-color: rgba(232, 171, 83, 0.38);
-  color: var(--color-warning);
-  background: var(--color-warning-light);
+  border-color: var(--status-warning-border);
+  color: var(--status-warning);
+  background: var(--status-warning-surface);
 }
 
 /* ── Version Popup ── */
@@ -1312,10 +1223,10 @@ button.git-summary-row:disabled,
   left: 68px;
   bottom: 8px;
   width: 320px;
-  background: var(--tb-bg-alt);
-  border: 1px solid var(--tb-sep);
+  background: var(--toolbar-bg-alt);
+  border: 1px solid var(--toolbar-separator);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-floating);
   z-index: 100;
   overflow: hidden;
 }
@@ -1325,13 +1236,13 @@ button.git-summary-row:disabled,
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--tb-sep);
+  border-bottom: 1px solid var(--toolbar-separator);
 }
 
 .version-popup-title {
   font-size: 13px;
   font-weight: 700;
-  color: var(--tb-text);
+  color: var(--toolbar-text);
 }
 
 .version-popup-close {
@@ -1342,7 +1253,7 @@ button.git-summary-row:disabled,
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   cursor: pointer;
   font-size: 14px;
   transition:
@@ -1351,8 +1262,8 @@ button.git-summary-row:disabled,
 }
 
 .version-popup-close:hover {
-  color: var(--tb-text);
-  background: var(--tb-hover);
+  color: var(--toolbar-text);
+  background: var(--toolbar-hover);
 }
 
 .version-popup-body {
@@ -1379,12 +1290,12 @@ button.git-summary-row:disabled,
 }
 
 .version-popup-grid span {
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   white-space: nowrap;
 }
 
 .version-popup-grid strong {
-  color: var(--tb-text);
+  color: var(--toolbar-text);
   font-weight: 500;
   word-break: break-all;
 }
@@ -1402,23 +1313,23 @@ button.git-summary-row:disabled,
   height: 7px;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--tb-text-muted);
+  background: var(--toolbar-text-muted);
 }
 
 .core-status--ready > span {
-  background: var(--color-success);
+  background: var(--status-success);
 }
 
 .core-status--preview > span {
-  background: var(--color-primary);
+  background: var(--action-primary);
 }
 
 .version-popup-grid strong.core-status--error {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 .core-status--error > span {
-  background: var(--color-danger);
+  background: var(--status-danger);
 }
 
 .version-update-panel {
@@ -1435,7 +1346,7 @@ button.git-summary-row:disabled,
 .version-update-status {
   flex: 1;
   min-width: 0;
-  color: var(--tb-text);
+  color: var(--toolbar-text);
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -1444,10 +1355,10 @@ button.git-summary-row:disabled,
 .version-update-button {
   flex-shrink: 0;
   min-width: 76px;
-  border: 1px solid var(--tb-accent);
+  border: 1px solid var(--toolbar-accent);
   border-radius: 5px;
   padding: 4px 8px;
-  background: var(--tb-accent);
+  background: var(--toolbar-accent);
   color: white;
   font-size: 12px;
   font-weight: 600;
@@ -1457,7 +1368,7 @@ button.git-summary-row:disabled,
 }
 
 .version-update-button:hover:not(:disabled) {
-  background: var(--tb-accent-hover);
+  background: var(--toolbar-accent-hover);
 }
 
 .version-update-button:disabled {
@@ -1469,7 +1380,7 @@ button.git-summary-row:disabled,
   height: 5px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--tb-hover);
+  background: var(--toolbar-hover);
 }
 
 .version-update-progress span {
@@ -1477,7 +1388,7 @@ button.git-summary-row:disabled,
   height: 100%;
   min-width: 12%;
   border-radius: inherit;
-  background: var(--tb-accent);
+  background: var(--toolbar-accent);
   transition: width 0.18s ease;
 }
 
@@ -1485,7 +1396,7 @@ button.git-summary-row:disabled,
   max-height: 96px;
   margin: 0;
   overflow: auto;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -1496,13 +1407,13 @@ button.git-summary-row:disabled,
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--action-primary);
   font-size: 12px;
   font-weight: 600;
 }
 
 .version-update-link:hover {
-  color: var(--color-primary-hover);
+  color: var(--action-primary-hover);
   text-decoration: underline;
 }
 
@@ -1520,14 +1431,14 @@ button.git-summary-row:disabled,
 
 .version-diagnostic-status {
   min-width: 0;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
 .version-diagnostic-status--error {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 .version-diagnostic-button {
@@ -1539,7 +1450,7 @@ button.git-summary-row:disabled,
 
 .version-diagnostic-privacy {
   margin: 0;
-  color: var(--tb-text-muted);
+  color: var(--toolbar-text-muted);
   font-size: 11px;
 }
 
@@ -1550,22 +1461,22 @@ button.git-summary-row:disabled,
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: var(--color-surface-alt);
-  border-bottom: 1px solid var(--color-border-light);
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border-subtle);
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .breadcrumb-group {
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--action-primary);
 }
 
 .breadcrumb-group--link {
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--action-primary);
   cursor: pointer;
   font: inherit;
 }
@@ -1576,18 +1487,18 @@ button.git-summary-row:disabled,
 
 .breadcrumb-group--link:focus-visible {
   border-radius: 2px;
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--action-primary);
   outline-offset: 2px;
 }
 
 .breadcrumb-sep {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   opacity: 0.5;
 }
 
 .breadcrumb-current {
   font-weight: 500;
-  color: var(--color-text);
+  color: var(--text-primary);
 }
 
 /* ── Workspace ── */
@@ -1607,7 +1518,7 @@ button.git-summary-row:disabled,
 
 .eyebrow {
   margin: 0 0 4px;
-  color: var(--color-primary);
+  color: var(--action-primary);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1631,7 +1542,7 @@ button.git-summary-row:disabled,
   gap: 14px;
   padding: 0 0 16px;
   margin-bottom: 4px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .project-open-card:last-child,
@@ -1656,7 +1567,7 @@ button.git-summary-row:disabled,
 .ui-preview-copy p,
 .export-card p {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   line-height: 1.5;
   font-size: 13px;
 }
@@ -1707,7 +1618,7 @@ button.git-summary-row:disabled,
 .export-filename-grid label {
   display: grid;
   gap: 4px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -1716,10 +1627,10 @@ button.git-summary-row:disabled,
 .project-create-grid input,
 .export-form input,
 .export-filename-grid input {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
 }
@@ -1729,8 +1640,8 @@ button.git-summary-row:disabled,
 .export-form input:focus,
 .export-filename-grid input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 /* ── Buttons ── */
@@ -1749,7 +1660,7 @@ button.git-summary-row:disabled,
   border: 0;
   border-radius: var(--radius-sm);
   padding: 7px 14px;
-  background: var(--color-primary-solid);
+  background: var(--action-primary-solid);
   color: white;
   cursor: pointer;
   font-weight: 600;
@@ -1762,15 +1673,15 @@ button.git-summary-row:disabled,
 .path-open-button:hover,
 .export-form button:hover,
 .recent-projects-panel button:hover {
-  background: var(--color-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
 }
 
 .sample-actions button {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 12px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   cursor: pointer;
   font-weight: 600;
   font-size: 12px;
@@ -1778,9 +1689,9 @@ button.git-summary-row:disabled,
 }
 
 .sample-actions button:hover {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 .sample-actions button:disabled {
@@ -1792,10 +1703,10 @@ button.git-summary-row:disabled,
   display: grid;
   gap: 10px;
   min-width: 0;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 12px;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .export-result-header,
@@ -1807,31 +1718,31 @@ button.git-summary-row:disabled,
 }
 
 .export-result-header strong {
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
 }
 
 .export-result-header span {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .export-result-header button {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 5px 10px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
 
 .export-result-header button:hover {
-  border-color: var(--color-primary-border);
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
 }
 
 .export-tools-section {
@@ -1873,7 +1784,7 @@ button.git-summary-row:disabled,
 }
 
 .project-section-hint {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
 }
@@ -1881,7 +1792,7 @@ button.git-summary-row:disabled,
 .project-section-header strong {
   font-size: 13px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--text-primary);
 }
 
 /* Open project row */
@@ -1896,19 +1807,19 @@ button.git-summary-row:disabled,
 .project-open-input {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
   font-size: 13px;
-  color: var(--color-text);
-  background: var(--color-surface);
+  color: var(--text-primary);
+  background: var(--surface-panel);
   transition: border-color 0.15s;
 }
 
 .project-open-input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .project-open-actions {
@@ -1930,14 +1841,14 @@ button.git-summary-row:disabled,
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  background: var(--color-primary-solid);
+  background: var(--action-primary-solid);
   color: white;
   white-space: nowrap;
   transition: background 0.15s;
 }
 
 .project-open-btn:hover:not(:disabled) {
-  background: var(--color-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
 }
 
 .project-open-btn:disabled {
@@ -1946,21 +1857,21 @@ button.git-summary-row:disabled,
 }
 
 .project-open-btn--secondary {
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
 }
 
 .project-open-btn--secondary:hover:not(:disabled) {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 .project-link-btn {
   border: 0;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--action-primary);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -1969,7 +1880,7 @@ button.git-summary-row:disabled,
 }
 
 .project-link-btn:hover:not(:disabled) {
-  color: var(--color-primary-hover);
+  color: var(--action-primary-hover);
   text-decoration: underline;
 }
 
@@ -1991,12 +1902,12 @@ button.git-summary-row:disabled,
 .project-recent-select {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
   font-size: 12px;
-  color: var(--color-text);
-  background: var(--color-surface);
+  color: var(--text-primary);
+  background: var(--surface-panel);
   cursor: pointer;
   transition:
     border-color 0.15s,
@@ -2005,8 +1916,8 @@ button.git-summary-row:disabled,
 
 .project-recent-select:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .project-recent-select:disabled {
@@ -2022,19 +1933,19 @@ button.git-summary-row:disabled,
 
 .project-create-name {
   width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   font-size: 13px;
-  color: var(--color-text);
-  background: var(--color-surface);
+  color: var(--text-primary);
+  background: var(--surface-panel);
   transition: border-color 0.15s;
 }
 
 .project-create-name:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .project-create-bottom {
@@ -2053,30 +1964,30 @@ button.git-summary-row:disabled,
 .project-create-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
 .project-create-num {
   width: 68px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
   font-size: 13px;
-  color: var(--color-text);
-  background: var(--color-surface);
+  color: var(--text-primary);
+  background: var(--surface-panel);
   text-align: center;
   transition: border-color 0.15s;
 }
 
 .project-create-num:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .project-create-x {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
   flex-shrink: 0;
 }
@@ -2092,29 +2003,29 @@ button.git-summary-row:disabled,
   display: grid;
   gap: 2px;
   padding: 6px 10px;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
 }
 
 .project-info-item span {
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .project-info-item strong {
   font-size: 13px;
-  color: var(--color-text);
+  color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
 .project-info-item strong.project-info-path {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .project-info-actions {
@@ -2125,7 +2036,7 @@ button.git-summary-row:disabled,
 
 .project-git-section {
   padding-top: 12px;
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .git-version-create {
@@ -2139,24 +2050,24 @@ button.git-summary-row:disabled,
 .git-version-input {
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface-panel);
+  color: var(--text-primary);
   font-size: 13px;
 }
 
 .git-version-input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .git-managed-paths,
 .git-history-empty {
   margin: 0;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -2164,9 +2075,9 @@ button.git-summary-row:disabled,
 .git-loading-status {
   margin: 0;
   padding: 7px 9px;
-  border-left: 2px solid var(--color-primary);
-  background: var(--color-primary-light);
-  color: var(--color-text-secondary);
+  border-left: 2px solid var(--action-primary);
+  background: var(--action-primary-subtle);
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -2190,18 +2101,18 @@ button.git-summary-row:disabled,
 }
 
 .git-history-header strong {
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 12px;
 }
 
 .git-history-header span {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 11px;
 }
 
 .git-history-list {
   display: grid;
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .git-history-row {
@@ -2210,11 +2121,11 @@ button.git-summary-row:disabled,
   gap: 10px;
   align-items: center;
   min-height: 48px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .git-history-row code {
-  color: var(--color-primary);
+  color: var(--action-primary);
   font-size: 12px;
 }
 
@@ -2226,14 +2137,14 @@ button.git-summary-row:disabled,
 
 .git-history-copy strong {
   overflow: hidden;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .git-history-copy span {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 11px;
 }
 
@@ -2268,7 +2179,7 @@ button.git-summary-row:disabled,
 }
 
 .git-preview-content section > strong {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -2276,11 +2187,11 @@ button.git-summary-row:disabled,
   min-height: 300px;
   margin: 0;
   overflow: auto;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 10px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-secondary);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.5;
@@ -2306,10 +2217,10 @@ button.git-summary-row:disabled,
 .export-report article {
   display: grid;
   gap: 3px;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 10px 12px;
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
   min-width: 0;
 }
 
@@ -2319,7 +2230,7 @@ button.git-summary-row:disabled,
 
 .project-open-report span,
 .export-report span {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -2327,19 +2238,19 @@ button.git-summary-row:disabled,
 .project-open-report strong,
 .export-report strong {
   overflow-wrap: anywhere;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 14px;
 }
 
 .project-open-error,
 .export-error {
-  color: var(--color-danger);
+  color: var(--status-danger);
   font-size: 13px;
 }
 
 .project-open-warning,
 .export-warning {
-  color: var(--color-warning);
+  color: var(--status-warning);
   font-size: 13px;
 }
 
@@ -2349,7 +2260,7 @@ button.git-summary-row:disabled,
   border: 1px solid currentColor;
   border-radius: var(--radius-sm);
   padding: 8px 10px;
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -2386,9 +2297,9 @@ button.git-summary-row:disabled,
 .ui-resource-side-panel,
 .ui-option-gallery-panel,
 .ui-property-panel {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
 }
 
 .ui-resource-tree-panel {
@@ -2429,13 +2340,13 @@ button.git-summary-row:disabled,
 
 .ui-resource-tree-header strong,
 .ui-panel-section-title strong {
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 14px;
 }
 
 .ui-resource-tree-header span,
 .ui-panel-section-title span {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -2451,7 +2362,7 @@ button.git-summary-row:disabled,
 .ui-tree-children {
   margin-left: 16px;
   padding-left: 10px;
-  border-left: 1px dashed var(--color-border);
+  border-left: 1px dashed var(--border-default);
 }
 
 .ui-tree-children--nested {
@@ -2470,19 +2381,19 @@ button.git-summary-row:disabled,
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--color-text);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
 .ui-tree-toggle {
   padding: 0;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 13px;
 }
 
 .ui-tree-toggle:hover,
 .ui-tree-node:hover {
-  border-color: var(--color-border);
+  border-color: var(--border-default);
   background: white;
 }
 
@@ -2507,43 +2418,43 @@ button.git-summary-row:disabled,
 }
 
 .ui-tree-node small {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 11px;
 }
 
 .ui-tree-node--group {
-  background: rgba(37, 99, 235, 0.06);
+  background: var(--selection-subtle);
 }
 
 .ui-tree-node--resource.selected {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: rgba(37, 99, 235, 0.12);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.08);
+  border-color: var(--selection-border);
+  background: var(--focus-ring-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--action-primary) 8%, transparent);
 }
 
 .ui-tree-empty,
 .ui-property-muted {
   margin: 0;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .ui-canvas-frame {
   overflow: auto;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   padding: 16px;
-  background: #0f172a;
+  background: var(--canvas-surface);
 }
 
 .ui-canvas {
   position: relative;
   min-height: 272px;
-  border: 1px dashed rgba(148, 163, 184, 0.4);
+  border: 1px dashed var(--canvas-grid-border);
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px), #111827;
+    linear-gradient(var(--canvas-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--canvas-grid-line) 1px, transparent 1px), var(--canvas-surface-deep);
   background-size: 24px 24px;
 }
 
@@ -2553,18 +2464,18 @@ button.git-summary-row:disabled,
   align-items: flex-start;
   justify-content: flex-start;
   overflow: hidden;
-  border: 1px solid rgba(6, 182, 212, 0.7);
+  border: 1px solid var(--canvas-object-border);
   border-radius: var(--radius-md);
   padding: 6px;
-  background: rgba(6, 182, 212, 0.15);
-  color: #ecfeff;
+  background: var(--canvas-object-surface);
+  color: var(--canvas-object-text);
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s;
 }
 
 .ui-canvas-item:hover {
-  border-color: rgba(6, 182, 212, 1);
+  border-color: var(--canvas-object-border-active);
 }
 
 .ui-canvas-image {
@@ -2584,7 +2495,7 @@ button.git-summary-row:disabled,
   max-width: 100%;
   border-radius: var(--radius-sm);
   padding: 4px 6px;
-  background: rgba(15, 23, 42, 0.7);
+  background: var(--canvas-label-surface);
 }
 
 .ui-canvas-label strong,
@@ -2595,12 +2506,12 @@ button.git-summary-row:disabled,
 }
 
 .ui-canvas-item.selected {
-  border-color: #fbbf24;
-  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2);
+  border-color: var(--status-warning-border-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-warning-border-strong) 20%, transparent);
 }
 
 .ui-canvas-item small {
-  color: #a7f3d0;
+  color: var(--canvas-success-text);
 }
 
 .ui-canvas-image-error {
@@ -2611,8 +2522,8 @@ button.git-summary-row:disabled,
   margin-top: auto;
   border-radius: var(--radius-sm);
   padding: 4px 6px;
-  background: rgba(185, 28, 28, 0.85);
-  color: #fee2e2;
+  background: var(--canvas-danger-surface);
+  color: var(--canvas-danger-text);
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -2621,7 +2532,7 @@ button.git-summary-row:disabled,
   position: absolute;
   left: 50%;
   top: 50%;
-  color: #64748b;
+  color: var(--text-muted);
   transform: translate(-50%, -50%);
   font-size: 14px;
 }
@@ -2642,15 +2553,15 @@ button.git-summary-row:disabled,
   grid-template-columns: 64px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   padding: 8px;
   background: white;
 }
 
 .ui-option-card.selected {
-  border-color: rgba(37, 99, 235, 0.55);
-  background: rgba(37, 99, 235, 0.06);
+  border-color: var(--selection-border-strong);
+  background: var(--selection-subtle);
 }
 
 .ui-option-preview {
@@ -2659,11 +2570,11 @@ button.git-summary-row:disabled,
   overflow: hidden;
   width: 64px;
   height: 48px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 0;
-  background: #0f172a;
-  color: #cbd5e1;
+  background: var(--canvas-surface);
+  color: var(--text-code);
   cursor: pointer;
   font-size: 11px;
 }
@@ -2688,7 +2599,7 @@ button.git-summary-row:disabled,
 }
 
 .ui-option-meta strong {
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 12px;
 }
 
@@ -2696,14 +2607,14 @@ button.git-summary-row:disabled,
   width: fit-content;
   border-radius: 999px;
   padding: 2px 6px;
-  background: rgba(37, 99, 235, 0.12);
-  color: var(--color-primary);
+  background: var(--focus-ring-strong);
+  color: var(--action-primary);
   font-size: 11px;
   font-weight: 700;
 }
 
 .ui-option-meta small {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 11px;
 }
 
@@ -2717,20 +2628,20 @@ button.git-summary-row:disabled,
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 0;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 13px;
   transition: all 0.15s;
 }
 
 .ui-option-delete:hover:not(:disabled) {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  background: var(--color-danger-light);
+  border-color: var(--status-danger);
+  color: var(--status-danger);
+  background: var(--status-danger-surface);
 }
 
 .ui-property-panel {
@@ -2745,14 +2656,14 @@ button.git-summary-row:disabled,
 }
 
 .ui-property-panel small {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .ui-property-section {
   display: grid;
   gap: 10px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border-default);
   padding-top: 12px;
 }
 
@@ -2774,14 +2685,14 @@ button.git-summary-row:disabled,
 }
 
 .ui-property-facts dt {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .ui-property-facts dd {
   min-width: 0;
   margin: 0;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
@@ -2801,7 +2712,7 @@ button.git-summary-row:disabled,
 .ui-property-grid label {
   display: grid;
   gap: 5px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -2810,11 +2721,11 @@ button.git-summary-row:disabled,
 .ui-property-grid select,
 .ui-option-tools textarea {
   width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 7px 10px;
   background: white;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
 }
@@ -2823,8 +2734,8 @@ button.git-summary-row:disabled,
 .ui-property-grid select:focus,
 .ui-option-tools textarea:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .ui-option-tools {
@@ -2835,7 +2746,7 @@ button.git-summary-row:disabled,
 .ui-option-tools label {
   display: grid;
   gap: 5px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -2858,7 +2769,7 @@ button.git-summary-row:disabled,
   align-items: center;
   justify-content: center;
   gap: 4px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 14px;
   font-size: 12px;
@@ -2875,41 +2786,41 @@ button.git-summary-row:disabled,
 }
 
 .ui-editor-btn--primary {
-  background: var(--color-primary-solid);
-  border-color: var(--color-primary-solid);
+  background: var(--action-primary-solid);
+  border-color: var(--action-primary-solid);
   color: white;
 }
 
 .ui-editor-btn--primary:hover:not(:disabled) {
-  background: var(--color-primary-solid-hover);
-  border-color: var(--color-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
+  border-color: var(--action-primary-solid-hover);
 }
 
 .ui-editor-btn--secondary {
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
 }
 
 .ui-editor-btn--secondary:hover:not(:disabled) {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 .ui-editor-btn--danger {
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .ui-editor-btn--danger:hover:not(:disabled) {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  background: var(--color-danger-light);
+  border-color: var(--status-danger);
+  color: var(--status-danger);
+  background: var(--status-danger-surface);
 }
 
 .ui-preview-errors {
   margin: 0;
-  color: var(--color-danger);
+  color: var(--status-danger);
   font-size: 13px;
 }
 
@@ -2973,13 +2884,13 @@ button.git-summary-row:disabled,
 }
 
 .config-summary-strip span {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 500;
 }
 
 .config-summary-strip strong {
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
 }
@@ -2988,11 +2899,11 @@ button.git-summary-row:disabled,
 
 .config-helper-text {
   margin: 0;
-  border-left: 2px solid var(--color-primary-border);
+  border-left: 2px solid var(--action-primary-border);
   border-radius: 0;
   padding: 6px 12px;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   line-height: 1.5;
   font-size: 12px;
 }
@@ -3013,11 +2924,11 @@ button.git-summary-row:disabled,
 }
 
 .config-table-toolbar input {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
   background: white;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
   min-width: 160px;
@@ -3025,8 +2936,8 @@ button.git-summary-row:disabled,
 
 .config-table-toolbar input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .config-table-toolbar button,
@@ -3035,7 +2946,7 @@ button.git-summary-row:disabled,
   border: 0;
   border-radius: var(--radius-sm);
   padding: 6px 12px;
-  background: var(--color-primary-solid);
+  background: var(--action-primary-solid);
   color: white;
   cursor: pointer;
   font-weight: 600;
@@ -3046,7 +2957,7 @@ button.git-summary-row:disabled,
 .config-table-toolbar button:hover,
 .structured-list button:hover,
 .config-table button:hover {
-  background: var(--color-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
 }
 
 /* ── Structured List ── */
@@ -3060,11 +2971,11 @@ button.git-summary-row:disabled,
 .structured-list label {
   display: grid;
   gap: 5px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   padding: 12px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-secondary);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -3090,11 +3001,11 @@ button.git-summary-row:disabled,
 .structured-list label {
   display: grid;
   gap: 5px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   padding: 12px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-secondary);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -3103,11 +3014,11 @@ button.git-summary-row:disabled,
 .config-table input,
 .config-table select {
   width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   background: white;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
 }
@@ -3116,17 +3027,17 @@ button.git-summary-row:disabled,
 .config-table input:focus,
 .config-table select:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 /* ── Config Table ── */
 
 .config-table-frame {
   overflow: auto;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .config-table {
@@ -3138,7 +3049,7 @@ button.git-summary-row:disabled,
 
 .config-table th,
 .config-table td {
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
   padding: 8px 10px;
   text-align: left;
   vertical-align: top;
@@ -3148,8 +3059,8 @@ button.git-summary-row:disabled,
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--color-surface-alt);
-  color: var(--color-text-secondary);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -3158,16 +3069,16 @@ button.git-summary-row:disabled,
 }
 
 .config-table tbody tr:nth-child(even) td {
-  background: #fafbfd;
+  background: var(--table-row-alternate);
 }
 
 .config-table tbody tr:hover td {
-  background: var(--color-primary-light);
+  background: var(--action-primary-subtle);
 }
 
 .config-table tbody tr.pdo-row-highlight td {
-  background: #fef3c7;
-  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.4);
+  background: var(--status-warning-highlight);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-warning-accent) 40%, transparent);
 }
 
 .config-table td {
@@ -3176,22 +3087,22 @@ button.git-summary-row:disabled,
 
 .config-entry-modified,
 .config-table tbody tr.config-entry-modified td {
-  border-color: #fbbf24;
-  background: var(--color-warning-light);
-  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.2);
+  border-color: var(--status-warning-border-strong);
+  background: var(--status-warning-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--status-warning-accent) 20%, transparent);
 }
 
 .config-field-modified {
-  border-color: #f59e0b;
-  background: var(--color-warning-light);
+  border-color: var(--status-warning-accent);
+  background: var(--status-warning-surface);
 }
 
 .config-restore-button {
-  background: var(--color-warning);
+  background: var(--status-warning);
 }
 
 .config-restore-button:hover {
-  background: #b45309;
+  background: var(--status-warning-strong);
 }
 
 /* ── Danger buttons in tables ── */
@@ -3199,22 +3110,22 @@ button.git-summary-row:disabled,
 .config-table button:not(.config-restore-button),
 .structured-list button:not(.config-restore-button) {
   background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
+  color: var(--text-muted);
+  border: 1px solid var(--border-default);
   padding: 4px 10px;
 }
 
 .config-table button.danger,
 .structured-list button.danger {
-  border-color: var(--color-danger);
-  color: var(--color-danger-text);
+  border-color: var(--status-danger);
+  color: var(--status-danger-text);
 }
 
 .config-table button:not(.config-restore-button):hover,
 .structured-list button:not(.config-restore-button):hover {
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  background: var(--color-danger-light);
+  border-color: var(--status-danger);
+  color: var(--status-danger);
+  background: var(--status-danger-surface);
 }
 
 /* ── PDO Editors ── */
@@ -3232,15 +3143,15 @@ button.git-summary-row:disabled,
 }
 
 .pdo-frame-card {
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 12px;
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
   transition: border-color 0.15s;
 }
 
 .pdo-frame-card:hover {
-  border-color: var(--color-primary-border);
+  border-color: var(--action-primary-border);
 }
 
 .pdo-frame-grid {
@@ -3261,9 +3172,9 @@ button.git-summary-row:disabled,
 .pdo-frame-actions button {
   border-radius: var(--radius-sm);
   padding: 7px 12px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   cursor: pointer;
   font-weight: 600;
   font-size: 12px;
@@ -3271,27 +3182,27 @@ button.git-summary-row:disabled,
 }
 
 .pdo-frame-actions button:hover {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 .pdo-frame-actions button.danger {
-  background: var(--color-danger);
-  border-color: var(--color-danger);
+  background: var(--status-danger);
+  border-color: var(--status-danger);
   color: white;
 }
 
 .pdo-frame-actions button.danger:hover {
-  background: #b91c1c;
-  border-color: #b91c1c;
+  background: var(--status-danger-text);
+  border-color: var(--status-danger-text);
 }
 
 .pdo-frame-grid label,
 .pdo-frame-field {
   display: grid;
   gap: 5px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -3299,11 +3210,11 @@ button.git-summary-row:disabled,
 .pdo-frame-grid input,
 .pdo-frame-grid select {
   width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   background: white;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
 }
@@ -3311,15 +3222,15 @@ button.git-summary-row:disabled,
 .pdo-frame-grid input:focus,
 .pdo-frame-grid select:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .pdo-frame-grid button {
   border: 0;
   border-radius: var(--radius-sm);
   padding: 7px 12px;
-  background: var(--color-danger);
+  background: var(--status-danger);
   color: white;
   cursor: pointer;
   font-weight: 600;
@@ -3328,7 +3239,7 @@ button.git-summary-row:disabled,
 }
 
 .pdo-frame-grid button:hover {
-  background: #b91c1c;
+  background: var(--status-danger-text);
 }
 
 .pdo-frame-header {
@@ -3347,7 +3258,7 @@ button.git-summary-row:disabled,
 .private-frame-props label {
   display: grid;
   gap: 4px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -3355,11 +3266,11 @@ button.git-summary-row:disabled,
 .private-frame-props input,
 .private-frame-props select {
   width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface-panel);
+  color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
 }
@@ -3367,8 +3278,8 @@ button.git-summary-row:disabled,
 .private-frame-props input:focus,
 .private-frame-props select:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .private-protocol-header {
@@ -3387,7 +3298,7 @@ button.git-summary-row:disabled,
 
 .private-protocol-header-text p {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   line-height: 1.5;
   font-size: 13px;
 }
@@ -3415,7 +3326,7 @@ button.git-summary-row:disabled,
 .battery-config-row label {
   display: grid;
   gap: 4px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
@@ -3423,11 +3334,11 @@ button.git-summary-row:disabled,
 .battery-config-row input,
 .battery-config-row select {
   width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 5px 8px;
   background: white;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
 }
@@ -3435,8 +3346,8 @@ button.git-summary-row:disabled,
 .battery-config-row input:focus,
 .battery-config-row select:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .battery-frame-card {
@@ -3454,7 +3365,7 @@ button.git-summary-row:disabled,
 .battery-frame-grid label {
   display: grid;
   gap: 3px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 600;
 }
@@ -3462,11 +3373,11 @@ button.git-summary-row:disabled,
 .battery-frame-grid input,
 .battery-frame-grid select {
   width: 100%;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 4px 7px;
   background: white;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 12px;
   transition: border-color 0.15s;
 }
@@ -3474,8 +3385,8 @@ button.git-summary-row:disabled,
 .battery-frame-grid input:focus,
 .battery-frame-grid select:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .battery-frame-actions {
@@ -3488,9 +3399,9 @@ button.git-summary-row:disabled,
 .battery-frame-actions button {
   border-radius: var(--radius-sm);
   padding: 5px 10px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   cursor: pointer;
   font-weight: 600;
   font-size: 11px;
@@ -3498,53 +3409,53 @@ button.git-summary-row:disabled,
 }
 
 .battery-frame-actions button:hover {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 .battery-frame-actions button.danger {
-  background: var(--color-danger);
-  border-color: var(--color-danger);
+  background: var(--status-danger);
+  border-color: var(--status-danger);
   color: white;
 }
 
 .battery-frame-actions button.danger:hover {
-  background: #b91c1c;
-  border-color: #b91c1c;
+  background: var(--status-danger-text);
+  border-color: var(--status-danger-text);
 }
 
 .config-table input[type="checkbox"] {
   width: auto;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--color-primary);
+  accent-color: var(--action-primary);
 }
 
 [data-theme="dark"] .battery-config-row input,
 [data-theme="dark"] .battery-config-row select,
 [data-theme="dark"] .battery-frame-grid input,
 [data-theme="dark"] .battery-frame-grid select {
-  background: #3c3c3c;
-  border-color: #3e3e3e;
-  color: #d4d4d4;
+  background: var(--control-surface);
+  border-color: var(--control-border);
+  color: var(--control-text);
 }
 
 [data-theme="dark"] .battery-config-row input:focus,
 [data-theme="dark"] .battery-config-row select:focus,
 [data-theme="dark"] .battery-frame-grid input:focus,
 [data-theme="dark"] .battery-frame-grid select:focus {
-  border-color: var(--color-primary);
-  background: #3c3c3c;
+  border-color: var(--action-primary);
+  background: var(--control-surface);
 }
 
 /* ── Table Format Reference ── */
 
 .table-format-ref {
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 10px 14px;
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
 }
 
 .table-format-ref strong {
@@ -3552,7 +3463,7 @@ button.git-summary-row:disabled,
   margin-bottom: 10px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .table-format-chips {
@@ -3565,9 +3476,9 @@ button.git-summary-row:disabled,
   display: inline-block;
   padding: 3px 10px;
   border-radius: 999px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -3580,8 +3491,8 @@ button.git-summary-row:disabled,
   gap: 6px;
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-default);
 }
 
 .table-io-result-row {
@@ -3592,32 +3503,32 @@ button.git-summary-row:disabled,
 }
 
 .table-io-result-row span {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
 .table-io-result-row strong {
   font-size: 13px;
-  color: var(--color-text);
+  color: var(--text-primary);
 }
 
 :is(p, div, span, strong).text-success {
-  color: var(--color-success);
+  color: var(--status-success);
 }
 
 :is(p, div, span, strong).text-warning {
-  color: var(--color-warning);
+  color: var(--status-warning);
 }
 
 :is(p, div, span, strong).text-danger {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 /* ── Section Dividers ── */
 
 .section-divider {
   height: 1px;
-  background: var(--color-border);
+  background: var(--border-default);
   margin: 8px 0;
 }
 
@@ -3626,7 +3537,7 @@ button.git-summary-row:disabled,
 .tab-bar {
   display: flex;
   gap: 2px;
-  border-bottom: 2px solid var(--color-border);
+  border-bottom: 2px solid var(--border-default);
   margin-bottom: 16px;
 }
 
@@ -3636,7 +3547,7 @@ button.git-summary-row:disabled,
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   padding: 8px 16px;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: pointer;
   font-weight: 600;
   font-size: 13px;
@@ -3645,14 +3556,14 @@ button.git-summary-row:disabled,
 }
 
 .tab-button:hover {
-  color: var(--color-text-secondary);
-  background: var(--color-surface-alt);
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
 }
 
 .tab-button.active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-  background: var(--color-primary-light);
+  color: var(--action-primary);
+  border-bottom-color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 /* ── Status Badge ── */
@@ -3668,18 +3579,18 @@ button.git-summary-row:disabled,
 }
 
 .status-badge--success {
-  background: var(--color-success-light);
-  color: var(--color-success);
+  background: var(--status-success-surface);
+  color: var(--status-success);
 }
 
 .status-badge--warning {
-  background: var(--color-warning-light);
-  color: var(--color-warning);
+  background: var(--status-warning-surface);
+  color: var(--status-warning);
 }
 
 .status-badge--error {
-  background: var(--color-danger-light);
-  color: var(--color-danger);
+  background: var(--status-danger-surface);
+  color: var(--status-danger);
 }
 
 /* ── Empty State ── */
@@ -3692,7 +3603,7 @@ button.git-summary-row:disabled,
   gap: 12px;
   padding: 48px 24px;
   text-align: center;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .empty-state-icon {
@@ -3701,10 +3612,10 @@ button.git-summary-row:disabled,
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-default);
   font-size: 20px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .empty-state p {
@@ -3723,12 +3634,12 @@ button.git-summary-row:disabled,
   min-height: 240px;
   padding: 40px 24px;
   text-align: center;
-  color: var(--color-text);
+  color: var(--text-primary);
 }
 
 .recovery-boundary--app {
   min-height: 100vh;
-  background: var(--color-bg);
+  background: var(--surface-canvas);
 }
 
 .recovery-boundary--feature {
@@ -3740,10 +3651,10 @@ button.git-summary-row:disabled,
   width: 48px;
   height: 48px;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--status-danger) 28%, var(--border-default));
   border-radius: 50%;
-  background: var(--color-danger-light);
-  color: var(--color-danger);
+  background: var(--status-danger-surface);
+  color: var(--status-danger);
 }
 
 .recovery-boundary-copy h1,
@@ -3756,7 +3667,7 @@ button.git-summary-row:disabled,
 .recovery-boundary-copy p {
   max-width: 420px;
   margin: 8px 0 0;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -3768,9 +3679,9 @@ button.git-summary-row:disabled,
   gap: 7px;
   min-height: 34px;
   padding: 0 14px;
-  border: 1px solid var(--color-primary-solid);
+  border: 1px solid var(--action-primary-solid);
   border-radius: var(--radius-sm);
-  background: var(--color-primary-solid);
+  background: var(--action-primary-solid);
   color: white;
   font: inherit;
   font-size: 13px;
@@ -3779,18 +3690,18 @@ button.git-summary-row:disabled,
 }
 
 .recovery-boundary-action:hover {
-  background: var(--color-primary-solid-hover);
-  border-color: var(--color-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
+  border-color: var(--action-primary-solid-hover);
 }
 
 .recovery-boundary-action:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--action-primary);
   outline-offset: 2px;
 }
 
 .recovery-boundary-details {
   max-width: min(560px, 100%);
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -3804,9 +3715,9 @@ button.git-summary-row:disabled,
   margin-top: 8px;
   padding: 8px 10px;
   overflow: auto;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
   text-align: left;
   overflow-wrap: anywhere;
 }
@@ -3868,15 +3779,15 @@ button.git-summary-row:disabled,
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid var(--spinner-track-on-dark);
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
 
 .spinner--dark {
-  border-color: rgba(0, 0, 0, 0.1);
-  border-top-color: var(--color-primary);
+  border-color: var(--spinner-track-on-light);
+  border-top-color: var(--action-primary);
 }
 
 @keyframes spin {
@@ -3900,8 +3811,8 @@ html {
 /* ── Selection color ── */
 
 ::selection {
-  background: rgba(37, 99, 235, 0.15);
-  color: var(--color-text);
+  background: var(--selection-strong);
+  color: var(--text-primary);
 }
 
 /* ── Workspace overlay when JSON editor is active ── */
@@ -3915,14 +3826,14 @@ html {
   position: absolute;
   inset: 0;
   z-index: 17;
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--neutral-hover);
   pointer-events: all;
   cursor: not-allowed;
   border-radius: var(--radius-md);
 }
 
 [data-theme="dark"] .workspace-json-active::after {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--neutral-pressed);
 }
 
 .json-active-banner {
@@ -3931,10 +3842,10 @@ html {
   justify-content: center;
   gap: 8px;
   padding: 6px 12px;
-  background: var(--color-warning-light);
-  border: 1px solid #fbbf24;
+  background: var(--status-warning-surface);
+  border: 1px solid var(--status-warning-border-strong);
   border-radius: var(--radius-sm);
-  color: #92400e;
+  color: var(--status-warning);
   font-size: 12px;
   font-weight: 600;
   margin-bottom: 8px;
@@ -3944,7 +3855,7 @@ html {
   border: 0;
   border-radius: var(--radius-sm);
   padding: 2px 8px;
-  background: var(--color-warning);
+  background: var(--status-warning);
   color: white;
   font-size: 11px;
   font-weight: 600;
@@ -3952,5 +3863,5 @@ html {
 }
 
 .json-active-banner button:hover {
-  background: #b45309;
+  background: var(--status-warning-strong);
 }

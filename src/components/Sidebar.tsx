@@ -249,7 +249,7 @@ export function Sidebar({
               aria-label={group.label}
               aria-pressed={isActive}
               aria-expanded={isActive ? !collapsed : undefined}
-              style={{ '--activity-accent': group.accent } as CSSProperties}
+              style={{ '--activity-accent': `var(${group.accentToken})` } as CSSProperties}
             >
               <span className="activity-icon-glyph" aria-hidden="true">
                 <GroupIcon size={19} strokeWidth={1.8} />

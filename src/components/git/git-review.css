@@ -8,8 +8,8 @@
   grid-template-columns: 230px minmax(0, 1fr);
   min-height: calc(100vh - var(--app-toolbar-height));
   overflow: hidden;
-  background: var(--color-bg);
-  color: var(--color-text);
+  background: var(--surface-canvas);
+  color: var(--text-primary);
 }
 
 body.git-review-open {
@@ -21,8 +21,8 @@ body.git-review-open {
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   overflow: hidden;
-  border-right: 1px solid var(--color-border);
-  background: var(--color-surface-alt);
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-subtle);
 }
 
 .git-review-sidebar-header {
@@ -30,7 +30,7 @@ body.git-review-open {
   align-items: center;
   justify-content: space-between;
   min-height: 54px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
   padding: 8px 12px;
 }
 
@@ -46,7 +46,7 @@ body.git-review-open {
 }
 
 .git-review-sidebar-header > div > span {
-  color: var(--color-text);
+  color: var(--text-primary);
   font-weight: 700;
 }
 
@@ -56,8 +56,8 @@ body.git-review-open {
   min-width: 19px;
   height: 19px;
   border-radius: 10px;
-  background: var(--color-surface);
-  color: var(--color-text-muted);
+  background: var(--surface-panel);
+  color: var(--text-muted);
   font-weight: 600;
 }
 
@@ -77,15 +77,15 @@ body.git-review-open {
   border-radius: 5px;
   padding: 5px 7px;
   background: transparent;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   text-align: left;
   cursor: pointer;
 }
 
 .git-review-file-item:hover,
 .git-review-file-item--active {
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface-panel);
+  color: var(--text-primary);
 }
 
 .git-review-file-item:disabled {
@@ -112,7 +112,7 @@ body.git-review-open {
 }
 
 .git-review-file-item small {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 10px;
 }
 
@@ -123,15 +123,15 @@ body.git-review-open {
 }
 
 .git-review-status--modified {
-  color: var(--color-warning);
+  color: var(--status-warning);
 }
 
 .git-review-status--added {
-  color: var(--color-success);
+  color: var(--status-success);
 }
 
 .git-review-status--deleted {
-  color: var(--color-danger-text);
+  color: var(--status-danger-text);
 }
 
 .git-review-main {
@@ -149,9 +149,9 @@ body.git-review-open {
   align-items: center;
   gap: 12px;
   min-height: 78px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border-default);
   padding: 9px 14px;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .git-review-branch-info {
@@ -181,7 +181,7 @@ body.git-review-open {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-family: var(--font-mono);
   font-size: 11px;
   text-overflow: ellipsis;
@@ -190,7 +190,7 @@ body.git-review-open {
 
 .git-review-branch-info p small {
   overflow: hidden;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-family: inherit;
   font-size: 10px;
   text-overflow: ellipsis;
@@ -206,12 +206,12 @@ body.git-review-open {
 }
 
 .git-review-stats strong {
-  color: var(--color-success);
+  color: var(--status-success);
   font-weight: 500;
 }
 
 .git-review-stats em {
-  color: var(--color-danger-text);
+  color: var(--status-danger-text);
   font-style: normal;
 }
 
@@ -227,10 +227,10 @@ body.git-review-open {
   gap: 1px;
   height: 30px;
   margin-right: 4px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: 5px;
   padding: 2px;
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
   min-width: 0;
 }
 
@@ -242,13 +242,13 @@ body.git-review-open {
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: pointer;
 }
 
 .git-review-toolbar-actions button:hover:not(:disabled) {
-  background: var(--color-surface-alt);
-  color: var(--color-text);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
 }
 
 .git-review-toolbar-actions button:disabled {
@@ -266,18 +266,18 @@ body.git-review-open {
 .git-review-commit-bar input {
   min-width: 0;
   height: 32px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: 5px;
   padding: 0 9px;
-  background: var(--color-surface-alt);
-  color: var(--color-text);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
   font-size: 12px;
 }
 
 .git-review-commit-bar input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring-strong);
 }
 
 .git-review-commit-bar button {
@@ -285,10 +285,10 @@ body.git-review-open {
   align-items: center;
   gap: 5px;
   height: 32px;
-  border: 1px solid var(--color-primary-solid);
+  border: 1px solid var(--action-primary-solid);
   border-radius: 5px;
   padding: 0 11px;
-  background: var(--color-primary-solid);
+  background: var(--action-primary-solid);
   color: white;
   font-size: 12px;
   font-weight: 600;
@@ -296,7 +296,7 @@ body.git-review-open {
 }
 
 .git-review-commit-bar button:hover:not(:disabled) {
-  background: var(--color-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
 }
 
 .git-review-commit-bar button:disabled {
@@ -336,7 +336,7 @@ body.git-review-open {
 }
 
 .git-review-history-bar small {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 10px;
 }
 
@@ -345,18 +345,18 @@ body.git-review-open {
   align-items: center;
   gap: 5px;
   height: 32px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: 5px;
   padding: 0 10px;
-  background: var(--color-surface-alt);
-  color: var(--color-text);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
   font-size: 12px;
   cursor: pointer;
 }
 
 .git-review-history-bar > button:hover:not(:disabled) {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  border-color: var(--action-primary);
+  color: var(--action-primary);
 }
 
 .git-review-history-bar > button:disabled {
@@ -370,16 +370,16 @@ body.git-review-open {
 }
 
 .git-review-view-switch button.active {
-  background: var(--color-surface);
-  color: var(--color-primary);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  background: var(--surface-panel);
+  color: var(--action-primary);
+  box-shadow: var(--shadow-compact-strong);
 }
 
 .git-review-content {
   min-height: 0;
   overflow: auto;
   padding: 8px 10px 40px;
-  background: var(--color-bg);
+  background: var(--surface-canvas);
 }
 
 .git-review-file-editor {
@@ -389,9 +389,9 @@ body.git-review-open {
   height: 100%;
   min-height: 420px;
   overflow: hidden;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: 5px;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .git-review-file-editor > header {
@@ -401,8 +401,8 @@ body.git-review-open {
   gap: 12px;
   min-height: 48px;
   padding: 7px 10px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-subtle);
 }
 
 .git-review-file-editor > header > div:first-child {
@@ -430,7 +430,7 @@ body.git-review-open {
 }
 
 .git-review-file-editor > header small {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 10px;
 }
 
@@ -446,19 +446,19 @@ body.git-review-open {
   align-items: center;
   gap: 5px;
   height: 30px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 0 9px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
 }
 
 .git-review-editor-actions button:hover:not(:disabled) {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
 }
 
 .git-review-editor-actions button:disabled {
@@ -467,29 +467,29 @@ body.git-review-open {
 }
 
 .git-review-editor-actions .git-review-editor-save {
-  border-color: var(--color-primary-solid);
-  background: var(--color-primary-solid);
+  border-color: var(--action-primary-solid);
+  background: var(--action-primary-solid);
   color: white;
 }
 
 .git-review-editor-actions .git-review-editor-save:hover:not(:disabled) {
-  border-color: var(--color-primary-solid-hover);
-  background: var(--color-primary-solid-hover);
+  border-color: var(--action-primary-solid-hover);
+  background: var(--action-primary-solid-hover);
   color: white;
 }
 
 .git-review-editor-labels {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-panel);
 }
 
 .git-review-editor-labels span {
   min-width: 0;
   padding: 5px 12px;
   overflow: hidden;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -497,13 +497,13 @@ body.git-review-open {
 }
 
 .git-review-editor-labels span + span {
-  border-left: 1px solid var(--color-border);
+  border-left: 1px solid var(--border-default);
 }
 
 .git-review-merge-editor {
   min-height: 0;
   overflow: hidden;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .git-review-merge-editor .cm-mergeView {
@@ -517,23 +517,23 @@ body.git-review-open {
 }
 
 .git-review-merge-editor .cm-mergeViewEditor + .cm-mergeViewEditor {
-  border-left: 1px solid var(--color-border);
+  border-left: 1px solid var(--border-default);
 }
 
 .git-review-merge-editor .cm-merge-revert {
-  background: var(--color-surface-alt);
-  border-left: 1px solid var(--color-border);
-  border-right: 1px solid var(--color-border);
+  background: var(--surface-subtle);
+  border-left: 1px solid var(--border-default);
+  border-right: 1px solid var(--border-default);
 }
 
 .git-review-merge-editor .git-review-revert-chunk {
   min-height: 22px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .git-review-merge-editor .git-review-revert-chunk:hover,
 .git-review-merge-editor .git-review-revert-chunk:focus-visible {
-  background: var(--color-primary-solid);
+  background: var(--action-primary-solid);
   color: white;
   outline: none;
 }
@@ -541,18 +541,18 @@ body.git-review-open {
 .git-review-file-editor > p {
   margin: 0;
   padding: 7px 12px;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-danger-text);
+  border-top: 1px solid var(--border-default);
+  color: var(--status-danger-text);
   font-size: 11px;
 }
 
 .git-review-file {
   min-width: 720px;
   margin-bottom: 8px;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: 5px;
   overflow: clip;
-  background: var(--color-surface);
+  background: var(--surface-panel);
   scroll-margin-top: 8px;
 }
 
@@ -567,16 +567,16 @@ body.git-review-open {
   width: 100%;
   min-height: 38px;
   border: 0;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
   padding: 5px 10px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-secondary);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
   text-align: left;
   cursor: pointer;
 }
 
 .git-review-file-header:hover {
-  color: var(--color-text);
+  color: var(--text-primary);
 }
 
 .git-review-file-header strong {
@@ -598,7 +598,7 @@ body.git-review-open {
 }
 
 .git-review-hunk + .git-review-hunk {
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .git-review-hunk-header {
@@ -607,8 +607,8 @@ body.git-review-open {
   gap: 7px;
   min-height: 31px;
   padding: 4px 10px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
+  background: var(--surface-subtle);
+  color: var(--text-muted);
   font-size: 11px;
 }
 
@@ -622,15 +622,15 @@ body.git-review-open {
 }
 
 .git-review-line > span {
-  border-right: 1px solid var(--color-border-light);
-  color: var(--color-text-muted);
+  border-right: 1px solid var(--border-subtle);
+  color: var(--text-muted);
   text-align: right;
   padding-right: 8px;
   user-select: none;
 }
 
 .git-review-line > i {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-style: normal;
   text-align: center;
   user-select: none;
@@ -638,35 +638,35 @@ body.git-review-open {
 
 .git-review-line > code {
   padding: 0 10px 0 2px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-family: inherit;
   white-space: pre;
 }
 
 .git-review-line--addition {
-  background: rgba(34, 197, 94, 0.13);
+  background: var(--diff-add-surface);
 }
 
 .git-review-line--addition > i,
 .git-review-line--addition > span {
-  color: var(--color-success);
+  color: var(--status-success);
 }
 
 .git-review-line--addition > code {
-  color: color-mix(in srgb, var(--color-success) 65%, var(--color-text));
+  color: var(--diff-add-text);
 }
 
 .git-review-line--deletion {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--diff-delete-surface);
 }
 
 .git-review-line--deletion > i,
 .git-review-line--deletion > span {
-  color: var(--color-danger-text);
+  color: var(--status-danger-text);
 }
 
 .git-review-line--deletion > code {
-  color: color-mix(in srgb, var(--color-danger) 65%, var(--color-text));
+  color: var(--diff-delete-text);
 }
 
 .git-review-split-diff {
@@ -689,19 +689,19 @@ body.git-review-open {
 }
 
 .git-review-split-side + .git-review-split-side {
-  border-left: 2px solid var(--color-border);
+  border-left: 2px solid var(--border-default);
 }
 
 .git-review-split-side > span {
-  border-right: 1px solid var(--color-border-light);
+  border-right: 1px solid var(--border-subtle);
   padding-right: 8px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   text-align: right;
   user-select: none;
 }
 
 .git-review-split-side > i {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-style: normal;
   text-align: center;
   user-select: none;
@@ -709,45 +709,45 @@ body.git-review-open {
 
 .git-review-split-side > code {
   padding: 0 10px 0 2px;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-family: inherit;
   white-space: pre;
 }
 
 .git-review-split-side--addition {
-  background: rgba(34, 197, 94, 0.13);
+  background: var(--diff-add-surface);
 }
 
 .git-review-split-side--addition > span,
 .git-review-split-side--addition > i {
-  color: var(--color-success);
+  color: var(--status-success);
 }
 
 .git-review-split-side--addition > code {
-  color: color-mix(in srgb, var(--color-success) 65%, var(--color-text));
+  color: var(--diff-add-text);
 }
 
 .git-review-split-side--deletion {
-  background: rgba(239, 68, 68, 0.12);
+  background: var(--diff-delete-surface);
 }
 
 .git-review-split-side--deletion > span,
 .git-review-split-side--deletion > i {
-  color: var(--color-danger-text);
+  color: var(--status-danger-text);
 }
 
 .git-review-split-side--deletion > code {
-  color: color-mix(in srgb, var(--color-danger) 65%, var(--color-text));
+  color: var(--diff-delete-text);
 }
 
 .git-review-split-side--empty {
-  background-color: var(--color-surface-alt);
+  background-color: var(--surface-subtle);
   background-image: repeating-linear-gradient(
     -45deg,
     transparent,
     transparent 5px,
-    color-mix(in srgb, var(--color-border) 35%, transparent) 5px,
-    color-mix(in srgb, var(--color-border) 35%, transparent) 6px
+    color-mix(in srgb, var(--border-default) 35%, transparent) 5px,
+    color-mix(in srgb, var(--border-default) 35%, transparent) 6px
   );
 }
 
@@ -757,13 +757,13 @@ body.git-review-open {
   align-content: center;
   gap: 9px;
   min-height: 320px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
   text-align: center;
 }
 
 .git-review-empty--error {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 .git-review-spin {
@@ -805,7 +805,7 @@ body.git-review-open {
 
   .git-review-sidebar {
     border-right: 0;
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--border-default);
   }
 
   .git-review-sidebar-header {

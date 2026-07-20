@@ -4,8 +4,8 @@
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr);
   min-height: calc(100vh - 98px);
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-panel);
 }
 
 .legacy-data-page--collapsed {
@@ -13,8 +13,8 @@
 }
 
 .legacy-data-sidebar {
-  border-right: 1px solid var(--color-border);
-  background: #f4f7fb;
+  border-right: 1px solid var(--border-default);
+  background: var(--surface-emphasis);
   overflow: auto;
 }
 
@@ -23,12 +23,12 @@
   align-items: center;
   justify-content: space-between;
   height: 40px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .legacy-data-sidebar-title {
   padding: 10px 12px;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
 }
@@ -47,7 +47,7 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
   transition:
@@ -56,8 +56,8 @@
 }
 
 .legacy-sidebar-collapse-btn:hover {
-  background: rgba(37, 99, 235, 0.1);
-  color: var(--color-primary);
+  background: var(--focus-ring);
+  color: var(--action-primary);
 }
 
 .legacy-data-header-left {
@@ -72,11 +72,11 @@
 }
 
 .legacy-mode-tabs-inline button {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 4px 12px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -87,14 +87,14 @@
 }
 
 .legacy-mode-tabs-inline button:hover {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
 }
 
 .legacy-mode-tabs-inline button.active {
-  border-color: var(--color-primary-border);
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
 }
 
 .legacy-menu-list {
@@ -116,7 +116,7 @@
   border-left: 4px solid transparent;
   padding: 0 10px;
   background: transparent;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 700;
   text-align: left;
@@ -130,17 +130,17 @@
 }
 
 .legacy-menu-item:hover {
-  background: rgba(37, 99, 235, 0.08);
+  background: color-mix(in srgb, var(--action-primary) 8%, transparent);
 }
 
 .legacy-menu-item.active {
-  border-left-color: var(--color-primary);
-  background: #cfe3f8;
-  color: #0f4f8f;
+  border-left-color: var(--action-primary);
+  background: var(--navigation-selected-surface);
+  color: var(--navigation-selected-text);
 }
 
 .legacy-menu-item.setting-menu-match:not(.active) {
-  background: rgba(232, 171, 83, 0.12);
+  background: var(--warning-surface-medium);
 }
 
 .setting-menu-search {
@@ -148,25 +148,25 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   padding: 10px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .setting-menu-search input {
   min-width: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface-panel);
+  color: var(--text-primary);
   font-size: 12px;
 }
 
 .setting-menu-search button {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 0 8px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -188,27 +188,27 @@
   min-width: 22px;
   border-radius: 999px;
   padding: 1px 6px;
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
   font-size: 11px;
   font-weight: 700;
   text-align: center;
 }
 
 .setting-menu-count--empty {
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
+  background: var(--surface-subtle);
+  color: var(--text-muted);
 }
 
 .setting-menu-empty {
   padding: 14px 12px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
   line-height: 1.6;
 }
 
 .legacy-menu-arrow {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -216,7 +216,7 @@
   display: grid;
   grid-template-rows: auto 1fr;
   min-width: 0;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .legacy-data-header {
@@ -226,7 +226,7 @@
   gap: 16px;
   min-height: 70px;
   padding: 0 22px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .legacy-data-header strong {
@@ -245,7 +245,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -257,7 +257,7 @@
 .setting-breadcrumb-segment:not(:last-child)::after {
   content: "›";
   margin-left: 4px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 .setting-menu-summary {
@@ -270,19 +270,19 @@
 .setting-summary-chip {
   border-radius: 999px;
   padding: 2px 8px;
-  background: var(--color-surface-alt);
-  color: var(--color-text-secondary);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
 }
 
 .setting-help-card {
   margin-bottom: 12px;
-  border: 1px solid rgba(232, 171, 83, 0.35);
+  border: 1px solid var(--warning-border);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
-  background: rgba(232, 171, 83, 0.1);
-  color: var(--color-text);
+  background: var(--warning-surface-soft);
+  color: var(--text-primary);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -298,13 +298,13 @@
 }
 
 .setting-access-chip--readonly {
-  background: rgba(232, 171, 83, 0.12);
-  color: var(--tb-warning);
+  background: var(--warning-surface-medium);
+  color: var(--toolbar-warning);
 }
 
 .setting-access-chip--readwrite {
-  background: var(--color-primary-light);
-  color: var(--color-primary-hover);
+  background: var(--action-primary-subtle);
+  color: var(--action-primary-hover);
 }
 
 .legacy-data-actions {
@@ -315,27 +315,27 @@
 
 .legacy-data-actions button {
   min-width: 86px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: 999px;
   padding: 6px 16px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
 .legacy-data-actions button:hover:not(:disabled) {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
-  background: var(--color-primary-light);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
+  background: var(--action-primary-subtle);
 }
 
 .legacy-data-actions button:disabled {
-  color: var(--color-text-muted);
-  background: var(--color-surface-alt);
+  color: var(--text-muted);
+  background: var(--surface-subtle);
 }
 
 .legacy-data-actions button.danger {
-  color: var(--color-danger-text);
+  color: var(--status-danger-text);
 }
 
 .legacy-data-table-wrap {
@@ -349,7 +349,7 @@
 }
 
 .setting-data-table-wrap:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--color-primary-border);
+  box-shadow: inset 0 0 0 1px var(--action-primary-border);
 }
 
 .setting-table-toolbar {
@@ -364,10 +364,10 @@
   width: 100%;
   min-height: 42px;
   padding: 6px 10px;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-bottom: 0;
-  background: var(--color-surface-alt);
-  color: var(--color-text-secondary);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -396,36 +396,36 @@
 .setting-column-preset select,
 .setting-table-toolbar button {
   height: 28px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 0 9px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
 .setting-column-preset select:focus,
 .setting-table-toolbar button:focus-visible {
   outline: none;
-  border-color: var(--color-primary);
+  border-color: var(--action-primary);
 }
 
 .setting-table-toolbar button:hover {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
 }
 
 .setting-table-toolbar button.danger {
-  color: var(--color-danger);
+  color: var(--status-danger);
 }
 
 .setting-table-toolbar button.danger:hover {
-  border-color: var(--color-danger);
-  background: var(--color-danger-light);
+  border-color: var(--status-danger);
+  background: var(--status-danger-surface);
 }
 
 .setting-visible-column-count {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -434,7 +434,7 @@
   min-width: 1180px;
   border-collapse: collapse;
   table-layout: fixed;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -442,7 +442,7 @@
 .legacy-data-table td {
   height: 30px;
   padding: 4px 10px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -451,10 +451,10 @@
 
 .legacy-data-table th {
   position: relative;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: 700;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .setting-data-table-wrap .legacy-data-table th {
@@ -479,11 +479,11 @@
 }
 
 .setting-table-sticky-left-edge {
-  box-shadow: 2px 0 0 var(--color-border-light);
+  box-shadow: 2px 0 0 var(--border-subtle);
 }
 
 .setting-data-table-wrap .setting-table-sticky-right {
-  box-shadow: -2px 0 0 var(--color-border-light);
+  box-shadow: -2px 0 0 var(--border-subtle);
 }
 
 .legacy-data-th-content {
@@ -523,7 +523,7 @@
 }
 
 .legacy-data-column-resizer:hover::after {
-  background: var(--color-primary);
+  background: var(--action-primary);
 }
 
 .legacy-data-table .text-left {
@@ -539,27 +539,27 @@
 }
 
 .legacy-data-table tbody tr:nth-child(odd) td {
-  background: #f2f5f9;
+  background: var(--surface-sunken);
 }
 
 .legacy-data-table tbody tr:nth-child(even) td {
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .setting-data-table-wrap .legacy-data-table tbody tr:hover td {
-  background: var(--color-primary-light);
+  background: var(--action-primary-subtle);
 }
 
 .legacy-data-table button {
   border: 0;
   background: transparent;
-  color: var(--color-primary);
+  color: var(--action-primary);
   font-size: 13px;
   padding: 2px 8px;
 }
 
 .legacy-data-table button.danger {
-  color: var(--color-danger-text);
+  color: var(--status-danger-text);
 }
 
 .legacy-data-table button:hover {
@@ -574,7 +574,7 @@
   border-radius: var(--radius-sm);
   padding: 4px 6px;
   background: transparent;
-  color: var(--color-text);
+  color: var(--text-primary);
   font: inherit;
   text-align: center;
 }
@@ -582,8 +582,8 @@
 .legacy-data-table input:focus,
 .legacy-data-table select:focus {
   outline: none;
-  border-color: var(--color-primary-border);
-  background: var(--color-surface);
+  border-color: var(--action-primary-border);
+  background: var(--surface-panel);
 }
 
 .legacy-data-table input[type="checkbox"] {
@@ -591,12 +591,12 @@
   height: 15px;
   padding: 0;
   border: 0;
-  accent-color: var(--color-primary);
+  accent-color: var(--action-primary);
   cursor: pointer;
 }
 
 .legacy-data-table tbody tr.setting-parameter-row--selected td {
-  background: var(--color-primary-light);
+  background: var(--action-primary-subtle);
 }
 
 .legacy-data-table--compact {
@@ -607,7 +607,7 @@
   display: grid;
   min-height: 280px;
   place-items: center;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -616,23 +616,23 @@
   grid-template-columns: 1fr 1fr;
   gap: 6px;
   padding: 10px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .legacy-mode-tabs button {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 700;
 }
 
 .legacy-mode-tabs button.active {
-  border-color: var(--color-primary-border);
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
 }
 
 .legacy-edit-panel,
@@ -647,10 +647,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border: 1px solid var(--color-border-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 10px 12px;
-  background: var(--color-surface-alt);
+  background: var(--surface-subtle);
 }
 
 .legacy-advanced-summary,
@@ -662,30 +662,30 @@
 }
 
 .legacy-advanced-summary {
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
 .legacy-advanced-summary strong {
-  color: var(--color-text);
+  color: var(--text-primary);
 }
 
 .legacy-advanced-actions button,
 .legacy-drawer-tabs button,
 .legacy-drawer-header button {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 5px 10px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
 .legacy-advanced-actions button:hover,
 .legacy-drawer-tabs button:hover,
 .legacy-drawer-header button:hover {
-  border-color: var(--color-primary-border);
-  color: var(--color-primary);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary);
 }
 
 .legacy-drawer-layer {
@@ -700,7 +700,7 @@
   inset: 0;
   border: 0;
   padding: 0;
-  background: rgba(15, 23, 42, 0.32);
+  background: var(--drawer-backdrop);
   backdrop-filter: blur(2px);
   cursor: default;
   pointer-events: auto;
@@ -714,9 +714,9 @@
   grid-template-rows: auto auto minmax(0, 1fr);
   width: min(720px, calc(100vw - 32px));
   height: 100%;
-  border-left: 1px solid var(--color-border);
-  background: var(--color-surface);
-  box-shadow: -18px 0 36px rgba(15, 23, 42, 0.18);
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-panel);
+  box-shadow: -18px 0 36px var(--shadow-drawer);
   pointer-events: auto;
   animation: legacyDrawerIn 0.18s ease-out;
 }
@@ -740,19 +740,19 @@
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--color-border-light);
-  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
 }
 
 .legacy-drawer-header strong {
   display: block;
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 15px;
 }
 
 .legacy-drawer-header p {
   margin: 4px 0 0;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -761,14 +761,14 @@
   display: flex;
   gap: 8px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .legacy-drawer-tabs button.active,
 .legacy-drawer-tabs button[aria-selected="true"] {
-  border-color: var(--color-primary-border);
-  background: var(--color-primary-light);
-  color: var(--color-primary);
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
 }
 
 .legacy-drawer-body {
@@ -793,10 +793,10 @@
 
 .legacy-edit-panel {
   margin-bottom: 14px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 12px;
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 .legacy-edit-panel-header {
@@ -809,11 +809,11 @@
 
 .legacy-edit-panel-header button,
 .legacy-condition-row button {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 5px 10px;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
 }
 
 .legacy-edit-sections {
@@ -827,7 +827,7 @@
 }
 
 .legacy-edit-section-title {
-  color: var(--color-text);
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: 700;
 }
@@ -847,7 +847,7 @@
 .legacy-condition-row label {
   display: grid;
   gap: 4px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
 }
@@ -856,11 +856,11 @@
 .legacy-edit-grid select,
 .legacy-condition-row input {
   min-width: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  background: var(--surface-panel);
+  color: var(--text-primary);
 }
 
 .legacy-edit-grid select {
@@ -868,35 +868,30 @@
 }
 
 [data-theme="dark"] .legacy-data-sidebar {
-  background: #202124;
+  background: var(--sidebar-surface);
 }
 
 [data-theme="dark"] .legacy-sidebar-collapse-btn {
-  color: var(--color-text-muted);
+  color: var(--text-muted);
 }
 
 [data-theme="dark"] .legacy-sidebar-collapse-btn:hover {
-  background: rgba(55, 148, 255, 0.15);
-  color: var(--color-primary);
+  background: var(--selection-strong);
+  color: var(--action-primary);
 }
 
 [data-theme="dark"] .legacy-drawer {
-  box-shadow: -18px 0 36px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-drawer);
 }
 
 [data-theme="dark"] .legacy-mode-tabs-inline button {
-  background: var(--color-surface);
-  border-color: var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-[data-theme="dark"] .legacy-menu-item.active {
-  background: rgba(55, 148, 255, 0.18);
-  color: var(--color-primary-hover);
+  background: var(--surface-panel);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
 }
 
 [data-theme="dark"] .legacy-menu-item.setting-menu-match:not(.active) {
-  background: rgba(232, 171, 83, 0.14);
+  background: var(--status-warning-highlight);
 }
 
 @media (max-width: 760px) {
@@ -916,30 +911,30 @@
 
 [data-theme="dark"] .setting-menu-search input,
 [data-theme="dark"] .setting-menu-search button {
-  background: var(--color-surface);
-  border-color: var(--color-border);
+  background: var(--surface-panel);
+  border-color: var(--border-default);
 }
 
 [data-theme="dark"] .setting-help-card {
-  background: rgba(232, 171, 83, 0.12);
-  border-color: rgba(232, 171, 83, 0.32);
+  background: var(--warning-surface-medium);
+  border-color: var(--status-warning-border);
 }
 
 [data-theme="dark"] .setting-summary-chip,
 [data-theme="dark"] .setting-menu-count--empty {
-  background: #202124;
+  background: var(--sidebar-surface);
 }
 
 [data-theme="dark"] .legacy-data-table tbody tr:nth-child(odd) td {
-  background: #2a2a2a;
+  background: var(--table-row-alternate);
 }
 
 [data-theme="dark"] .legacy-data-table tbody tr:nth-child(even) td,
 [data-theme="dark"] .legacy-data-table th {
-  background: var(--color-surface);
+  background: var(--surface-panel);
 }
 
 [data-theme="dark"] .legacy-data-table input:focus,
 [data-theme="dark"] .legacy-data-table select:focus {
-  background: #202124;
+  background: var(--sidebar-surface);
 }

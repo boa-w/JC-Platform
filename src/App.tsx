@@ -6,6 +6,9 @@ import { Dashboard } from './pages/Dashboard';
 import { defaultNavigationKey } from './stores/navigation';
 import { useTheme } from './stores/theme';
 import type { BackendHealth, LoadedProject, NavigationKey, ProjectSummary } from './types/platform';
+import './styles/tokens/primitives.css';
+import './styles/tokens/semantic.css';
+import './styles/tokens/components.css';
 import './styles/app.css';
 import './styles/theme-dark.css';
 

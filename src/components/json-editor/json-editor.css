@@ -5,9 +5,9 @@
   z-index: 18;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
+  background: var(--surface-panel);
   box-shadow: var(--shadow-lg);
   animation: fadeIn 0.12s ease-out;
   overflow: hidden;
@@ -19,8 +19,8 @@
   justify-content: space-between;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--color-border-light);
-  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
   user-select: none;
 }
 
@@ -40,15 +40,15 @@
   border-radius: 4px;
   padding: 0;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   cursor: move;
 }
 
 .json-popup-drag-handle:hover,
 .json-popup-drag-handle:focus-visible {
-  background: var(--color-surface);
-  color: var(--color-text);
-  outline: 2px solid var(--color-primary);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  outline: 2px solid var(--action-primary);
   outline-offset: 1px;
 }
 
@@ -69,8 +69,8 @@
   min-height: 0;
   border: 0;
   padding: 10px 12px;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--surface-canvas);
+  color: var(--control-text);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
@@ -95,7 +95,7 @@
 .json-popup-resize-handle::after {
   content: "";
   position: absolute;
-  background: var(--color-text-muted);
+  background: var(--text-muted);
   border-radius: 1px;
 }
 
@@ -119,23 +119,23 @@
 .json-popup-resize-handle:hover::after,
 .json-popup-resize-handle:focus-visible::before,
 .json-popup-resize-handle:focus-visible::after {
-  background: var(--color-primary);
+  background: var(--action-primary);
 }
 
 [data-theme="dark"] .json-popup {
-  border-color: var(--color-border);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-editor);
 }
 
 [data-theme="dark"] .json-popup-header {
-  background: #2d2d2d;
-  border-color: #3e3e3e;
+  background: var(--surface-subtle);
+  border-color: var(--control-border);
 }
 
 .json-popup-error {
   margin: 0;
   padding: 6px 12px;
-  color: var(--color-danger);
+  color: var(--status-danger);
   font-size: 12px;
-  border-top: 1px solid var(--color-border-light);
+  border-top: 1px solid var(--border-subtle);
 }
