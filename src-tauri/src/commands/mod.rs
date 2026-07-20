@@ -180,6 +180,25 @@ pub fn review_project_git_revision(
     git::review_revision(&request, &revision)
 }
 
+/// 读取当前项目受管且未提交的工作树文件。
+#[tauri::command]
+pub fn load_project_git_worktree_file(
+    request: GitProjectRequest,
+    path: String,
+) -> Result<git::GitWorktreeFileContent, String> {
+    git::load_worktree_file(&request, &path)
+}
+
+/// 保存当前项目受管且未提交的工作树 JSON 文件。
+#[tauri::command]
+pub fn save_project_git_worktree_file(
+    request: GitProjectRequest,
+    path: String,
+    content: String,
+) -> Result<(), String> {
+    git::save_worktree_file(&request, &path, &content)
+}
+
 /// 从磁盘加载 `.jcpro` 项目文件，返回摘要、校验结果与原始 JSON。
 #[tauri::command]
 pub fn load_project(path: String) -> Result<LoadedProject, String> {

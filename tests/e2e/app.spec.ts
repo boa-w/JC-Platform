@@ -1,6 +1,10 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { installRichProjectDesktopMock, richProjectPath } from './fixtures/richProject';
+import {
+  installRichProjectDesktopMock,
+  richProjectDocument,
+  richProjectPath,
+} from './fixtures/richProject';
 
 function captureRuntimeErrors(page: Page) {
   const errors: string[] = [];
@@ -387,6 +391,31 @@ test('supports accessible Git review and comparison views', async ({ page }) => 
     'aria-pressed',
     'true',
   );
+  await gitReview.getByRole('button', { name: '编辑当前工作区文件' }).click();
+  const worktreeEditor = gitReview.getByRole('region', { name: '对照编辑 rich-fixture.jcpro' });
+  const worktreeContent = worktreeEditor.locator('.cm-merge-b .cm-content');
+  await expect(worktreeEditor).toBeVisible();
+  await expect(worktreeEditor.getByText('HEAD 原始版本')).toBeVisible();
+  await expect(worktreeEditor.getByText('当前工作区（可编辑）')).toBeVisible();
+  await expect(worktreeEditor.getByRole('button', { name: '回退此差异块' }).first()).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, 'Git 工作树对照编辑');
+  await worktreeContent.fill('{');
+  await worktreeEditor.getByRole('button', { name: '保存文件' }).click();
+  await expect(worktreeEditor.getByRole('alert')).toBeVisible();
+  const validContent = JSON.stringify({ ...richProjectDocument, config_version: 'jc002' }, null, 2);
+  await worktreeContent.fill(validContent);
+  await worktreeEditor.getByRole('button', { name: '保存文件' }).click();
+  await expect(worktreeEditor).toBeHidden();
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __SAVED_GIT_WORKTREE_FILE__: { path?: string; content?: string } | null;
+          }
+        ).__SAVED_GIT_WORKTREE_FILE__,
+    ),
+  ).toMatchObject({ path: 'rich-fixture.jcpro', content: validContent });
   await gitReview.getByRole('button', { name: '关闭审阅' }).click();
 });
 

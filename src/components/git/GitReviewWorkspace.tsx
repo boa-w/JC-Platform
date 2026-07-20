@@ -7,20 +7,28 @@ import {
   GitBranch,
   GitCommitHorizontal,
   History,
+  Pencil,
   RefreshCw,
   RotateCcw,
   Rows3,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type {
   GitDiffLine,
   GitReviewFile,
   GitReviewReport,
   GitRevision,
+  GitWorktreeFileContent,
 } from '../../types/platform';
 import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import './git-review.css';
+
+const GitWorktreeDiffEditor = lazy(() =>
+  import('./GitWorktreeDiffEditor').then((module) => ({
+    default: module.GitWorktreeDiffEditor,
+  })),
+);
 
 type GitReviewViewMode = 'unified' | 'split';
 
@@ -42,6 +50,9 @@ interface GitReviewWorkspaceProps {
   onCommit: () => void;
   onRestore: () => void;
   onRefresh: () => void;
+  canEditWorkingTree: boolean;
+  onLoadWorkingTreeFile: (path: string) => Promise<GitWorktreeFileContent>;
+  onSaveWorkingTreeFile: (path: string, content: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -102,12 +113,20 @@ export function GitReviewWorkspace({
   onCommit,
   onRestore,
   onRefresh,
+  canEditWorkingTree,
+  onLoadWorkingTreeFile,
+  onSaveWorkingTreeFile,
   onClose,
 }: GitReviewWorkspaceProps) {
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set());
   const [activePath, setActivePath] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<GitReviewViewMode>(loadViewMode);
+  const [editorFile, setEditorFile] = useState<GitWorktreeFileContent | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [editorBusy, setEditorBusy] = useState(false);
+  const [editorError, setEditorError] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLElement | null>>({});
+  const activeFile = report?.files.find((file) => file.path === activePath) ?? null;
 
   useEffect(() => {
     const paths = new Set(report?.files.map((file) => file.path) ?? []);
@@ -115,6 +134,9 @@ export function GitReviewWorkspace({
       current && paths.has(current) ? current : (report?.files[0]?.path ?? null),
     );
     setCollapsedFiles((current) => new Set([...current].filter((path) => paths.has(path))));
+    setEditorFile(null);
+    setEditorDirty(false);
+    setEditorError(null);
   }, [report]);
 
   function updateViewMode(mode: GitReviewViewMode) {
@@ -154,6 +176,41 @@ export function GitReviewWorkspace({
     );
   }
 
+  async function openWorkingTreeEditor() {
+    if (!activeFile || revision || activeFile.status === 'deleted') return;
+    setEditorBusy(true);
+    setEditorError(null);
+    try {
+      const content = await onLoadWorkingTreeFile(activeFile.path);
+      setEditorFile(content);
+      setEditorDirty(false);
+    } catch (cause) {
+      setEditorError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setEditorBusy(false);
+    }
+  }
+
+  function closeWorkingTreeEditor() {
+    setEditorFile(null);
+    setEditorDirty(false);
+    setEditorError(null);
+  }
+
+  async function saveWorkingTreeFile(content: string) {
+    if (!editorFile || !editorDirty) return;
+    setEditorBusy(true);
+    setEditorError(null);
+    try {
+      await onSaveWorkingTreeFile(editorFile.path, content);
+      closeWorkingTreeEditor();
+    } catch (cause) {
+      setEditorError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setEditorBusy(false);
+    }
+  }
+
   return (
     <section aria-label="Git 更改审阅" className="git-review-workspace">
       <aside className="git-review-sidebar">
@@ -176,6 +233,7 @@ export function GitReviewWorkspace({
                   : 'git-review-file-item'
               }
               key={file.path}
+              disabled={editorFile !== null}
               onClick={() => scrollToFile(file.path)}
               title={file.path}
               type="button"
@@ -212,6 +270,29 @@ export function GitReviewWorkspace({
             </p>
           </div>
           <div className="git-review-toolbar-actions">
+            {!revision ? (
+              <button
+                aria-label="编辑当前工作区文件"
+                disabled={
+                  !canEditWorkingTree ||
+                  !activeFile ||
+                  activeFile.status === 'deleted' ||
+                  editorFile !== null ||
+                  editorBusy
+                }
+                onClick={() => void openWorkingTreeEditor()}
+                title={
+                  !canEditWorkingTree
+                    ? '请先保存或恢复主编辑器中的修改'
+                    : activeFile?.status === 'deleted'
+                      ? '已删除文件无法编辑'
+                      : '编辑当前未提交文件'
+                }
+                type="button"
+              >
+                <Pencil aria-hidden="true" size={15} strokeWidth={1.7} />
+              </button>
+            ) : null}
             <fieldset aria-label="对比视图" className="git-review-view-switch">
               <button
                 aria-label="统一对比视图"
@@ -245,14 +326,20 @@ export function GitReviewWorkspace({
             </button>
             <button
               aria-label="刷新审阅"
-              disabled={busy}
+              disabled={busy || editorFile !== null}
               onClick={onRefresh}
               title="刷新审阅"
               type="button"
             >
               <RefreshCw aria-hidden="true" size={16} strokeWidth={1.7} />
             </button>
-            <button aria-label="关闭审阅" onClick={onClose} title="关闭审阅" type="button">
+            <button
+              aria-label="关闭审阅"
+              disabled={editorDirty || editorBusy}
+              onClick={onClose}
+              title={editorDirty ? '请先保存或取消文件编辑' : '关闭审阅'}
+              type="button"
+            >
               <X aria-hidden="true" size={17} strokeWidth={1.7} />
             </button>
           </div>
@@ -294,15 +381,33 @@ export function GitReviewWorkspace({
         </header>
 
         <div className="git-review-content">
-          {busy && !report ? (
+          {editorFile ? (
+            <Suspense
+              fallback={
+                <div className="git-review-empty" role="status">
+                  <RefreshCw aria-hidden="true" className="git-review-spin" size={22} />
+                  <span>正在加载对照编辑器</span>
+                </div>
+              }
+            >
+              <GitWorktreeDiffEditor
+                busy={editorBusy}
+                error={editorError}
+                file={editorFile}
+                onCancel={closeWorkingTreeEditor}
+                onDirtyChange={setEditorDirty}
+                onSave={saveWorkingTreeFile}
+              />
+            </Suspense>
+          ) : busy && !report ? (
             <div className="git-review-empty">
               <RefreshCw aria-hidden="true" className="git-review-spin" size={22} />
               <span>正在读取更改</span>
             </div>
-          ) : error ? (
+          ) : error || editorError ? (
             <div className="git-review-empty git-review-empty--error" role="alert">
               <X aria-hidden="true" size={22} />
-              <span>{error}</span>
+              <span>{error ?? editorError}</span>
             </div>
           ) : report?.files.length ? (
             report.files.map((file) => {

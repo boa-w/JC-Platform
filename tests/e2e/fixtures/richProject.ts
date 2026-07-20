@@ -240,6 +240,12 @@ export async function installRichProjectDesktopMock(page: Page) {
           },
         ],
       };
+      const originalWorktreeContent = JSON.stringify(
+        { ...document, config_version: 'jc000' },
+        null,
+        2,
+      );
+      let worktreeContent = JSON.stringify(document, null, 2);
 
       const internals = {
         metadata: { currentWindow: { label: 'main' } },
@@ -251,7 +257,7 @@ export async function installRichProjectDesktopMock(page: Page) {
           if (command === 'plugin:window|set_title') return null;
           if (command === 'plugin:app|name') return '自定义开发平台';
           if (command === 'plugin:app|version') return '0.1.0';
-          if (command === 'load_project') return loadedProject(document);
+          if (command === 'load_project') return loadedProject(JSON.parse(worktreeContent));
           if (command === 'load_json_file') throw new Error('optional sidecar not found');
           if (command === 'validate_project_document') {
             return { valid: true, missing_sections: [], warnings: [] };
@@ -261,6 +267,25 @@ export async function installRichProjectDesktopMock(page: Page) {
           }
           if (command === 'load_project_git_context') return gitContext;
           if (command === 'review_project_git_changes') return gitReview;
+          if (command === 'load_project_git_worktree_file') {
+            return {
+              path: args?.path,
+              original_content: originalWorktreeContent,
+              current_content: worktreeContent,
+            };
+          }
+          if (command === 'save_project_git_worktree_file') {
+            const content = args?.content as string;
+            JSON.parse(content);
+            worktreeContent = content;
+            (
+              window as unknown as { __SAVED_GIT_WORKTREE_FILE__: unknown }
+            ).__SAVED_GIT_WORKTREE_FILE__ = {
+              path: args?.path,
+              content,
+            };
+            return null;
+          }
           if (command === 'import_single_language_csv') {
             const request = args?.request as {
               document: typeof document.language_info;
@@ -323,6 +348,8 @@ export async function installRichProjectDesktopMock(page: Page) {
       (
         window as unknown as { __FULL_LANGUAGE_IMPORT_REQUEST__: unknown }
       ).__FULL_LANGUAGE_IMPORT_REQUEST__ = null;
+      (window as unknown as { __SAVED_GIT_WORKTREE_FILE__: unknown }).__SAVED_GIT_WORKTREE_FILE__ =
+        null;
       (window as unknown as { __TAURI_INTERNALS__: typeof internals }).__TAURI_INTERNALS__ =
         internals;
     },

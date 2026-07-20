@@ -3,9 +3,11 @@ import {
   commitProjectGitVersion,
   loadProjectGitContext,
   loadProjectGitRevision,
+  loadProjectGitWorktreeFile,
   revealItemInDir,
   reviewProjectGitChanges,
   reviewProjectGitRevision,
+  saveProjectGitWorktreeFile,
 } from '../../api/commands';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { refactorOnlySections } from '../../modules/documentSections';
@@ -35,6 +37,7 @@ interface UseProjectGitControllerOptions {
   hasUnsavedChanges: boolean;
   onNavigate: (key: NavigationKey) => void;
   onRestoreDocument: (document: unknown, revision: GitRevision) => void | Promise<void>;
+  onReloadWorkingTree: () => void | Promise<void>;
   onStatusChange: (message: string) => void;
 }
 
@@ -44,6 +47,7 @@ export function useProjectGitController({
   hasUnsavedChanges,
   onNavigate,
   onRestoreDocument,
+  onReloadWorkingTree,
   onStatusChange,
 }: UseProjectGitControllerOptions) {
   const [status, setStatus] = useState<GitProjectStatus | null>(null);
@@ -209,6 +213,23 @@ export function useProjectGitController({
     }
   }
 
+  async function loadWorktreeFile(path: string) {
+    if (!request) throw new Error('当前没有可编辑的 Git 项目。');
+    if (reviewRevision) throw new Error('历史版本仅供查看，不能编辑。');
+    if (hasUnsavedChanges) throw new Error('请先保存或恢复主编辑器中的修改。');
+    return loadProjectGitWorktreeFile(request, path);
+  }
+
+  async function saveWorktreeFile(path: string, content: string) {
+    if (!request) throw new Error('当前没有可编辑的 Git 项目。');
+    if (reviewRevision) throw new Error('历史版本仅供查看，不能编辑。');
+    if (hasUnsavedChanges) throw new Error('请先保存或恢复主编辑器中的修改。');
+    await saveProjectGitWorktreeFile(request, path, content);
+    await onReloadWorkingTree();
+    await Promise.all([refresh(), refreshReview(null)]);
+    onStatusChange(`已保存工作区文件：${path}`);
+  }
+
   function showHistory() {
     onNavigate('project');
     window.setTimeout(
@@ -251,10 +272,12 @@ export function useProjectGitController({
     commitVersion,
     openRepository,
     openReview,
+    loadWorktreeFile,
     previewVersion,
     refresh,
     refreshReview,
     restoreVersion,
+    saveWorktreeFile,
     setMessage,
     showHistory,
   };

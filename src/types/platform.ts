@@ -122,6 +122,12 @@ export interface GitReviewFile {
   hunks: GitDiffHunk[];
 }
 
+export interface GitWorktreeFileContent {
+  path: string;
+  original_content: string;
+  current_content: string;
+}
+
 export interface GitDiffHunk {
   header: string;
   old_start: number;

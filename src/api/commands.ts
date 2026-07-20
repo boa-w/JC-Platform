@@ -24,9 +24,8 @@ import type {
   GitReviewReport,
   GitRevision,
   GitRevisionSnapshot,
+  GitWorktreeFileContent,
   LanguageImportReport,
-  SingleLanguageCsvImportRequest,
-  SingleLanguageImportReport,
   LegacyTableKind,
   LegacyTableSpec,
   LoadedProject,
@@ -45,6 +44,8 @@ import type {
   SaveProjectRequest,
   SaveTranslationCredentialsRequest,
   SdoImportReport,
+  SingleLanguageCsvImportRequest,
+  SingleLanguageImportReport,
   TableDocument,
   TableFileRequest,
   TableValidationReport,
@@ -134,6 +135,21 @@ export async function reviewProjectGitRevision(
   revision: string,
 ): Promise<GitReviewReport> {
   return invoke<GitReviewReport>('review_project_git_revision', { request, revision });
+}
+
+export async function loadProjectGitWorktreeFile(
+  request: GitProjectRequest,
+  path: string,
+): Promise<GitWorktreeFileContent> {
+  return invoke<GitWorktreeFileContent>('load_project_git_worktree_file', { request, path });
+}
+
+export async function saveProjectGitWorktreeFile(
+  request: GitProjectRequest,
+  path: string,
+  content: string,
+): Promise<void> {
+  return invoke<void>('save_project_git_worktree_file', { request, path, content });
 }
 
 export async function loadProject(path: string): Promise<LoadedProject> {

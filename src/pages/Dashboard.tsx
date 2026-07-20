@@ -286,6 +286,7 @@ export function Dashboard({
     sidecarPath: projectLifecycle.refactorConfigPath,
     hasUnsavedChanges,
     onNavigate,
+    onReloadWorkingTree: projectLifecycle.reloadProject,
     onStatusChange: projectLifecycle.setSaveStatus,
     onRestoreDocument: async (document, revision) => {
       if (!loadedProject) return;
@@ -485,6 +486,9 @@ export function Dashboard({
             onCommit={() => void projectGit.commitVersion()}
             onRestore={() => void projectGit.restoreVersion()}
             onRefresh={() => void projectGit.refreshReview()}
+            canEditWorkingTree={!hasUnsavedChanges}
+            onLoadWorkingTreeFile={projectGit.loadWorktreeFile}
+            onSaveWorkingTreeFile={projectGit.saveWorktreeFile}
             onClose={projectGit.closeReview}
           />
         ) : null}

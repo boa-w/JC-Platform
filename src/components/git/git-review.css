@@ -88,6 +88,11 @@ body.git-review-open {
   color: var(--color-text);
 }
 
+.git-review-file-item:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .git-review-file-item > span {
   display: grid;
   gap: 2px;
@@ -375,6 +380,170 @@ body.git-review-open {
   overflow: auto;
   padding: 8px 10px 40px;
   background: var(--color-bg);
+}
+
+.git-review-file-editor {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-surface);
+}
+
+.git-review-file-editor > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+}
+
+.git-review-file-editor > header > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.git-review-file-editor > header span {
+  display: grid;
+  min-width: 0;
+}
+
+.git-review-file-editor > header strong,
+.git-review-file-editor > header small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-review-file-editor > header strong {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.git-review-file-editor > header small {
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.git-review-editor-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+}
+
+.git-review-editor-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0 9px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.git-review-editor-actions button:hover:not(:disabled) {
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+}
+
+.git-review-editor-actions button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.git-review-editor-actions .git-review-editor-save {
+  border-color: var(--color-primary-solid);
+  background: var(--color-primary-solid);
+  color: white;
+}
+
+.git-review-editor-actions .git-review-editor-save:hover:not(:disabled) {
+  border-color: var(--color-primary-solid-hover);
+  background: var(--color-primary-solid-hover);
+  color: white;
+}
+
+.git-review-editor-labels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.git-review-editor-labels span {
+  min-width: 0;
+  padding: 5px 12px;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-review-editor-labels span + span {
+  border-left: 1px solid var(--color-border);
+}
+
+.git-review-merge-editor {
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.git-review-merge-editor .cm-mergeView {
+  height: 100%;
+  overflow: auto;
+}
+
+.git-review-merge-editor .cm-editor {
+  min-width: 0;
+  font-size: 12px;
+}
+
+.git-review-merge-editor .cm-mergeViewEditor + .cm-mergeViewEditor {
+  border-left: 1px solid var(--color-border);
+}
+
+.git-review-merge-editor .cm-merge-revert {
+  background: var(--color-surface-alt);
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+}
+
+.git-review-merge-editor .git-review-revert-chunk {
+  min-height: 22px;
+  color: var(--color-text-secondary);
+}
+
+.git-review-merge-editor .git-review-revert-chunk:hover,
+.git-review-merge-editor .git-review-revert-chunk:focus-visible {
+  background: var(--color-primary-solid);
+  color: white;
+  outline: none;
+}
+
+.git-review-file-editor > p {
+  margin: 0;
+  padding: 7px 12px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-danger-text);
+  font-size: 11px;
 }
 
 .git-review-file {

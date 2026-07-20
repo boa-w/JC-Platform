@@ -6,6 +6,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+const MAX_WORKTREE_EDITOR_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitProjectRequest {
     pub project_path: String,
@@ -102,6 +104,13 @@ pub struct GitReviewFile {
     pub additions: usize,
     pub deletions: usize,
     pub hunks: Vec<GitDiffHunk>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GitWorktreeFileContent {
+    pub path: String,
+    pub original_content: String,
+    pub current_content: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -382,6 +391,71 @@ pub fn review_project(request: &GitProjectRequest) -> Result<GitReviewReport, St
         deletions,
         files,
     })
+}
+
+pub fn load_worktree_file(
+    request: &GitProjectRequest,
+    path: &str,
+) -> Result<GitWorktreeFileContent, String> {
+    let (context, file_path) = editable_worktree_file(request, path)?;
+    let metadata = std::fs::metadata(&file_path)
+        .map_err(|error| format!("读取文件信息失败 {}：{error}", file_path.display()))?;
+    if metadata.len() > MAX_WORKTREE_EDITOR_BYTES as u64 {
+        return Err(format!(
+            "文件超过内置编辑器的 16 MiB 限制：{}",
+            file_path.display()
+        ));
+    }
+    let current_content = std::fs::read_to_string(&file_path)
+        .map_err(|error| format!("读取工作区文件失败 {}：{error}", file_path.display()))?;
+    let original_content = if git_success(&context.root, &["rev-parse", "--verify", "HEAD"]).is_ok()
+        && git_success(&context.root, &["ls-files", "--error-unmatch", "--", path]).is_ok()
+    {
+        git_raw_text(&context.root, &["show".to_string(), format!("HEAD:{path}")])?
+    } else {
+        String::new()
+    };
+    Ok(GitWorktreeFileContent {
+        path: path.to_string(),
+        original_content,
+        current_content,
+    })
+}
+
+pub fn save_worktree_file(
+    request: &GitProjectRequest,
+    path: &str,
+    content: &str,
+) -> Result<(), String> {
+    if content.len() > MAX_WORKTREE_EDITOR_BYTES {
+        return Err("文件超过内置编辑器的 16 MiB 限制".to_string());
+    }
+    let document = serde_json::from_str::<Value>(content)
+        .map_err(|error| format!("JSON 格式错误，未保存：{error}"))?;
+    if !document.is_object() {
+        return Err("配置根节点必须是 JSON 对象，未保存".to_string());
+    }
+    let (_, file_path) = editable_worktree_file(request, path)?;
+    std::fs::write(&file_path, content)
+        .map_err(|error| format!("保存工作区文件失败 {}：{error}", file_path.display()))
+}
+
+fn editable_worktree_file(
+    request: &GitProjectRequest,
+    path: &str,
+) -> Result<(RepositoryContext, PathBuf), String> {
+    let context = discover_repository(request)?;
+    if !context.managed_paths.iter().any(|managed| managed == path) {
+        return Err("只能编辑当前项目明确受管的配置文件".to_string());
+    }
+    if !path_has_changes(&context.root, path) {
+        return Err("只能编辑当前未提交状态的文件".to_string());
+    }
+    let file_path = context.root.join(path);
+    if !file_path.is_file() {
+        return Err(format!("工作区文件不存在或已删除：{}", file_path.display()));
+    }
+    Ok((context, file_path))
 }
 
 pub fn review_revision(
@@ -1087,6 +1161,51 @@ mod tests {
         .unwrap_err();
         assert!(error.contains("暂存区已有内容"));
         assert!(path_has_changes(&root, "meter.jcpro"));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn edits_only_changed_managed_worktree_json_files() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("jc-git-editor-test-{unique}"));
+        fs::create_dir_all(&root).unwrap();
+        git_success(&root, &["init"]).unwrap();
+        git_success(&root, &["config", "user.name", "JC Test"]).unwrap();
+        git_success(&root, &["config", "user.email", "jc@example.invalid"]).unwrap();
+
+        let project = root.join("meter.jcpro");
+        let unrelated = root.join("notes.json");
+        fs::write(&project, r#"{"config_version":"v1"}"#).unwrap();
+        fs::write(&unrelated, r#"{"note":"initial"}"#).unwrap();
+        git_success(&root, &["add", "--", "meter.jcpro", "notes.json"]).unwrap();
+        git_success(&root, &["commit", "-m", "initial"]).unwrap();
+        fs::write(&project, r#"{"config_version":"v2"}"#).unwrap();
+        fs::write(&unrelated, r#"{"note":"changed"}"#).unwrap();
+
+        let request = GitProjectRequest {
+            project_path: project.to_string_lossy().to_string(),
+            sidecar_path: None,
+        };
+        let content = load_worktree_file(&request, "meter.jcpro").unwrap();
+        assert!(content.original_content.contains("v1"));
+        assert!(content.current_content.contains("v2"));
+        save_worktree_file(&request, "meter.jcpro", r#"{"config_version":"v3"}"#).unwrap();
+        assert!(fs::read_to_string(&project).unwrap().contains("v3"));
+
+        let invalid = save_worktree_file(&request, "meter.jcpro", "not json").unwrap_err();
+        assert!(invalid.contains("JSON 格式错误"));
+        assert!(fs::read_to_string(&project).unwrap().contains("v3"));
+
+        let unmanaged = load_worktree_file(&request, "notes.json").unwrap_err();
+        assert!(unmanaged.contains("明确受管"));
+
+        save_worktree_file(&request, "meter.jcpro", r#"{"config_version":"v1"}"#).unwrap();
+        let unchanged = load_worktree_file(&request, "meter.jcpro").unwrap_err();
+        assert!(unchanged.contains("未提交状态"));
 
         fs::remove_dir_all(root).unwrap();
     }
