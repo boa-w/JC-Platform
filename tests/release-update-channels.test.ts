@@ -38,13 +38,32 @@ test('selects the matching updater config in the release workflow', () => {
   );
   assert.match(
     workflow,
-    /github\.event_name == 'release' && '--config src-tauri\/tauri\.updater\.conf\.json'/,
+    /args: --target \$\{\{ matrix\.target \}\} --config src-tauri\/tauri\.updater\.conf\.json/,
   );
   assert.match(
     workflow,
     /npm run release:check -- --channel stable --target \$\{\{ matrix\.target \}\}/,
   );
-  assert.match(workflow, /APPLE_CERTIFICATE: \$\{\{ secrets\.APPLE_CERTIFICATE \}\}/);
+  const nightlyBuildStep = workflow.slice(
+    workflow.indexOf('- name: Build Tauri app'),
+    workflow.indexOf('- name: Build signed Tauri app'),
+  );
+  const signedBuildStep = workflow.slice(
+    workflow.indexOf('- name: Build signed Tauri app'),
+    workflow.indexOf('- name: Download previous Windows nightly installer'),
+  );
+  assert.match(nightlyBuildStep, /if: github\.event_name != 'release'/);
+  assert.doesNotMatch(nightlyBuildStep, /APPLE_CERTIFICATE/);
+  assert.doesNotMatch(nightlyBuildStep, /APPLE_SIGNING_IDENTITY/);
+  assert.match(signedBuildStep, /if: github\.event_name == 'release'/);
+  assert.match(
+    signedBuildStep,
+    /APPLE_CERTIFICATE: \$\{\{ secrets\.APPLE_CERTIFICATE \}\}/,
+  );
+  assert.match(
+    signedBuildStep,
+    /APPLE_SIGNING_IDENTITY: \$\{\{ secrets\.APPLE_SIGNING_IDENTITY \}\}/,
+  );
 });
 
 test('smoke tests bundled installers before publishing artifacts', () => {

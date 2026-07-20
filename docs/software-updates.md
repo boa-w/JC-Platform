@@ -120,6 +120,11 @@ App Store Connect API key 形式的 notarization 凭据。
 8. `Normalize nightly assets` job 会把 action 上传的 `_0.1.1-xx_...` 资产重命名为
    `JC-Platform_0.1.1-xx_...`，并生成可用于 Tauri updater 的 `latest.json`。
 
+Nightly 构建只注入 `TAURI_SIGNING_PRIVATE_KEY` 来签署 updater 更新包，不注入
+`APPLE_CERTIFICATE` 等 Developer ID 凭据，因此 macOS nightly 产物不会触发代码签名和
+notarization。Apple 签名变量只在正式 GitHub Release 构建中注入，并由 stable 发布前检查
+强制校验；仓库中残留或无效的 Apple secret 不会阻断 nightly 构建。
+
 `latest.json` 必须包含当前平台的下载 URL 和 `.sig` 文件内容，Tauri updater
 会先校验签名再安装更新。不要手动把 `.sig` 文件路径写进 JSON。
 
