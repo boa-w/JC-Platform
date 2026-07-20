@@ -1,12 +1,18 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 
 interface TranslationValueInputProps {
+  ariaLabel: string;
   value: string;
   modified: boolean;
   onCommit: (value: string) => void;
 }
 
-export function TranslationValueInput({ value, modified, onCommit }: TranslationValueInputProps) {
+export function TranslationValueInput({
+  ariaLabel,
+  value,
+  modified,
+  onCommit,
+}: TranslationValueInputProps) {
   const [draft, setDraft] = useState(value);
   const focusedRef = useRef(false);
   const cancelCommitRef = useRef(false);
@@ -37,6 +43,7 @@ export function TranslationValueInput({ value, modified, onCommit }: Translation
 
   return (
     <input
+      aria-label={ariaLabel}
       className={`lang-table-input ${modified ? 'modified' : ''}`}
       value={draft}
       onBlur={() => {

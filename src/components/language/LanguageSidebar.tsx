@@ -156,12 +156,14 @@ export function LanguageSidebar({
             <span className="lang-sidebar-add-label">自定义：</span>
             <div className="lang-sidebar-add-form">
               <input
+                aria-label="新语言代码"
                 placeholder="代码"
                 value={newCode}
                 onChange={(e) => setNewCode(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               />
               <input
+                aria-label="新语言名称"
                 placeholder="名称"
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
@@ -187,18 +189,15 @@ export function LanguageSidebar({
           const isZh = lang.code === 'zh';
           const isEditing = editingLang === lang.code;
           return (
-            <button
+            <div
               className={`lang-sidebar-item ${isSelected ? 'active' : ''} ${isZh ? 'lang-sidebar-item--zh' : ''}`}
               key={lang.code}
-              onClick={() => {
-                if (!isEditing) onSelectLanguage(isSelected ? null : lang.code);
-              }}
-              type="button"
             >
-              <div className="lang-sidebar-item-header">
-                {isEditing ? (
-                  <>
+              {isEditing ? (
+                <div className="lang-sidebar-edit">
+                  <div className="lang-sidebar-item-header">
                     <input
+                      aria-label={`编辑语言代码 ${lang.label}`}
                       className="lang-sidebar-edit-input lang-sidebar-edit-code"
                       value={editCode}
                       onChange={(e) => setEditCode(e.target.value)}
@@ -210,6 +209,7 @@ export function LanguageSidebar({
                       disabled={isZh}
                     />
                     <input
+                      aria-label={`编辑语言名称 ${lang.code}`}
                       className="lang-sidebar-edit-input lang-sidebar-edit-label"
                       value={editLabel}
                       onChange={(e) => setEditLabel(e.target.value)}
@@ -220,51 +220,62 @@ export function LanguageSidebar({
                       }}
                       onBlur={commitEditLang}
                     />
-                  </>
-                ) : (
-                  <>
-                    <span className="lang-sidebar-code">{lang.code}</span>
-                    <span className="lang-sidebar-label">{lang.label}</span>
-                    <div className="lang-sidebar-item-actions">
-                      {!isZh ? (
-                        <button
-                          className="lang-sidebar-action-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEditLang(lang.code);
-                          }}
-                          type="button"
-                          title="编辑语言"
-                        >
-                          ✎
-                        </button>
-                      ) : null}
-                      {!isZh ? (
-                        <button
-                          className="lang-sidebar-remove"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConfirmDelete(lang.code);
-                          }}
-                          type="button"
-                          title="删除语言"
-                        >
-                          ×
-                        </button>
-                      ) : null}
+                  </div>
+                  <div className="lang-sidebar-progress">
+                    <div className="lang-sidebar-progress-bar">
+                      <div className="lang-sidebar-progress-fill" style={{ width: `${pct}%` }} />
                     </div>
-                  </>
-                )}
-              </div>
-              <div className="lang-sidebar-progress">
-                <div className="lang-sidebar-progress-bar">
-                  <div className="lang-sidebar-progress-fill" style={{ width: `${pct}%` }} />
+                    <span className="lang-sidebar-progress-text">
+                      {lang.translated}/{lang.total}
+                    </span>
+                  </div>
                 </div>
-                <span className="lang-sidebar-progress-text">
-                  {lang.translated}/{lang.total}
-                </span>
-              </div>
-            </button>
+              ) : (
+                <>
+                  <button
+                    aria-pressed={isSelected}
+                    className="lang-sidebar-select"
+                    onClick={() => onSelectLanguage(isSelected ? null : lang.code)}
+                    type="button"
+                  >
+                    <div className="lang-sidebar-item-header">
+                      <span className="lang-sidebar-code">{lang.code}</span>
+                      <span className="lang-sidebar-label">{lang.label}</span>
+                    </div>
+                    <div className="lang-sidebar-progress">
+                      <div className="lang-sidebar-progress-bar">
+                        <div className="lang-sidebar-progress-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="lang-sidebar-progress-text">
+                        {lang.translated}/{lang.total}
+                      </span>
+                    </div>
+                  </button>
+                  {!isZh ? (
+                    <div className="lang-sidebar-item-actions">
+                      <button
+                        aria-label={`编辑语言 ${lang.label}`}
+                        className="lang-sidebar-action-btn"
+                        onClick={() => startEditLang(lang.code)}
+                        type="button"
+                        title="编辑语言"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        aria-label={`删除语言 ${lang.label}`}
+                        className="lang-sidebar-remove"
+                        onClick={() => setConfirmDelete(lang.code)}
+                        type="button"
+                        title="删除语言"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
           );
         })}
       </div>

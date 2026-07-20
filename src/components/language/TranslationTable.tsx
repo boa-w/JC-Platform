@@ -287,6 +287,7 @@ export function TranslationTable({
                 <td className="lang-table-cell-key">
                   {editingKeyIndex === row.index ? (
                     <input
+                      aria-label={`编辑翻译键 ${row.key}`}
                       className="lang-table-key-input editing"
                       disabled={isReadonlyKey}
                       value={keyDraft}
@@ -318,6 +319,7 @@ export function TranslationTable({
                 </td>
                 <td className="lang-table-cell-source">
                   <TranslationValueInput
+                    ariaLabel={`${row.key} ${getLabel(document, sourceLanguage)}`}
                     modified={isModified}
                     value={sourceValue}
                     onCommit={(value) => onUpdateValue(row.key, sourceLanguage, value)}
@@ -326,6 +328,7 @@ export function TranslationTable({
                 {targetLanguage && targetLanguage !== sourceLanguage ? (
                   <td className="lang-table-cell-target">
                     <TranslationValueInput
+                      ariaLabel={`${row.key} ${getLabel(document, targetLanguage)}`}
                       modified={isModified}
                       value={targetValue}
                       onCommit={(value) => onUpdateValue(row.key, targetLanguage, value)}

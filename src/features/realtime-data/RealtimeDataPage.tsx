@@ -152,6 +152,7 @@ export function RealtimeDataPage({
                   <td>{index + 1}</td>
                   <td>
                     <input
+                      aria-label={`全局变量 ${index + 1} 参数 ID`}
                       value={item.param_id}
                       onChange={(event) =>
                         updatePdoGlobalParam(index, 'param_id', event.target.value)
@@ -160,18 +161,21 @@ export function RealtimeDataPage({
                   </td>
                   <td>
                     <input
+                      aria-label={`全局变量 ${index + 1} 名称`}
                       value={item.name}
                       onChange={(event) => updatePdoGlobalParam(index, 'name', event.target.value)}
                     />
                   </td>
                   <td>
                     <input
+                      aria-label={`全局变量 ${index + 1} 默认值`}
                       value={item.def}
                       onChange={(event) => updatePdoGlobalParam(index, 'def', event.target.value)}
                     />
                   </td>
                   <td>
                     <input
+                      aria-label={`全局变量 ${index + 1} 保留值`}
                       type="number"
                       value={item.reserved}
                       onChange={(event) =>
@@ -181,6 +185,7 @@ export function RealtimeDataPage({
                   </td>
                   <td>
                     <input
+                      aria-label={`全局变量 ${index + 1} 类型`}
                       type="number"
                       value={item.type}
                       onChange={(event) =>
@@ -190,6 +195,7 @@ export function RealtimeDataPage({
                   </td>
                   <td>
                     <input
+                      aria-label={`全局变量 ${index + 1} 内部变量`}
                       type="number"
                       value={item.inner}
                       onChange={(event) =>
@@ -553,6 +559,7 @@ export function RealtimeDataPage({
                         <td>{index + 1}</td>
                         <td>
                           <input
+                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}帧 ${index + 1} ID`}
                             inputMode="text"
                             value={formatFrameId(frame.id)}
                             onChange={(event) =>
@@ -562,6 +569,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <select
+                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}帧 ${index + 1} 类型`}
                             value={frame.type}
                             onChange={(event) =>
                               updatePdoFrame(
@@ -578,6 +586,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}帧 ${index + 1} 描述`}
                             value={frame.desc}
                             onChange={(event) =>
                               updatePdoFrame(
@@ -660,6 +669,7 @@ export function RealtimeDataPage({
                         <td>{index + 1}</td>
                         <td>
                           <input
+                            aria-label={`信号 ${index + 1} 参数名称`}
                             value={signal.pdo_param_name || ''}
                             onChange={(event) =>
                               updatePdoSignal(
@@ -674,6 +684,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <select
+                            aria-label={`信号 ${index + 1} 读取方式`}
                             value={signal.show_type}
                             onChange={(event) =>
                               updatePdoSignal(
@@ -692,6 +703,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`信号 ${index + 1} bit 开始位置`}
                             type="number"
                             value={signal.pos}
                             onChange={(event) =>
@@ -707,6 +719,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`信号 ${index + 1} bit 长度`}
                             type="number"
                             value={signal.len}
                             onChange={(event) =>
@@ -722,6 +735,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`信号 ${index + 1} 参数索引`}
                             type="number"
                             value={signal.pdo_param_index}
                             onChange={(event) =>
@@ -808,6 +822,7 @@ export function RealtimeDataPage({
                         <td>{index + 1}</td>
                         <td>
                           <input
+                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}高级帧 ${index + 1} ID`}
                             inputMode="text"
                             value={formatFrameId(frame.id)}
                             onChange={(event) =>
@@ -821,6 +836,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}高级帧 ${index + 1} 类型`}
                             type="number"
                             value={frame.type}
                             onChange={(event) =>
@@ -835,6 +851,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}高级帧 ${index + 1} 描述`}
                             value={frame.desc}
                             onChange={(event) =>
                               updatePdoAdvancedFrame(
@@ -898,6 +915,7 @@ export function RealtimeDataPage({
                         <td>{index + 1}</td>
                         <td>
                           <input
+                            aria-label={`高级信号 ${index + 1} 参数 ID`}
                             value={signal.param_id}
                             onChange={(event) =>
                               updatePdoAdvancedSignal(
@@ -912,6 +930,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`高级信号 ${index + 1} bit 开始位置`}
                             type="number"
                             value={signal.pos}
                             onChange={(event) =>
@@ -927,6 +946,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`高级信号 ${index + 1} bit 长度`}
                             type="number"
                             value={signal.len}
                             onChange={(event) =>
@@ -942,6 +962,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`高级信号 ${index + 1} 显示类型`}
                             type="number"
                             value={signal.show_type}
                             onChange={(event) =>
@@ -957,6 +978,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`高级信号 ${index + 1} 处理器`}
                             type="number"
                             value={signal.handle}
                             onChange={(event) =>
@@ -972,6 +994,7 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
+                            aria-label={`高级信号 ${index + 1} 处理参数`}
                             value={signal.handle_param}
                             onChange={(event) =>
                               updatePdoAdvancedSignal(

@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
+import { installRichProjectDesktopMock, richProjectPath } from './fixtures/richProject';
 
 function captureRuntimeErrors(page: Page) {
   const errors: string[] = [];
@@ -21,6 +22,15 @@ async function expectNoSeriousAccessibilityViolations(page: Page, context: strin
     violations,
     `${context} accessibility violations:\n${JSON.stringify(violations, null, 2)}`,
   ).toEqual([]);
+}
+
+async function openRichProject(page: Page) {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await installRichProjectDesktopMock(page);
+  await page.getByLabel('项目文件路径').fill(richProjectPath);
+  const openSection = page.locator('.project-section').filter({ hasText: '打开现有项目' });
+  await openSection.getByRole('button', { name: '打开', exact: true }).click();
+  await expect(page.locator('.action-bar-project')).toContainText('Rich Fixture');
 }
 
 test.beforeEach(async ({ page }) => {
@@ -241,6 +251,88 @@ test('surfaces desktop-only actions as accessible errors in browser preview', as
   await expect(page.getByRole('alert')).toHaveText(
     '系统文件选择器只能在桌面应用中使用；也可以粘贴项目路径后打开。',
   );
+});
+
+test('supports accessible loaded-project editing and save', async ({ page }) => {
+  test.setTimeout(180_000);
+  await openRichProject(page);
+
+  await page.getByRole('button', { name: '数据', exact: true }).click();
+  const dataNavigation = page.getByRole('navigation', { name: '数据 功能' });
+  await dataNavigation.getByRole('button', { name: '设置数据', exact: true }).click();
+  await expect(page.getByRole('main', { name: '设置数据' })).toBeVisible();
+  await expect(page.getByText('最高车速', { exact: true })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '已加载项目的设置数据工作区');
+
+  const parameterRow = page.getByRole('row').filter({ hasText: '最高车速' });
+  await parameterRow.getByRole('button', { name: '编辑定义' }).click();
+  const parameterDialog = page.getByRole('dialog', { name: '参数编辑：最高车速' });
+  await expect(parameterDialog.getByRole('button', { name: '关闭设置数据编辑面板' })).toBeFocused();
+  await expectNoSeriousAccessibilityViolations(page, '设置参数编辑抽屉');
+  await parameterDialog.getByLabel('名称').fill('最大车速');
+  await expect(
+    page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press('Escape');
+  await expect(parameterDialog).toBeHidden();
+
+  await dataNavigation.getByRole('button', { name: '实时数据', exact: true }).click();
+  await expect(page.getByRole('main', { name: '实时数据' })).toBeVisible();
+  await expect(page.locator('input[value="车辆状态"]')).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '已加载项目的实时数据工作区');
+
+  await page.getByRole('button', { name: '配置', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '配置 功能' })
+    .getByRole('button', { name: '故障代码', exact: true })
+    .click();
+  await expect(page.getByText('牵引故障', { exact: true })).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '已加载项目的故障代码工作区');
+
+  await page.getByRole('button', { name: '多国语言', exact: true }).click();
+  await expect(page.getByRole('main', { name: '多国语言' })).toBeVisible();
+  await expect(page.locator('input[value="Maximum speed"]')).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, '已加载项目的多国语言工作区');
+
+  await page.keyboard.press('Control+s');
+  const saveDialog = page.getByRole('dialog', { name: '确认保存' });
+  await saveDialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(saveDialog).toBeHidden();
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __SAVED_PROJECT_DOCUMENT__: {
+              sdo_info?: { children?: Array<{ children?: Array<{ name?: string }> }> };
+            };
+          }
+        ).__SAVED_PROJECT_DOCUMENT__?.sdo_info?.children?.[0]?.children?.[0]?.name,
+    ),
+  ).toBe('最大车速');
+  await expect(
+    page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
+  ).toBeDisabled();
+});
+
+test('supports accessible Git review and comparison views', async ({ page }) => {
+  test.setTimeout(60_000);
+  await openRichProject(page);
+
+  const gitTrigger = page.locator('.action-bar-git-trigger');
+  await expect(gitTrigger).toContainText('main');
+  await gitTrigger.click();
+  const gitSummary = page.getByRole('dialog', { name: 'Git 版本摘要' });
+  await gitSummary.getByRole('button', { name: /审阅更改/ }).click();
+  const gitReview = page.getByRole('region', { name: 'Git 更改审阅' });
+  await expect(gitReview).toBeVisible();
+  await expectNoSeriousAccessibilityViolations(page, 'Git 更改审阅工作区');
+  await gitReview.getByRole('button', { name: '并排对比视图' }).click();
+  await expect(gitReview.getByRole('button', { name: '并排对比视图' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await gitReview.getByRole('button', { name: '关闭审阅' }).click();
 });
 
 test('offers to restore an unsaved project draft', async ({ page }) => {

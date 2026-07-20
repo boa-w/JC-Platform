@@ -346,7 +346,15 @@ export function Dashboard({
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      void unlistenPromise.then((unlisten) => unlisten());
+      void unlistenPromise
+        .then((unlisten) => {
+          try {
+            void Promise.resolve(unlisten()).catch(() => undefined);
+          } catch {
+            // The desktop event bridge may already be gone during window teardown.
+          }
+        })
+        .catch(() => undefined);
     };
   }, [hasUnsavedChanges, isUpdateRelaunchAuthorized]);
 

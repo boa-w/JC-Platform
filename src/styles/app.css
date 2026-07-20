@@ -14,11 +14,12 @@
   --color-primary-light: #eff6ff;
   --color-primary-border: #bfdbfe;
   --color-accent: #0ea5e9;
-  --color-success: #059669;
+  --color-success: #047857;
   --color-success-light: #ecfdf5;
   --color-warning: #92400e;
   --color-warning-light: #fffbeb;
   --color-danger: #dc2626;
+  --color-danger-text: #b91c1c;
   --color-danger-light: #fef2f2;
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -74,6 +75,7 @@
   --color-warning: #e8ab53;
   --color-warning-light: rgba(232, 171, 83, 0.1);
   --color-danger: #f44747;
+  --color-danger-text: #ff6b6b;
   --color-danger-light: rgba(244, 71, 71, 0.1);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
@@ -4376,7 +4378,7 @@ body.git-review-open {
 }
 
 .legacy-data-table button.danger {
-  color: #ff4b2b;
+  color: var(--color-danger-text);
 }
 
 .legacy-data-table button:hover {
@@ -6343,14 +6345,10 @@ html {
 }
 
 .lang-sidebar-item {
-  display: block;
+  position: relative;
   width: 100%;
-  border: 0;
   border-left: 3px solid transparent;
-  padding: 8px 14px;
   background: transparent;
-  cursor: pointer;
-  text-align: left;
   transition: background 0.1s;
 }
 
@@ -6363,6 +6361,26 @@ html {
   background: var(--color-primary-light);
 }
 
+.lang-sidebar-select {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 8px 14px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lang-sidebar-select:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.lang-sidebar-edit {
+  padding: 8px 14px;
+}
+
 .lang-sidebar-item-header {
   display: flex;
   align-items: center;
@@ -6371,15 +6389,21 @@ html {
 }
 
 .lang-sidebar-item-actions {
+  position: absolute;
+  top: 8px;
+  right: 10px;
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-left: auto;
   opacity: 0;
   transition: opacity 0.15s;
 }
 
 .lang-sidebar-item:hover .lang-sidebar-item-actions {
+  opacity: 1;
+}
+
+.lang-sidebar-item:focus-within .lang-sidebar-item-actions {
   opacity: 1;
 }
 
@@ -6445,14 +6469,7 @@ html {
   cursor: pointer;
   font-size: 14px;
   padding: 0 4px;
-  opacity: 0;
-  transition:
-    opacity 0.15s,
-    color 0.15s;
-}
-
-.lang-sidebar-item:hover .lang-sidebar-remove {
-  opacity: 1;
+  transition: color 0.15s;
 }
 
 .lang-sidebar-remove:hover {

@@ -798,6 +798,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                 <tr key={`${sourceKeyFor(source)}-${source.source_id}-${source.can_id}`}>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} 启用`}
                       checked={source.enabled ?? true}
                       type="checkbox"
                       onChange={(event) => updateSource(index, { enabled: event.target.checked })}
@@ -805,6 +806,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} Key`}
                       value={sourceKeyFor(source)}
                       onChange={(event) =>
                         updateSource(index, { source_key: event.target.value.trim() })
@@ -813,12 +815,14 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} 名称`}
                       value={source.name ?? ''}
                       onChange={(event) => updateSource(index, { name: event.target.value })}
                     />
                   </td>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} ID`}
                       min={1}
                       type="number"
                       value={source.source_id}
@@ -829,6 +833,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} 类型字符`}
                       maxLength={1}
                       value={source.type_char}
                       onChange={(event) =>
@@ -840,6 +845,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} CAN ID`}
                       value={source.can_id}
                       onChange={(event) =>
                         updateSource(index, { can_id: numberValue(event.target.value) })
@@ -849,6 +855,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <select
+                      aria-label={`来源 ${index + 1} 帧类型`}
                       value={source.frame_type ?? source.type ?? 0}
                       onChange={(event) =>
                         updateSource(index, { frame_type: numberValue(event.target.value) })
@@ -860,6 +867,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} 取码字节`}
                       min={0}
                       max={7}
                       type="number"
@@ -871,6 +879,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} 清除码`}
                       min={0}
                       max={255}
                       type="number"
@@ -882,6 +891,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
+                      aria-label={`来源 ${index + 1} 无效码`}
                       value={codeListText(source.invalid_codes)}
                       onChange={(event) =>
                         updateSource(index, { invalid_codes: parseCodeList(event.target.value) })
@@ -1092,6 +1102,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   >
                     <td>
                       <input
+                        aria-label={`故障码 ${index + 1} 启用`}
                         checked={item.enabled ?? true}
                         type="checkbox"
                         onChange={(event) => updateCode(index, { enabled: event.target.checked })}
@@ -1099,6 +1110,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                     </td>
                     <td>
                       <select
+                        aria-label={`故障码 ${index + 1} 来源`}
                         value={item.source_key ?? codeSourceKey}
                         onChange={(event) => updateCode(index, { source_key: event.target.value })}
                       >
@@ -1126,6 +1138,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                     </td>
                     <td>
                       <input
+                        aria-label={`故障码 ${index + 1} Code`}
                         min={0}
                         max={255}
                         type="number"
@@ -1142,6 +1155,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                     </td>
                     <td>
                       <select
+                        aria-label={`故障码 ${index + 1} 等级`}
                         value={item.severity ?? 'fault'}
                         onChange={(event) => updateCode(index, { severity: event.target.value })}
                       >
@@ -1156,6 +1170,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       <div className="fault-code-i18n-cell">
                         <div className="fault-code-i18n-search-row">
                           <input
+                            aria-label={`故障码 ${index + 1} 搜索 i18n`}
                             disabled={i18nKeys.length === 0}
                             placeholder="搜索 i18n key / 文案"
                             type="search"
@@ -1181,6 +1196,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                           ) : null}
                         </div>
                         <select
+                          aria-label={`故障码 ${index + 1} 绑定 i18n`}
                           disabled={i18nKeys.length === 0}
                           value={selectedI18nKey}
                           onFocus={() => setActiveI18nRow(index)}
@@ -1213,6 +1229,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                               : selectedI18nKey || '聚焦后选择已有 i18n'}
                         </small>
                         <input
+                          aria-label={`故障码 ${index + 1} 文案 Key`}
                           value={messageKeyDraftByRow[index] ?? key}
                           onBlur={() => commitMessageKeyDraft(index)}
                           onChange={(event) =>
@@ -1239,6 +1256,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                     </td>
                     <td>
                       <input
+                        aria-label={`故障码 ${index + 1} 中文文案`}
                         value={languageText(language, key) || item.name || ''}
                         onChange={(event) => updateCodeText(index, event.target.value)}
                       />
@@ -1246,6 +1264,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                     <td>
                       <div className="fault-code-row-actions">
                         <select
+                          aria-label={`故障码 ${index + 1} 复制目标来源`}
                           disabled={cloneSourceOptions.length === 0}
                           value={selectedCloneSource}
                           onChange={(event) =>
