@@ -247,11 +247,7 @@ pub fn merge_single_language_rows(
         })
         .unwrap_or_default();
     let indexed_keys = inner_keys.iter().cloned().collect::<HashSet<_>>();
-    let mut configured_keys = inner_keys
-        .iter()
-        .skip(codes.len())
-        .cloned()
-        .collect::<HashSet<_>>();
+    let mut configured_keys = inner_keys.iter().cloned().collect::<HashSet<_>>();
     if let Some(translations) = document.get("list_translate").and_then(Value::as_object) {
         configured_keys.extend(
             translations
@@ -361,10 +357,34 @@ fn is_single_language_header(row: &[String]) -> bool {
         .first()
         .map(|value| value.trim().to_ascii_lowercase())
         .unwrap_or_default();
-    matches!(
+    if matches!(
         first.as_str(),
         "key" | "auto" | "translation_key" | "translation key" | "翻译键" | "键"
-    )
+    ) {
+        return true;
+    }
+
+    row.first()
+        .is_some_and(|value| is_language_column_header(value))
+        && row
+            .get(1)
+            .is_some_and(|value| is_language_column_header(value))
+}
+
+fn is_language_column_header(value: &str) -> bool {
+    let Some((label, code)) = value.trim().rsplit_once('_') else {
+        return false;
+    };
+    !label.trim().is_empty()
+        && !code.is_empty()
+        && code.len() <= 16
+        && code
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '-')
+        && code
+            .chars()
+            .next()
+            .is_some_and(|character| character.is_ascii_alphabetic())
 }
 
 fn language_labels_from_document(
@@ -583,5 +603,31 @@ mod tests {
         assert!(!invalid.valid);
         assert!(invalid.document.is_none());
         assert!(invalid.errors[0].contains("de"));
+    }
+
+    #[test]
+    fn single_language_import_skips_language_pair_header() {
+        let document = json!({
+            "list_code_language": ["zh", "uk"],
+            "list_inner": ["中文", "英文"],
+            "list_translate": {
+                "中文": { "zh": "中文", "uk": "" },
+                "英文": { "zh": "英文", "uk": "" }
+            }
+        });
+        let rows = vec![
+            vec!["中文_zh".to_string(), "乌克兰语_uk".to_string()],
+            vec!["中文".to_string(), "Китайська".to_string()],
+            vec!["英文".to_string(), "Англійська".to_string()],
+        ];
+
+        let report = merge_single_language_rows(&document, "uk", rows);
+
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(report.filled, 2);
+        assert_eq!(report.skipped_unknown, 0);
+        let imported = report.document.unwrap();
+        assert_eq!(imported["list_translate"]["中文"]["uk"], "Китайська");
+        assert_eq!(imported["list_translate"]["英文"]["uk"], "Англійська");
     }
 }

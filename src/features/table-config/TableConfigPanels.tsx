@@ -17,7 +17,11 @@ export function TableConfigStatusPanel({ controller }: TableConfigStatusPanelPro
     <section className="table-spec-card">
       <div>
         <h2>{tableConfigTitles[kind]}</h2>
-        <p>导入/导出操作请使用顶部工具栏按钮。支持 CSV、XLS、XLSX、XML 格式。</p>
+        <p>
+          {kind === 'language'
+            ? '单语言 CSV 请使用语言列表内的导入按钮；完整语言表可从顶部工具栏导出。'
+            : '导入/导出操作请使用顶部工具栏按钮。支持 CSV、XLS、XLSX、XML 格式。'}
+        </p>
       </div>
       {controller.specs
         .filter((spec) => spec.kind === kind)
@@ -28,12 +32,12 @@ export function TableConfigStatusPanel({ controller }: TableConfigStatusPanelPro
             title={`表头格式（${spec.headers.length} 列）`}
           />
         ))}
-      {controller.importError ? (
+      {kind !== 'language' && controller.importError ? (
         <p className="project-open-error" role="alert">
           {controller.importError}
         </p>
       ) : null}
-      {controller.importReport ? (
+      {kind !== 'language' && controller.importReport ? (
         <div className="table-io-result">
           <div className="table-io-result-row">
             <span>导入校验</span>

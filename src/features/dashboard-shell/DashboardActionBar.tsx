@@ -289,16 +289,18 @@ export function DashboardActionBar({
           <span className="action-bar-sep" />
           {currentLegacyTableKind ? (
             <div className="action-bar-group">
-              <button
-                className="action-bar-btn action-bar-btn--secondary"
-                disabled={!loadedProject || isImportingTable}
-                onClick={() => void handleImportTableConfig(currentLegacyTableKind)}
-                type="button"
-                title="从 CSV/XLS/XLSX/XML 文件导入"
-              >
-                <FileDown aria-hidden="true" size={14} strokeWidth={1.8} />
-                {isImportingTable ? '导入中...' : '导入'}
-              </button>
+              {currentLegacyTableKind !== 'language' ? (
+                <button
+                  className="action-bar-btn action-bar-btn--secondary"
+                  disabled={!loadedProject || isImportingTable}
+                  onClick={() => void handleImportTableConfig(currentLegacyTableKind)}
+                  type="button"
+                  title="从 CSV/XLS/XLSX/XML 文件导入"
+                >
+                  <FileDown aria-hidden="true" size={14} strokeWidth={1.8} />
+                  {isImportingTable ? '导入中...' : '导入'}
+                </button>
+              ) : null}
               <button
                 className="action-bar-btn action-bar-btn--ghost"
                 disabled={!loadedProject || isExportingTable}

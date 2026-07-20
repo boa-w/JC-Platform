@@ -311,6 +311,9 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await expect(existingEnglishTranslation).toHaveValue('Maximum speed');
   await expect(emptyEnglishTranslation).toHaveValue('');
   await expectNoSeriousAccessibilityViolations(page, '已加载项目的多国语言工作区');
+  await expect(
+    page.locator('.action-bar').getByRole('button', { name: '导入', exact: true }),
+  ).toHaveCount(0);
 
   await page.getByRole('button', { name: '导入单语言 CSV', exact: true }).click();
   await expect(emptyEnglishTranslation).toHaveValue('Diagnostic mode');
