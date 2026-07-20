@@ -7,6 +7,7 @@ import { basicSetup } from 'codemirror';
 import { Braces, Pencil, Save } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { GitWorktreeFileContent } from '../../types/platform';
+import { lineDiffChanges } from './lineDiff';
 
 interface GitWorktreeDiffEditorProps {
   file: GitWorktreeFileContent;
@@ -95,6 +96,7 @@ export function GitWorktreeDiffEditor({
         ],
       },
       collapseUnchanged: { margin: 3, minSize: 5 },
+      diffConfig: { override: lineDiffChanges },
       gutter: true,
       highlightChanges: true,
       orientation: 'a-b',

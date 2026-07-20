@@ -406,12 +406,17 @@ pub fn load_worktree_file(
             file_path.display()
         ));
     }
-    let current_content = std::fs::read_to_string(&file_path)
-        .map_err(|error| format!("读取工作区文件失败 {}：{error}", file_path.display()))?;
+    let current_content = normalize_worktree_editor_content(
+        std::fs::read_to_string(&file_path)
+            .map_err(|error| format!("读取工作区文件失败 {}：{error}", file_path.display()))?,
+    );
     let original_content = if git_success(&context.root, &["rev-parse", "--verify", "HEAD"]).is_ok()
         && git_success(&context.root, &["ls-files", "--error-unmatch", "--", path]).is_ok()
     {
-        git_raw_text(&context.root, &["show".to_string(), format!("HEAD:{path}")])?
+        normalize_worktree_editor_content(git_raw_text(
+            &context.root,
+            &["show".to_string(), format!("HEAD:{path}")],
+        )?)
     } else {
         String::new()
     };
@@ -420,6 +425,10 @@ pub fn load_worktree_file(
         original_content,
         current_content,
     })
+}
+
+fn normalize_worktree_editor_content(content: String) -> String {
+    content.replace("\r\n", "\n").replace('\r', "\n")
 }
 
 pub fn save_worktree_file(
