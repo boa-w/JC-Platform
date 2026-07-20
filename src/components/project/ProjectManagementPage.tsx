@@ -35,6 +35,7 @@ interface ProjectManagementPageProps {
   sidecarMissingSections: string[];
   projectGitSectionRef: { current: HTMLDivElement | null };
   gitBusy: boolean;
+  gitLoading: boolean;
   gitStatus: GitProjectStatus | null;
   gitMessage: string;
   setGitMessage: Dispatch<SetStateAction<string>>;
@@ -77,6 +78,7 @@ export function ProjectManagementPage({
   sidecarMissingSections,
   projectGitSectionRef,
   gitBusy,
+  gitLoading,
   gitStatus,
   gitMessage,
   setGitMessage,
@@ -334,6 +336,7 @@ export function ProjectManagementPage({
 
       {loadedProject ? (
         <div
+          aria-busy={gitLoading}
           className="project-section project-git-section"
           ref={(node) => {
             projectGitSectionRef.current = node;
@@ -343,15 +346,20 @@ export function ProjectManagementPage({
             <strong>Git 版本管理</strong>
             <button
               className="project-link-btn"
-              disabled={gitBusy}
+              disabled={gitBusy || gitLoading}
               onClick={() => void refreshProjectGit()}
               type="button"
             >
-              刷新
+              {gitLoading ? '后台加载中...' : '刷新'}
             </button>
           </div>
           {gitStatus?.available ? (
             <>
+              {gitLoading ? (
+                <p className="git-loading-status" role="status">
+                  正在后台更新仓库状态和版本历史，窗口可继续操作。
+                </p>
+              ) : null}
               <div className="project-info-grid">
                 <div className="project-info-item">
                   <span>仓库</span>
@@ -447,7 +455,10 @@ export function ProjectManagementPage({
             </>
           ) : (
             <p className="git-history-empty">
-              {gitStatus?.warning ?? '正在检查项目所在的 Git 仓库...'}
+              {gitStatus?.warning ??
+                (gitLoading
+                  ? '正在后台更新仓库状态和版本历史，窗口可继续操作。'
+                  : '正在检查项目所在的 Git 仓库...')}
             </p>
           )}
           {gitError ? (

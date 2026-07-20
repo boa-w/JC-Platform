@@ -997,7 +997,16 @@ fn git_success_owned(root: &Path, args: &[String]) -> Result<(), String> {
 }
 
 fn git_output(root: &Path, args: &[&str]) -> Result<Output, String> {
-    Command::new("git")
+    let mut command = Command::new("git");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_PAGER", "cat")
         .arg("-C")
         .arg(root)
         .args(args)

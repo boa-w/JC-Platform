@@ -130,73 +130,90 @@ pub fn take_pending_project_path(state: tauri::State<'_, PendingProjectPath>) ->
 }
 
 /// 检查项目文件所属的 Git 仓库及受管配置状态。
+async fn run_blocking_git<T, F>(operation: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(operation)
+        .await
+        .map_err(|error| format!("Git 后台任务异常结束：{error}"))?
+}
+
 #[tauri::command]
-pub fn inspect_project_git(request: GitProjectRequest) -> GitProjectStatus {
-    git::inspect_project(&request)
+pub async fn inspect_project_git(request: GitProjectRequest) -> Result<GitProjectStatus, String> {
+    run_blocking_git(move || Ok(git::inspect_project(&request))).await
 }
 
 /// 一次性返回项目 Git 状态和历史，避免桌面端重复发现仓库。
 #[tauri::command]
-pub fn load_project_git_context(request: GitProjectRequest, limit: usize) -> GitProjectContext {
-    git::load_project_context(&request, limit)
+pub async fn load_project_git_context(
+    request: GitProjectRequest,
+    limit: usize,
+) -> Result<GitProjectContext, String> {
+    run_blocking_git(move || Ok(git::load_project_context(&request, limit))).await
 }
 
 /// 返回影响当前项目配置的最近 Git 版本。
 #[tauri::command]
-pub fn list_project_git_revisions(
+pub async fn list_project_git_revisions(
     request: GitProjectRequest,
     limit: usize,
 ) -> Result<Vec<GitRevision>, String> {
-    git::list_revisions(&request, limit)
+    run_blocking_git(move || git::list_revisions(&request, limit)).await
 }
 
 /// 读取指定版本中的项目配置和可选 sidecar。
 #[tauri::command]
-pub fn load_project_git_revision(
+pub async fn load_project_git_revision(
     request: GitProjectRequest,
     revision: String,
 ) -> Result<GitRevisionSnapshot, String> {
-    git::load_revision(&request, &revision)
+    run_blocking_git(move || git::load_revision(&request, &revision)).await
 }
 
 /// 仅提交当前项目明确受管的配置文件。
 #[tauri::command]
-pub fn commit_project_git_version(request: GitCommitRequest) -> Result<GitCommitReport, String> {
-    git::commit_project(&request)
+pub async fn commit_project_git_version(
+    request: GitCommitRequest,
+) -> Result<GitCommitReport, String> {
+    run_blocking_git(move || git::commit_project(&request)).await
 }
 
 /// 返回当前受管项目配置的结构化逐行差异。
 #[tauri::command]
-pub fn review_project_git_changes(request: GitProjectRequest) -> Result<GitReviewReport, String> {
-    git::review_project(&request)
+pub async fn review_project_git_changes(
+    request: GitProjectRequest,
+) -> Result<GitReviewReport, String> {
+    run_blocking_git(move || git::review_project(&request)).await
 }
 
 /// 返回指定项目版本相对其父版本的结构化逐行差异。
 #[tauri::command]
-pub fn review_project_git_revision(
+pub async fn review_project_git_revision(
     request: GitProjectRequest,
     revision: String,
 ) -> Result<GitReviewReport, String> {
-    git::review_revision(&request, &revision)
+    run_blocking_git(move || git::review_revision(&request, &revision)).await
 }
 
 /// 读取当前项目受管且未提交的工作树文件。
 #[tauri::command]
-pub fn load_project_git_worktree_file(
+pub async fn load_project_git_worktree_file(
     request: GitProjectRequest,
     path: String,
 ) -> Result<git::GitWorktreeFileContent, String> {
-    git::load_worktree_file(&request, &path)
+    run_blocking_git(move || git::load_worktree_file(&request, &path)).await
 }
 
 /// 保存当前项目受管且未提交的工作树 JSON 文件。
 #[tauri::command]
-pub fn save_project_git_worktree_file(
+pub async fn save_project_git_worktree_file(
     request: GitProjectRequest,
     path: String,
     content: String,
 ) -> Result<(), String> {
-    git::save_worktree_file(&request, &path, &content)
+    run_blocking_git(move || git::save_worktree_file(&request, &path, &content)).await
 }
 
 /// 从磁盘加载 `.jcpro` 项目文件，返回摘要、校验结果与原始 JSON。

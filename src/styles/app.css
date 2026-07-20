@@ -512,9 +512,26 @@ textarea:focus-visible {
   opacity: 0.35;
 }
 
+.git-summary-header-actions button.is-spinning svg {
+  animation: git-status-spin 0.8s linear infinite;
+}
+
+@keyframes git-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .git-summary-body {
   display: grid;
   padding: 0 8px 9px;
+}
+
+.git-summary-loading {
+  margin: 2px 6px 5px;
+  color: var(--tb-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .git-summary-row {
@@ -2142,6 +2159,22 @@ button.git-summary-row:disabled,
   color: var(--color-text-muted);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.git-loading-status {
+  margin: 0;
+  padding: 7px 9px;
+  border-left: 2px solid var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .git-summary-header-actions button.is-spinning svg {
+    animation: none;
+  }
 }
 
 .git-history {
@@ -3816,7 +3849,17 @@ button.git-summary-row:disabled,
 }
 
 .workspace > section {
-  animation: fadeIn 0.15s ease-out;
+  animation: workspaceEnter 0.15s ease-out;
+}
+
+@keyframes workspaceEnter {
+  from {
+    transform: translateY(4px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }
 
 /* ── Loading Spinner ── */

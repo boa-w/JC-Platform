@@ -59,6 +59,28 @@ test('navigates core workspaces without runtime errors', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 2, name: '业务信号字典' })).toBeVisible();
 });
 
+test('keeps the workspace interactive while Git context loads in the background', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await installRichProjectDesktopMock(page);
+  await page.evaluate(() => {
+    (window as unknown as { __GIT_CONTEXT_DELAY_MS__: number }).__GIT_CONTEXT_DELAY_MS__ = 1_500;
+  });
+  await page.getByLabel('项目文件路径').fill(richProjectPath);
+  const openSection = page.locator('.project-section').filter({ hasText: '打开现有项目' });
+  await openSection.getByRole('button', { name: '打开', exact: true }).click();
+  await expect(page.locator('.action-bar-project')).toContainText('Rich Fixture');
+  await expect(page.getByText('正在后台更新仓库状态和版本历史')).toBeVisible();
+
+  await page.getByRole('button', { name: '数据', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '数据 功能' })
+    .getByRole('button', { name: '设置数据', exact: true })
+    .click();
+  await expect(page.getByRole('main', { name: '设置数据' })).toBeVisible();
+});
+
 test('meets the serious accessibility baseline across primary surfaces', async ({ page }) => {
   test.setTimeout(60_000);
   await expectNoSeriousAccessibilityViolations(page, '默认工作区');

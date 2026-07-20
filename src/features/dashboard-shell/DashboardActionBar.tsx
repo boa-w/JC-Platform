@@ -50,6 +50,7 @@ interface DashboardActionBarProps {
   showJsonEditor: boolean;
   gitStatus: GitProjectStatus | null;
   gitBusy: boolean;
+  gitLoading: boolean;
   gitError: string | null;
   gitRevisions: GitRevision[];
   gitRepositoryName: string;
@@ -91,6 +92,7 @@ export function DashboardActionBar({
   showJsonEditor,
   gitStatus,
   gitBusy,
+  gitLoading,
   gitError,
   gitRevisions,
   gitRepositoryName,
@@ -386,13 +388,15 @@ export function DashboardActionBar({
           id={gitSummaryId}
           ref={gitSummaryRef}
           role="dialog"
+          aria-busy={gitLoading}
         >
           <div className="git-summary-header">
             <span>版本摘要</span>
             <div className="git-summary-header-actions">
               <button
                 aria-label="刷新 Git 状态"
-                disabled={gitBusy || !loadedProject}
+                className={gitLoading ? 'is-spinning' : undefined}
+                disabled={gitBusy || gitLoading || !loadedProject}
                 onClick={() => void refreshProjectGit()}
                 title="刷新 Git 状态"
                 type="button"
@@ -417,6 +421,9 @@ export function DashboardActionBar({
             </div>
           ) : gitStatus?.available ? (
             <div className="git-summary-body">
+              {gitLoading ? (
+                <p className="git-summary-loading" role="status">正在后台刷新 Git 状态，当前信息仍可查看</p>
+              ) : null}
               <button
                 className="git-summary-row"
                 onClick={() => void openGitReview()}

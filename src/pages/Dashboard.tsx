@@ -449,6 +449,7 @@ export function Dashboard({
         showJsonEditor={jsonEditor.open}
         gitStatus={projectGit.status}
         gitBusy={projectGit.busy}
+        gitLoading={projectGit.refreshBusy}
         gitError={projectGit.error}
         gitRevisions={projectGit.revisions}
         gitRepositoryName={projectGit.repositoryName}
@@ -571,6 +572,7 @@ export function Dashboard({
               sidecarMissingSections={sidecarMissingSections}
               projectGitSectionRef={projectGit.projectSectionRef}
               gitBusy={projectGit.busy}
+              gitLoading={projectGit.refreshBusy}
               gitStatus={projectGit.status}
               gitMessage={projectGit.message}
               setGitMessage={projectGit.setMessage}

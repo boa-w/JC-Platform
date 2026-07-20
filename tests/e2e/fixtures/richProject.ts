@@ -265,7 +265,13 @@ export async function installRichProjectDesktopMock(page: Page) {
           if (command === 'parse_ui_resources_with_project_path') {
             return { valid: true, logo: null, main_items: [], errors: [] };
           }
-          if (command === 'load_project_git_context') return gitContext;
+          if (command === 'load_project_git_context') {
+            const delay = (
+              window as unknown as { __GIT_CONTEXT_DELAY_MS__: number }
+            ).__GIT_CONTEXT_DELAY_MS__;
+            if (delay > 0) await new Promise((resolve) => window.setTimeout(resolve, delay));
+            return gitContext;
+          }
           if (command === 'review_project_git_changes') return gitReview;
           if (command === 'load_project_git_worktree_file') {
             return {
@@ -350,6 +356,7 @@ export async function installRichProjectDesktopMock(page: Page) {
       ).__FULL_LANGUAGE_IMPORT_REQUEST__ = null;
       (window as unknown as { __SAVED_GIT_WORKTREE_FILE__: unknown }).__SAVED_GIT_WORKTREE_FILE__ =
         null;
+      (window as unknown as { __GIT_CONTEXT_DELAY_MS__: number }).__GIT_CONTEXT_DELAY_MS__ = 0;
       (window as unknown as { __TAURI_INTERNALS__: typeof internals }).__TAURI_INTERNALS__ =
         internals;
     },

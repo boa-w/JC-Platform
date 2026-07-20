@@ -55,12 +55,14 @@ export function useProjectGitController({
   const [message, setMessage] = useState(defaultCommitMessage);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [refreshBusy, setRefreshBusy] = useState(false);
   const [review, setReview] = useState<GitReviewReport | null>(null);
   const [reviewRevision, setReviewRevision] = useState<GitRevision | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const refreshGenerationRef = useRef(0);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
   const reviewGenerationRef = useRef(0);
   const projectSectionRef = useRef<HTMLDivElement | null>(null);
   const restoreConfirmation = useConfirmDialog();
@@ -72,26 +74,34 @@ export function useProjectGitController({
   );
   const previousRequestRef = useRef(request);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
     const generation = ++refreshGenerationRef.current;
     if (!request || !isTauriRuntime()) {
       setStatus(null);
       setRevisions([]);
       setError(null);
-      return;
+      setRefreshBusy(false);
+      return Promise.resolve();
     }
-    try {
-      const context = await loadProjectGitContext(request, 20);
-      if (generation !== refreshGenerationRef.current) return;
-      setStatus(context.status);
-      setRevisions(context.revisions);
-      setError(null);
-    } catch (cause) {
-      if (generation !== refreshGenerationRef.current) return;
-      setStatus(null);
-      setRevisions([]);
-      setError(cause instanceof Error ? cause.message : String(cause));
-    }
+    setRefreshBusy(true);
+    const promise = loadProjectGitContext(request, 20)
+      .then((context) => {
+        if (generation !== refreshGenerationRef.current) return;
+        setStatus(context.status);
+        setRevisions(context.revisions);
+        setError(null);
+      })
+      .catch((cause: unknown) => {
+        if (generation !== refreshGenerationRef.current) return;
+        setError(cause instanceof Error ? cause.message : String(cause));
+      })
+      .finally(() => {
+        if (refreshPromiseRef.current === promise) refreshPromiseRef.current = null;
+        if (generation === refreshGenerationRef.current) setRefreshBusy(false);
+      });
+    refreshPromiseRef.current = promise;
+    return promise;
   }, [request]);
 
   const refreshReview = useCallback(
@@ -134,6 +144,8 @@ export function useProjectGitController({
     if (previousRequestRef.current === request) return;
     previousRequestRef.current = request;
     refreshGenerationRef.current += 1;
+    refreshPromiseRef.current = null;
+    setRefreshBusy(false);
     setStatus(null);
     setRevisions([]);
     setError(null);
@@ -248,6 +260,7 @@ export function useProjectGitController({
   const commitDisabled =
     !status?.available ||
     busy ||
+    refreshBusy ||
     hasUnsavedChanges ||
     status.has_staged_changes ||
     status.changed_paths.length === 0;
@@ -255,6 +268,7 @@ export function useProjectGitController({
 
   return {
     busy,
+    refreshBusy,
     commitDisabled,
     error,
     message,
