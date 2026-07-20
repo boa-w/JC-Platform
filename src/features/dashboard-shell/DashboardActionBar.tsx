@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import type { TestDataType } from '../../data/test-data';
+import type { TestDataType } from '../../data/test-data/metadata';
 import { type DocumentSectionKey, modifiedSectionLabels } from '../../modules/documentSections';
 import type {
   FeatureModule,

@@ -5,10 +5,9 @@ import type {
   PdoSimpleDocument,
 } from '../../types/platform';
 import { batteryMonitorTestData } from './battery-monitor';
+import type { TestDataType } from './metadata';
 import { pdoAdvancedTestData } from './pdo-advanced';
 import { pdoSimpleTestData } from './pdo-simple';
-
-export type TestDataType = 'pdo-simple' | 'pdo-advanced' | 'battery-monitor' | 'battery-protocol';
 
 export interface TestDataResult {
   pdoSimple?: PdoSimpleDocument;
@@ -16,13 +15,6 @@ export interface TestDataResult {
   batteryMonitor?: BatteryMonitorInfo;
   batteryProtocol?: BatteryProtocol;
 }
-
-export const testDataLabels: Record<TestDataType, string> = {
-  'pdo-simple': 'PDO 简化配置',
-  'pdo-advanced': 'PDO 高级配置',
-  'battery-monitor': '锂电监控显示配置',
-  'battery-protocol': '锂电协议',
-};
 
 export const batteryProtocolTestData: BatteryProtocol = {
   default_timeout_ticks: 200,
@@ -194,5 +186,6 @@ export function getTestData(type: TestDataType): TestDataResult {
 }
 
 export { batteryMonitorTestData } from './battery-monitor';
+export { type TestDataType, testDataLabels } from './metadata';
 export { pdoAdvancedTestData } from './pdo-advanced';
 export { pdoSimpleTestData } from './pdo-simple';

@@ -17,14 +17,6 @@ import type {
   BatteryMonitorSignal,
   BatteryProtocol,
 } from '../../types/platform';
-import {
-  csvToFrames,
-  csvToItems,
-  csvToSignals,
-  framesToCsv,
-  itemsToCsv,
-  signalsToCsv,
-} from '../../utils/batteryCsv';
 import type { JsonPath } from '../../utils/projectDirty';
 import { runSystemDialog } from '../../utils/systemDialog';
 import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
@@ -521,6 +513,7 @@ export function useBatteryLegacyController({
 
     setIsExportingBatteryCsv(true);
     try {
+      const { framesToCsv } = await import('../../utils/batteryCsv');
       const csv = framesToCsv(currentBatteryProtocolDocument?.frames ?? []);
       await saveTextFile(selected, `\uFEFF${csv}`);
       setBatteryCsvStatus(`帧 CSV 已导出：${selected}`);
@@ -556,6 +549,7 @@ export function useBatteryLegacyController({
     try {
       const text = await loadTextFile(selected);
       if (!documentGuard.isCurrent(operation)) return;
+      const { csvToFrames } = await import('../../utils/batteryCsv');
       const { frames, errors } = csvToFrames(text);
       if (errors.length > 0) {
         setBatteryCsvStatus(`导入帧 CSV 出错：${errors.join('；')}`);
@@ -593,6 +587,7 @@ export function useBatteryLegacyController({
 
     setIsExportingBatteryCsv(true);
     try {
+      const { signalsToCsv } = await import('../../utils/batteryCsv');
       const csv = signalsToCsv(currentBatteryProtocolDocument?.signals ?? []);
       await saveTextFile(selected, `\uFEFF${csv}`);
       setBatteryCsvStatus(`信号 CSV 已导出：${selected}`);
@@ -628,6 +623,7 @@ export function useBatteryLegacyController({
     try {
       const text = await loadTextFile(selected);
       if (!documentGuard.isCurrent(operation)) return;
+      const { csvToSignals } = await import('../../utils/batteryCsv');
       const { signals, errors } = csvToSignals(text);
       if (errors.length > 0) {
         setBatteryCsvStatus(`导入信号 CSV 出错：${errors.join('；')}`);
@@ -665,6 +661,7 @@ export function useBatteryLegacyController({
 
     setIsExportingBatteryCsv(true);
     try {
+      const { itemsToCsv } = await import('../../utils/batteryCsv');
       const csv = itemsToCsv(currentBatteryMonitorDocument?.items ?? []);
       await saveTextFile(selected, `\uFEFF${csv}`);
       setBatteryCsvStatus(`显示项 CSV 已导出：${selected}`);
@@ -700,6 +697,7 @@ export function useBatteryLegacyController({
     try {
       const text = await loadTextFile(selected);
       if (!documentGuard.isCurrent(operation)) return;
+      const { csvToItems } = await import('../../utils/batteryCsv');
       const { items, errors } = csvToItems(text);
       if (errors.length > 0) {
         setBatteryCsvStatus(`导入显示项 CSV 出错：${errors.join('；')}`);

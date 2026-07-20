@@ -281,6 +281,13 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await expect(page.locator('input[value="车辆状态"]')).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, '已加载项目的实时数据工作区');
 
+  await page.getByRole('button', { name: '生成测试数据', exact: true }).click();
+  const testDataDialog = page.getByRole('dialog', { name: '确认生成测试数据' });
+  await expect(testDataDialog).toContainText('PDO 简化配置');
+  await testDataDialog.getByRole('button', { name: '确认生成', exact: true }).click();
+  await expect(testDataDialog).toBeHidden();
+  await expect(page.locator('input[value="电机运行状态"]')).toBeVisible();
+
   await page.getByRole('button', { name: '配置', exact: true }).click();
   await page
     .getByRole('navigation', { name: '配置 功能' })

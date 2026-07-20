@@ -10,6 +10,7 @@
     "dev": "vite",
     "prebuild": "npm run version:check",
     "build": "tsc && vite build",
+    "postbuild": "node scripts/check-frontend-bundle.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

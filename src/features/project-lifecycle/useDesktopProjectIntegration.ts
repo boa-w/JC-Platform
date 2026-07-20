@@ -1,5 +1,3 @@
-import { listen } from '@tauri-apps/api/event';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useEffect, useRef, useState } from 'react';
 import { takePendingProjectPath } from '../../api/commands';
 import {
@@ -36,8 +34,8 @@ export function useDesktopProjectIntegration({
     const title = buildProjectWindowTitle(projectName, projectPath, hasUnsavedChanges);
     document.title = title;
     if (isTauriRuntime()) {
-      void getCurrentWindow()
-        .setTitle(title)
+      void import('@tauri-apps/api/window')
+        .then(({ getCurrentWindow }) => getCurrentWindow().setTitle(title))
         .catch((cause) => {
           statusChangeRef.current(
             `无法更新窗口标题：${cause instanceof Error ? cause.message : String(cause)}`,
@@ -69,6 +67,12 @@ export function useDesktopProjectIntegration({
     }
 
     async function bindDesktopEvents() {
+      const [{ listen }, { getCurrentWindow }] = await Promise.all([
+        import('@tauri-apps/api/event'),
+        import('@tauri-apps/api/window'),
+      ]);
+      if (disposed) return;
+
       const unlistenOpen = await listen<string>('open-project', (event) =>
         openExternalProject(event.payload),
       );
@@ -119,7 +123,13 @@ export function useDesktopProjectIntegration({
 
     return () => {
       disposed = true;
-      for (const unlisten of unlisteners) unlisten();
+      for (const unlisten of unlisteners) {
+        try {
+          void Promise.resolve(unlisten()).catch(() => undefined);
+        } catch {
+          // The desktop bridge may already be unavailable during window teardown.
+        }
+      }
     };
   }, []);
 

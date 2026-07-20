@@ -1,4 +1,3 @@
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { FolderOpen } from 'lucide-react';
 import { lazy, useEffect, useId, useRef, useState } from 'react';
 import { validateProjectDocument } from '../api/commands';
@@ -6,7 +5,7 @@ import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
 import { featureModules } from '../data/modules';
-import { getTestData, type TestDataType } from '../data/test-data';
+import type { TestDataType } from '../data/test-data/metadata';
 import { useBatteryLegacyController } from '../features/battery-legacy/useBatteryLegacyController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
 import { useProjectJsonEditor } from '../features/json-editor/useProjectJsonEditor';
@@ -336,25 +335,36 @@ export function Dashboard({
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    const unlistenPromise = isTauriRuntime()
-      ? getCurrentWindow().onCloseRequested((event) => {
-          if (isUpdateRelaunchAuthorized()) return;
-          event.preventDefault();
-          setShowCloseConfirm(true);
-        })
-      : Promise.resolve(() => undefined);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      void unlistenPromise
-        .then((unlisten) => {
-          try {
-            void Promise.resolve(unlisten()).catch(() => undefined);
-          } catch {
-            // The desktop event bridge may already be gone during window teardown.
+    let disposed = false;
+    let unlisten: (() => void | Promise<void>) | null = null;
+    if (isTauriRuntime()) {
+      void import('@tauri-apps/api/window')
+        .then(({ getCurrentWindow }) =>
+          getCurrentWindow().onCloseRequested((event) => {
+            if (isUpdateRelaunchAuthorized()) return;
+            event.preventDefault();
+            setShowCloseConfirm(true);
+          }),
+        )
+        .then((listener) => {
+          if (disposed) {
+            void Promise.resolve(listener()).catch(() => undefined);
+            return;
           }
+          unlisten = listener;
         })
         .catch(() => undefined);
+    }
+
+    return () => {
+      disposed = true;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (!unlisten) return;
+      try {
+        void Promise.resolve(unlisten()).catch(() => undefined);
+      } catch {
+        // The desktop event bridge may already be gone during window teardown.
+      }
     };
   }, [hasUnsavedChanges, isUpdateRelaunchAuthorized]);
 
@@ -372,12 +382,14 @@ export function Dashboard({
     return (loadedProject.document as Record<string, unknown>).language_info as LanguageDocument;
   }
 
-  function confirmGenerateTestData() {
+  async function confirmGenerateTestData() {
     if (!confirmGenerateType || !loadedProject) return;
-    const data = getTestData(confirmGenerateType);
-    setGeneratingTestKey(confirmGenerateType);
+    const type = confirmGenerateType;
+    setGeneratingTestKey(type);
     setConfirmGenerateType(null);
     try {
+      const { getTestData } = await import('../data/test-data');
+      const data = getTestData(type);
       if (data.pdoSimple) pdoEditor.updateSimpleDocument(data.pdoSimple);
       if (data.pdoAdvanced) pdoEditor.updateAdvancedDocument(data.pdoAdvanced);
       if (data.batteryMonitor)
@@ -494,12 +506,15 @@ export function Dashboard({
         onCancelSave={projectLifecycle.cancelSaveProject}
         onConfirmSave={projectLifecycle.confirmSaveProject}
         onCancelTestData={() => setConfirmGenerateType(null)}
-        onConfirmTestData={confirmGenerateTestData}
+        onConfirmTestData={() => void confirmGenerateTestData()}
         onCancelClose={() => setShowCloseConfirm(false)}
         onConfirmClose={async () => {
           setShowCloseConfirm(false);
           const cleared = await projectRecovery.clearCurrentDraft(loadedProject?.summary.path);
-          if (cleared !== null) await getCurrentWindow().destroy();
+          if (cleared !== null) {
+            const { getCurrentWindow } = await import('@tauri-apps/api/window');
+            await getCurrentWindow().destroy();
+          }
         }}
       />
 

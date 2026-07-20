@@ -1,0 +1,40 @@
+import { readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
+
+const distDir = join(process.cwd(), 'dist');
+const html = readFileSync(join(distDir, 'index.html'), 'utf8');
+const budgets = {
+  script: 90 * 1024,
+  stylesheet: 20 * 1024,
+};
+
+function resolveAsset(pattern, label) {
+  const match = html.match(pattern);
+  if (!match?.[1]) throw new Error(`Unable to locate the built ${label} in dist/index.html.`);
+  return join(distDir, match[1].replace(/^\//, ''));
+}
+
+function verifyGzipBudget(path, budget, label) {
+  const content = readFileSync(path);
+  const gzipBytes = gzipSync(content).byteLength;
+  const rawKiB = statSync(path).size / 1024;
+  const gzipKiB = gzipBytes / 1024;
+  const budgetKiB = budget / 1024;
+  if (gzipBytes > budget) {
+    throw new Error(
+      `${label} exceeds its ${budgetKiB.toFixed(0)} KiB gzip budget: ${gzipKiB.toFixed(2)} KiB.`,
+    );
+  }
+  return `${label}: ${rawKiB.toFixed(2)} KiB raw / ${gzipKiB.toFixed(2)} KiB gzip`;
+}
+
+const entryScript = resolveAsset(/<script[^>]+src="([^"]+\.js)"/, 'entry script');
+const mainStylesheet = resolveAsset(/<link[^>]+href="([^"]+\.css)"/, 'main stylesheet');
+
+console.log(
+  [
+    verifyGzipBudget(entryScript, budgets.script, 'Entry script'),
+    verifyGzipBudget(mainStylesheet, budgets.stylesheet, 'Main stylesheet'),
+  ].join('\n'),
+);

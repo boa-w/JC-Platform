@@ -1,6 +1,6 @@
 import { useId, useRef } from 'react';
 import { ConfirmDialog, ConfirmDialogHost } from '../../components/ConfirmDialog';
-import { type TestDataType, testDataLabels } from '../../data/test-data';
+import { type TestDataType, testDataLabels } from '../../data/test-data/metadata';
 import type { ConfirmDialogController } from '../../hooks/useConfirmDialog';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { type DocumentSectionKey, modifiedSectionLabels } from '../../modules/documentSections';
