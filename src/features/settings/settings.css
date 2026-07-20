@@ -1,0 +1,237 @@
+/* ── Settings Controls ── */
+
+.settings-option-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(150px, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-border-light);
+}
+
+.settings-option-grid__head,
+.settings-option-info,
+.settings-check {
+  background: var(--color-surface-alt);
+  padding: 10px 14px;
+}
+
+.settings-option-grid__head {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.settings-option-info {
+  display: grid;
+  gap: 2px;
+}
+
+.settings-option-info span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.settings-option-info small,
+.settings-option-footer {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.settings-check input {
+  accent-color: var(--color-primary);
+}
+
+.settings-option-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-option-footer button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 6px 10px;
+}
+
+.settings-option-footer button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.settings-option-footer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.settings-option-footer button:disabled:hover {
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.settings-service-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(180px, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+
+.settings-service-info,
+.settings-field {
+  display: grid;
+  gap: 5px;
+}
+
+.settings-service-info span,
+.settings-field span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.settings-service-info small {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.settings-field input {
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.settings-field input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.settings-option-footer--compact {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+  padding-top: 4px;
+}
+
+.settings-credential-status {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.5;
+}
+
+.settings-credential-status--error {
+  color: var(--color-danger);
+}
+
+.settings-credential-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.settings-credential-actions .settings-primary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-color: var(--color-primary-solid);
+  background: var(--color-primary-solid);
+  color: white;
+}
+
+.settings-credential-actions .settings-primary-action:hover:not(:disabled) {
+  border-color: var(--color-primary-solid-hover);
+  background: var(--color-primary-solid-hover);
+  color: white;
+}
+
+.settings-credential-privacy {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ── Theme Toggle ── */
+
+.theme-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+
+.theme-toggle-info {
+  display: grid;
+  gap: 2px;
+}
+
+.theme-toggle-info span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.theme-toggle-info small {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.theme-toggle-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.theme-toggle-track {
+  display: flex;
+  align-items: center;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: #d4d4d4;
+  padding: 2px;
+  transition: background 0.2s;
+}
+
+.theme-toggle-track--dark {
+  background: var(--color-primary);
+}
+
+.theme-toggle-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.theme-toggle-track--dark .theme-toggle-thumb {
+  transform: translateX(18px);
+}

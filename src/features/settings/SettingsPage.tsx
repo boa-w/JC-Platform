@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import type { TranslationSettingsController } from '../../stores/translationSettings';
 import type { ExportBatteryOptions } from '../../types/platform';
+import './settings.css';
 
 interface SettingsPageProps {
   exportOptions: ExportBatteryOptions;

@@ -20,6 +20,7 @@ import type {
   GitRevision,
 } from '../../types/platform';
 import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
+import './git-review.css';
 
 type GitReviewViewMode = 'unified' | 'split';
 

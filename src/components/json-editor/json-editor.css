@@ -1,0 +1,141 @@
+/* ── JSON Editor Popup ── */
+
+.json-popup {
+  position: fixed;
+  z-index: 18;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  animation: fadeIn 0.12s ease-out;
+  overflow: hidden;
+}
+
+.json-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-light);
+  background: var(--color-surface-alt);
+  user-select: none;
+}
+
+.json-popup-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.json-popup-drag-handle {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: move;
+}
+
+.json-popup-drag-handle:hover,
+.json-popup-drag-handle:focus-visible {
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.json-popup-header strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.json-popup-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.json-popup-editor {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  padding: 10px 12px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+
+.json-popup-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 1;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.json-popup-resize-handle::before,
+.json-popup-resize-handle::after {
+  content: "";
+  position: absolute;
+  background: var(--color-text-muted);
+  border-radius: 1px;
+}
+
+.json-popup-resize-handle::before {
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 2px;
+  transform: rotate(-45deg);
+}
+
+.json-popup-resize-handle::after {
+  right: 6px;
+  bottom: 3px;
+  width: 5px;
+  height: 2px;
+  transform: rotate(-45deg);
+}
+
+.json-popup-resize-handle:hover::before,
+.json-popup-resize-handle:hover::after,
+.json-popup-resize-handle:focus-visible::before,
+.json-popup-resize-handle:focus-visible::after {
+  background: var(--color-primary);
+}
+
+[data-theme="dark"] .json-popup {
+  border-color: var(--color-border);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .json-popup-header {
+  background: #2d2d2d;
+  border-color: #3e3e3e;
+}
+
+.json-popup-error {
+  margin: 0;
+  padding: 6px 12px;
+  color: var(--color-danger);
+  font-size: 12px;
+  border-top: 1px solid var(--color-border-light);
+}

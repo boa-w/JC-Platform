@@ -6,7 +6,7 @@ const distDir = join(process.cwd(), 'dist');
 const html = readFileSync(join(distDir, 'index.html'), 'utf8');
 const budgets = {
   script: 90 * 1024,
-  stylesheet: 14 * 1024,
+  stylesheet: 12 * 1024,
 };
 
 function resolveAsset(pattern, label) {

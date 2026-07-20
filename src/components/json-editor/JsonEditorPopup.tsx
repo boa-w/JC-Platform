@@ -1,6 +1,7 @@
 import { GripHorizontal, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
+import './json-editor.css';
 
 interface JsonEditorPopupProps {
   open: boolean;

@@ -281,6 +281,14 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await expect(page.locator('input[value="车辆状态"]')).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, '已加载项目的实时数据工作区');
 
+  await page.getByRole('button', { name: '打开 JSON 编辑器' }).click();
+  const jsonEditor = page.getByRole('dialog', { name: 'JSON 编辑器' });
+  await expect(jsonEditor).toBeVisible();
+  await expect(jsonEditor).toHaveCSS('position', 'fixed');
+  await expectNoSeriousAccessibilityViolations(page, 'JSON 编辑器');
+  await jsonEditor.getByRole('button', { name: '关闭 JSON 编辑器' }).click();
+  await expect(jsonEditor).toBeHidden();
+
   await page.getByRole('button', { name: '生成测试数据', exact: true }).click();
   const testDataDialog = page.getByRole('dialog', { name: '确认生成测试数据' });
   await expect(testDataDialog).toContainText('PDO 简化配置');
