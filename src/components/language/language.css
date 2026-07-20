@@ -360,6 +360,60 @@
   white-space: nowrap;
 }
 
+.lang-import-help {
+  position: relative;
+}
+
+.lang-import-help-trigger {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  background: transparent;
+}
+
+.lang-import-help-trigger:hover,
+.lang-import-help-trigger:focus-visible,
+.lang-import-help-trigger[aria-expanded="true"] {
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+  outline: none;
+}
+
+.lang-import-help-popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(380px, calc(100vw - 40px));
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-elevated, var(--color-surface));
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.lang-import-help-popover strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.lang-import-help-popover p {
+  margin: 8px 0 0;
+}
+
+.lang-import-help-popover code {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
 .lang-translate-panel {
   display: flex;
   align-items: flex-end;

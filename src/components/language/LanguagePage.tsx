@@ -35,7 +35,10 @@ interface LanguagePageProps {
   baseline: LanguageDocument | null;
   loaded: boolean;
   translationConfigured: boolean;
+  fullLanguageImportStatus: string | null;
+  isImportingFullLanguage: boolean;
   onUpdate: (document: LanguageDocument) => void;
+  onImportFullLanguage: () => void | Promise<void>;
 }
 
 type ViewMode = 'editor' | 'comparison';
@@ -189,7 +192,10 @@ export function LanguagePage({
   baseline,
   loaded,
   translationConfigured,
+  fullLanguageImportStatus,
+  isImportingFullLanguage,
   onUpdate,
+  onImportFullLanguage,
 }: LanguagePageProps) {
   const langMainRef = useRef<HTMLDivElement | null>(null);
   const scrollTopButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -490,6 +496,11 @@ export function LanguagePage({
     } finally {
       if (importGuard.isCurrent(operation)) setIsImportingSingleLanguage(false);
     }
+  }
+
+  function handleImportFullLanguage() {
+    setSingleLanguageImportStatus(null);
+    void onImportFullLanguage();
   }
 
   function handleUpdateKey(index: number, _oldKey: string, newKey: string) {
@@ -953,11 +964,15 @@ export function LanguagePage({
               totalKeys={visibleLanguageKeys.length}
               filteredCount={rows.length}
               importStatus={singleLanguageImportStatus}
-              isImporting={isImportingSingleLanguage}
+              fullImportStatus={fullLanguageImportStatus}
+              isImportingSingleLanguage={isImportingSingleLanguage}
+              isImportingFullLanguage={isImportingFullLanguage}
+              canImportFullLanguage={loaded}
               onSearch={setSearchQuery}
               onFilter={setFilterMode}
               onSyncKeys={() => {}}
               onImportSingleLanguage={() => void handleImportSingleLanguage()}
+              onImportFullLanguage={handleImportFullLanguage}
             />
             <TranslationServicePanel
               languages={languageOptions}

@@ -19,7 +19,7 @@ export function TableConfigStatusPanel({ controller }: TableConfigStatusPanelPro
         <h2>{tableConfigTitles[kind]}</h2>
         <p>
           {kind === 'language'
-            ? '单语言 CSV 请使用语言列表内的导入按钮；完整语言表可从顶部工具栏导出。'
+            ? '单语言 CSV 与完整语言表请使用语言列表内的两个独立导入入口。'
             : '导入/导出操作请使用顶部工具栏按钮。支持 CSV、XLS、XLSX、XML 格式。'}
         </p>
       </div>

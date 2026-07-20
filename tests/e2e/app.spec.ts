@@ -314,6 +314,10 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '导入', exact: true }),
   ).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '导入完整语言表', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '查看语言导入说明' }).click();
+  await expect(page.getByRole('note')).toContainText('中文_zh,乌克兰语_uk');
+  await expect(page.getByRole('note')).toContainText('不覆盖已有翻译');
 
   await page.getByRole('button', { name: '导入单语言 CSV', exact: true }).click();
   await expect(emptyEnglishTranslation).toHaveValue('Diagnostic mode');
@@ -331,6 +335,19 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
         ).__SINGLE_LANGUAGE_IMPORT_REQUEST__,
     ),
   ).toMatchObject({ language_code: 'en', path: 'D:\\imports\\en.csv' });
+
+  await page.getByRole('button', { name: '导入完整语言表', exact: true }).click();
+  await expect(page.locator('.lang-import-status')).toHaveText('完整语言表已导入。');
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __FULL_LANGUAGE_IMPORT_REQUEST__: { path?: string } | null;
+          }
+        ).__FULL_LANGUAGE_IMPORT_REQUEST__,
+    ),
+  ).toMatchObject({ path: 'D:\\imports\\en.csv' });
 
   await page.keyboard.press('Control+s');
   const saveDialog = page.getByRole('dialog', { name: '确认保存' });

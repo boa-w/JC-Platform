@@ -642,7 +642,13 @@ export function Dashboard({
               baseline={baselineLanguageDocument()}
               loaded={!!loadedProject}
               translationConfigured={translationSettings.isConfigured}
+              fullLanguageImportStatus={
+                tableConfig.importError ??
+                (tableConfig.importReport?.valid ? '完整语言表已导入。' : null)
+              }
+              isImportingFullLanguage={tableConfig.isImporting}
               onUpdate={updateLanguageDocument}
+              onImportFullLanguage={() => tableConfig.importTable('language')}
             />
           ) : null}
 

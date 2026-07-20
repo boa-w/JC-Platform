@@ -284,14 +284,32 @@ export async function installRichProjectDesktopMock(page: Page) {
               document: nextDocument,
             };
           }
+          if (command === 'import_language_csv') {
+            const request = args?.request as { path: string };
+            (
+              window as unknown as { __FULL_LANGUAGE_IMPORT_REQUEST__: unknown }
+            ).__FULL_LANGUAGE_IMPORT_REQUEST__ = request;
+            return {
+              valid: true,
+              table: {
+                valid: true,
+                expected_headers: ['序号', 'auto'],
+                actual_headers: ['序号', 'auto', '中文_zh', '英文_en'],
+                errors: [],
+              },
+              errors: [],
+              document: structuredClone(document.language_info),
+            };
+          }
           if (command === 'load_project_recovery_draft') return null;
           if (command === 'save_project_recovery_draft') return null;
           if (command === 'clear_project_recovery_draft') return true;
           if (command === 'save_project') {
             const request = args?.request as { document?: unknown } | undefined;
             const savedDocument = request?.document ?? document;
-            (window as unknown as { __SAVED_PROJECT_DOCUMENT__: unknown }).__SAVED_PROJECT_DOCUMENT__ =
-              savedDocument;
+            (
+              window as unknown as { __SAVED_PROJECT_DOCUMENT__: unknown }
+            ).__SAVED_PROJECT_DOCUMENT__ = savedDocument;
             return loadedProject(savedDocument);
           }
           throw new Error(`Unexpected desktop command: ${command}`);
@@ -302,6 +320,9 @@ export async function installRichProjectDesktopMock(page: Page) {
       (
         window as unknown as { __SINGLE_LANGUAGE_IMPORT_REQUEST__: unknown }
       ).__SINGLE_LANGUAGE_IMPORT_REQUEST__ = null;
+      (
+        window as unknown as { __FULL_LANGUAGE_IMPORT_REQUEST__: unknown }
+      ).__FULL_LANGUAGE_IMPORT_REQUEST__ = null;
       (window as unknown as { __TAURI_INTERNALS__: typeof internals }).__TAURI_INTERNALS__ =
         internals;
     },
