@@ -4,6 +4,7 @@ import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { JsonPath } from '../../utils/projectDirty';
 import { formatFrameId, formatFrameIdPadded, type PdoEditorController } from './usePdoEditor';
+import '../legacy-data.css';
 
 interface RealtimeDataPageProps {
   controller: PdoEditorController;

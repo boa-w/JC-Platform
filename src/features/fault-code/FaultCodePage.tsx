@@ -46,6 +46,7 @@ import {
   sourcePresets,
   typeChars,
 } from './faultCodeModel';
+import './fault-code.css';
 
 interface FaultCodePageProps {
   loadedProject: LoadedProject | null;

@@ -22,6 +22,7 @@ import {
   optionsWithCurrentValue,
   sdoNodeDocumentPath,
 } from './utils';
+import '../legacy-data.css';
 
 const pinnedSettingColumnKeys: SettingParameterColumnKey[] = ['select', 'index', 'name'];
 

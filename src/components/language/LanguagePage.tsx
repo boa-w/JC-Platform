@@ -25,6 +25,7 @@ import { TranslationTable } from './TranslationTable';
 import { TranslationToolbar } from './TranslationToolbar';
 import type { FilterMode, TranslationRow } from './types';
 import { useLanguageIndex } from './useLanguageIndex';
+import './language.css';
 
 interface LanguagePageProps {
   document: LanguageDocument;
