@@ -819,6 +819,24 @@ export interface LanguageImportReport {
   document: unknown | null;
 }
 
+export interface SingleLanguageCsvImportRequest {
+  path: string;
+  language_code: string;
+  document: LanguageDocument;
+}
+
+export interface SingleLanguageImportReport {
+  valid: boolean;
+  language_code: string;
+  filled: number;
+  skipped_existing: number;
+  skipped_unknown: number;
+  skipped_empty: number;
+  skipped_duplicate: number;
+  errors: string[];
+  document: LanguageDocument | null;
+}
+
 export interface UiResourceParseReport {
   valid: boolean;
   logo: ParsedUiResource | null;

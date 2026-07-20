@@ -306,8 +306,28 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
 
   await page.getByRole('button', { name: '多国语言', exact: true }).click();
   await expect(page.getByRole('main', { name: '多国语言' })).toBeVisible();
-  await expect(page.locator('input[value="Maximum speed"]')).toBeVisible();
+  const existingEnglishTranslation = page.getByRole('textbox', { name: '最高车速 英文' });
+  const emptyEnglishTranslation = page.getByRole('textbox', { name: '诊断模式 英文' });
+  await expect(existingEnglishTranslation).toHaveValue('Maximum speed');
+  await expect(emptyEnglishTranslation).toHaveValue('');
   await expectNoSeriousAccessibilityViolations(page, '已加载项目的多国语言工作区');
+
+  await page.getByRole('button', { name: '导入单语言 CSV', exact: true }).click();
+  await expect(emptyEnglishTranslation).toHaveValue('Diagnostic mode');
+  await expect(existingEnglishTranslation).toHaveValue('Maximum speed');
+  await expect(page.locator('.lang-import-status')).toContainText(
+    '填充 1 条；跳过已有 1、未知 key 1、空值 1、重复 1',
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __SINGLE_LANGUAGE_IMPORT_REQUEST__: { language_code?: string; path?: string } | null;
+          }
+        ).__SINGLE_LANGUAGE_IMPORT_REQUEST__,
+    ),
+  ).toMatchObject({ language_code: 'en', path: 'D:\\imports\\en.csv' });
 
   await page.keyboard.press('Control+s');
   const saveDialog = page.getByRole('dialog', { name: '确认保存' });

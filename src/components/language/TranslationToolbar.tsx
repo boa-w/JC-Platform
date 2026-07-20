@@ -1,3 +1,4 @@
+import { FileUp } from 'lucide-react';
 import type { FilterMode } from './types';
 
 interface TranslationToolbarProps {
@@ -7,9 +8,12 @@ interface TranslationToolbarProps {
   targetLanguage: string | null;
   totalKeys: number;
   filteredCount: number;
+  importStatus: string | null;
+  isImporting: boolean;
   onSearch: (query: string) => void;
   onFilter: (mode: FilterMode) => void;
   onSyncKeys: () => void;
+  onImportSingleLanguage: () => void;
 }
 
 const filterOptions: { label: string; value: FilterMode }[] = [
@@ -26,9 +30,12 @@ export function TranslationToolbar({
   targetLanguage,
   totalKeys,
   filteredCount,
+  importStatus,
+  isImporting,
   onSearch,
   onFilter,
   onSyncKeys,
+  onImportSingleLanguage,
 }: TranslationToolbarProps) {
   return (
     <div className="lang-toolbar">
@@ -70,6 +77,21 @@ export function TranslationToolbar({
         <span className="lang-toolbar-lang-pair">
           {sourceLanguage} → {targetLanguage ?? '—'}
         </span>
+        {importStatus ? (
+          <span className="lang-import-status" role="status" title={importStatus}>
+            {importStatus}
+          </span>
+        ) : null}
+        <button
+          className="lang-btn lang-btn--ghost"
+          disabled={!targetLanguage || isImporting}
+          onClick={onImportSingleLanguage}
+          title={targetLanguage ? '按 key 匹配，仅填充当前语言的空白翻译' : '请先选择目标语言'}
+          type="button"
+        >
+          <FileUp aria-hidden="true" size={14} />
+          {isImporting ? '导入中...' : '导入单语言 CSV'}
+        </button>
         <button className="lang-btn lang-btn--ghost" onClick={onSyncKeys} type="button">
           同步配置键
         </button>

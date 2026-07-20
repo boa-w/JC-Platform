@@ -259,7 +259,10 @@
 .lang-toolbar-right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .lang-toolbar-search {
@@ -346,6 +349,15 @@
   background: var(--color-surface-alt);
   padding: 3px 8px;
   border-radius: 4px;
+}
+
+.lang-import-status {
+  max-width: min(360px, 40vw);
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lang-translate-panel {

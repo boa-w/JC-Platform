@@ -11,7 +11,8 @@ use crate::domain::export::{
     UiImageCopyReport,
 };
 use crate::domain::language::{
-    language_document_to_table, parse_language_table, LanguageImportReport,
+    language_document_to_table, merge_single_language_rows, parse_language_table,
+    LanguageImportReport, SingleLanguageImportReport,
 };
 use crate::domain::pdo::{
     parse_pdo_advanced_document, parse_pdo_simple_table, pdo_simple_document_to_table,
@@ -41,7 +42,7 @@ use crate::infrastructure::credentials::{
     self, SaveTranslationCredentialsRequest, TranslationCredentialStatus,
 };
 use crate::infrastructure::csv_excel::{
-    read_csv, read_workbook, validate_headers, validate_language_headers, write_csv,
+    read_csv, read_csv_rows, read_workbook, validate_headers, validate_language_headers, write_csv,
     write_workbook_xml, ExportTableRequest, TableDocument, TableFileRequest, TableValidationReport,
     LANGUAGE_REQUIRED_PREFIX_HEADERS, PDO_SIMPLE_HEADERS, SDO_HEADERS,
 };
@@ -62,6 +63,13 @@ use tauri::Manager;
 
 #[derive(Default)]
 pub struct PendingProjectPath(Mutex<Option<String>>);
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SingleLanguageCsvImportRequest {
+    pub path: String,
+    pub language_code: String,
+    pub document: Value,
+}
 
 impl PendingProjectPath {
     pub fn new(path: Option<String>) -> Self {
@@ -488,6 +496,18 @@ pub fn import_language_csv(request: TableFileRequest) -> Result<LanguageImportRe
 pub fn import_language_workbook(request: TableFileRequest) -> Result<LanguageImportReport, String> {
     let document = read_workbook(&request.path).map_err(|error| error.to_string())?;
     Ok(parse_language_table(document))
+}
+
+#[tauri::command]
+pub fn import_single_language_csv(
+    request: SingleLanguageCsvImportRequest,
+) -> Result<SingleLanguageImportReport, String> {
+    let rows = read_csv_rows(&request.path).map_err(|error| error.to_string())?;
+    Ok(merge_single_language_rows(
+        &request.document,
+        &request.language_code,
+        rows,
+    ))
 }
 
 #[tauri::command]

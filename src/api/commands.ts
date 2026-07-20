@@ -25,6 +25,8 @@ import type {
   GitRevision,
   GitRevisionSnapshot,
   LanguageImportReport,
+  SingleLanguageCsvImportRequest,
+  SingleLanguageImportReport,
   LegacyTableKind,
   LegacyTableSpec,
   LoadedProject,
@@ -279,6 +281,12 @@ export async function importLanguageWorkbook(
   request: TableFileRequest,
 ): Promise<LanguageImportReport> {
   return invoke<LanguageImportReport>('import_language_workbook', { request });
+}
+
+export async function importSingleLanguageCsv(
+  request: SingleLanguageCsvImportRequest,
+): Promise<SingleLanguageImportReport> {
+  return invoke<SingleLanguageImportReport>('import_single_language_csv', { request });
 }
 
 export async function exportTableCsv(request: ExportTableRequest): Promise<void> {

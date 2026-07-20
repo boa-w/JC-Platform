@@ -35,6 +35,20 @@ pub struct LanguageImportReport {
     pub document: Option<Value>,
 }
 
+/// 单语言 CSV 导入结果。只更新项目已配置且目标语言为空的键。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SingleLanguageImportReport {
+    pub valid: bool,
+    pub language_code: String,
+    pub filled: usize,
+    pub skipped_existing: usize,
+    pub skipped_unknown: usize,
+    pub skipped_empty: usize,
+    pub skipped_duplicate: usize,
+    pub errors: Vec<String>,
+    pub document: Option<Value>,
+}
+
 /// 将项目中的 `language_info` JSON 转换为表格文档（用于导出）。
 ///
 /// 导出完整翻译表：语言名称前缀、`list_inner` 中普通项，以及仅存在于
@@ -199,6 +213,160 @@ pub fn parse_language_table(document: TableDocument) -> LanguageImportReport {
     }
 }
 
+/// 将两列 CSV 数据按 key 合并到单个目标语言。
+///
+/// CSV 行顺序不影响结果；未知 key 不会加入项目，已有非空翻译不会被覆盖。
+pub fn merge_single_language_rows(
+    document: &Value,
+    language_code: &str,
+    rows: Vec<Vec<String>>,
+) -> SingleLanguageImportReport {
+    let language_code = language_code.trim().to_string();
+    let codes = document
+        .get("list_code_language")
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).collect::<Vec<_>>())
+        .unwrap_or_default();
+    let mut errors = Vec::new();
+    if !document.is_object() {
+        errors.push("项目多国语言配置格式无效。".to_string());
+    }
+    if !codes.iter().any(|code| *code == language_code) {
+        errors.push(format!("目标语言未在项目中配置：{}", language_code));
+    }
+
+    let inner_keys = document
+        .get("list_inner")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let indexed_keys = inner_keys.iter().cloned().collect::<HashSet<_>>();
+    let mut configured_keys = inner_keys
+        .iter()
+        .skip(codes.len())
+        .cloned()
+        .collect::<HashSet<_>>();
+    if let Some(translations) = document.get("list_translate").and_then(Value::as_object) {
+        configured_keys.extend(
+            translations
+                .keys()
+                .filter(|key| !indexed_keys.contains(*key))
+                .cloned(),
+        );
+        if translations.values().any(|value| !value.is_object()) {
+            errors.push("项目翻译映射格式无效。".to_string());
+        }
+    } else {
+        errors.push("项目缺少翻译映射。".to_string());
+    }
+
+    let data_rows = rows
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, row)| {
+            if index == 0 && is_single_language_header(&row) {
+                None
+            } else {
+                Some(row)
+            }
+        })
+        .collect::<Vec<_>>();
+    if data_rows.iter().all(|row| row.len() < 2) {
+        errors.push("CSV 必须包含两列：key 和翻译内容。".to_string());
+    }
+
+    if !errors.is_empty() {
+        return SingleLanguageImportReport {
+            valid: false,
+            language_code,
+            filled: 0,
+            skipped_existing: 0,
+            skipped_unknown: 0,
+            skipped_empty: 0,
+            skipped_duplicate: 0,
+            errors,
+            document: None,
+        };
+    }
+
+    let mut next_document = document.clone();
+    let translations = next_document
+        .as_object_mut()
+        .expect("language document must be an object")
+        .entry("list_translate")
+        .or_insert_with(|| Value::Object(Map::new()))
+        .as_object_mut()
+        .expect("list_translate must be an object");
+    let mut seen = HashSet::new();
+    let mut filled = 0;
+    let mut skipped_existing = 0;
+    let mut skipped_unknown = 0;
+    let mut skipped_empty = 0;
+    let mut skipped_duplicate = 0;
+
+    for row in data_rows {
+        let key = row.first().map(|value| value.trim()).unwrap_or_default();
+        let value = row.get(1).map(|value| value.trim()).unwrap_or_default();
+        if key.is_empty() || value.is_empty() {
+            skipped_empty += 1;
+            continue;
+        }
+        if !seen.insert(key.to_string()) {
+            skipped_duplicate += 1;
+            continue;
+        }
+        if !configured_keys.contains(key) {
+            skipped_unknown += 1;
+            continue;
+        }
+
+        let values = translations
+            .entry(key.to_string())
+            .or_insert_with(|| Value::Object(Map::new()))
+            .as_object_mut()
+            .expect("translation entry must be an object");
+        let existing = values
+            .get(&language_code)
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        if !existing.trim().is_empty() {
+            skipped_existing += 1;
+            continue;
+        }
+        values.insert(language_code.clone(), Value::String(value.to_string()));
+        filled += 1;
+    }
+
+    SingleLanguageImportReport {
+        valid: true,
+        language_code,
+        filled,
+        skipped_existing,
+        skipped_unknown,
+        skipped_empty,
+        skipped_duplicate,
+        errors,
+        document: Some(next_document),
+    }
+}
+
+fn is_single_language_header(row: &[String]) -> bool {
+    let first = row
+        .first()
+        .map(|value| value.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    matches!(
+        first.as_str(),
+        "key" | "auto" | "translation_key" | "translation key" | "翻译键" | "键"
+    )
+}
+
 fn language_labels_from_document(
     document: &Value,
     codes: &[String],
@@ -352,5 +520,68 @@ mod tests {
                 .and_then(Value::as_str),
             Some("Menu")
         );
+    }
+
+    #[test]
+    fn single_language_import_matches_keys_and_only_fills_empty_values() {
+        let document = json!({
+            "list_code_language": ["zh", "en"],
+            "language_labels": { "zh": "中文", "en": "英文" },
+            "list_inner": ["中文", "英文", "speed", "parking"],
+            "list_translate": {
+                "中文": { "zh": "中文", "en": "Chinese" },
+                "英文": { "zh": "英文", "en": "English" },
+                "speed": { "zh": "车速", "en": "Speed" },
+                "parking": { "zh": "驻车", "en": "" },
+                "external_fault": { "zh": "外部故障", "en": "" }
+            }
+        });
+        let original_inner = document["list_inner"].clone();
+        let rows = vec![
+            vec!["key".to_string(), "English".to_string()],
+            vec!["external_fault".to_string(), "Fault, external".to_string()],
+            vec!["parking".to_string(), "Parking".to_string()],
+            vec!["speed".to_string(), "New speed".to_string()],
+            vec!["unknown".to_string(), "Unknown".to_string()],
+            vec!["parking".to_string(), "Duplicate".to_string()],
+            vec!["empty".to_string(), "".to_string()],
+        ];
+
+        let report = merge_single_language_rows(&document, "en", rows);
+
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(report.filled, 2);
+        assert_eq!(report.skipped_existing, 1);
+        assert_eq!(report.skipped_unknown, 1);
+        assert_eq!(report.skipped_empty, 1);
+        assert_eq!(report.skipped_duplicate, 1);
+        let imported = report.document.unwrap();
+        assert_eq!(imported["list_inner"], original_inner);
+        assert_eq!(imported["list_translate"]["speed"]["en"], "Speed");
+        assert_eq!(imported["list_translate"]["parking"]["en"], "Parking");
+        assert_eq!(
+            imported["list_translate"]["external_fault"]["en"],
+            "Fault, external"
+        );
+        assert!(imported["list_translate"].get("unknown").is_none());
+    }
+
+    #[test]
+    fn single_language_import_accepts_headerless_rows_and_rejects_unknown_language() {
+        let document = json!({
+            "list_code_language": ["zh", "en"],
+            "list_inner": ["中文", "英文", "parking"],
+            "list_translate": { "parking": { "zh": "驻车", "en": "" } }
+        });
+        let rows = vec![vec!["parking".to_string(), "Parking".to_string()]];
+
+        let report = merge_single_language_rows(&document, "en", rows.clone());
+        assert!(report.valid);
+        assert_eq!(report.filled, 1);
+
+        let invalid = merge_single_language_rows(&document, "de", rows);
+        assert!(!invalid.valid);
+        assert!(invalid.document.is_none());
+        assert!(invalid.errors[0].contains("de"));
     }
 }

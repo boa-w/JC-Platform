@@ -95,6 +95,8 @@ pub enum TableFileError {
         path: String,
         source: std::io::Error,
     },
+    #[error("failed to parse CSV file {path}: {source}")]
+    Csv { path: String, source: csv::Error },
     #[error("failed to open workbook {path}: {source}")]
     WorkbookOpen {
         path: String,
@@ -133,6 +135,39 @@ pub fn read_csv(path: impl AsRef<Path>) -> Result<TableDocument, TableFileError>
         .collect::<Vec<_>>();
 
     Ok(TableDocument { headers, rows })
+}
+
+/// 读取标准 CSV 的全部数据行，支持引号、字段内逗号和可变列数。
+pub fn read_csv_rows(path: impl AsRef<Path>) -> Result<Vec<Vec<String>>, TableFileError> {
+    let path_ref = path.as_ref();
+    let path_text = path_ref.display().to_string();
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .flexible(true)
+        .trim(csv::Trim::All)
+        .from_path(path_ref)
+        .map_err(|source| TableFileError::Csv {
+            path: path_text.clone(),
+            source,
+        })?;
+    let mut rows = Vec::new();
+    for record in reader.records() {
+        let record = record.map_err(|source| TableFileError::Csv {
+            path: path_text.clone(),
+            source,
+        })?;
+        let mut row = record.iter().map(str::to_string).collect::<Vec<_>>();
+        if let Some(first) = row.first_mut() {
+            *first = first.trim_start_matches('\u{feff}').to_string();
+        }
+        if row.iter().any(|cell| !cell.trim().is_empty()) {
+            rows.push(row);
+        }
+    }
+    if rows.is_empty() {
+        return Err(TableFileError::Empty { path: path_text });
+    }
+    Ok(rows)
 }
 
 /// 将表格文档写入 CSV 文件。
@@ -347,5 +382,27 @@ pub fn validate_language_headers(actual: &[String]) -> TableValidationReport {
         ],
         actual_headers: actual.to_vec(),
         errors,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn standard_csv_rows_preserve_quoted_commas_and_strip_bom() {
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        write!(
+            file,
+            "\u{feff}key,en\nparking,Parking\nfault,\"Fault, external\"\n"
+        )
+        .unwrap();
+
+        let rows = read_csv_rows(file.path()).unwrap();
+
+        assert_eq!(rows[0], vec!["key", "en"]);
+        assert_eq!(rows[1], vec!["parking", "Parking"]);
+        assert_eq!(rows[2], vec!["fault", "Fault, external"]);
     }
 }

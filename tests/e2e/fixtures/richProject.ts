@@ -126,11 +126,12 @@ export const richProjectDocument = {
   language_info: {
     list_code_language: ['zh', 'en'],
     language_labels: { zh: '中文', en: '英文' },
-    list_inner: ['中文', '英文', '最高车速', '驻车开关', '牵引故障'],
+    list_inner: ['中文', '英文', '最高车速', '驻车开关', '牵引故障', '诊断模式'],
     list_translate: {
       最高车速: { zh: '最高车速', en: 'Maximum speed' },
       驻车开关: { zh: '驻车开关', en: 'Parking switch' },
       牵引故障: { zh: '牵引故障', en: 'Traction fault' },
+      诊断模式: { zh: '诊断模式', en: '' },
     },
   },
   battery_protocol: {},
@@ -246,6 +247,7 @@ export async function installRichProjectDesktopMock(page: Page) {
         unregisterCallback: () => undefined,
         invoke: async (command: string, args?: Record<string, unknown>) => {
           if (command.startsWith('plugin:event|')) return 1;
+          if (command === 'plugin:dialog|open') return 'D:\\imports\\en.csv';
           if (command === 'plugin:window|set_title') return null;
           if (command === 'plugin:app|name') return '自定义开发平台';
           if (command === 'plugin:app|version') return '0.1.0';
@@ -259,6 +261,29 @@ export async function installRichProjectDesktopMock(page: Page) {
           }
           if (command === 'load_project_git_context') return gitContext;
           if (command === 'review_project_git_changes') return gitReview;
+          if (command === 'import_single_language_csv') {
+            const request = args?.request as {
+              document: typeof document.language_info;
+              language_code: string;
+              path: string;
+            };
+            (
+              window as unknown as { __SINGLE_LANGUAGE_IMPORT_REQUEST__: unknown }
+            ).__SINGLE_LANGUAGE_IMPORT_REQUEST__ = request;
+            const nextDocument = structuredClone(request.document);
+            nextDocument.list_translate.诊断模式.en = 'Diagnostic mode';
+            return {
+              valid: true,
+              language_code: request.language_code,
+              filled: 1,
+              skipped_existing: 1,
+              skipped_unknown: 1,
+              skipped_empty: 1,
+              skipped_duplicate: 1,
+              errors: [],
+              document: nextDocument,
+            };
+          }
           if (command === 'load_project_recovery_draft') return null;
           if (command === 'save_project_recovery_draft') return null;
           if (command === 'clear_project_recovery_draft') return true;
@@ -274,6 +299,9 @@ export async function installRichProjectDesktopMock(page: Page) {
       };
       (window as unknown as { __SAVED_PROJECT_DOCUMENT__: unknown }).__SAVED_PROJECT_DOCUMENT__ =
         null;
+      (
+        window as unknown as { __SINGLE_LANGUAGE_IMPORT_REQUEST__: unknown }
+      ).__SINGLE_LANGUAGE_IMPORT_REQUEST__ = null;
       (window as unknown as { __TAURI_INTERNALS__: typeof internals }).__TAURI_INTERNALS__ =
         internals;
     },

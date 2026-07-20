@@ -1,3 +1,4 @@
+import { open } from '@tauri-apps/plugin-dialog';
 import {
   type MouseEvent,
   type PointerEvent,
@@ -7,9 +8,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { translateBaiduText } from '../../api/commands';
+import { importSingleLanguageCsv, translateBaiduText } from '../../api/commands';
+import { useOperationGuard } from '../../hooks/useOperationGuard';
 import type { LanguageDocument } from '../../types/platform';
 import { getStorageItem, removeStorageItem, setStorageItem } from '../../utils/safeStorage';
+import { runSystemDialog } from '../../utils/systemDialog';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { LanguageComparisonView } from './LanguageComparisonView';
@@ -45,6 +48,8 @@ const SCROLL_TOP_BUTTON_WIDTH = 92;
 const SCROLL_TOP_BUTTON_HEIGHT = 34;
 const SCROLL_TOP_BUTTON_MARGIN = 12;
 const TRANSLATION_UPDATE_BATCH_SIZE = 20;
+
+const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 interface SavedTranslateOptions {
   scope?: string;
@@ -220,6 +225,8 @@ export function LanguagePage({
     useState<TranslateProgress>(initialTranslateProgress);
   const [translateLogs, setTranslateLogs] = useState<TranslateLogEntry[]>([]);
   const [showTranslateLogs, setShowTranslateLogs] = useState(false);
+  const [singleLanguageImportStatus, setSingleLanguageImportStatus] = useState<string | null>(null);
+  const [isImportingSingleLanguage, setIsImportingSingleLanguage] = useState(false);
   const [scrollTopPosition, setScrollTopPosition] = useState<FloatingButtonPosition>(
     readSavedScrollTopPosition,
   );
@@ -228,6 +235,7 @@ export function LanguagePage({
     () => new Set(),
   );
   const languageIndex = useLanguageIndex(document);
+  const importGuard = useOperationGuard(document);
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const isBaiduTranslateConfigured = translationConfigured;
@@ -361,6 +369,7 @@ export function LanguagePage({
 
   function handleAddLanguage(code: string, label: string) {
     if (document.list_code_language.includes(code)) return;
+    setSingleLanguageImportStatus(null);
     const nextTranslate: Record<string, unknown> = { ...document.list_translate };
     for (const key of visibleLanguageKeys) {
       const existing = (nextTranslate[key] as Record<string, string>) ?? {};
@@ -376,8 +385,14 @@ export function LanguagePage({
     );
   }
 
+  function handleSelectLanguage(code: string | null) {
+    setSingleLanguageImportStatus(null);
+    setSelectedLanguage(code);
+  }
+
   function handleRemoveLanguage(code: string) {
     if (code === 'zh' || document.list_code_language.length <= 1) return;
+    setSingleLanguageImportStatus(null);
     const nextCodes = document.list_code_language.filter((c) => c !== code);
     const nextLabels = { ...(document.language_labels ?? {}) };
     delete nextLabels[code];
@@ -389,6 +404,7 @@ export function LanguagePage({
   function handleUpdateLanguage(oldCode: string, newCode: string, newLabel: string) {
     if (oldCode === newCode && newLabel === getLabel(document, oldCode)) return;
     if (oldCode !== newCode && document.list_code_language.includes(newCode)) return;
+    setSingleLanguageImportStatus(null);
     const nextCodes = document.list_code_language.map((c) => (c === oldCode ? newCode : c));
     const nextLabels = { ...(document.language_labels ?? {}) };
     if (oldCode !== newCode) {
@@ -425,6 +441,55 @@ export function LanguagePage({
         [key]: { ...translations, [code]: value },
       },
     });
+  }
+
+  async function handleImportSingleLanguage() {
+    if (!selectedLanguage) {
+      setSingleLanguageImportStatus('请先选择目标语言。');
+      return;
+    }
+    if (!isTauriRuntime()) {
+      setSingleLanguageImportStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+
+    const operation = importGuard.begin();
+    const selected = await runSystemDialog(
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: '单语言翻译 CSV', extensions: ['csv'] }],
+        }),
+      (message) => {
+        if (importGuard.isCurrent(operation)) setSingleLanguageImportStatus(message);
+      },
+    );
+    if (typeof selected !== 'string' || !importGuard.isCurrent(operation)) return;
+
+    setIsImportingSingleLanguage(true);
+    setSingleLanguageImportStatus(null);
+    try {
+      const report = await importSingleLanguageCsv({
+        path: selected,
+        language_code: selectedLanguage,
+        document,
+      });
+      if (!importGuard.isCurrent(operation)) return;
+      if (!report.valid || !report.document) {
+        setSingleLanguageImportStatus(report.errors.join('；') || '单语言 CSV 导入失败。');
+        return;
+      }
+      if (report.filled > 0) onUpdate(report.document);
+      setSingleLanguageImportStatus(
+        `${getLabel(document, selectedLanguage)}：填充 ${report.filled} 条；跳过已有 ${report.skipped_existing}、未知 key ${report.skipped_unknown}、空值 ${report.skipped_empty}、重复 ${report.skipped_duplicate}。`,
+      );
+    } catch (error) {
+      if (importGuard.isCurrent(operation)) {
+        setSingleLanguageImportStatus(error instanceof Error ? error.message : String(error));
+      }
+    } finally {
+      if (importGuard.isCurrent(operation)) setIsImportingSingleLanguage(false);
+    }
   }
 
   function handleUpdateKey(index: number, _oldKey: string, newKey: string) {
@@ -831,7 +896,7 @@ export function LanguagePage({
         document={document}
         languageIndex={languageIndex}
         selectedLanguage={selectedLanguage}
-        onSelectLanguage={setSelectedLanguage}
+        onSelectLanguage={handleSelectLanguage}
         onAddLanguage={handleAddLanguage}
         onUpdateLanguage={handleUpdateLanguage}
         onRemoveLanguage={handleRemoveLanguage}
@@ -887,9 +952,12 @@ export function LanguagePage({
               targetLanguage={selectedLanguage}
               totalKeys={visibleLanguageKeys.length}
               filteredCount={rows.length}
+              importStatus={singleLanguageImportStatus}
+              isImporting={isImportingSingleLanguage}
               onSearch={setSearchQuery}
               onFilter={setFilterMode}
               onSyncKeys={() => {}}
+              onImportSingleLanguage={() => void handleImportSingleLanguage()}
             />
             <TranslationServicePanel
               languages={languageOptions}
@@ -906,7 +974,7 @@ export function LanguagePage({
               logs={translateLogs}
               showLogs={showTranslateLogs}
               onSourceLanguageChange={setTranslateSourceLanguage}
-              onTargetLanguageChange={setSelectedLanguage}
+              onTargetLanguageChange={handleSelectLanguage}
               onScopeChange={setTranslateScope}
               onTranslate={handleTranslateRows}
               onCancelTranslate={handleCancelTranslate}
