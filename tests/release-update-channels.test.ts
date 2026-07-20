@@ -86,8 +86,9 @@ test('smoke tests bundled installers before publishing artifacts', () => {
   assert.match(workflow, /needs\.prepare-nightly\.outputs\.has_previous_windows == 'true'/);
   assert.ok(
     workflow.indexOf('- name: Preserve previous Windows nightly installer') <
-      workflow.indexOf('- name: Recreate nightly release'),
+      workflow.indexOf('- name: Update nightly release metadata'),
   );
+  assert.doesNotMatch(workflow, /gh release delete "\$NIGHTLY_TAG"/);
   assert.ok(
     workflow.indexOf('- name: Download previous Windows nightly installer') <
       workflow.indexOf('- name: Smoke test Windows cross-version upgrade'),
@@ -95,6 +96,9 @@ test('smoke tests bundled installers before publishing artifacts', () => {
   assert.match(workflow, /- name: Smoke test macOS bundle/);
   assert.match(workflow, /bash \.\/scripts\/test-macos-bundle\.sh/);
   assert.match(workflow, /args\+=\(--require-signature\)/);
+  assert.match(workflow, /- name: Verify macOS updater artifacts/);
+  assert.match(workflow, /-name '\*\.app\.tar\.gz'/);
+  assert.doesNotMatch(workflow, /bundle\/macos\/\*\.app/);
   assert.ok(
     workflow.indexOf('- name: Build Tauri app') <
       workflow.indexOf('- name: Smoke test macOS bundle'),
@@ -109,6 +113,7 @@ test('smoke tests bundled installers before publishing artifacts', () => {
   const binaryUpload = workflow.search(/gh release upload "\$tag" "\$\{assets\[@\]\}"/);
   const manifestUpload = workflow.search(/gh release upload "\$tag" "\$manifest"/);
   assert.ok(binaryUpload >= 0 && binaryUpload < manifestUpload);
+  assert.match(workflow, /Removing stale nightly asset/);
   assert.doesNotMatch(workflow, /^\s+releaseId:/m);
   assert.doesNotMatch(workflow, /^\s+tagName:/m);
   assert.doesNotMatch(buildStep, /GITHUB_TOKEN/);

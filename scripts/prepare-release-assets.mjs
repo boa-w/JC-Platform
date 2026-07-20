@@ -16,7 +16,10 @@ function collectFiles(root) {
 function findUnique(files, predicate, label) {
   const matches = files.filter((path) => predicate(basename(path)));
   if (matches.length !== 1) {
-    throw new Error(`Expected exactly one ${label}, found ${matches.length}.`);
+    const inventory = files.map((path) => basename(path)).sort().join(', ') || '(empty)';
+    throw new Error(
+      `Expected exactly one ${label}, found ${matches.length}. Available files: ${inventory}`,
+    );
   }
   return matches[0];
 }
@@ -79,7 +82,7 @@ export function prepareReleaseAssets({
   const macDmg = findUnique(files, (name) => name.endsWith('_aarch64.dmg'), 'macOS DMG');
   const macArchive = findUnique(
     files,
-    (name) => name.endsWith('_aarch64.app.tar.gz'),
+    (name) => name.endsWith('.app.tar.gz'),
     'macOS updater archive',
   );
   const macSignature = signatureFor(files, macArchive, 'macOS updater archive');

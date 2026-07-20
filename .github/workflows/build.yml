@@ -127,22 +127,29 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-      - name: Recreate nightly release
+      - name: Update nightly release metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NIGHTLY_VERSION: ${{ steps.version.outputs.version }}
         shell: bash
         run: |
-          gh release delete "$NIGHTLY_TAG" --yes --cleanup-tag || true
           git tag -f "$NIGHTLY_TAG" "$GITHUB_SHA"
           git push origin "refs/tags/$NIGHTLY_TAG" --force
 
           SHORT_SHA="${GITHUB_SHA::7}"
-          gh release create "$NIGHTLY_TAG" \
-            --target "$GITHUB_SHA" \
-            --title "Nightly $SHORT_SHA" \
-            --notes "Automated nightly build from main commit $GITHUB_SHA. App version: $NIGHTLY_VERSION." \
-            --prerelease
+          if gh release view "$NIGHTLY_TAG" >/dev/null 2>&1; then
+            gh release edit "$NIGHTLY_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "Nightly $SHORT_SHA" \
+              --notes "Automated nightly build from main commit $GITHUB_SHA. App version: $NIGHTLY_VERSION." \
+              --prerelease
+          else
+            gh release create "$NIGHTLY_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "Nightly $SHORT_SHA" \
+              --notes "Automated nightly build from main commit $GITHUB_SHA. App version: $NIGHTLY_VERSION." \
+              --prerelease
+          fi
 
   build:
     name: Build (${{ matrix.label }})
@@ -301,6 +308,26 @@ jobs:
           fi
           bash ./scripts/test-macos-bundle.sh "${args[@]}"
 
+      - name: Verify macOS updater artifacts
+        if: startsWith(matrix.label, 'macos') && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_root="src-tauri/target/${{ matrix.target }}/release/bundle"
+          mapfile -d '' archives < <(find "$bundle_root" -type f -name '*.app.tar.gz' -print0)
+          if [ "${#archives[@]}" -ne 1 ]; then
+            echo "Expected exactly one macOS updater archive, found ${#archives[@]}." >&2
+            find "$bundle_root" -maxdepth 3 -type f -print | sort >&2
+            exit 1
+          fi
+          signature="${archives[0]}.sig"
+          if [ ! -s "$signature" ]; then
+            echo "Missing or empty macOS updater signature: $signature" >&2
+            find "$bundle_root" -maxdepth 3 -type f -print | sort >&2
+            exit 1
+          fi
+          echo "Verified macOS updater archive: ${archives[0]}"
+
       - name: Upload Windows workflow artifacts
         if: startsWith(matrix.label, 'windows') && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
@@ -319,7 +346,6 @@ jobs:
           name: installers-${{ matrix.label }}
           path: |
             src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
-            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.tar.gz
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
           if-no-files-found: error
@@ -383,6 +409,9 @@ jobs:
             --repository "$REPO" \
             --notes "$notes"
 
+          echo "Prepared release assets:"
+          find publish-assets -maxdepth 1 -type f -printf '%f\n' | sort
+
           manifest="publish-assets/latest.json"
           mapfile -d '' assets < <(find publish-assets -maxdepth 1 -type f ! -name 'latest.json' -print0)
           if [ "${#assets[@]}" -eq 0 ]; then
@@ -391,3 +420,12 @@ jobs:
           fi
           gh release upload "$tag" "${assets[@]}" --repo "$REPO" --clobber
           gh release upload "$tag" "$manifest" --repo "$REPO" --clobber
+
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            while IFS= read -r existing; do
+              if [ ! -f "publish-assets/$existing" ]; then
+                echo "Removing stale nightly asset: $existing"
+                gh release delete-asset "$tag" "$existing" --repo "$REPO" --yes
+              fi
+            done < <(gh release view "$tag" --repo "$REPO" --json assets --jq '.assets[].name')
+          fi

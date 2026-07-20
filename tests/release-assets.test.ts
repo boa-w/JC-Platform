@@ -18,8 +18,8 @@ function fixture() {
     windowsSignature: join(input, 'windows', 'nsis', '自定义开发平台_0.1.1-42_x64-setup.exe.sig'),
     windowsMsi: join(input, 'windows', 'msi', '自定义开发平台_0.1.1-42_x64_zh-CN.msi'),
     macDmg: join(input, 'macos', 'dmg', '自定义开发平台_0.1.1-42_aarch64.dmg'),
-    macArchive: join(input, 'macos', 'updater', '自定义开发平台_0.1.1-42_aarch64.app.tar.gz'),
-    macSignature: join(input, 'macos', 'updater', '自定义开发平台_0.1.1-42_aarch64.app.tar.gz.sig'),
+    macArchive: join(input, 'macos', 'updater', '自定义开发平台.app.tar.gz'),
+    macSignature: join(input, 'macos', 'updater', '自定义开发平台.app.tar.gz.sig'),
   };
   for (const path of Object.values(files)) writeFileSync(path, `fixture:${path}`);
   writeFileSync(files.windowsSignature, 'windows-signature\n');
@@ -48,6 +48,7 @@ test('normalizes verified desktop assets and creates updater metadata', () => {
     });
     assert.equal(result.manifest.platforms['darwin-aarch64'].signature, 'mac-signature');
     assert.equal(existsSync(join(output, 'JC-Platform_0.1.1-42_aarch64.dmg')), true);
+    assert.equal(existsSync(join(output, 'JC-Platform_0.1.1-42_aarch64.app.tar.gz')), true);
     assert.equal(existsSync(join(output, 'latest.json')), true);
     const checksums = readFileSync(join(output, 'SHA256SUMS'), 'utf8');
     assert.match(checksums, /JC-Platform_0\.1\.1-42_x64-setup\.exe/);
