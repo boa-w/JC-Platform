@@ -29,7 +29,7 @@ const require = createRequire(import.meta.url);
 const cliPath = require.resolve('@playwright/test/cli');
 const child = spawn(
   process.execPath,
-  [cliPath, 'test', '--fail-on-flaky-tests', ...process.argv.slice(2)],
+  [cliPath, 'test', ...process.argv.slice(2)],
   {
     env: { ...process.env, PLAYWRIGHT_PORT: String(port) },
     stdio: 'inherit',

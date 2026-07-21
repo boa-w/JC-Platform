@@ -311,6 +311,7 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   const jsonEditor = page.getByRole('dialog', { name: 'JSON 编辑器' });
   await expect(jsonEditor).toBeVisible();
   await expect(jsonEditor).toHaveCSS('position', 'fixed');
+  await expect(jsonEditor).toHaveCSS('opacity', '1');
   await expectNoSeriousAccessibilityViolations(page, 'JSON 编辑器');
   await jsonEditor.getByRole('button', { name: '关闭 JSON 编辑器' }).click();
   await expect(jsonEditor).toBeHidden();
