@@ -65,9 +65,16 @@ const defaultFaultCodeInfo = {
   codes: [],
 };
 
+const defaultExportInfo = {
+  folder_name: 'jc_export',
+  manifest_filename: 'ConfigUpdate.json',
+  binary_filename: 'pdo_sdo_data.bin',
+};
+
 function withRequiredEditorSections(document: unknown) {
   const source = (document as Record<string, unknown>) ?? {};
   const defaults: Record<string, unknown> = {};
+  if (!source.export_info) defaults.export_info = cloneJson(defaultExportInfo);
   if (!source.battery_protocol) defaults.battery_protocol = cloneJson(defaultBatteryProtocol);
   if (!source.battery_monitor_info)
     defaults.battery_monitor_info = cloneJson(defaultBatteryMonitorInfo);

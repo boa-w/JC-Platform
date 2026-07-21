@@ -1,3 +1,4 @@
+import { RotateCcw } from 'lucide-react';
 import type { ProjectExportController } from './useProjectExport';
 
 interface ProjectExportPageProps {
@@ -8,6 +9,8 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
   const {
     outputDir: exportOutputDir,
     setOutputDir: setExportOutputDir,
+    folderName: exportFolderName,
+    setFolderName: setExportFolderName,
     manifestFilename: exportManifestFilename,
     setManifestFilename: setExportManifestFilename,
     binaryFilename: exportBinaryFilename,
@@ -22,6 +25,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
     buildBinaryReport: handleBuildBinaryReport,
     compareBinary: handleCompareBinary,
     selectOutputDir: handleSelectExportDir,
+    resetExportNaming: handleResetExportNaming,
     exportPackage: handleExportPackage,
     openExportDir: handleOpenExportDir,
   } = controller;
@@ -32,7 +36,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
         <div>
           <h2>项目导出</h2>
           <p>
-            生成 jc_export、ConfigUpdate.json、UI 图片资源和 pdo_sdo_data.bin，用于设备配置发布。
+            默认在项目文件同级目录生成导出包；文件夹名和文件名随项目配置保存。
           </p>
         </div>
         {exportReport ? (
@@ -47,14 +51,14 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
       </div>
       <div className="export-form">
         <label>
-          导出目录
+          导出基路径
           <input
             value={exportOutputDir}
             onChange={(event) => setExportOutputDir(event.target.value)}
           />
         </label>
         <button type="button" onClick={() => void handleSelectExportDir()} disabled={isExporting}>
-          选择目录
+          选择基路径
         </button>
         <button
           type="button"
@@ -65,6 +69,14 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
         </button>
       </div>
       <div className="export-filename-grid">
+        <label>
+          导出文件夹名
+          <input
+            value={exportFolderName}
+            onChange={(event) => setExportFolderName(event.target.value)}
+            placeholder="jc_export"
+          />
+        </label>
         <label>
           JSON 文件名
           <input
@@ -81,6 +93,15 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
             placeholder="pdo_sdo_data.bin"
           />
         </label>
+        <button
+          className="export-naming-reset"
+          type="button"
+          onClick={handleResetExportNaming}
+          disabled={isExporting}
+        >
+          <RotateCcw size={14} aria-hidden="true" />
+          恢复默认命名
+        </button>
       </div>
       {exportError ? (
         <p className="export-error" role="alert">

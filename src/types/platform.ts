@@ -162,6 +162,7 @@ export interface ProjectParseReport {
 export interface ProjectDocument {
   config_version?: string;
   project: ProjectMetadata;
+  export_info: ProjectExportSettings;
   device: DeviceConfig;
   ui_info: UiInfoDocument;
   pdo_simple_send_recv: PdoSimpleDocument;
@@ -177,6 +178,12 @@ export interface ProjectDocument {
   battery_protocol: BatteryProtocol;
   battery_monitor_info: BatteryMonitorInfo;
   fault_code_info: FaultCodeInfo;
+}
+
+export interface ProjectExportSettings {
+  folder_name: string;
+  manifest_filename: string;
+  binary_filename: string;
 }
 
 export interface UnifiedProtocolModel {
@@ -633,6 +640,7 @@ export interface ExportPlanRequest {
   project_path?: string;
   output_dir: string;
   document: unknown;
+  folder_name?: string;
   manifest_filename?: string;
   binary_filename?: string;
   export_options?: ExportBatteryOptions;

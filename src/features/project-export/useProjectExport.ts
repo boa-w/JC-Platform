@@ -1,5 +1,5 @@
 import { open } from '@tauri-apps/plugin-dialog';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   buildProjectBinaryReport,
   compareProjectBinaryReport,
@@ -15,11 +15,17 @@ import type {
   UiImageCopyReport,
 } from '../../types/platform';
 import { runSystemDialog } from '../../utils/systemDialog';
+import {
+  defaultProjectExportSettings,
+  projectDirectory,
+  readProjectExportSettings,
+} from './exportSettings';
 
 interface UseProjectExportOptions {
   document: unknown;
   projectPath?: string;
   exportOptions: ExportBatteryOptions;
+  updateProjectDocument: (section: string, value: unknown) => void;
 }
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -28,16 +34,28 @@ export function useProjectExport({
   document,
   projectPath,
   exportOptions,
+  updateProjectDocument,
 }: UseProjectExportOptions) {
-  const [outputDir, setOutputDir] = useState('jc-export');
-  const [manifestFilename, setManifestFilename] = useState('ConfigUpdate.json');
-  const [binaryFilename, setBinaryFilename] = useState('pdo_sdo_data.bin');
+  const [outputDir, setOutputDir] = useState(() => projectDirectory(projectPath));
+  const exportSettings = useMemo(() => readProjectExportSettings(document), [document]);
   const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
   const [imageCopyReport, setImageCopyReport] = useState<UiImageCopyReport | null>(null);
   const [binaryReport, setBinaryReport] = useState<BinaryBuildReport | null>(null);
   const [binaryCompareReport, setBinaryCompareReport] = useState<BinaryCompareReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    setOutputDir(projectDirectory(projectPath));
+  }, [projectPath]);
+
+  function updateExportSetting(key: keyof typeof exportSettings, value: string) {
+    updateProjectDocument('export_info', { ...exportSettings, [key]: value });
+  }
+
+  function resetExportNaming() {
+    updateProjectDocument('export_info', defaultProjectExportSettings);
+  }
 
   async function copyUiImages() {
     setError(null);
@@ -47,6 +65,7 @@ export function useProjectExport({
         project_path: projectPath,
         output_dir: outputDir,
         document,
+        folder_name: exportSettings.folder_name,
       });
       setImageCopyReport(report);
       if (!report.valid) setError(report.errors.join('；') || 'UI 图片复制存在问题');
@@ -121,8 +140,9 @@ export function useProjectExport({
         project_path: projectPath,
         output_dir: outputDir,
         document,
-        manifest_filename: manifestFilename,
-        binary_filename: binaryFilename,
+        folder_name: exportSettings.folder_name,
+        manifest_filename: exportSettings.manifest_filename,
+        binary_filename: exportSettings.binary_filename,
         export_options: exportOptions,
       });
       setExportReport(report);
@@ -144,10 +164,12 @@ export function useProjectExport({
   return {
     outputDir,
     setOutputDir,
-    manifestFilename,
-    setManifestFilename,
-    binaryFilename,
-    setBinaryFilename,
+    folderName: exportSettings.folder_name,
+    setFolderName: (value: string) => updateExportSetting('folder_name', value),
+    manifestFilename: exportSettings.manifest_filename,
+    setManifestFilename: (value: string) => updateExportSetting('manifest_filename', value),
+    binaryFilename: exportSettings.binary_filename,
+    setBinaryFilename: (value: string) => updateExportSetting('binary_filename', value),
     exportReport,
     imageCopyReport,
     binaryReport,
@@ -158,6 +180,7 @@ export function useProjectExport({
     buildBinaryReport,
     compareBinary,
     selectOutputDir,
+    resetExportNaming,
     exportPackage,
     openExportDir,
   };

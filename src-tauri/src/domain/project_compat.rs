@@ -20,6 +20,7 @@ const LEGACY_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "config_version",
     "device",
     "project",
+    "export_info",
     "ui_info",
     "language_info",
     "fault_code_info",
@@ -33,6 +34,7 @@ const LEGACY_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
 ];
 
 const PROJECT_FIELD_ORDER: &[&str] = &["name", "create_time", "update_time", "from", "base_path"];
+const EXPORT_INFO_FIELD_ORDER: &[&str] = &["folder_name", "manifest_filename", "binary_filename"];
 const DEVICE_FIELD_ORDER: &[&str] = &[
     "type",
     "version",
@@ -144,6 +146,7 @@ fn update_project_update_time(document: &mut Value, timestamp: &str) {
 
 fn order_legacy_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "project", PROJECT_FIELD_ORDER);
+    order_child_object(&mut document, "export_info", EXPORT_INFO_FIELD_ORDER);
     order_child_object(&mut document, "device", DEVICE_FIELD_ORDER);
     order_ui_info(&mut document);
     order_language_info(&mut document);
@@ -343,6 +346,11 @@ mod tests {
             "protocol_mapping": [],
             "battery_monitor_info": {},
             "battery_protocol": { "frames": [] },
+            "export_info": {
+                "binary_filename": "data.bin",
+                "folder_name": "release",
+                "manifest_filename": "update.json"
+            },
             "fault_code_info": { "sources": [], "codes": [] },
             "pdo_recv": []
         });
@@ -354,6 +362,13 @@ mod tests {
         assert!(sanitized.get("protocol_mapping").is_none());
         assert!(sanitized.get("battery_monitor_info").is_none());
         assert!(sanitized.get("battery_protocol").is_some());
+        assert_eq!(
+            sanitized
+                .get("export_info")
+                .and_then(Value::as_object)
+                .map(|value| value.keys().map(String::as_str).collect::<Vec<_>>()),
+            Some(vec!["folder_name", "manifest_filename", "binary_filename"])
+        );
         assert!(sanitized.get("fault_code_info").is_some());
         assert!(sanitized.get("pdo_recv").is_some());
     }
@@ -392,6 +407,7 @@ mod tests {
         let document = json!({
             "sdo_info": { "children": [], "name": "", "name_index": 0, "type": 0, "user_auth": 0 },
             "project": { "base_path": "", "from": "", "update_time": "", "create_time": "", "name": "demo" },
+            "export_info": { "binary_filename": "data.bin", "manifest_filename": "update.json", "folder_name": "release" },
             "pdo_recv": [],
             "language_info": { "list_translate": {}, "list_inner": [], "list_code_language": [] },
             "fault_code_info": {
@@ -508,13 +524,14 @@ mod tests {
         assert_eq!(
             object
                 .keys()
-                .take(13)
+                .take(14)
                 .map(String::as_str)
                 .collect::<Vec<_>>(),
             vec![
                 "config_version",
                 "device",
                 "project",
+                "export_info",
                 "ui_info",
                 "language_info",
                 "fault_code_info",

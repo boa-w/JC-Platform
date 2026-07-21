@@ -228,6 +228,7 @@ export function Dashboard({
     document: loadedProject?.document ?? uiResourcePreviewDocument,
     projectPath: loadedProject?.summary.path,
     exportOptions: exportBatteryOptions,
+    updateProjectDocument,
   });
   const batteryLegacyController = useBatteryLegacyController({
     document: loadedProject?.document ?? null,

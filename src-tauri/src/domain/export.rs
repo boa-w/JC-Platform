@@ -74,8 +74,11 @@ fn default_enabled_export_target() -> ExportTargetOptions {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportPlanRequest {
     pub project_path: Option<String>,
+    #[serde(default)]
     pub output_dir: String,
     pub document: Value,
+    #[serde(default)]
+    pub folder_name: Option<String>,
     #[serde(default)]
     pub manifest_filename: Option<String>,
     #[serde(default)]
@@ -284,14 +287,25 @@ impl DataDescriptionPlan {
 ///
 /// 分析 UI 资源和二进制数据，生成目录结构、文件路径和资源清单。
 pub fn build_export_plan(request: ExportPlanRequest) -> ExportPlanReport {
-    let export_root = join_fs_path(&request.output_dir, "jc_export");
+    let export_root = export_root(&request);
     let manifest_filename = export_file_name(
-        request.manifest_filename.as_deref(),
+        export_setting(
+            &request,
+            request.manifest_filename.as_deref(),
+            "manifest_filename",
+        ),
         "ConfigUpdate.json",
         "json",
     );
-    let binary_filename =
-        export_file_name(request.binary_filename.as_deref(), "pdo_sdo_data.bin", "bin");
+    let binary_filename = export_file_name(
+        export_setting(
+            &request,
+            request.binary_filename.as_deref(),
+            "binary_filename",
+        ),
+        "pdo_sdo_data.bin",
+        "bin",
+    );
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
     let ui_report = parse_ui_info(request.project_path.as_deref(), &request.document);
@@ -457,7 +471,7 @@ pub fn export_project_package(request: ExportPlanRequest) -> ProjectExportReport
 }
 
 pub fn copy_ui_images(request: ExportPlanRequest) -> UiImageCopyReport {
-    let export_root = join_fs_path(&request.output_dir, "jc_export");
+    let export_root = export_root(&request);
     let mut errors = Vec::new();
     if let Err(error) = prepare_image_directories(&export_root) {
         errors.push(error);
@@ -473,7 +487,7 @@ pub fn copy_ui_images(request: ExportPlanRequest) -> UiImageCopyReport {
 }
 
 fn copy_ui_images_without_clean(request: ExportPlanRequest) -> UiImageCopyReport {
-    let export_root = join_fs_path(&request.output_dir, "jc_export");
+    let export_root = export_root(&request);
     let directories = vec![
         join_fs_path(&export_root, "img"),
         join_fs_path(&export_root, "img/anim"),
@@ -2398,10 +2412,56 @@ fn join_path(base: &str, child: &str) -> String {
 
 fn join_fs_path(base: &str, child: &str) -> String {
     let mut path = PathBuf::from(base);
-    for segment in child.split(['/', '\\']).filter(|segment| !segment.is_empty()) {
+    for segment in child
+        .split(['/', '\\'])
+        .filter(|segment| !segment.is_empty())
+    {
         path.push(segment);
     }
     path.to_string_lossy().into_owned()
+}
+
+fn export_root(request: &ExportPlanRequest) -> String {
+    let output_dir = request.output_dir.trim().to_string();
+    let output_dir = if output_dir.is_empty() {
+        request
+            .project_path
+            .as_deref()
+            .and_then(|path| std::path::Path::new(path).parent())
+            .filter(|path| !path.as_os_str().is_empty())
+            .map(|path| path.to_string_lossy().into_owned())
+            .unwrap_or_else(|| ".".to_string())
+    } else {
+        output_dir
+    };
+    let configured = export_setting(request, request.folder_name.as_deref(), "folder_name");
+    join_fs_path(&output_dir, &export_folder_name(configured, "jc_export"))
+}
+
+fn export_setting<'a>(
+    request: &'a ExportPlanRequest,
+    request_value: Option<&'a str>,
+    key: &str,
+) -> Option<&'a str> {
+    request_value.or_else(|| {
+        request
+            .document
+            .get("export_info")
+            .and_then(|value| value.get(key))
+            .and_then(Value::as_str)
+    })
+}
+
+fn export_folder_name(value: Option<&str>, default_name: &str) -> String {
+    value
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .and_then(|name| std::path::Path::new(name).file_name())
+        .and_then(|name| name.to_str())
+        .map(str::trim)
+        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .unwrap_or(default_name)
+        .to_string()
 }
 
 fn export_file_name(value: Option<&str>, default_name: &str, extension: &str) -> String {
@@ -2645,6 +2705,7 @@ mod tests {
             project_path: None,
             output_dir: "out".to_string(),
             document,
+            folder_name: None,
             manifest_filename: None,
             binary_filename: None,
             export_options: ExportBatteryOptions::default(),
@@ -2693,6 +2754,7 @@ mod tests {
             project_path: None,
             output_dir: "out".to_string(),
             document,
+            folder_name: None,
             manifest_filename: Some("../release_config".to_string()),
             binary_filename: Some("release_data".to_string()),
             export_options: ExportBatteryOptions::default(),
@@ -2704,7 +2766,96 @@ mod tests {
         );
         assert_eq!(
             report.binary_path,
-            join_fs_path(&join_fs_path(&report.export_root, "bin"), "release_data.bin")
+            join_fs_path(
+                &join_fs_path(&report.export_root, "bin"),
+                "release_data.bin"
+            )
+        );
+    }
+
+    #[test]
+    fn export_plan_uses_project_directory_and_document_export_settings() {
+        let project_path = join_fs_path(&join_fs_path("workspace", "project"), "demo.jcpro");
+        let document = json!({
+            "export_info": {
+                "folder_name": "release_bundle",
+                "manifest_filename": "device_update",
+                "binary_filename": "device_data"
+            },
+            "device": { "resolution_w": 800, "resolution_h": 480 },
+            "ui_info": [],
+            "language_info": language_info_without_selected_languages(),
+            "battery_monitor_info": disabled_battery_monitor(),
+            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] }
+        });
+
+        let report = build_export_plan(ExportPlanRequest {
+            project_path: Some(project_path),
+            output_dir: String::new(),
+            document,
+            folder_name: None,
+            manifest_filename: None,
+            binary_filename: None,
+            export_options: ExportBatteryOptions::default(),
+        });
+
+        assert_eq!(
+            report.export_root,
+            join_fs_path(&join_fs_path("workspace", "project"), "release_bundle")
+        );
+        assert_eq!(
+            report.manifest_path,
+            join_fs_path(&report.export_root, "device_update.json")
+        );
+        assert_eq!(
+            report.binary_path,
+            join_fs_path(&report.export_root, "bin/device_data.bin")
+        );
+    }
+
+    #[test]
+    fn export_plan_request_names_override_document_export_settings() {
+        let document = json!({
+            "export_info": {
+                "folder_name": "document_folder",
+                "manifest_filename": "document_manifest.json",
+                "binary_filename": "document_binary.bin"
+            },
+            "device": { "resolution_w": 800, "resolution_h": 480 },
+            "ui_info": [],
+            "language_info": language_info_without_selected_languages(),
+            "battery_monitor_info": disabled_battery_monitor(),
+            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] }
+        });
+
+        let report = build_export_plan(ExportPlanRequest {
+            project_path: None,
+            output_dir: "out".to_string(),
+            document,
+            folder_name: Some("request_folder".to_string()),
+            manifest_filename: Some("request_manifest".to_string()),
+            binary_filename: Some("request_binary".to_string()),
+            export_options: ExportBatteryOptions::default(),
+        });
+
+        assert_eq!(report.export_root, join_fs_path("out", "request_folder"));
+        assert_eq!(
+            report.manifest_path,
+            join_fs_path(&report.export_root, "request_manifest.json")
+        );
+        assert_eq!(
+            report.binary_path,
+            join_fs_path(&report.export_root, "bin/request_binary.bin")
         );
     }
 

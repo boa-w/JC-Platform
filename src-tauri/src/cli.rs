@@ -279,8 +279,10 @@ enum ExportCommand {
     Plan {
         #[arg(long)]
         document: String,
-        #[arg(long = "output-dir")]
+        #[arg(long = "output-dir", default_value = "")]
         output_dir: String,
+        #[arg(long = "folder-name")]
+        folder_name: Option<String>,
         #[arg(long = "manifest-filename")]
         manifest_filename: Option<String>,
         #[arg(long = "binary-filename")]
@@ -292,8 +294,10 @@ enum ExportCommand {
     Package {
         #[arg(long)]
         document: String,
-        #[arg(long = "output-dir")]
+        #[arg(long = "output-dir", default_value = "")]
         output_dir: String,
+        #[arg(long = "folder-name")]
+        folder_name: Option<String>,
         #[arg(long = "manifest-filename")]
         manifest_filename: Option<String>,
         #[arg(long = "binary-filename")]
@@ -305,8 +309,10 @@ enum ExportCommand {
     CopyUiImages {
         #[arg(long)]
         document: String,
-        #[arg(long = "output-dir")]
+        #[arg(long = "output-dir", default_value = "")]
         output_dir: String,
+        #[arg(long = "folder-name")]
+        folder_name: Option<String>,
         #[arg(long)]
         project_path: Option<String>,
     },
@@ -619,14 +625,16 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
         ExportCommand::Plan {
             document,
             output_dir,
+            folder_name,
             manifest_filename,
             binary_filename,
             project_path,
         } => print_json(
             &commands::build_project_export_plan(ExportPlanRequest {
-                project_path,
+                project_path: project_path.or_else(|| Some(document.clone())),
                 output_dir,
                 document: read_json_value(&document)?,
+                folder_name,
                 manifest_filename,
                 binary_filename,
                 export_options: Default::default(),
@@ -636,14 +644,16 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
         ExportCommand::Package {
             document,
             output_dir,
+            folder_name,
             manifest_filename,
             binary_filename,
             project_path,
         } => print_json(
             &commands::export_project_package_command(ExportPlanRequest {
-                project_path,
+                project_path: project_path.or_else(|| Some(document.clone())),
                 output_dir,
                 document: read_json_value(&document)?,
+                folder_name,
                 manifest_filename,
                 binary_filename,
                 export_options: Default::default(),
@@ -653,12 +663,14 @@ fn run_export(command: ExportCommand, pretty: bool) -> Result<(), CliError> {
         ExportCommand::CopyUiImages {
             document,
             output_dir,
+            folder_name,
             project_path,
         } => print_json(
             &commands::copy_ui_resource_images(ExportPlanRequest {
-                project_path,
+                project_path: project_path.or_else(|| Some(document.clone())),
                 output_dir,
                 document: read_json_value(&document)?,
+                folder_name,
                 manifest_filename: None,
                 binary_filename: None,
                 export_options: Default::default(),

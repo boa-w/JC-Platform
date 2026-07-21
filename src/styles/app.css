@@ -1608,6 +1608,28 @@ button.git-summary-row:disabled,
   gap: 10px;
 }
 
+.export-naming-reset {
+  display: inline-flex;
+  align-items: center;
+  align-self: end;
+  justify-self: start;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.export-naming-reset:hover {
+  border-color: var(--action-primary-border);
+  color: var(--text-primary);
+}
+
 .project-create-grid {
   grid-template-columns: minmax(0, 1fr) 100px 100px auto;
 }
@@ -1759,6 +1781,7 @@ button.git-summary-row:disabled,
 .project-open-form button:disabled,
 .path-open-button:disabled,
 .export-form button:disabled,
+.export-naming-reset:disabled,
 .recent-projects-panel button:disabled {
   cursor: not-allowed;
   opacity: 0.5;

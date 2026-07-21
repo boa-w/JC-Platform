@@ -194,6 +194,7 @@ pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_
             "create_time": "",
             "update_time": ""
         },
+        "export_info": ProjectExportSettings::default(),
         "ui_info": [],
         "language_info": default_language_info(),
         "fault_code_info": default_fault_code_info(),
@@ -968,6 +969,8 @@ pub struct ProjectDocument {
     #[serde(default)]
     pub project: ProjectMetadata,
     #[serde(default)]
+    pub export_info: ProjectExportSettings,
+    #[serde(default)]
     pub device: DeviceConfig,
     #[serde(default)]
     pub ui_info: UiInfoDocument,
@@ -995,6 +998,38 @@ pub struct ProjectDocument {
     pub battery_monitor_info: Value,
     #[serde(default = "default_fault_code_info")]
     pub fault_code_info: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectExportSettings {
+    #[serde(default = "default_export_folder_name")]
+    pub folder_name: String,
+    #[serde(default = "default_manifest_filename")]
+    pub manifest_filename: String,
+    #[serde(default = "default_binary_filename")]
+    pub binary_filename: String,
+}
+
+impl Default for ProjectExportSettings {
+    fn default() -> Self {
+        Self {
+            folder_name: default_export_folder_name(),
+            manifest_filename: default_manifest_filename(),
+            binary_filename: default_binary_filename(),
+        }
+    }
+}
+
+fn default_export_folder_name() -> String {
+    "jc_export".to_string()
+}
+
+fn default_manifest_filename() -> String {
+    "ConfigUpdate.json".to_string()
+}
+
+fn default_binary_filename() -> String {
+    "pdo_sdo_data.bin".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

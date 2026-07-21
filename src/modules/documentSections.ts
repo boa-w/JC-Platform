@@ -7,6 +7,7 @@ type JsonEditorContext = {
 };
 
 export type DocumentSectionKey =
+  | 'export_info'
   | 'ui_info'
   | 'sdo_info'
   | 'pdo_simple_send_recv'
@@ -25,6 +26,7 @@ export type DocumentSectionKey =
 export type JsonEditorKey = NavigationKey | 'sdo' | 'pdo-simple' | 'pdo-advanced';
 
 export const modifiedSectionLabels: Record<DocumentSectionKey, string> = {
+  export_info: '导出设置',
   ui_info: 'UI 资源',
   sdo_info: 'SDO 参数',
   pdo_simple_send_recv: 'PDO 简化配置',
