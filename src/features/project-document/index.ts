@@ -9,6 +9,7 @@ export {
   type ProjectDocumentController,
   useProjectDocumentController,
 } from './useProjectDocumentController';
+export { withRequiredEditorSections } from './projectDocumentDefaults';
 export {
   type ProjectRecoveryDraftController,
   useProjectRecoveryDraft,

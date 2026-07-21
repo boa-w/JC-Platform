@@ -46,14 +46,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Verify application
-        run: npm run verify
-
       - name: Install browser for UI tests
         run: npx playwright install chromium
 
-      - name: Run UI workflow tests
-        run: npm run test:e2e
+      - name: Verify application
+        run: npm run verify
 
       - name: Upload UI test diagnostics
         if: failure()

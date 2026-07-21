@@ -25,12 +25,13 @@
     "lint": "biome lint . --max-diagnostics=500 && npm run design-tokens:check",
     "lint:fix": "biome check --write .",
     "test:frontend": "node --test --experimental-strip-types tests/*.test.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "node scripts/run-playwright.mjs",
     "test:installer:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows-installer.ps1",
     "test:bundle:macos": "bash scripts/test-macos-bundle.sh",
     "test:upgrade:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows-upgrade.ps1",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "verify": "npm run lint && npm run test:frontend && npm run build && npm run test:rust"
+    "verify:code": "npm run lint && npm run test:frontend && npm run build && npm run test:rust",
+    "verify": "npm run verify:code && npm run test:e2e"
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",

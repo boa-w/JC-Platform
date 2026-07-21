@@ -422,11 +422,13 @@ test('supports accessible Git review and comparison views', async ({ page }) => 
   await expect(worktreeEditor.getByRole('button', { name: '回退此差异块' }).first()).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, 'Git 工作树对照编辑');
   await worktreeContent.fill('{');
-  await worktreeEditor.getByRole('button', { name: '保存文件' }).click();
+  const saveWorktreeButton = worktreeEditor.getByRole('button', { name: '保存文件' });
+  await saveWorktreeButton.click();
   await expect(worktreeEditor.getByRole('alert')).toBeVisible();
+  await expect(saveWorktreeButton).toBeEnabled();
   const validContent = JSON.stringify({ ...richProjectDocument, config_version: 'jc002' }, null, 2);
   await worktreeContent.fill(validContent);
-  await worktreeEditor.getByRole('button', { name: '保存文件' }).click();
+  await saveWorktreeButton.click();
   await expect(worktreeEditor).toBeHidden();
   expect(
     await page.evaluate(

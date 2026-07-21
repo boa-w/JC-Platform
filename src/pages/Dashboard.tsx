@@ -12,6 +12,7 @@ import { useProjectJsonEditor } from '../features/json-editor/useProjectJsonEdit
 import {
   useProjectDocumentController,
   useProjectRecoveryDraft,
+  withRequiredEditorSections,
 } from '../features/project-document';
 import { useProjectExport } from '../features/project-export/useProjectExport';
 import { useProjectGitController } from '../features/project-git';
@@ -259,13 +260,14 @@ export function Dashboard({
     onPersistenceError: projectLifecycle.setSaveStatus,
     onRestoreDocument: async (document) => {
       if (!loadedProject) return;
-      const validation = await validateProjectDocument(document);
+      const restoredDocument = withRequiredEditorSections(document) ?? document;
+      const validation = await validateProjectDocument(restoredDocument);
       applyLoadedProject(
-        { ...loadedProject, document, validation },
+        { ...loadedProject, document: restoredDocument, validation },
         undefined,
         trackedDocumentSections,
       );
-      void uiResource.refreshPreview(document, loadedProject.summary.path);
+      void uiResource.refreshPreview(restoredDocument, loadedProject.summary.path);
       projectLifecycle.setSaveStatus('已恢复异常退出前的未保存修改。');
     },
   });

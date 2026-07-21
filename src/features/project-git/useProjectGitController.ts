@@ -237,9 +237,13 @@ export function useProjectGitController({
     if (reviewRevision) throw new Error('历史版本仅供查看，不能编辑。');
     if (hasUnsavedChanges) throw new Error('请先保存或恢复主编辑器中的修改。');
     await saveProjectGitWorktreeFile(request, path, content);
-    await onReloadWorkingTree();
-    await Promise.all([refresh(), refreshReview(null)]);
     onStatusChange(`已保存工作区文件：${path}`);
+    void Promise.resolve()
+      .then(() => onReloadWorkingTree())
+      .then(() => Promise.all([refresh(), refreshReview(null)]))
+      .catch((cause) => {
+        setReviewError(cause instanceof Error ? cause.message : String(cause));
+      });
   }
 
   function showHistory() {

@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-const baseURL = 'http://127.0.0.1:1430';
+const port = Number(process.env.PLAYWRIGHT_PORT ?? 1430);
+const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -17,7 +18,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 1430',
+    command: `npm run dev -- --host 127.0.0.1 --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
