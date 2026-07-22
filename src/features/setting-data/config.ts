@@ -7,6 +7,8 @@ import type {
 
 export const settingColumnWidthStorageKey = 'jc-custom-platform.settingData.columnWidths';
 export const settingColumnPresetStorageKey = 'jc-custom-platform.settingData.columnPreset';
+export const communicationIndexRadixStorageKey =
+  'jc-custom-platform.settingData.communicationIndexRadix';
 export const maxSettingColumnWidth = 480;
 
 export const settingParameterColumns: SettingParameterColumn[] = [

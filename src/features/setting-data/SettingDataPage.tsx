@@ -3,11 +3,13 @@ import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import {
+  communicationIndexRadixStorageKey,
   settingColumnPresetOptions,
   settingColumnPresetStorageKey,
   settingParameterColumns,
 } from './config';
 import type {
+  CommunicationIndexRadix,
   SettingColumnPreset,
   SettingDataPageProps,
   SettingEditorField,
@@ -16,6 +18,7 @@ import type {
   SettingParameterRow,
 } from './types';
 import { useSettingData } from './useSettingData';
+import { formatCommunicationIndex, parseCommunicationIndex } from './communicationIndex';
 import {
   formatSettingPath,
   isSameOrDescendantPath,
@@ -25,6 +28,71 @@ import {
 import '../legacy-data.css';
 
 const pinnedSettingColumnKeys: SettingParameterColumnKey[] = ['select', 'index', 'name'];
+const communicationIndexFields = new Set(['fid', 'mid', 'sid']);
+
+function readCommunicationIndexRadix(): CommunicationIndexRadix {
+  if (typeof window === 'undefined') return 'hexadecimal';
+  return getStorageItem(communicationIndexRadixStorageKey) === 'decimal'
+    ? 'decimal'
+    : 'hexadecimal';
+}
+
+interface CommunicationIndexInputProps {
+  field: SettingEditorField;
+  radix: CommunicationIndexRadix;
+  value: number;
+  onCommit: (value: number) => void;
+}
+
+function CommunicationIndexInput({
+  field,
+  radix,
+  value,
+  onCommit,
+}: CommunicationIndexInputProps) {
+  const hexWidth = field.field === 'mid' ? 4 : 2;
+  const formattedValue = formatCommunicationIndex(value, radix, hexWidth);
+  const [draft, setDraft] = useState(formattedValue);
+  const parsedDraft = parseCommunicationIndex(draft, radix);
+  const isInvalid = parsedDraft === null;
+
+  useEffect(() => {
+    setDraft(formattedValue);
+  }, [formattedValue]);
+
+  function commit() {
+    if (parsedDraft === null) {
+      setDraft(formattedValue);
+      return;
+    }
+    onCommit(parsedDraft);
+    setDraft(formatCommunicationIndex(parsedDraft, radix, hexWidth));
+  }
+
+  return (
+    <label>
+      {field.label}
+      <input
+        aria-invalid={isInvalid || undefined}
+        inputMode={radix === 'decimal' ? 'numeric' : 'text'}
+        spellCheck={false}
+        value={draft}
+        onBlur={commit}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur();
+          if (event.key === 'Escape') {
+            setDraft(formattedValue);
+            event.currentTarget.blur();
+          }
+        }}
+      />
+      <span className="setting-index-input-hint">
+        {radix === 'hexadecimal' ? '输入十六进制，例如 0x10' : '输入十进制，例如 16'}
+      </span>
+    </label>
+  );
+}
 
 function readSettingColumnPreset(): SettingColumnPreset {
   if (typeof window === 'undefined') return 'common';
@@ -65,6 +133,8 @@ export function SettingDataPage({
   );
   const [pendingDeleteRows, setPendingDeleteRows] = useState<SettingParameterRow[]>([]);
   const [columnPreset, setColumnPreset] = useState<SettingColumnPreset>(readSettingColumnPreset);
+  const [communicationIndexRadix, setCommunicationIndexRadix] =
+    useState<CommunicationIndexRadix>(readCommunicationIndexRadix);
   const lastSelectedParameterPathRef = useRef<string | null>(null);
   const visibleParameterPathKeysRef = useRef<string[]>([]);
   const selectedColumnPreset =
@@ -168,6 +238,35 @@ export function SettingDataPage({
     setStorageItem(settingColumnPresetStorageKey, nextPreset);
   }
 
+  function handleCommunicationIndexRadixChange(nextRadix: CommunicationIndexRadix) {
+    setCommunicationIndexRadix(nextRadix);
+    setStorageItem(communicationIndexRadixStorageKey, nextRadix);
+  }
+
+  function renderCommunicationIndexRadixControl(compact = false) {
+    return (
+      <fieldset
+        className={`setting-index-radix${compact ? ' setting-index-radix--compact' : ''}`}
+        aria-label="通信索引显示进制"
+      >
+        <button
+          aria-pressed={communicationIndexRadix === 'decimal'}
+          onClick={() => handleCommunicationIndexRadixChange('decimal')}
+          type="button"
+        >
+          十进制
+        </button>
+        <button
+          aria-pressed={communicationIndexRadix === 'hexadecimal'}
+          onClick={() => handleCommunicationIndexRadixChange('hexadecimal')}
+          type="button"
+        >
+          十六进制
+        </button>
+      </fieldset>
+    );
+  }
+
   function settingColumnClassName(column: SettingParameterColumn) {
     return [
       column.align ? `text-${column.align}` : '',
@@ -244,6 +343,15 @@ export function SettingDataPage({
         </span>
       );
     }
+    if (column.key === 'frameId') {
+      return formatCommunicationIndex(row.frameIdValue, communicationIndexRadix, 2);
+    }
+    if (column.key === 'mainIndex') {
+      return formatCommunicationIndex(row.mainIndexValue, communicationIndexRadix, 4);
+    }
+    if (column.key === 'subIndex') {
+      return formatCommunicationIndex(row.subIndexValue, communicationIndexRadix, 2);
+    }
     const value = row[column.key];
     return column.key === 'name' || column.key === 'dataType' || column.key === 'preprocess' ? (
       <span title={String(value)}>{value}</span>
@@ -256,6 +364,19 @@ export function SettingDataPage({
     const node = settingData.editingSettingNode;
     if (!node) return null;
     const value = settingData.settingEditorFieldValue(node, field);
+    if (communicationIndexFields.has(field.field)) {
+      return (
+        <CommunicationIndexInput
+          field={field}
+          key={field.field}
+          radix={communicationIndexRadix}
+          value={typeof value === 'number' ? value : Number(value) || 0}
+          onCommit={(nextValue) =>
+            settingData.updateSettingEditorField(path, field, nextValue)
+          }
+        />
+      );
+    }
     if (field.kind === 'select') {
       const options = optionsWithCurrentValue(field.options ?? [], value);
       return (
@@ -369,7 +490,12 @@ export function SettingDataPage({
                   .visibleSettingEditorSections(settingData.editingSettingNode)
                   .map((section) => (
                     <section className="legacy-edit-section" key={section.title}>
-                      <div className="legacy-edit-section-title">{section.title}</div>
+                      <div className="legacy-edit-section-heading">
+                        <div className="legacy-edit-section-title">{section.title}</div>
+                        {section.title === '通信索引'
+                          ? renderCommunicationIndexRadixControl(true)
+                          : null}
+                      </div>
                       <div className="legacy-edit-grid legacy-edit-grid--sectioned">
                         {section.fields.map((field) =>
                           renderSettingEditorField(field, settingData.editingSettingPath!),
@@ -575,6 +701,7 @@ export function SettingDataPage({
                         ))}
                       </select>
                     </label>
+                    {renderCommunicationIndexRadixControl()}
                     <button onClick={settingData.resetSettingColumnWidths} type="button">
                       重置列宽
                     </button>

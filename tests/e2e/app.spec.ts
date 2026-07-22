@@ -291,16 +291,30 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await expectNoSeriousAccessibilityViolations(page, '已加载项目的设置数据工作区');
 
   const parameterRow = page.getByRole('row').filter({ hasText: '最高车速' });
+  const tableRadix = page.getByRole('group', { name: '通信索引显示进制' });
+  await expect(parameterRow).toContainText('0x2002');
+  await tableRadix.getByRole('button', { name: '十进制', exact: true }).click();
+  await expect(parameterRow).toContainText('8194');
   await parameterRow.getByRole('button', { name: '编辑定义' }).click();
   const parameterDialog = page.getByRole('dialog', { name: '参数编辑：最高车速' });
   await expect(parameterDialog.getByRole('button', { name: '关闭设置数据编辑面板' })).toBeFocused();
   await expectNoSeriousAccessibilityViolations(page, '设置参数编辑抽屉');
+  await expect(parameterDialog.getByLabel('MID')).toHaveValue('8194');
+  await parameterDialog
+    .getByRole('group', { name: '通信索引显示进制' })
+    .getByRole('button', { name: '十六进制', exact: true })
+    .click();
+  await expect(parameterDialog.getByLabel('MID')).toHaveValue('0x2002');
+  await parameterDialog.getByLabel('MID').fill('0x2003');
+  await parameterDialog.getByLabel('MID').blur();
+  await expect(parameterDialog.getByLabel('MID')).toHaveValue('0x2003');
   await parameterDialog.getByLabel('名称').fill('最大车速');
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
   ).toBeEnabled();
   await page.keyboard.press('Escape');
   await expect(parameterDialog).toBeHidden();
+  await expect(page.getByRole('row').filter({ hasText: '最大车速' })).toContainText('0x2003');
 
   await dataNavigation.getByRole('button', { name: '实时数据', exact: true }).click();
   await expect(page.getByRole('main', { name: '实时数据' })).toBeVisible();

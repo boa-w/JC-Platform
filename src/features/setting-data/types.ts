@@ -53,6 +53,8 @@ export type SettingParameterColumnKey =
 
 export type SettingColumnPreset = 'common' | 'communication' | 'values' | 'processing' | 'all';
 
+export type CommunicationIndexRadix = 'decimal' | 'hexadecimal';
+
 export interface SettingColumnPresetOption {
   value: SettingColumnPreset;
   label: string;
@@ -122,6 +124,9 @@ export interface SettingParameterRow {
   frameId: string;
   mainIndex: string;
   subIndex: string;
+  frameIdValue?: number;
+  mainIndexValue?: number;
+  subIndexValue?: number;
   access: string;
   maxValue: string;
   minValue: string;

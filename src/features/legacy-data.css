@@ -404,6 +404,37 @@
   font-size: 12px;
 }
 
+.setting-index-radix {
+  display: inline-flex;
+  flex-shrink: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.setting-index-radix button,
+.setting-table-toolbar .setting-index-radix button {
+  height: 24px;
+  border: 0;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.setting-index-radix button[aria-pressed='true'],
+.setting-table-toolbar .setting-index-radix button[aria-pressed='true'] {
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
+  font-weight: 700;
+}
+
+.setting-index-radix--compact button {
+  font-size: 11px;
+}
+
 .setting-column-preset select:focus,
 .setting-table-toolbar button:focus-visible {
   outline: none;
@@ -830,6 +861,24 @@
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 700;
+}
+
+.legacy-edit-section-heading {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setting-index-input-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.legacy-edit-grid input[aria-invalid='true'] {
+  border-color: var(--status-danger);
 }
 
 .legacy-edit-grid,

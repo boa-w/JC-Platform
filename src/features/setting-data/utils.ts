@@ -12,6 +12,7 @@ import type {
   SettingParameterColumn,
   SettingParameterRow,
 } from './types';
+import { formatCommunicationIndex } from './communicationIndex';
 
 export function sdoNodeDocumentPath(path: number[]): JsonPath {
   const segments: JsonPath = ['sdo_info'];
@@ -348,6 +349,9 @@ export function collectSettingParameters(
         frameId: formatHex(current.fid, 2),
         mainIndex: formatHex(current.mid, 4),
         subIndex: String(current.sid ?? ''),
+        frameIdValue: current.fid,
+        mainIndexValue: current.mid,
+        subIndexValue: current.sid,
         access: sdoAccessLabel(current.control_rw),
         maxValue: current.data_max ?? '',
         minValue: current.data_min ?? '',
@@ -373,6 +377,9 @@ export function collectSettingParameters(
           row.frameId,
           row.mainIndex,
           row.subIndex,
+          formatCommunicationIndex(current.fid, 'decimal'),
+          formatCommunicationIndex(current.mid, 'decimal'),
+          formatCommunicationIndex(current.sid, 'hexadecimal', 2),
           row.access,
           row.dataType,
         ].join(' '),
