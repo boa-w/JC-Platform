@@ -19,6 +19,11 @@ import {
   settingDataTypeByName,
   settingDataTypeSelectValue as canonicalSettingDataTypeSelectValue,
 } from './settingDataTypes';
+import {
+  settingPreprocessByHandle,
+  settingPreprocessByName,
+  settingPreprocessDecimalName,
+} from './settingPreprocessing';
 
 export function sdoNodeDocumentPath(path: number[]): JsonPath {
   const segments: JsonPath = ['sdo_info'];
@@ -214,6 +219,15 @@ export function settingNodeSearchText(node: SdoNodeDocument, pathNames: string[]
   );
 }
 
+export function settingPreprocessLabel(node: SdoNodeDocument) {
+  return (
+    settingPreprocessByHandle(node.pre_handle)?.name ??
+    settingPreprocessByName(node.pre_handle_name)?.name ??
+    node.pre_handle_name ??
+    '原始数据'
+  );
+}
+
 export function settingNodeMatchesQuery(node: SdoNodeDocument, query: string, pathNames: string[]) {
   if (!query) return true;
   return settingNodeSearchText(node, pathNames).includes(query);
@@ -352,10 +366,13 @@ export function collectSettingParameters(
         dataType: settingDataTypeLabel(current),
         bitStart: handle.bitStart,
         bitLength: handle.bitLength,
-        preprocess: current.pre_handle_name ?? '原始数据',
+        preprocess: settingPreprocessLabel(current),
         scale: current.pre_handle_scale ?? '',
         offset: current.pre_handle_offset ?? '',
-        decimals: current.pre_handle_decimal_name ?? String(current.pre_handle_decimal ?? ''),
+        decimals:
+          settingPreprocessDecimalName(current.pre_handle_decimal) ??
+          current.pre_handle_decimal_name ??
+          '',
         isReadonly,
         isBooleanMonitor,
         usageHint,

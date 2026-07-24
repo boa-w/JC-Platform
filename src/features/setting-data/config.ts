@@ -5,6 +5,10 @@ import type {
   SettingParameterColumn,
 } from './types';
 import { settingDataTypeDefinitions } from './settingDataTypes';
+import {
+  settingPreprocessDecimalDefinitions,
+  settingPreprocessDefinitions,
+} from './settingPreprocessing';
 
 export const settingColumnWidthStorageKey = 'jc-custom-platform.settingData.columnWidths';
 export const settingColumnPresetStorageKey = 'jc-custom-platform.settingData.columnPreset';
@@ -138,6 +142,19 @@ export const sdoDataTypeOptions: SettingEditorOption[] = settingDataTypeDefiniti
   }),
 );
 
+export const sdoPreprocessOptions: SettingEditorOption[] = settingPreprocessDefinitions.map(
+  (definition) => ({
+    value: `${definition.name}:${definition.handle}`,
+    label: `${definition.name} (pre_handle=${definition.handle})`,
+  }),
+);
+
+export const sdoPreprocessDecimalOptions: SettingEditorOption[] =
+  settingPreprocessDecimalDefinitions.map((definition) => ({
+    value: definition.value,
+    label: definition.name,
+  }));
+
 export const settingEditorSections: SettingEditorSection[] = [
   {
     title: '基础信息',
@@ -262,9 +279,10 @@ export const settingEditorSections: SettingEditorSection[] = [
       {
         field: 'preprocess_label',
         label: '数据预处理',
-        kind: 'text',
-        defaultValue: '原始数据',
+        kind: 'select',
+        defaultValue: '原始数据:0',
         visibleFor: 'parameter',
+        options: sdoPreprocessOptions,
       },
       {
         field: 'scale_value',
@@ -283,9 +301,10 @@ export const settingEditorSections: SettingEditorSection[] = [
       {
         field: 'decimals_value',
         label: '保留小数',
-        kind: 'text',
-        defaultValue: '',
+        kind: 'select',
+        defaultValue: 0,
         visibleFor: 'parameter',
+        options: sdoPreprocessDecimalOptions,
       },
     ],
   },

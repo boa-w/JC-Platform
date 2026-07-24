@@ -313,6 +313,16 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await expect(parameterDialog.getByLabel('bit开始位置')).toBeVisible();
   await expect(parameterDialog.getByLabel('bit长度')).toBeVisible();
   await dataTypeSelect.selectOption('s16:3');
+  const preprocessSelect = parameterDialog.getByLabel('数据预处理');
+  await expect(preprocessSelect).toHaveValue('原始数据:0');
+  await expect(parameterDialog.getByLabel('缩放值')).toBeDisabled();
+  await expect(parameterDialog.getByLabel('偏移值')).toBeDisabled();
+  await expect(parameterDialog.getByLabel('保留小数')).toBeDisabled();
+  await preprocessSelect.selectOption('缩小偏移:1');
+  await expect(parameterDialog.getByText('配置写入 pre_handle=1', { exact: false })).toBeVisible();
+  await parameterDialog.getByLabel('缩放值').fill('10');
+  await parameterDialog.getByLabel('偏移值').fill('1.5');
+  await parameterDialog.getByLabel('保留小数').selectOption('2');
   await parameterDialog.getByLabel('名称').fill('最大车速');
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
@@ -407,7 +417,17 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
             __SAVED_PROJECT_DOCUMENT__: {
               sdo_info?: {
                 children?: Array<{
-                  children?: Array<{ name?: string; handle?: number; handle_name?: string }>;
+                  children?: Array<{
+                    name?: string;
+                    handle?: number;
+                    handle_name?: string;
+                    pre_handle?: number;
+                    pre_handle_name?: string;
+                    pre_handle_scale?: string;
+                    pre_handle_offset?: string;
+                    pre_handle_decimal?: number;
+                    pre_handle_decimal_name?: string;
+                  }>;
                 }>;
               };
             };
@@ -423,14 +443,32 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
             __SAVED_PROJECT_DOCUMENT__: {
               sdo_info?: {
                 children?: Array<{
-                  children?: Array<{ handle?: number; handle_name?: string }>;
+                  children?: Array<{
+                    handle?: number;
+                    handle_name?: string;
+                    pre_handle?: number;
+                    pre_handle_name?: string;
+                    pre_handle_scale?: string;
+                    pre_handle_offset?: string;
+                    pre_handle_decimal?: number;
+                    pre_handle_decimal_name?: string;
+                  }>;
                 }>;
               };
             };
           }
         ).__SAVED_PROJECT_DOCUMENT__?.sdo_info?.children?.[0]?.children?.[0],
     ),
-  ).toMatchObject({ handle: 3, handle_name: 's16' });
+  ).toMatchObject({
+    handle: 3,
+    handle_name: 's16',
+    pre_handle: 1,
+    pre_handle_name: '缩小偏移',
+    pre_handle_scale: '10',
+    pre_handle_offset: '1.5',
+    pre_handle_decimal: 2,
+    pre_handle_decimal_name: '2位',
+  });
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
   ).toBeDisabled();

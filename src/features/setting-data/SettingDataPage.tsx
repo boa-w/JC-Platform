@@ -26,6 +26,13 @@ import {
   validateDefaultWriteValue,
 } from './settingDataTypes';
 import {
+  parseSettingPreprocessValue,
+  settingPreprocessByHandle,
+  settingPreprocessDecimalName,
+  validateSettingPreprocessOffset,
+  validateSettingPreprocessScale,
+} from './settingPreprocessing';
+import {
   formatSettingPath,
   isSameOrDescendantPath,
   optionsWithCurrentValue,
@@ -370,6 +377,7 @@ export function SettingDataPage({
     const node = settingData.editingSettingNode;
     if (!node) return null;
     const value = settingData.settingEditorFieldValue(node, field);
+    const fieldDisabled = settingData.settingEditorFieldDisabled(node, field);
     if (communicationIndexFields.has(field.field)) {
       return (
         <CommunicationIndexInput
@@ -387,10 +395,13 @@ export function SettingDataPage({
       const options = optionsWithCurrentValue(field.options ?? [], value);
       const dataTypeDefinition =
         field.field === 'data_type_label' ? parseSettingDataTypeValue(value) : null;
+      const preprocessDefinition =
+        field.field === 'preprocess_label' ? parseSettingPreprocessValue(value) : null;
       return (
         <label key={field.field}>
           {field.label}
           <select
+            disabled={fieldDisabled}
             value={String(value)}
             onChange={(event) =>
               settingData.updateSettingEditorField(
@@ -411,6 +422,18 @@ export function SettingDataPage({
           {dataTypeDefinition ? (
             <span className="setting-editor-field-hint">
               {dataTypeDefinition.description} · 配置写入 handle={dataTypeDefinition.handle}
+            </span>
+          ) : null}
+          {preprocessDefinition ? (
+            <span className="setting-editor-field-hint">
+              {preprocessDefinition.description} · 配置写入 pre_handle=
+              {preprocessDefinition.handle}
+            </span>
+          ) : null}
+          {field.field === 'decimals_value' ? (
+            <span className="setting-editor-field-hint">
+              配置写入 pre_handle_decimal=
+              {Number(value)}（{settingPreprocessDecimalName(Number(value)) ?? '未知'}）
             </span>
           ) : null}
         </label>
@@ -436,15 +459,27 @@ export function SettingDataPage({
         : null;
     const defaultWriteValueValid =
       !defaultWriteDefinition || validateDefaultWriteValue(String(value), node.handle);
+    const preprocessDefinition = settingPreprocessByHandle(node.pre_handle);
+    const scaleValueValid =
+      field.field !== 'scale_value' ||
+      validateSettingPreprocessScale(String(value), node.pre_handle);
+    const offsetValueValid =
+      field.field !== 'offset_value' ||
+      validateSettingPreprocessOffset(String(value), node.pre_handle);
+    const preprocessValueRequired =
+      (field.field === 'scale_value' && preprocessDefinition?.scaleRequired) ||
+      (field.field === 'offset_value' && preprocessDefinition?.offsetRequired);
+    const fieldValueValid = defaultWriteValueValid && scaleValueValid && offsetValueValid;
     return (
       <label key={field.field}>
         {field.label}
         <input
-          aria-invalid={!defaultWriteValueValid || undefined}
+          aria-invalid={!fieldValueValid || undefined}
+          disabled={fieldDisabled}
           placeholder={
             defaultWriteDefinition ? '必填，支持十进制或 0x 十六进制' : undefined
           }
-          required={Boolean(defaultWriteDefinition)}
+          required={Boolean(defaultWriteDefinition || preprocessValueRequired)}
           value={String(value)}
           onChange={(event) =>
             settingData.updateSettingEditorField(path, field, event.target.value)
@@ -453,6 +488,17 @@ export function SettingDataPage({
         {defaultWriteDefinition ? (
           <span className="setting-editor-field-hint">
             {defaultWriteDefinition.defaultWriteBytes} 字节无符号值，不能为空且不能超出范围
+          </span>
+        ) : null}
+        {field.field === 'scale_value' && node.pre_handle !== 0 ? (
+          <span className="setting-editor-field-hint">
+            {preprocessDefinition?.scaleRequired ? '必填' : '选填'}，整数范围 -32768～32767
+            {preprocessDefinition?.shrinking ? '，缩小模式不能为 0' : ''}
+          </span>
+        ) : null}
+        {field.field === 'offset_value' && node.pre_handle !== 0 ? (
+          <span className="setting-editor-field-hint">
+            {preprocessDefinition?.offsetRequired ? '必填' : '选填'}，支持整数或小数
           </span>
         ) : null}
       </label>

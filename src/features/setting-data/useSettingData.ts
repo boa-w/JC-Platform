@@ -10,6 +10,13 @@ import {
   settingDataTypeUsesBitRange,
 } from './settingDataTypes';
 import {
+  parseSettingPreprocessValue,
+  settingPreprocessByHandle,
+  settingPreprocessByName,
+  settingPreprocessDecimalName,
+  settingPreprocessSelectValue,
+} from './settingPreprocessing';
+import {
   clampSettingColumnWidth,
   collectSettingMenus,
   collectSettingParameters,
@@ -105,15 +112,18 @@ export function useSettingData({
       case 'bit_length':
         return bits.bitLength || field.defaultValue;
       case 'preprocess_label':
-        return node.pre_handle_name ?? field.defaultValue;
+        if (settingPreprocessByHandle(node.pre_handle)) {
+          return settingPreprocessSelectValue(node.pre_handle ?? 0);
+        }
+        return settingPreprocessByName(node.pre_handle_name)
+          ? settingPreprocessSelectValue(settingPreprocessByName(node.pre_handle_name)?.handle ?? 0)
+          : field.defaultValue;
       case 'scale_value':
         return node.pre_handle_scale ?? field.defaultValue;
       case 'offset_value':
         return node.pre_handle_offset ?? field.defaultValue;
       case 'decimals_value':
-        return (
-          node.pre_handle_decimal_name ?? String(node.pre_handle_decimal ?? field.defaultValue)
-        );
+        return node.pre_handle_decimal ?? field.defaultValue;
       default: {
         const rawValue = node[field.field];
         return (rawValue ?? field.defaultValue) as string | number;
@@ -153,7 +163,23 @@ export function useSettingData({
             handle_param: formatHandleParamFromBitRange(current.handle_param, null, value),
           };
         case 'preprocess_label':
-          return { ...current, pre_handle_name: String(value) };
+          {
+            const selection = parseSettingPreprocessValue(value);
+            if (!selection) return current;
+            return {
+              ...current,
+              pre_handle: selection.handle,
+              pre_handle_name: selection.name,
+              ...(selection.handle === 0
+                ? {
+                    pre_handle_scale: '',
+                    pre_handle_offset: '',
+                    pre_handle_decimal: 0,
+                    pre_handle_decimal_name: settingPreprocessDecimalName(0),
+                  }
+                : {}),
+            };
+          }
         case 'scale_value':
           return { ...current, pre_handle_scale: String(value) };
         case 'offset_value':
@@ -162,7 +188,7 @@ export function useSettingData({
           const decimals = parseSettingBitNumber(value, current.pre_handle_decimal ?? 0);
           return {
             ...current,
-            pre_handle_decimal_name: String(value),
+            pre_handle_decimal_name: settingPreprocessDecimalName(decimals) ?? String(decimals),
             pre_handle_decimal: decimals,
           };
         }
@@ -232,6 +258,15 @@ export function useSettingData({
         ),
       }))
       .filter((section) => section.fields.length > 0);
+  }
+
+  function settingEditorFieldDisabled(node: SdoNodeDocument, field: SettingEditorField) {
+    const preprocessDefinition =
+      settingPreprocessByHandle(node.pre_handle) ?? settingPreprocessByName(node.pre_handle_name);
+    return (
+      (preprocessDefinition?.handle ?? 0) === 0 &&
+      ['scale_value', 'offset_value', 'decimals_value'].includes(field.field)
+    );
   }
 
   function addSdoMenu(parentPath: number[]) {
@@ -380,6 +415,7 @@ export function useSettingData({
     settingDrawerCloseRef,
     settingDrawerRef,
     settingEditorFieldValue,
+    settingEditorFieldDisabled,
     settingMenus,
     settingParameters,
     settingSearchQuery,
