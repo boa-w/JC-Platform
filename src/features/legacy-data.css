@@ -426,8 +426,8 @@
 
 .setting-index-radix button[aria-pressed='true'],
 .setting-table-toolbar .setting-index-radix button[aria-pressed='true'] {
-  background: var(--action-primary-subtle);
-  color: var(--action-primary);
+  background: var(--action-primary-solid);
+  color: var(--text-on-accent);
   font-weight: 700;
 }
 
@@ -444,6 +444,14 @@
 .setting-table-toolbar button:hover {
   border-color: var(--action-primary-border);
   color: var(--action-primary);
+}
+
+.setting-index-radix button[aria-pressed='true']:hover,
+.setting-index-radix button[aria-pressed='true']:focus-visible,
+.setting-table-toolbar .setting-index-radix button[aria-pressed='true']:hover,
+.setting-table-toolbar .setting-index-radix button[aria-pressed='true']:focus-visible {
+  background: var(--action-primary-solid-hover);
+  color: var(--text-on-accent);
 }
 
 .setting-table-toolbar button.danger {
