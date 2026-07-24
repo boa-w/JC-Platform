@@ -6,6 +6,10 @@ import { removeStorageItem } from '../../utils/safeStorage';
 import { settingColumnWidthStorageKey, settingEditorSections } from './config';
 import type { SdoNodeField, SettingEditorField, SettingParameterColumn } from './types';
 import {
+  settingDataTypeIsDefaultWrite,
+  settingDataTypeUsesBitRange,
+} from './settingDataTypes';
+import {
   clampSettingColumnWidth,
   collectSettingMenus,
   collectSettingParameters,
@@ -133,6 +137,9 @@ export function useSettingData({
             ...current,
             handle_name: selection.label,
             ...(selection.handle === undefined ? {} : { handle: selection.handle }),
+            ...(settingDataTypeIsDefaultWrite(selection.handle)
+              ? { control_use_default: 0 }
+              : {}),
           };
         }
         case 'bit_start':
@@ -217,9 +224,11 @@ export function useSettingData({
         ...section,
         fields: section.fields.filter(
           (field) =>
-            field.visibleFor === undefined ||
-            field.visibleFor === 'all' ||
-            field.visibleFor === nodeKind,
+            (field.visibleFor === undefined ||
+              field.visibleFor === 'all' ||
+              field.visibleFor === nodeKind) &&
+            (!['bit_start', 'bit_length'].includes(field.field) ||
+              settingDataTypeUsesBitRange(node.handle)),
         ),
       }))
       .filter((section) => section.fields.length > 0);

@@ -4,6 +4,7 @@ import type {
   SettingEditorSection,
   SettingParameterColumn,
 } from './types';
+import { settingDataTypeDefinitions } from './settingDataTypes';
 
 export const settingColumnWidthStorageKey = 'jc-custom-platform.settingData.columnWidths';
 export const settingColumnPresetStorageKey = 'jc-custom-platform.settingData.columnPreset';
@@ -130,16 +131,12 @@ export const sdoBooleanOptions: SettingEditorOption[] = [
   { value: 1, label: '是' },
 ];
 
-export const sdoDataTypeOptions: SettingEditorOption[] = [
-  { value: 'u8:0', label: 'u8 (handle=0)' },
-  { value: 'u16:2', label: 'u16 (handle=2)' },
-  { value: 'u16:3', label: 'u16 (handle=3)' },
-  { value: 'u32:4', label: 'u32 (handle=4)' },
-  { value: 'u32:7', label: 'u32 (handle=7)' },
-  { value: 'string:6', label: 'string (handle=6)' },
-  { value: 'bit:11', label: 'bit (handle=11)' },
-  { value: 'bit:12', label: 'bit (handle=12)' },
-];
+export const sdoDataTypeOptions: SettingEditorOption[] = settingDataTypeDefinitions.map(
+  (definition) => ({
+    value: `${definition.name}:${definition.handle}`,
+    label: `${definition.name} (handle=${definition.handle})`,
+  }),
+);
 
 export const settingEditorSections: SettingEditorSection[] = [
   {

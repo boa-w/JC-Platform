@@ -20,6 +20,12 @@ import type {
 import { useSettingData } from './useSettingData';
 import { formatCommunicationIndex, parseCommunicationIndex } from './communicationIndex';
 import {
+  parseSettingDataTypeValue,
+  settingDataTypeByHandle,
+  settingDataTypeIsDefaultWrite,
+  validateDefaultWriteValue,
+} from './settingDataTypes';
+import {
   formatSettingPath,
   isSameOrDescendantPath,
   optionsWithCurrentValue,
@@ -379,6 +385,8 @@ export function SettingDataPage({
     }
     if (field.kind === 'select') {
       const options = optionsWithCurrentValue(field.options ?? [], value);
+      const dataTypeDefinition =
+        field.field === 'data_type_label' ? parseSettingDataTypeValue(value) : null;
       return (
         <label key={field.field}>
           {field.label}
@@ -400,6 +408,11 @@ export function SettingDataPage({
               </option>
             ))}
           </select>
+          {dataTypeDefinition ? (
+            <span className="setting-editor-field-hint">
+              {dataTypeDefinition.description} · 配置写入 handle={dataTypeDefinition.handle}
+            </span>
+          ) : null}
         </label>
       );
     }
@@ -417,15 +430,31 @@ export function SettingDataPage({
         </label>
       );
     }
+    const defaultWriteDefinition =
+      field.field === 'data_default' && settingDataTypeIsDefaultWrite(node.handle)
+        ? settingDataTypeByHandle(node.handle)
+        : null;
+    const defaultWriteValueValid =
+      !defaultWriteDefinition || validateDefaultWriteValue(String(value), node.handle);
     return (
       <label key={field.field}>
         {field.label}
         <input
+          aria-invalid={!defaultWriteValueValid || undefined}
+          placeholder={
+            defaultWriteDefinition ? '必填，支持十进制或 0x 十六进制' : undefined
+          }
+          required={Boolean(defaultWriteDefinition)}
           value={String(value)}
           onChange={(event) =>
             settingData.updateSettingEditorField(path, field, event.target.value)
           }
         />
+        {defaultWriteDefinition ? (
+          <span className="setting-editor-field-hint">
+            {defaultWriteDefinition.defaultWriteBytes} 字节无符号值，不能为空且不能超出范围
+          </span>
+        ) : null}
       </label>
     );
   }

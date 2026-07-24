@@ -13,6 +13,12 @@ import type {
   SettingParameterRow,
 } from './types';
 import { formatCommunicationIndex } from './communicationIndex';
+import {
+  parseSettingDataTypeValue,
+  settingDataTypeByHandle,
+  settingDataTypeByName,
+  settingDataTypeSelectValue as canonicalSettingDataTypeSelectValue,
+} from './settingDataTypes';
 
 export function sdoNodeDocumentPath(path: number[]): JsonPath {
   const segments: JsonPath = ['sdo_info'];
@@ -67,6 +73,8 @@ export function sdoProtocolLabel(value?: number) {
 }
 
 export function settingDataTypeLabel(node: SdoNodeDocument) {
+  const canonicalType = settingDataTypeByHandle(node.handle);
+  if (canonicalType) return canonicalType.name;
   const explicitType = [
     node.handle_name,
     typeof node.data_type === 'string' ? node.data_type : undefined,
@@ -81,29 +89,12 @@ export function settingDataTypeLabel(node: SdoNodeDocument) {
 }
 
 export function settingDataTypeBaseLabel(handle?: number) {
-  switch (handle) {
-    case 0:
-      return 'u8';
-    case 2:
-    case 3:
-      return 'u16';
-    case 4:
-    case 7:
-      return 'u32';
-    case 6:
-      return 'string';
-    case 11:
-    case 12:
-      return 'bit';
-    default:
-      return '';
-  }
+  return settingDataTypeByHandle(handle)?.name ?? '';
 }
 
 export function settingDataTypeSelectValue(node: SdoNodeDocument) {
-  if (typeof node.handle === 'number') {
-    const base = settingDataTypeBaseLabel(node.handle);
-    if (base) return `${base}:${node.handle}`;
+  if (typeof node.handle === 'number' && settingDataTypeByHandle(node.handle)) {
+    return canonicalSettingDataTypeSelectValue(node.handle);
   }
   const explicit = [
     node.handle_name,
@@ -112,16 +103,18 @@ export function settingDataTypeSelectValue(node: SdoNodeDocument) {
   ]
     .find((item) => item?.trim())
     ?.trim();
-  return explicit || 'u8:0';
+  const explicitDefinition = settingDataTypeByName(explicit);
+  return explicitDefinition
+    ? canonicalSettingDataTypeSelectValue(explicitDefinition.handle)
+    : explicit || 'u8:0';
 }
 
 export function parseSettingDataTypeSelection(value: string | number) {
-  const text = String(value);
-  const [label, handleText] = text.split(':');
-  const handle = Number.parseInt(handleText ?? '', 10);
+  const definition = parseSettingDataTypeValue(value);
+  const text = String(value).trim();
   return {
-    label: label.trim() || text.trim(),
-    handle: Number.isFinite(handle) ? handle : undefined,
+    label: definition?.name ?? text.split(':')[0]?.trim() ?? text,
+    handle: definition?.handle,
   };
 }
 

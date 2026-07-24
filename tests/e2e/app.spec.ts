@@ -304,6 +304,15 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await parameterDialog.getByLabel('MID').fill('0x2003');
   await parameterDialog.getByLabel('MID').blur();
   await expect(parameterDialog.getByLabel('MID')).toHaveValue('0x2003');
+  const dataTypeSelect = parameterDialog.getByLabel('数据类型');
+  await dataTypeSelect.selectOption('s16:3');
+  await expect(parameterDialog.getByText('配置写入 handle=3', { exact: false })).toBeVisible();
+  await expect(parameterDialog.getByLabel('bit开始位置')).toHaveCount(0);
+  await expect(parameterDialog.getByLabel('bit长度')).toHaveCount(0);
+  await dataTypeSelect.selectOption('bits_4字节:10');
+  await expect(parameterDialog.getByLabel('bit开始位置')).toBeVisible();
+  await expect(parameterDialog.getByLabel('bit长度')).toBeVisible();
+  await dataTypeSelect.selectOption('s16:3');
   await parameterDialog.getByLabel('名称').fill('最大车速');
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
@@ -396,12 +405,32 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
         (
           window as unknown as {
             __SAVED_PROJECT_DOCUMENT__: {
-              sdo_info?: { children?: Array<{ children?: Array<{ name?: string }> }> };
+              sdo_info?: {
+                children?: Array<{
+                  children?: Array<{ name?: string; handle?: number; handle_name?: string }>;
+                }>;
+              };
             };
           }
         ).__SAVED_PROJECT_DOCUMENT__?.sdo_info?.children?.[0]?.children?.[0]?.name,
     ),
   ).toBe('最大车速');
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __SAVED_PROJECT_DOCUMENT__: {
+              sdo_info?: {
+                children?: Array<{
+                  children?: Array<{ handle?: number; handle_name?: string }>;
+                }>;
+              };
+            };
+          }
+        ).__SAVED_PROJECT_DOCUMENT__?.sdo_info?.children?.[0]?.children?.[0],
+    ),
+  ).toMatchObject({ handle: 3, handle_name: 's16' });
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
   ).toBeDisabled();
