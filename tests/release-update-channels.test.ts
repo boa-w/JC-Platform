@@ -66,6 +66,31 @@ test('selects the matching updater config in the release workflow', () => {
   );
 });
 
+test('runs independent quality checks in parallel before the build', () => {
+  const workflow = readFileSync('.github/workflows/build.yml', 'utf8');
+  assert.match(workflow, /^ {2}frontend_quality:/m);
+  assert.match(workflow, /^ {2}rust_quality:/m);
+  assert.match(workflow, /^ {2}ui_quality:/m);
+  assert.match(
+    workflow,
+    /quality:\n {4}name: Quality gate\n {4}needs:\n {6}- frontend_quality\n {6}- rust_quality\n {6}- ui_quality\n {4}if: always\(\)/,
+  );
+  assert.match(
+    workflow,
+    /- name: Verify frontend\n {8}run: npm run lint && npm run test:frontend && npm run build/,
+  );
+  assert.match(
+    workflow,
+    /- name: Test Rust\n {8}run: cargo test --manifest-path src-tauri\/Cargo.toml/,
+  );
+  assert.match(workflow, /- name: Run UI tests\n {8}run: npm run test:e2e/);
+  assert.doesNotMatch(workflow, /run: npm run verify$/m);
+  assert.match(
+    workflow,
+    /build:\n {4}name: Build \(\$\{\{ matrix\.label \}\}\)\n {4}needs:\n {6}- quality/,
+  );
+});
+
 test('smoke tests bundled installers before publishing artifacts', () => {
   const workflow = readFileSync('.github/workflows/build.yml', 'utf8');
   const buildStep = workflow.slice(

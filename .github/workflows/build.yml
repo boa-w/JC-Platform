@@ -22,8 +22,45 @@ env:
   NIGHTLY_TAG: nightly
 
 jobs:
-  quality:
-    name: Quality gate
+  frontend_quality:
+    name: Frontend quality
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Verify frontend
+        run: npm run lint && npm run test:frontend && npm run build
+
+  rust_quality:
+    name: Rust quality
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Test Rust
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  ui_quality:
+    name: UI quality
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -35,22 +72,14 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-
       - name: Install frontend dependencies
         run: npm ci
 
       - name: Install browser for UI tests
         run: npx playwright install chromium
 
-      - name: Verify application
-        run: npm run verify
+      - name: Run UI tests
+        run: npm run test:e2e
 
       - name: Upload UI test diagnostics
         if: failure()
@@ -62,6 +91,27 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  quality:
+    name: Quality gate
+    needs:
+      - frontend_quality
+      - rust_quality
+      - ui_quality
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Require every quality check
+        env:
+          FRONTEND_RESULT: ${{ needs.frontend_quality.result }}
+          RUST_RESULT: ${{ needs.rust_quality.result }}
+          UI_RESULT: ${{ needs.ui_quality.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$FRONTEND_RESULT" = "success"
+          test "$RUST_RESULT" = "success"
+          test "$UI_RESULT" = "success"
 
   prepare-nightly:
     name: Prepare nightly release
