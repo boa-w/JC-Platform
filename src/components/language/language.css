@@ -726,7 +726,9 @@
 
 .lang-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13px;
 }
 
@@ -744,8 +746,8 @@
 }
 
 .lang-table-th-key {
-  width: 180px;
-  min-width: 140px;
+  width: 200px;
+  min-width: 0;
 }
 
 .lang-table-th-select {
@@ -760,11 +762,11 @@
 }
 
 .lang-table-th-source {
-  width: 200px;
+  width: 220px;
 }
 
 .lang-table-th-target {
-  width: 200px;
+  width: 220px;
 }
 
 .lang-table-th-actions {
@@ -772,6 +774,7 @@
 }
 
 .lang-table td {
+  min-width: 0;
   border-bottom: 1px solid var(--border-subtle);
   padding: 6px 12px;
   vertical-align: middle;
@@ -788,6 +791,8 @@
 }
 
 .lang-table-cell-key {
+  width: 200px;
+  min-width: 0;
   max-width: 200px;
 }
 
@@ -812,6 +817,7 @@
 .lang-table-key-text {
   display: block;
   width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   font-family: var(--font-mono);
@@ -821,6 +827,9 @@
   padding: 2px 4px;
   border-radius: 3px;
   text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   transition: background 0.1s;
 }
 
@@ -1163,7 +1172,9 @@
 
 .lang-comparison-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 13px;
 }
 
@@ -1187,15 +1198,16 @@
 }
 
 .lang-comparison-th-key {
-  width: 160px;
-  min-width: 120px;
+  width: 200px;
+  min-width: 0;
   font-weight: 600;
   color: var(--text-secondary);
   font-size: 12px;
 }
 
 .lang-comparison-table .lang-comparison-th-lang {
-  min-width: 140px;
+  width: 160px;
+  min-width: 0;
   padding: 8px 12px;
 }
 
@@ -1218,6 +1230,7 @@
 }
 
 .lang-comparison-table td {
+  min-width: 0;
   border-bottom: 1px solid var(--border-subtle);
   padding: 6px 12px;
   vertical-align: middle;
@@ -1234,7 +1247,9 @@
 }
 
 .lang-comparison-cell-key {
-  max-width: 180px;
+  width: 200px;
+  min-width: 0;
+  max-width: 200px;
 }
 
 .lang-comparison-cell-index {
@@ -1246,6 +1261,9 @@
 }
 
 .lang-comparison-key-text {
+  display: block;
+  width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   font-family: var(--font-mono);
@@ -1255,6 +1273,9 @@
   padding: 2px 4px;
   border-radius: 3px;
   text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   transition: background 0.1s;
 }
 
@@ -1290,7 +1311,7 @@
 
 .lang-comparison-cell {
   cursor: pointer;
-  min-width: 120px;
+  min-width: 0;
 }
 
 .lang-comparison-table td.lang-comparison-cell:hover {
@@ -1300,6 +1321,7 @@
 .lang-comparison-value {
   display: block;
   width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   font-size: 13px;
@@ -1309,6 +1331,9 @@
   min-height: 24px;
   text-align: left;
   cursor: pointer;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .lang-comparison-cell--empty .lang-comparison-value {

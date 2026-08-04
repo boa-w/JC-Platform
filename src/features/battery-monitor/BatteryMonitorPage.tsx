@@ -25,6 +25,22 @@ const valueTypeOptions = [
   ['datetime', '日期时间'],
 ] as const;
 
+const batterySignalHeaders = [
+  ['signal_key', '信号标识'],
+  ['param_id', '参数标识'],
+  ['名称', '信号名称'],
+  ['帧', '所属 CAN 帧'],
+  ['pos / len', '起始位 / 位长度'],
+  ['raw offset', '原始字节偏移'],
+  ['raw type', '原始数据类型'],
+  ['value type', '解析值类型'],
+  ['字节序', '数据字节序'],
+  ['resolution', '解析倍率'],
+  ['offset', '解析偏移'],
+  ['mask', '位掩码'],
+  ['shift', '位移'],
+] as const;
+
 const formatterOptions = [
   ['linear', '线性'],
   ['bool_text', '布尔文本'],
@@ -384,23 +400,16 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
               </button>
             </div>
             <div className="config-table-frame">
-              <table className="config-table">
+              <table className="config-table battery-monitor-signal-table">
                 <thead>
                   <tr>
-                    <th>signal_key</th>
-                    <th>param_id</th>
-                    <th>名称</th>
-                    <th>帧</th>
-                    <th>pos / len</th>
-                    <th>raw offset</th>
-                    <th>raw type</th>
-                    <th>value type</th>
-                    <th>字节序</th>
-                    <th>resolution</th>
-                    <th>offset</th>
-                    <th>mask</th>
-                    <th>shift</th>
-                    <th>操作</th>
+                    {batterySignalHeaders.map(([key, label]) => (
+                      <th key={key} scope="col">
+                        <span className="battery-signal-header-code">{key}</span>
+                        <span className="battery-signal-header-label">{label}</span>
+                      </th>
+                    ))}
+                    <th scope="col">操作</th>
                   </tr>
                 </thead>
                 <tbody>

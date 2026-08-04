@@ -105,6 +105,76 @@ test('formats the loaded jcpro file from project management', async ({ page }) =
   expect(JSON.parse(formattedFile?.content ?? '{}')).toMatchObject({ config_version: 'jc001' });
 });
 
+test('keeps protocol field explanations and long language keys readable', async ({ page }) => {
+  await openRichProject(page);
+
+  await page.getByRole('button', { name: '协议', exact: true }).click();
+  const protocolNavigation = page.getByRole('navigation', { name: '协议 功能' });
+  await protocolNavigation.getByRole('button', { name: '锂电监控协议', exact: true }).click();
+  const batteryMain = page.getByRole('main', { name: '锂电监控协议' });
+  const signalHeader = batteryMain
+    .locator('.battery-monitor-signal-table th')
+    .filter({ hasText: 'signal_key' });
+  await expect(signalHeader).toContainText('信号标识');
+  await expect(signalHeader.locator('.battery-signal-header-code')).toHaveText('signal_key');
+  await expect(signalHeader.locator('.battery-signal-header-label')).toHaveText('信号标识');
+
+  await page.getByRole('button', { name: '多国语言', exact: true }).click();
+  const longKey = 'battery_monitor.signal_with_an_intentionally_long_translation_key';
+  await page.getByLabel('新增翻译键').fill(longKey);
+  await page.getByRole('button', { name: '添加键', exact: true }).click();
+  const translationRow = page.locator('.lang-table tbody tr').filter({ hasText: longKey });
+  await expect(translationRow).toBeVisible();
+
+  const editorLayout = await translationRow.evaluate((element) => {
+    const keyCell = element.querySelector<HTMLElement>('.lang-table-cell-key');
+    const sourceCell = element.querySelector<HTMLElement>('.lang-table-cell-source');
+    const keyText = element.querySelector<HTMLElement>('.lang-table-key-text');
+    const keyRect = keyCell?.getBoundingClientRect();
+    const sourceRect = sourceCell?.getBoundingClientRect();
+    const style = keyText ? getComputedStyle(keyText) : null;
+    return {
+      keyWidth: keyRect?.width ?? 0,
+      keyRight: keyRect?.right ?? 0,
+      sourceLeft: sourceRect?.left ?? 0,
+      sourceWidth: sourceRect?.width ?? 0,
+      keyHeight: keyText?.getBoundingClientRect().height ?? 0,
+      whiteSpace: style?.whiteSpace,
+      overflowWrap: style?.overflowWrap,
+    };
+  });
+  expect(editorLayout.keyWidth).toBeLessThan(260);
+  expect(editorLayout.sourceWidth).toBeGreaterThan(0);
+  expect(editorLayout.keyRight).toBeLessThanOrEqual(editorLayout.sourceLeft);
+  expect(editorLayout.keyHeight).toBeGreaterThan(24);
+  expect(editorLayout.whiteSpace).toBe('normal');
+  expect(editorLayout.overflowWrap).toBe('anywhere');
+
+  await page.getByRole('button', { name: '全语言对比', exact: true }).click();
+  const comparisonRow = page
+    .locator('.lang-comparison-table tbody tr')
+    .filter({ hasText: longKey });
+  await expect(comparisonRow).toBeVisible();
+  const comparisonLayout = await comparisonRow.evaluate((element) => {
+    const keyCell = element.querySelector<HTMLElement>('.lang-comparison-cell-key');
+    const translationCell = element.querySelector<HTMLElement>('.lang-comparison-cell');
+    const keyText = element.querySelector<HTMLElement>('.lang-comparison-key-text');
+    const keyRect = keyCell?.getBoundingClientRect();
+    const translationRect = translationCell?.getBoundingClientRect();
+    return {
+      keyWidth: keyRect?.width ?? 0,
+      keyRight: keyRect?.right ?? 0,
+      translationLeft: translationRect?.left ?? 0,
+      translationWidth: translationRect?.width ?? 0,
+      keyHeight: keyText?.getBoundingClientRect().height ?? 0,
+    };
+  });
+  expect(comparisonLayout.keyWidth).toBeLessThan(260);
+  expect(comparisonLayout.translationWidth).toBeGreaterThan(0);
+  expect(comparisonLayout.keyRight).toBeLessThanOrEqual(comparisonLayout.translationLeft);
+  expect(comparisonLayout.keyHeight).toBeGreaterThan(24);
+});
+
 test('meets the serious accessibility baseline across primary surfaces', async ({ page }) => {
   test.setTimeout(60_000);
   await expectNoSeriousAccessibilityViolations(page, '默认工作区');

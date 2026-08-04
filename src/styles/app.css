@@ -3346,6 +3346,38 @@ button.git-summary-row:disabled,
   gap: 8px;
 }
 
+.battery-monitor-signal-table {
+  min-width: 1480px;
+  table-layout: fixed;
+}
+
+.battery-monitor-signal-table th {
+  white-space: normal;
+  text-transform: none;
+  line-height: 1.25;
+}
+
+.battery-signal-header-code,
+.battery-signal-header-label {
+  display: block;
+}
+
+.battery-signal-header-code {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.battery-signal-header-label {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .battery-config-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
