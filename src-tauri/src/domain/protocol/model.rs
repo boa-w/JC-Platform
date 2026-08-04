@@ -2,6 +2,7 @@
 //!
 //! 本模块只保存跨协议共享的数据结构，不读取项目 JSON，也不执行 legacy 兼容投影。
 
+use super::battery_monitor::BatteryMonitorProtocol;
 use crate::domain::private_protocol::PrivateProtocolDocument;
 use crate::domain::signal::{SignalDictionary, SignalId};
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,7 @@ use serde_json::Value;
 pub struct UnifiedProtocolModel {
     pub signal_dictionary: SignalDictionary,
     pub canopen: CanOpenTransport,
+    pub battery_monitor: BatteryMonitorProtocol,
     pub private_protocol: PrivateProtocolDocument,
     pub mappings: Vec<ProtocolMapping>,
     pub validation: ProtocolValidationReport,

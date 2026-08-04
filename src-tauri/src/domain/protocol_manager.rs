@@ -33,7 +33,7 @@ mod tests {
             "pdo_recv": [{ "id": 0x201, "type": 0, "desc": "recv", "data": [{ "param_id": "BATTERY_VOLTAGE", "pos": 0, "len": 16, "show_type": 0, "handle": 0, "handle_param": "" }] }],
             "pdo_send": [],
             "sdo_info": { "type": 0, "name": "root", "children": [{ "type": 1, "name": "参数A", "fid": 1, "mid": 0x2000, "sid": 1, "control_rw": 1, "handle_name": "u8" }] },
-            "battery_monitor_info": { "enabled": false }
+            "battery_monitor": { "enabled": false }
         });
 
         let model = build_unified_protocol_model(&document);
@@ -53,7 +53,7 @@ mod tests {
             "signal_dictionary": { "signals": [{ "signal_id": "A", "name": "A" }] },
             "pdo_recv": [{ "id": 1, "type": 0, "desc": "", "data": [{ "param_id": "A", "pos": 63, "len": 2, "show_type": 0, "handle": 0, "handle_param": "" }] }],
             "pdo_send": [],
-            "battery_monitor_info": { "enabled": false }
+            "battery_monitor": { "enabled": false }
         });
 
         let model = build_unified_protocol_model(&document);
@@ -76,7 +76,7 @@ mod tests {
                 "signal_id": "A",
                 "target": { "kind": "can_open_pdo", "direction": "receive", "frame_id": 0x202, "bit_offset": 16, "bit_length": 16 }
             }],
-            "battery_monitor_info": { "enabled": false }
+            "battery_monitor": { "enabled": false }
         });
 
         let model = build_unified_protocol_model(&document);
@@ -103,7 +103,7 @@ mod tests {
                 "signal_id": "A",
                 "target": { "kind": "can_open_pdo", "direction": "receive", "frame_id": 0x202, "bit_offset": 8, "bit_length": 16 }
             }],
-            "battery_monitor_info": { "enabled": false }
+            "battery_monitor": { "enabled": false }
         });
 
         let report = flatten_unified_protocol_to_legacy(document);
@@ -133,7 +133,7 @@ mod tests {
             "sdo_info": { "type": 0, "name": "root", "children": [] },
             "pdo_simple_send_recv": { "pdo_recv": [{ "id": 1 }], "pdo_send": [] },
             "private_protocol": { "enabled": true, "frames": [] },
-            "battery_monitor_info": { "enabled": false }
+            "battery_monitor": { "enabled": false }
         });
 
         let report = flatten_unified_protocol_to_legacy(document.clone());
@@ -153,8 +153,8 @@ mod tests {
             document["private_protocol"]
         );
         assert_eq!(
-            report.document["battery_monitor_info"],
-            document["battery_monitor_info"]
+            report.document["battery_monitor"],
+            document["battery_monitor"]
         );
     }
 }

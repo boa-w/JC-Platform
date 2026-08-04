@@ -7,6 +7,7 @@ import { basicSetup } from 'codemirror';
 import { Braces, Pencil, Save } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { GitWorktreeFileContent } from '../../types/platform';
+import { formatJsonText } from '../../utils/jsonFormat';
 import { lineDiffChanges } from './lineDiff';
 
 interface GitWorktreeDiffEditorProps {
@@ -125,7 +126,7 @@ export function GitWorktreeDiffEditor({
     const view = mergeRef.current?.b;
     if (!view) return;
     try {
-      const formatted = `${JSON.stringify(JSON.parse(view.state.doc.toString()), null, 2)}\n`;
+      const formatted = formatJsonText(view.state.doc.toString());
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: formatted } });
       setFormatError(null);
     } catch (cause) {

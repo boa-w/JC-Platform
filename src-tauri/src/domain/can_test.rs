@@ -576,7 +576,7 @@ fn extract_pdo_frame(
 fn battery_item_map(document: &Value) -> HashMap<String, (String, f64, i32, i32)> {
     let mut map = HashMap::new();
     if let Some(items) = document
-        .get("battery_monitor_info")
+        .get("battery_monitor")
         .and_then(|v| v.get("items"))
         .and_then(|v| v.as_array())
     {
@@ -601,20 +601,17 @@ fn battery_item_map(document: &Value) -> HashMap<String, (String, f64, i32, i32)
     map
 }
 
-fn collect_battery_protocol_frames(document: &Value, warnings: &mut Vec<String>) -> Vec<FrameSpec> {
-    let Some(protocol) = document.get("battery_protocol") else {
+fn collect_battery_monitor_frames(document: &Value, warnings: &mut Vec<String>) -> Vec<FrameSpec> {
+    let Some(monitor) = document.get("battery_monitor") else {
         return Vec::new();
     };
-    collect_battery_frames_from_section(protocol, "锂电协议", &battery_item_map(document), warnings)
-}
-
-fn collect_legacy_battery_monitor_frames(
-    document: &Value,
-    warnings: &mut Vec<String>,
-) -> Vec<FrameSpec> {
-    let Some(monitor) = document.get("battery_monitor_info") else {
+    if !monitor
+        .get("enabled")
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+    {
         return Vec::new();
-    };
+    }
     collect_battery_frames_from_section(monitor, "锂电监控", &battery_item_map(document), warnings)
 }
 
@@ -661,11 +658,11 @@ fn collect_battery_frames_from_section(
                 }
                 let (mapped_unit, mapped_offset, mapped_num, mapped_den) =
                     item_map.get(&key).cloned().unwrap_or_default();
-                let scale_num = object_f64(sig, "factor")
+                let scale_num = object_f64(sig, "parse_resolution")
                     .map(|v| (v * 1000.0).round() as i32)
                     .filter(|v| *v != 0)
                     .unwrap_or(mapped_num.max(1));
-                let scale_den = if object_f64(sig, "factor").is_some() {
+                let scale_den = if object_f64(sig, "parse_resolution").is_some() {
                     1000
                 } else {
                     mapped_den.max(1)
@@ -681,15 +678,15 @@ fn collect_battery_frames_from_section(
                     len,
                     scale_num,
                     scale_den,
-                    offset: object_f64(sig, "offset").unwrap_or(mapped_offset),
-                    min_value: object_f64(sig, "min"),
-                    max_value: object_f64(sig, "max"),
+                    offset: object_f64(sig, "parse_offset").unwrap_or(mapped_offset),
+                    min_value: None,
+                    max_value: None,
                     source: label.to_string(),
                 });
             }
             frames.push(FrameSpec {
                 id,
-                frame_type: object_u8(frame, "type", 0),
+                frame_type: object_u8(frame, "frame_type", 0),
                 name,
                 cycle_ms: object_u32(frame, "cycle_ms")
                     .or_else(|| object_u32(frame, "timeout_ticks"))
@@ -706,8 +703,7 @@ fn collect_battery_frames_from_section(
 fn collect_frame_specs(document: &Value, warnings: &mut Vec<String>) -> Vec<FrameSpec> {
     let dictionary = collect_signal_dictionary(document);
     let mut frames = collect_pdo_frames(document, &dictionary, warnings);
-    frames.extend(collect_battery_protocol_frames(document, warnings));
-    frames.extend(collect_legacy_battery_monitor_frames(document, warnings));
+    frames.extend(collect_battery_monitor_frames(document, warnings));
 
     let mut seen = HashSet::new();
     for frame in &frames {

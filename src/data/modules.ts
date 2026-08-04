@@ -48,18 +48,9 @@ export const featureModules: FeatureModule[] = [
     description: '负责设备分辨率画布、图标/动画资源、属性编辑、选项增删和资源导出路径维护。',
   },
   {
-    key: 'battery-protocol',
-    title: '锂电协议',
-    description: '负责锂电监控 CAN 帧定义、信号布局、数据类型和超时策略。',
-    lifecycle: 'experimental-deprecated',
-    lifecycleReason: '锂电行业定制实验功能，后续建议迁移到通用 CANOpen/DBC 扩展机制。',
-  },
-  {
     key: 'battery-monitor',
-    title: '锂电监控显示',
-    description: '负责锂电显示项配置：信号选取、单位、格式、精度和有效性策略。',
-    lifecycle: 'experimental-deprecated',
-    lifecycleReason: '依赖锂电协议扩展，仅保留兼容用途，后续将与核心 CANOpen 配置解耦。',
+    title: '锂电监控协议',
+    description: '统一维护锂电监控 CAN 帧、信号解析、页面显示项、超时策略和多语言名称。',
   },
   {
     key: 'fault-code',

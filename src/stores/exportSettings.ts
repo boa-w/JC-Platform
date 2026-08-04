@@ -5,11 +5,7 @@ import { getStorageItem, setStorageItem } from '../utils/safeStorage';
 const STORAGE_KEY = 'jc-platform.export.battery-options';
 
 export const defaultExportBatteryOptions: ExportBatteryOptions = {
-  battery_protocol: {
-    config: false,
-    bin: false,
-  },
-  battery_monitor_info: {
+  battery_monitor: {
     config: true,
     bin: true,
   },
@@ -32,21 +28,16 @@ function boolOrDefault(value: unknown, fallback: boolean) {
 
 function normalizeExportBatteryOptions(value: unknown): ExportBatteryOptions {
   const root = isRecord(value) ? value : {};
-  const protocol = isRecord(root.battery_protocol) ? root.battery_protocol : {};
-  const monitor = isRecord(root.battery_monitor_info) ? root.battery_monitor_info : {};
+  const monitor = isRecord(root.battery_monitor) ? root.battery_monitor : {};
   const faultCode = isRecord(root.fault_code_info) ? root.fault_code_info : {};
 
   return {
-    battery_protocol: {
-      config: boolOrDefault(protocol.config, defaultExportBatteryOptions.battery_protocol.config),
-      bin: boolOrDefault(protocol.bin, defaultExportBatteryOptions.battery_protocol.bin),
-    },
-    battery_monitor_info: {
+    battery_monitor: {
       config: boolOrDefault(
         monitor.config,
-        defaultExportBatteryOptions.battery_monitor_info.config,
+        defaultExportBatteryOptions.battery_monitor.config,
       ),
-      bin: boolOrDefault(monitor.bin, defaultExportBatteryOptions.battery_monitor_info.bin),
+      bin: boolOrDefault(monitor.bin, defaultExportBatteryOptions.battery_monitor.bin),
     },
     fault_code_info: {
       config: boolOrDefault(faultCode.config, defaultExportBatteryOptions.fault_code_info.config),

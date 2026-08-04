@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
+import { Braces } from 'lucide-react';
 import type {
   GitProjectStatus,
   GitRevision,
@@ -50,6 +51,8 @@ interface ProjectManagementPageProps {
   handleMigrateProject: () => void | Promise<void>;
   handleMountRefactorConfig: () => void | Promise<void>;
   handleCreateRefactorConfig: () => void | Promise<void>;
+  handleFormatJcproFile: () => void | Promise<void>;
+  isFormattingJcpro: boolean;
   refreshProjectGit: () => void | Promise<void>;
   handleCommitProjectVersion: () => void | Promise<void>;
   handlePreviewProjectVersion: (revision: GitRevision) => void | Promise<void>;
@@ -93,10 +96,14 @@ export function ProjectManagementPage({
   handleMigrateProject,
   handleMountRefactorConfig,
   handleCreateRefactorConfig,
+  handleFormatJcproFile,
+  isFormattingJcpro,
   refreshProjectGit,
   handleCommitProjectVersion,
   handlePreviewProjectVersion,
 }: ProjectManagementPageProps) {
+  const projectBusy = isOpening || isFormattingJcpro;
+
   return (
     <section className="project-page">
       {/* Open project */}
@@ -109,6 +116,7 @@ export function ProjectManagementPage({
           <input
             aria-label="项目文件路径"
             className="project-open-input"
+            disabled={projectBusy}
             placeholder="输入或粘贴 .jcpro 文件路径"
             value={projectPath}
             onChange={(event) => setProjectPath(event.target.value)}
@@ -121,7 +129,7 @@ export function ProjectManagementPage({
               className="project-open-btn"
               type="button"
               onClick={() => void handleSelectProjectFile()}
-              disabled={isOpening}
+              disabled={projectBusy}
             >
               {isOpening ? '打开中...' : '浏览'}
             </button>
@@ -129,7 +137,7 @@ export function ProjectManagementPage({
               className="project-open-btn project-open-btn--secondary"
               type="button"
               onClick={() => void handleOpenProject()}
-              disabled={isOpening || projectPath.trim() === ''}
+              disabled={projectBusy || projectPath.trim() === ''}
             >
               打开
             </button>
@@ -162,7 +170,7 @@ export function ProjectManagementPage({
               className="project-recent-select"
               value={selectedRecentProjectPath}
               onChange={(event) => setProjectPath(event.target.value)}
-              disabled={isOpening}
+              disabled={projectBusy}
               title={selectedRecentProjectPath || '选择最近项目'}
             >
               <option value="" disabled>
@@ -179,7 +187,7 @@ export function ProjectManagementPage({
                 className="project-open-btn project-open-btn--secondary"
                 type="button"
                 onClick={() => void handleOpenProject(selectedRecentProjectPath)}
-                disabled={isOpening || selectedRecentProjectPath === ''}
+                disabled={projectBusy || selectedRecentProjectPath === ''}
               >
                 打开项目
               </button>
@@ -187,7 +195,7 @@ export function ProjectManagementPage({
                 className="project-open-btn project-open-btn--secondary"
                 type="button"
                 onClick={() => removeRecentProject(selectedRecentProjectPath)}
-                disabled={isOpening || selectedRecentProjectPath === ''}
+                disabled={projectBusy || selectedRecentProjectPath === ''}
               >
                 移除
               </button>
@@ -232,7 +240,7 @@ export function ProjectManagementPage({
             </div>
             <button
               className="project-open-btn"
-              disabled={isOpening || newProjectName.trim() === ''}
+              disabled={projectBusy || newProjectName.trim() === ''}
               onClick={() => void handleCreateProject()}
               type="button"
             >
@@ -250,7 +258,7 @@ export function ProjectManagementPage({
             <div className="project-info-actions">
               <button
                 className="project-link-btn"
-                disabled={isOpening}
+                disabled={projectBusy}
                 onClick={() => void handleParseProject()}
                 type="button"
               >
@@ -258,7 +266,7 @@ export function ProjectManagementPage({
               </button>
               <button
                 className="project-link-btn"
-                disabled={isOpening}
+                disabled={projectBusy}
                 onClick={() => void handleMigrateProject()}
                 type="button"
               >
@@ -266,19 +274,37 @@ export function ProjectManagementPage({
               </button>
               <button
                 className="project-link-btn"
-                disabled={isOpening}
+                disabled={projectBusy}
                 onClick={() => void handleMountRefactorConfig()}
                 type="button"
               >
                 挂载重构配置
               </button>
               <button
-                className="project-link-btn"
-                disabled={isOpening || !loadedProject}
+                className="project-link-btn project-link-btn--icon"
+                disabled={projectBusy || !loadedProject}
                 onClick={() => void handleCreateRefactorConfig()}
                 type="button"
               >
                 {refactorConfigPath ? '保存重构配置' : '创建重构配置'}
+              </button>
+              <button
+                className="project-link-btn project-link-btn--icon"
+                disabled={
+                  projectBusy ||
+                  hasUnsavedChanges ||
+                  !loadedProject.summary.path?.toLowerCase().endsWith('.jcpro')
+                }
+                onClick={() => void handleFormatJcproFile()}
+                title={
+                  hasUnsavedChanges
+                    ? '请先保存未保存修改'
+                    : '格式化当前 .jcpro JSON 文件'
+                }
+                type="button"
+              >
+                <Braces aria-hidden="true" size={13} strokeWidth={1.8} />
+                {isFormattingJcpro ? '格式化中...' : '格式化 jcpro JSON'}
               </button>
             </div>
           </div>
@@ -336,7 +362,7 @@ export function ProjectManagementPage({
 
       {loadedProject ? (
         <div
-          aria-busy={gitLoading}
+          aria-busy={gitLoading || isFormattingJcpro}
           className="project-section project-git-section"
           ref={(node) => {
             projectGitSectionRef.current = node;
@@ -346,7 +372,7 @@ export function ProjectManagementPage({
             <strong>Git 版本管理</strong>
             <button
               className="project-link-btn"
-              disabled={gitBusy || gitLoading}
+              disabled={gitBusy || gitLoading || projectBusy}
               onClick={() => void refreshProjectGit()}
               type="button"
             >
@@ -398,6 +424,7 @@ export function ProjectManagementPage({
                   className="project-open-btn"
                   disabled={
                     gitBusy ||
+                    projectBusy ||
                     hasUnsavedChanges ||
                     gitStatus.has_staged_changes ||
                     gitStatus.changed_paths.length === 0 ||
@@ -439,7 +466,7 @@ export function ProjectManagementPage({
                         </div>
                         <button
                           className="project-link-btn"
-                          disabled={gitBusy}
+                          disabled={gitBusy || projectBusy}
                           onClick={() => void handlePreviewProjectVersion(revision)}
                           type="button"
                         >

@@ -16,8 +16,7 @@ export type DocumentSectionKey =
   | 'pdo_recv'
   | 'pdo_send'
   | 'language_info'
-  | 'battery_protocol'
-  | 'battery_monitor_info'
+  | 'battery_monitor'
   | 'fault_code_info'
   | 'signal_dictionary'
   | 'private_protocol'
@@ -35,8 +34,7 @@ export const modifiedSectionLabels: Record<DocumentSectionKey, string> = {
   pdo_recv: 'PDO 接收帧',
   pdo_send: 'PDO 发送帧',
   language_info: '多国语言',
-  battery_protocol: '锂电协议',
-  battery_monitor_info: '锂电监控显示',
+  battery_monitor: '锂电监控协议',
   fault_code_info: '故障代码',
   signal_dictionary: '业务信号字典',
   private_protocol: '私有协议',
@@ -49,8 +47,6 @@ export const refactorOnlySections = [
   'signal_dictionary',
   'private_protocol',
   'protocol_mapping',
-  'battery_protocol',
-  'battery_monitor_info',
 ] as const;
 
 export type RefactorOnlySection = (typeof refactorOnlySections)[number];
@@ -70,8 +66,7 @@ const legacyTableByModule: Partial<Record<NavigationKey, LegacyTableKind>> = {
 
 const sectionByModule: Partial<Record<NavigationKey, DocumentSectionKey>> = {
   language: 'language_info',
-  'battery-protocol': 'battery_protocol',
-  'battery-monitor': 'battery_monitor_info',
+  'battery-monitor': 'battery_monitor',
   'signal-dictionary': 'signal_dictionary',
   'private-protocol': 'private_protocol',
   'protocol-mapping': 'protocol_mapping',

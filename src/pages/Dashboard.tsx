@@ -6,7 +6,7 @@ import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
 import { featureModules } from '../data/modules';
 import type { TestDataType } from '../data/test-data/metadata';
-import { useBatteryLegacyController } from '../features/battery-legacy/useBatteryLegacyController';
+import { useBatteryMonitorController } from '../features/battery-monitor/useBatteryMonitorController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
 import { useProjectJsonEditor } from '../features/json-editor/useProjectJsonEditor';
 import {
@@ -62,13 +62,8 @@ const LanguagePage = lazy(() =>
     default: module.LanguagePage,
   })),
 );
-const BatteryProtocolPage = lazy(() =>
-  import('../features/battery-legacy/BatteryLegacyPages').then((module) => ({
-    default: module.BatteryProtocolPage,
-  })),
-);
 const BatteryMonitorPage = lazy(() =>
-  import('../features/battery-legacy/BatteryLegacyPages').then((module) => ({
+  import('../features/battery-monitor/BatteryMonitorPage').then((module) => ({
     default: module.BatteryMonitorPage,
   })),
 );
@@ -231,10 +226,11 @@ export function Dashboard({
     exportOptions: exportBatteryOptions,
     updateProjectDocument,
   });
-  const batteryLegacyController = useBatteryLegacyController({
+  const batteryMonitorController = useBatteryMonitorController({
     document: loadedProject?.document ?? null,
     projectPath: loadedProject?.summary.path,
     updateProjectDocument,
+    updateProjectSections,
     isModifiedPath,
     restoreModifiedPath,
   });
@@ -279,7 +275,10 @@ export function Dashboard({
   useDesktopProjectShortcuts({
     canSave: hasUnsavedChanges && Boolean(loadedProject?.summary.path),
     canSaveAs: Boolean(loadedProject?.summary.path),
-    isBusy: projectLifecycle.isOpening || projectLifecycle.isSavingProject,
+    isBusy:
+      projectLifecycle.isOpening ||
+      projectLifecycle.isSavingProject ||
+      projectLifecycle.isFormattingJcpro,
     onOpen: () => void projectLifecycle.selectProjectFile(),
     onSave: projectLifecycle.requestSaveProject,
     onSaveAs: () => void projectLifecycle.saveProjectToNewPath(),
@@ -310,6 +309,10 @@ export function Dashboard({
     projectName: loadedProject?.summary.name,
     projectPath: loadedProject?.summary.path,
     hasUnsavedChanges,
+    isBusy:
+      projectLifecycle.isOpening ||
+      projectLifecycle.isSavingProject ||
+      projectLifecycle.isFormattingJcpro,
     onOpenProject: (path) => {
       onNavigate('project');
       void projectLifecycle.openProject(path);
@@ -397,9 +400,7 @@ export function Dashboard({
       if (data.pdoSimple) pdoEditor.updateSimpleDocument(data.pdoSimple);
       if (data.pdoAdvanced) pdoEditor.updateAdvancedDocument(data.pdoAdvanced);
       if (data.batteryMonitor)
-        batteryLegacyController.updateBatteryMonitorDocument(data.batteryMonitor);
-      if (data.batteryProtocol)
-        void batteryLegacyController.updateBatteryProtocolDocument(data.batteryProtocol);
+        batteryMonitorController.updateBatteryMonitorDocument(data.batteryMonitor);
     } finally {
       setGeneratingTestKey(null);
     }
@@ -438,6 +439,7 @@ export function Dashboard({
         loadedProject={loadedProject}
         projectPath={projectLifecycle.projectPath}
         isOpening={projectLifecycle.isOpening}
+        isFormattingJcpro={projectLifecycle.isFormattingJcpro}
         hasUnsavedChanges={hasUnsavedChanges}
         modifiedSections={modifiedSections}
         isSavingProject={projectLifecycle.isSavingProject}
@@ -590,6 +592,8 @@ export function Dashboard({
               handleMigrateProject={projectLifecycle.migrateProject}
               handleMountRefactorConfig={projectLifecycle.mountRefactorConfig}
               handleCreateRefactorConfig={projectLifecycle.createRefactorConfig}
+              handleFormatJcproFile={projectLifecycle.formatJcproFile}
+              isFormattingJcpro={projectLifecycle.isFormattingJcpro}
               refreshProjectGit={projectGit.refresh}
               handleCommitProjectVersion={projectGit.commitVersion}
               handlePreviewProjectVersion={projectGit.previewVersion}
@@ -620,17 +624,10 @@ export function Dashboard({
 
           <TableConfigStatusPanel controller={tableConfig} />
 
-          {activeModule.key === 'battery-protocol' ? (
-            <BatteryProtocolPage
-              loadedProject={loadedProject}
-              controller={batteryLegacyController}
-            />
-          ) : null}
-
           {activeModule.key === 'battery-monitor' ? (
             <BatteryMonitorPage
               loadedProject={loadedProject}
-              controller={batteryLegacyController}
+              controller={batteryMonitorController}
             />
           ) : null}
           {activeModule.key === 'fault-code' ? (

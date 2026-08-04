@@ -1902,6 +1902,12 @@ button.git-summary-row:disabled,
   transition: color 0.1s;
 }
 
+.project-link-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .project-link-btn:hover:not(:disabled) {
   color: var(--action-primary-hover);
   text-decoration: underline;

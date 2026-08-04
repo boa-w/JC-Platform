@@ -10,6 +10,7 @@ interface UseDesktopProjectIntegrationOptions {
   projectName?: string;
   projectPath?: string;
   hasUnsavedChanges: boolean;
+  isBusy: boolean;
   onOpenProject: (path: string) => void;
   onStatusChange: (message: string) => void;
 }
@@ -20,15 +21,18 @@ export function useDesktopProjectIntegration({
   projectName,
   projectPath,
   hasUnsavedChanges,
+  isBusy,
   onOpenProject,
   onStatusChange,
 }: UseDesktopProjectIntegrationOptions) {
   const [isProjectDragActive, setIsProjectDragActive] = useState(false);
   const openProjectRef = useRef(onOpenProject);
   const statusChangeRef = useRef(onStatusChange);
+  const busyRef = useRef(isBusy);
   const lastHandledRef = useRef({ path: '', at: 0 });
   openProjectRef.current = onOpenProject;
   statusChangeRef.current = onStatusChange;
+  busyRef.current = isBusy;
 
   useEffect(() => {
     const title = buildProjectWindowTitle(projectName, projectPath, hasUnsavedChanges);
@@ -53,6 +57,10 @@ export function useDesktopProjectIntegration({
       const normalizedPath = path.trim();
       if (!isJcproProjectPath(normalizedPath)) {
         statusChangeRef.current('仅支持打开 .jcpro 项目文件。');
+        return;
+      }
+      if (busyRef.current) {
+        statusChangeRef.current('当前正在执行项目文件操作，请稍后再打开项目。');
         return;
       }
       const now = Date.now();

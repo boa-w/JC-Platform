@@ -134,8 +134,16 @@ export const richProjectDocument = {
       诊断模式: { zh: '诊断模式', en: '' },
     },
   },
-  battery_protocol: {},
-  battery_monitor_info: { enabled: true, page_size: 4, items: [] },
+  battery_monitor: {
+    schema_version: 1,
+    enabled: true,
+    version: 1,
+    default_timeout_ticks: 200,
+    page_size: 4,
+    frames: [],
+    signals: [],
+    items: [],
+  },
   fault_code_info: {
     schema_version: 1,
     enabled: true,
@@ -246,6 +254,7 @@ export async function installRichProjectDesktopMock(page: Page) {
         2,
       );
       let worktreeContent = JSON.stringify(document, null, 2);
+      let jcproContent = `\uFEFF${JSON.stringify(document)}`;
 
       const internals = {
         metadata: { currentWindow: { label: 'main' } },
@@ -258,6 +267,21 @@ export async function installRichProjectDesktopMock(page: Page) {
           if (command === 'plugin:app|name') return '自定义开发平台';
           if (command === 'plugin:app|version') return '0.1.0';
           if (command === 'load_project') return loadedProject(JSON.parse(worktreeContent));
+          if (command === 'load_text_file') {
+            const delay = (
+              window as unknown as { __FORMAT_FILE_DELAY_MS__: number }
+            ).__FORMAT_FILE_DELAY_MS__;
+            if (delay > 0) await new Promise((resolve) => window.setTimeout(resolve, delay));
+            return jcproContent;
+          }
+          if (command === 'save_text_file') {
+            jcproContent = String(args?.content ?? '');
+            worktreeContent = jcproContent;
+            (
+              window as unknown as { __FORMATTED_JCPRO_FILE__: unknown }
+            ).__FORMATTED_JCPRO_FILE__ = { path: args?.path, content: jcproContent };
+            return null;
+          }
           if (command === 'load_json_file') throw new Error('optional sidecar not found');
           if (command === 'validate_project_document') {
             return { valid: true, missing_sections: [], warnings: [] };
@@ -357,6 +381,8 @@ export async function installRichProjectDesktopMock(page: Page) {
       (window as unknown as { __SAVED_GIT_WORKTREE_FILE__: unknown }).__SAVED_GIT_WORKTREE_FILE__ =
         null;
       (window as unknown as { __GIT_CONTEXT_DELAY_MS__: number }).__GIT_CONTEXT_DELAY_MS__ = 0;
+      (window as unknown as { __FORMAT_FILE_DELAY_MS__: number }).__FORMAT_FILE_DELAY_MS__ = 0;
+      (window as unknown as { __FORMATTED_JCPRO_FILE__: unknown }).__FORMATTED_JCPRO_FILE__ = null;
       (window as unknown as { __TAURI_INTERNALS__: typeof internals }).__TAURI_INTERNALS__ =
         internals;
     },

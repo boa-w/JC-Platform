@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 /// 全局唯一业务信号 ID。
 pub type SignalId = String;
@@ -87,7 +87,6 @@ pub fn derive_signal_dictionary_from_legacy(document: &Value) -> SignalDictionar
     collect_pdo_global_signals(document, &mut dictionary);
     collect_simple_pdo_signals(document, &mut dictionary);
     collect_sdo_signals(document.get("sdo_info"), &mut dictionary);
-    collect_battery_monitor_signals(document, &mut dictionary);
     dictionary
         .signals
         .sort_by(|left, right| left.signal_id.cmp(&right.signal_id));
@@ -222,65 +221,6 @@ fn collect_sdo_signals(node: Option<&Value>, dictionary: &mut SignalDictionary) 
         for child in children {
             collect_sdo_signals(Some(child), dictionary);
         }
-    }
-}
-
-fn collect_battery_monitor_signals(document: &Value, dictionary: &mut SignalDictionary) {
-    let Some(root) = document.get("battery_monitor_info") else {
-        return;
-    };
-    let item_map = root
-        .get("items")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .map(|item| (object_string(item.get("signal_key"), ""), item))
-                .collect::<HashMap<_, _>>()
-        })
-        .unwrap_or_default();
-    let Some(signals) = root.get("signals").and_then(Value::as_array) else {
-        return;
-    };
-    for item in signals {
-        let param_id = object_string(item.get("param_id"), "");
-        if param_id.is_empty() {
-            continue;
-        }
-        let signal_key = object_string(item.get("signal_key"), "");
-        let display_item = item_map.get(&signal_key).copied();
-        let mut signal =
-            SignalDefinition::new(param_id.clone(), object_string(item.get("name"), &param_id));
-        signal.default_value = optional_string(item.get("def"));
-        signal.inner = item.get("inner").and_then(Value::as_i64);
-        signal.data_type =
-            legacy_type_to_signal_data_type(item.get("type").and_then(Value::as_i64));
-        if let Some(display_item) = display_item {
-            signal.display.unit = object_string(display_item.get("unit"), "");
-            if let Some(formatter) = display_item.get("formatter") {
-                signal.scale = SignalScale {
-                    scale_num: formatter
-                        .get("scale_num")
-                        .and_then(Value::as_i64)
-                        .unwrap_or(1) as i32,
-                    scale_den: formatter
-                        .get("scale_den")
-                        .and_then(Value::as_i64)
-                        .unwrap_or(1) as i32,
-                    offset: formatter
-                        .get("offset")
-                        .and_then(Value::as_f64)
-                        .unwrap_or(0.0),
-                    decimals: formatter
-                        .get("decimals")
-                        .and_then(Value::as_u64)
-                        .unwrap_or(0) as u8,
-                };
-                signal.display.format = object_string(formatter.get("kind"), "");
-            }
-        }
-        signal.display.description = "锂电私有协议迁移生成".to_string();
-        dictionary.upsert(signal);
     }
 }
 

@@ -71,8 +71,7 @@ export function useProjectJsonEditor({
       if (editorKey === 'sdo') document.sdo_info = parsed;
       if (editorKey === 'pdo-simple') document.pdo_simple_send_recv = parsed;
       if (activeModuleKey === 'language') document.language_info = parsed;
-      if (activeModuleKey === 'battery-protocol') document.battery_protocol = parsed;
-      if (activeModuleKey === 'battery-monitor') document.battery_monitor_info = parsed;
+      if (activeModuleKey === 'battery-monitor') document.battery_monitor = parsed;
       if (activeModuleKey === 'signal-dictionary') document.signal_dictionary = parsed;
       if (activeModuleKey === 'private-protocol') document.private_protocol = parsed;
       if (activeModuleKey === 'protocol-mapping') document.protocol_mapping = parsed;

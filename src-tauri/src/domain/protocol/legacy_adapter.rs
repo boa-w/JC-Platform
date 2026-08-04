@@ -2,6 +2,7 @@
 //!
 //! 对外行为保持与旧 protocol_manager 一致：导出仍使用旧段落，flatten 只回写高级 PDO 三段。
 
+use super::battery_monitor::parse_battery_monitor_protocol;
 use super::canopen_projection::derive_canopen_transport;
 use super::mapping::{canopen_transport_from_mappings, derive_mappings, parse_explicit_mappings};
 use super::model::{
@@ -22,6 +23,7 @@ pub fn build_unified_protocol_model(document: &Value) -> UnifiedProtocolModel {
         .and_then(|value| serde_json::from_value::<SignalDictionary>(value.clone()).ok())
         .unwrap_or_else(|| derive_signal_dictionary_from_legacy(document));
     let private_protocol = derive_private_protocol_from_legacy(document);
+    let battery_monitor = parse_battery_monitor_protocol(document);
     let legacy_canopen = derive_canopen_transport(document);
     let explicit_mappings = parse_explicit_mappings(document);
     let (canopen, mappings) = if explicit_mappings.is_empty() {
@@ -33,12 +35,18 @@ pub fn build_unified_protocol_model(document: &Value) -> UnifiedProtocolModel {
             explicit_mappings,
         )
     };
-    let validation =
-        validate_protocol_model(&signal_dictionary, &canopen, &private_protocol, &mappings);
+    let validation = validate_protocol_model(
+        &signal_dictionary,
+        &canopen,
+        &battery_monitor,
+        &private_protocol,
+        &mappings,
+    );
 
     UnifiedProtocolModel {
         signal_dictionary,
         canopen,
+        battery_monitor,
         private_protocol,
         mappings,
         validation,

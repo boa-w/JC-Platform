@@ -77,6 +77,34 @@ test('keeps the workspace interactive while Git context loads in the background'
   await expect(page.getByRole('main', { name: '设置数据' })).toBeVisible();
 });
 
+test('formats the loaded jcpro file from project management', async ({ page }) => {
+  await openRichProject(page);
+  await page.evaluate(() => {
+    (window as unknown as { __FORMAT_FILE_DELAY_MS__: number }).__FORMAT_FILE_DELAY_MS__ = 1_500;
+  });
+
+  const formatButton = page.locator('button[title="格式化当前 .jcpro JSON 文件"]');
+  await expect(formatButton).toBeEnabled();
+  await formatButton.click();
+  await expect(formatButton).toBeDisabled();
+  await expect(
+    page.locator('.action-bar').getByRole('button', { name: '重载', exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByText(`已格式化 jcpro JSON：${richProjectPath}`, { exact: true })).toBeVisible();
+
+  const formattedFile = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __FORMATTED_JCPRO_FILE__: { path?: string; content?: string } | null;
+        }
+      ).__FORMATTED_JCPRO_FILE__,
+  );
+  expect(formattedFile?.path).toBe(richProjectPath);
+  expect(formattedFile?.content).toMatch(/^\{\n {2}"config_version"/);
+  expect(JSON.parse(formattedFile?.content ?? '{}')).toMatchObject({ config_version: 'jc001' });
+});
+
 test('meets the serious accessibility baseline across primary surfaces', async ({ page }) => {
   test.setTimeout(60_000);
   await expectNoSeriousAccessibilityViolations(page, '默认工作区');
@@ -117,12 +145,12 @@ test('meets the serious accessibility baseline across every workspace', async ({
         '私有协议 实验/废弃',
         '协议映射 实验',
         'CANopen 导出 实验',
-        '锂电协议 实验/废弃',
+        '锂电监控协议',
       ],
     },
     {
       group: '配置',
-      modules: ['UI 资源编辑', '锂电监控显示 实验/废弃', '故障代码'],
+      modules: ['UI 资源编辑', '故障代码'],
     },
     {
       group: '多国语言',
@@ -233,7 +261,7 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   await expect(main.getByRole('heading', { level: 1, name: '软件设置' })).toBeAttached();
 
   await expect(
-    main.getByRole('checkbox', { name: '锂电协议：写入 ConfigUpdate.json' }),
+    main.getByRole('checkbox', { name: '锂电监控协议：写入 ConfigUpdate.json' }),
   ).toBeVisible();
   const themeSwitch = main.getByRole('switch', { name: '深色模式' });
   await expect(themeSwitch).toHaveAttribute(
@@ -557,8 +585,16 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
   await page.evaluate((path) => {
     const baseDocument = {
       project: { name: 'Recovery Fixture', revision: 1 },
-      battery_protocol: {},
-      battery_monitor_info: {},
+      battery_monitor: {
+        schema_version: 1,
+        enabled: true,
+        version: 1,
+        default_timeout_ticks: 200,
+        page_size: 4,
+        frames: [],
+        signals: [],
+        items: [],
+      },
       fault_code_info: {},
     };
     localStorage.setItem(

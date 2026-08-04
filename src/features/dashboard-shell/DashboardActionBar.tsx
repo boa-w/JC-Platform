@@ -36,6 +36,7 @@ interface DashboardActionBarProps {
   loadedProject: LoadedProject | null;
   projectPath: string;
   isOpening: boolean;
+  isFormattingJcpro: boolean;
   hasUnsavedChanges: boolean;
   modifiedSections: DocumentSectionKey[];
   isSavingProject: boolean;
@@ -78,6 +79,7 @@ export function DashboardActionBar({
   loadedProject,
   projectPath,
   isOpening,
+  isFormattingJcpro,
   hasUnsavedChanges,
   modifiedSections,
   isSavingProject,
@@ -168,9 +170,7 @@ export function DashboardActionBar({
         ? 'pdo-simple'
         : activeModule.key === 'realtime-data'
           ? 'pdo-advanced'
-          : activeModule.key === 'battery-protocol'
-            ? 'battery-protocol'
-            : 'battery-monitor';
+          : 'battery-monitor';
     onRequestTestData(type);
   }
 
@@ -222,6 +222,7 @@ export function DashboardActionBar({
                 ? 'action-bar-git-trigger action-bar-git-trigger--active'
                 : 'action-bar-git-trigger'
             }
+            disabled={isFormattingJcpro}
             onClick={() => setShowGitSummary((visible) => !visible)}
             ref={gitSummaryTriggerRef}
             title="切换 Git 版本摘要"
@@ -238,7 +239,7 @@ export function DashboardActionBar({
           <div className="action-bar-group">
             <button
               className="action-bar-btn action-bar-btn--ghost"
-              disabled={isOpening}
+              disabled={isOpening || isFormattingJcpro}
               onClick={() => void handleSelectProjectFile()}
               type="button"
               title="打开项目文件"
@@ -248,7 +249,11 @@ export function DashboardActionBar({
             </button>
             <button
               className="action-bar-btn action-bar-btn--ghost"
-              disabled={isOpening || !(loadedProject?.summary.path || projectPath.trim())}
+              disabled={
+                isOpening ||
+                isFormattingJcpro ||
+                !(loadedProject?.summary.path || projectPath.trim())
+              }
               onClick={() => void handleReloadProject()}
               type="button"
               title="重新加载当前项目"
@@ -261,7 +266,7 @@ export function DashboardActionBar({
           <div className="action-bar-group">
             <button
               className="action-bar-btn action-bar-btn--ghost"
-              disabled={!hasUnsavedChanges || isSavingProject}
+              disabled={!hasUnsavedChanges || isSavingProject || isFormattingJcpro}
               onClick={restoreAllChanges}
               type="button"
               title="恢复所有未保存修改"
@@ -271,7 +276,7 @@ export function DashboardActionBar({
             </button>
             <button
               className="action-bar-btn action-bar-btn--ghost"
-              disabled={!loadedProject?.summary.path || isSavingProject}
+              disabled={!loadedProject?.summary.path || isSavingProject || isFormattingJcpro}
               onClick={() => void handleSaveProjectAs()}
               type="button"
             >
@@ -280,7 +285,12 @@ export function DashboardActionBar({
             </button>
             <button
               className="action-bar-btn action-bar-btn--save"
-              disabled={!hasUnsavedChanges || !loadedProject?.summary.path || isSavingProject}
+              disabled={
+                !hasUnsavedChanges ||
+                !loadedProject?.summary.path ||
+                isSavingProject ||
+                isFormattingJcpro
+              }
               onClick={requestSaveProject}
               type="button"
             >
@@ -294,7 +304,7 @@ export function DashboardActionBar({
               {currentLegacyTableKind !== 'language' ? (
                 <button
                   className="action-bar-btn action-bar-btn--secondary"
-                  disabled={!loadedProject || isImportingTable}
+                  disabled={!loadedProject || isImportingTable || isFormattingJcpro}
                   onClick={() => void handleImportTableConfig(currentLegacyTableKind)}
                   type="button"
                   title="从 CSV/XLS/XLSX/XML 文件导入"
@@ -305,7 +315,7 @@ export function DashboardActionBar({
               ) : null}
               <button
                 className="action-bar-btn action-bar-btn--ghost"
-                disabled={!loadedProject || isExportingTable}
+                disabled={!loadedProject || isExportingTable || isFormattingJcpro}
                 onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'csv')}
                 type="button"
                 title="导出为 CSV 格式"
@@ -314,7 +324,7 @@ export function DashboardActionBar({
               </button>
               <button
                 className="action-bar-btn action-bar-btn--ghost"
-                disabled={!loadedProject || isExportingTable}
+                disabled={!loadedProject || isExportingTable || isFormattingJcpro}
                 onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'xml')}
                 type="button"
                 title="导出为 Excel XML 格式"
@@ -323,12 +333,12 @@ export function DashboardActionBar({
               </button>
             </div>
           ) : null}
-          {(['realtime-data', 'battery-protocol', 'battery-monitor'] as string[]).includes(
+          {(['realtime-data', 'battery-monitor'] as string[]).includes(
             activeModule.key,
           ) ? (
             <button
               className="action-bar-btn action-bar-btn--secondary"
-              disabled={!loadedProject || generatingTestKey !== null}
+              disabled={!loadedProject || generatingTestKey !== null || isFormattingJcpro}
               onClick={handleRequestTestData}
               type="button"
               title="自动构建当前页面的 CAN 测试数据"
@@ -353,7 +363,6 @@ export function DashboardActionBar({
             [
               'setting-data',
               'realtime-data',
-              'battery-protocol',
               'battery-monitor',
               'language',
               'signal-dictionary',
@@ -365,7 +374,7 @@ export function DashboardActionBar({
               className={`action-bar-btn ${
                 showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'
               }`}
-              disabled={!loadedProject}
+              disabled={!loadedProject || isFormattingJcpro}
               onClick={onToggleJsonEditor}
               type="button"
               title="打开 JSON 编辑器"
@@ -396,7 +405,7 @@ export function DashboardActionBar({
               <button
                 aria-label="刷新 Git 状态"
                 className={gitLoading ? 'is-spinning' : undefined}
-                disabled={gitBusy || gitLoading || !loadedProject}
+                disabled={gitBusy || gitLoading || !loadedProject || isFormattingJcpro}
                 onClick={() => void refreshProjectGit()}
                 title="刷新 Git 状态"
                 type="button"
@@ -426,6 +435,7 @@ export function DashboardActionBar({
               ) : null}
               <button
                 className="git-summary-row"
+                disabled={isFormattingJcpro}
                 onClick={() => void openGitReview()}
                 type="button"
               >
@@ -439,6 +449,7 @@ export function DashboardActionBar({
 
               <button
                 className="git-summary-row"
+                disabled={isFormattingJcpro}
                 onClick={() => void handleOpenGitRepository()}
                 title={gitStatus.repo_root ?? undefined}
                 type="button"
@@ -449,7 +460,12 @@ export function DashboardActionBar({
                 <ChevronRight aria-hidden="true" size={15} strokeWidth={1.7} />
               </button>
 
-              <button className="git-summary-row" onClick={showProjectGitHistory} type="button">
+              <button
+                className="git-summary-row"
+                disabled={isFormattingJcpro}
+                onClick={showProjectGitHistory}
+                type="button"
+              >
                 <GitBranch aria-hidden="true" size={17} strokeWidth={1.7} />
                 <span className="git-summary-row-label">{gitStatus.branch}</span>
                 <span className="git-summary-row-value git-summary-hash">
@@ -462,7 +478,7 @@ export function DashboardActionBar({
 
               <button
                 className="git-summary-row"
-                disabled={gitStatus.changed_paths.length === 0}
+                disabled={gitStatus.changed_paths.length === 0 || isFormattingJcpro}
                 onClick={() => void openGitReview()}
                 type="button"
               >
@@ -476,7 +492,7 @@ export function DashboardActionBar({
 
               <button
                 className="git-summary-row"
-                disabled={gitSummaryCommitDisabled}
+                disabled={gitSummaryCommitDisabled || isFormattingJcpro}
                 onClick={() => void handleCommitProjectVersion()}
                 title={
                   hasUnsavedChanges
@@ -500,7 +516,12 @@ export function DashboardActionBar({
                 <span className="git-summary-row-label">远程同步未接入</span>
               </div>
 
-              <button className="git-summary-row" onClick={showProjectGitHistory} type="button">
+              <button
+                className="git-summary-row"
+                disabled={isFormattingJcpro}
+                onClick={showProjectGitHistory}
+                type="button"
+              >
                 <History aria-hidden="true" size={17} strokeWidth={1.7} />
                 <span className="git-summary-row-label">版本历史</span>
                 <span className="git-summary-row-value">{gitRevisions.length} 条</span>

@@ -791,7 +791,8 @@ pub fn import_dbc(path: String) -> Result<Value, String> {
         frames.push(json!({
             "frame_key": frame_key,
             "can_id": can_id,
-            "type": frame_type,
+            "frame_type": frame_type,
+            "dlc": 8,
             "desc": desc,
             "timeout_ticks": 200,
         }));
@@ -802,17 +803,13 @@ pub fn import_dbc(path: String) -> Result<Value, String> {
                 ByteOrder::LittleEndian => 0i64,
             };
 
-            let sig_type = match &sig.value_type {
-                ValueType::Unsigned => {
-                    if sig.size <= 8 {
-                        0i64
-                    } else if sig.size <= 16 {
-                        1i64
-                    } else {
-                        2i64
-                    }
-                }
-                ValueType::Signed => 10i64,
+            let (raw_type, value_type) = match (&sig.value_type, sig.size) {
+                (ValueType::Signed, size) if size <= 8 => ("u8", "u8"),
+                (ValueType::Signed, size) if size <= 16 => ("u16_le", "f32"),
+                (ValueType::Signed, _) => ("u32_le", "f32"),
+                (ValueType::Unsigned, size) if size <= 8 => ("u8", "u8"),
+                (ValueType::Unsigned, size) if size <= 16 => ("u16_le", "u16"),
+                (ValueType::Unsigned, _) => ("u32_le", "u32"),
             };
 
             let sig_name = if sig.name.is_empty() {
@@ -837,19 +834,17 @@ pub fn import_dbc(path: String) -> Result<Value, String> {
                 "param_id": format!("BATTERY_DBC_{}", sig.name.to_uppercase()),
                 "name": name,
                 "inner": -1i64,
-                "type": sig_type,
-                "def": "0",
                 "frame_key": frame_key.clone(),
                 "pos": sig.start_bit as i64,
                 "len": sig.size as i64,
-                "show_type": show_type,
-                "handle": 0,
-                "handle_param": "",
-                "factor": sig.factor,
-                "offset": sig.offset,
-                "min": numeric_value_to_f64(&sig.min),
-                "max": numeric_value_to_f64(&sig.max),
-                "unit": sig.unit.clone(),
+                "byte_order": if show_type == 1 { "big_endian" } else { "little_endian" },
+                "raw_offset": (sig.start_bit / 8) as i64,
+                "raw_type": raw_type,
+                "value_type": value_type,
+                "parse_resolution": sig.factor,
+                "parse_offset": sig.offset,
+                "parse_mask": u32::MAX,
+                "parse_shift": 0,
                 "receiver": sig.receivers.join(","),
                 "comment": comment,
             }));
@@ -903,41 +898,29 @@ pub fn export_dbc(path: String, frames: Vec<Value>, signals: Vec<Value>) -> Resu
             let sig_name = sig["signal_key"].as_str().unwrap_or("unknown");
             let pos = sig["pos"].as_u64().unwrap_or(0);
             let len = sig["len"].as_u64().unwrap_or(8);
-            let show_type = sig["show_type"].as_u64().unwrap_or(0);
-            let sig_type = sig["type"].as_u64().unwrap_or(0);
-            let factor = sig["factor"].as_f64().unwrap_or(1.0);
-            let offset = sig["offset"].as_f64().unwrap_or(0.0);
+            let byte_order = if sig["byte_order"] == "big_endian" {
+                "0"
+            } else {
+                "1"
+            };
+            let factor = sig["parse_resolution"].as_f64().unwrap_or(1.0);
+            let offset = sig["parse_offset"].as_f64().unwrap_or(0.0);
             let min_val = sig["min"].as_f64().unwrap_or(0.0);
             let max_val = sig["max"].as_f64().unwrap_or(0.0);
             let unit = sig["unit"].as_str().unwrap_or("");
             let receiver = sig["receiver"].as_str().unwrap_or("dbc_export");
 
-            let byte_order = if show_type == 1 { "0" } else { "1" };
-            let value_sign = match sig_type {
-                10 => "-",
-                _ => "+",
-            };
-
             signal_lines.push(format!(
-                " SG_ {} : {}|{}@{}{} ({},{}) [{}|{}] \"{}\"  {}",
-                sig_name,
-                pos,
-                len,
-                byte_order,
-                value_sign,
-                factor,
-                offset,
-                min_val,
-                max_val,
-                unit,
-                receiver,
+                " SG_ {} : {}|{}@{}+ ({},{}) [{}|{}] \"{}\"  {}",
+                sig_name, pos, len, byte_order, factor, offset, min_val, max_val, unit, receiver,
             ));
         }
 
         lines.push(format!(
-            "BO_ {} {}: 8 dbc_export\n{}\n",
+            "BO_ {} {}: {} dbc_export\n{}\n",
             can_id,
             frame_key,
+            frame_val["dlc"].as_u64().unwrap_or(8),
             signal_lines.join("\n"),
         ));
     }
@@ -1015,41 +998,29 @@ pub fn generate_dbc_content(frames: Vec<Value>, signals: Vec<Value>) -> Result<S
             let sig_name = sig["signal_key"].as_str().unwrap_or("unknown");
             let pos = sig["pos"].as_u64().unwrap_or(0);
             let len = sig["len"].as_u64().unwrap_or(8);
-            let show_type = sig["show_type"].as_u64().unwrap_or(0);
-            let sig_type = sig["type"].as_u64().unwrap_or(0);
-            let factor = sig["factor"].as_f64().unwrap_or(1.0);
-            let offset = sig["offset"].as_f64().unwrap_or(0.0);
+            let byte_order = if sig["byte_order"] == "big_endian" {
+                "0"
+            } else {
+                "1"
+            };
+            let factor = sig["parse_resolution"].as_f64().unwrap_or(1.0);
+            let offset = sig["parse_offset"].as_f64().unwrap_or(0.0);
             let min_val = sig["min"].as_f64().unwrap_or(0.0);
             let max_val = sig["max"].as_f64().unwrap_or(0.0);
             let unit = sig["unit"].as_str().unwrap_or("");
             let receiver = sig["receiver"].as_str().unwrap_or("dbc_export");
 
-            let byte_order = if show_type == 1 { "0" } else { "1" };
-            let value_sign = match sig_type {
-                10 => "-",
-                _ => "+",
-            };
-
             signal_lines.push(format!(
-                " SG_ {} : {}|{}@{}{} ({},{}) [{}|{}] \"{}\"  {}",
-                sig_name,
-                pos,
-                len,
-                byte_order,
-                value_sign,
-                factor,
-                offset,
-                min_val,
-                max_val,
-                unit,
-                receiver,
+                " SG_ {} : {}|{}@{}+ ({},{}) [{}|{}] \"{}\"  {}",
+                sig_name, pos, len, byte_order, factor, offset, min_val, max_val, unit, receiver,
             ));
         }
 
         lines.push(format!(
-            "BO_ {} {}: 8 dbc_export\n{}\n",
+            "BO_ {} {}: {} dbc_export\n{}\n",
             can_id,
             frame_key,
+            frame_val["dlc"].as_u64().unwrap_or(8),
             signal_lines.join("\n"),
         ));
     }

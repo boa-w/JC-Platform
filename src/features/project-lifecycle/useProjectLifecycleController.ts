@@ -2,6 +2,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useRef, useState } from 'react';
 import {
   createProject,
+  loadTextFile,
   loadJsonFile,
   loadProject,
   migrateProjectDocument,
@@ -9,12 +10,14 @@ import {
   saveJsonFile,
   saveProject,
   saveProjectAs,
+  saveTextFile,
   validateProjectDocument,
 } from '../../api/commands';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { type DocumentSectionKey, refactorOnlySections } from '../../modules/documentSections';
 import type { LoadedProject, ProjectParseReport } from '../../types/platform';
 import { cloneJson } from '../../utils/projectDirty';
+import { formatJsonText } from '../../utils/jsonFormat';
 import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import { runSystemDialog } from '../../utils/systemDialog';
 
@@ -104,6 +107,7 @@ export function useProjectLifecycleController({
   const [openError, setOpenError] = useState<string | null>(null);
   const [projectParseReport, setProjectParseReport] = useState<ProjectParseReport | null>(null);
   const [isOpening, setIsOpening] = useState(false);
+  const [isFormattingJcpro, setIsFormattingJcpro] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [savingProjectAction, setSavingProjectAction] = useState<SavingProjectAction>(null);
   const [refactorConfigPath, setRefactorConfigPath] = useState<string | null>(null);
@@ -179,8 +183,6 @@ export function useProjectLifecycleController({
       signal_dictionary: source.signal_dictionary ?? { signals: [] },
       private_protocol: source.private_protocol ?? { enabled: false, frames: [] },
       protocol_mapping: source.protocol_mapping ?? [],
-      battery_protocol: source.battery_protocol ?? null,
-      battery_monitor_info: source.battery_monitor_info ?? null,
     };
   }
 
@@ -389,6 +391,44 @@ export function useProjectLifecycleController({
     return true;
   }
 
+  async function formatJcproFile() {
+    const path = loadedProject?.summary.path;
+    if (!path) {
+      setSaveStatus('当前项目没有可格式化的文件路径。');
+      return;
+    }
+    if (!path.toLowerCase().endsWith('.jcpro')) {
+      setSaveStatus('手动格式化仅支持 .jcpro JSON 配置文件。');
+      return;
+    }
+    if (hasUnsavedChanges) {
+      setSaveStatus('请先保存当前项目配置，再格式化磁盘上的 .jcpro 文件。');
+      return;
+    }
+    if (!isTauriRuntime()) {
+      setSaveStatus('jcpro 文件格式化只能在 Tauri 桌面应用中使用。');
+      return;
+    }
+
+    setIsFormattingJcpro(true);
+    setSaveStatus(null);
+    try {
+      const source = await loadTextFile(path);
+      const formatted = formatJsonText(source);
+      if (formatted === source) {
+        setSaveStatus('当前 .jcpro 文件已经是格式化 JSON。');
+        return;
+      }
+      await saveTextFile(path, formatted);
+      await onRefreshGit();
+      setSaveStatus(`已格式化 jcpro JSON：${path}`);
+    } catch (cause) {
+      setSaveStatus(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setIsFormattingJcpro(false);
+    }
+  }
+
   async function mountRefactorConfig() {
     if (!loadedProject) return;
     setSaveStatus(null);
@@ -547,7 +587,9 @@ export function useProjectLifecycleController({
     confirmSaveProject,
     createNewProject,
     createRefactorConfig,
+    formatJcproFile,
     isOpening,
+    isFormattingJcpro,
     isSavingProject: savingProjectAction !== null,
     markDocumentState,
     migrateProject,

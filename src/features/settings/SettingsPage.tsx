@@ -81,15 +81,15 @@ export function SettingsPage({
           <div className="settings-option-grid__head">写入 ConfigUpdate.json</div>
           <div className="settings-option-grid__head">写入 pdo_sdo_data.bin</div>
           <div className="settings-option-info">
-            <span>锂电协议</span>
-            <small>控制 battery_protocol 是否随完整导出写入配置文件或设备 bin。</small>
+            <span>锂电监控协议</span>
+            <small>统一控制 battery_monitor 是否写入 ConfigUpdate.json 和 pdo_sdo_data.bin。</small>
           </div>
           <label className="settings-check">
             <input
-              aria-label="锂电协议：写入 ConfigUpdate.json"
-              checked={exportBatteryOptions.battery_protocol.config}
+              aria-label="锂电监控协议：写入 ConfigUpdate.json"
+              checked={exportBatteryOptions.battery_monitor.config}
               onChange={(event) =>
-                updateExportBatteryOption('battery_protocol', 'config', event.target.checked)
+                updateExportBatteryOption('battery_monitor', 'config', event.target.checked)
               }
               type="checkbox"
             />
@@ -97,38 +97,10 @@ export function SettingsPage({
           </label>
           <label className="settings-check">
             <input
-              aria-label="锂电协议：写入 pdo_sdo_data.bin"
-              checked={exportBatteryOptions.battery_protocol.bin}
+              aria-label="锂电监控协议：写入 pdo_sdo_data.bin"
+              checked={exportBatteryOptions.battery_monitor.bin}
               onChange={(event) =>
-                updateExportBatteryOption('battery_protocol', 'bin', event.target.checked)
-              }
-              type="checkbox"
-            />
-            <span>bin 文件</span>
-          </label>
-          <div className="settings-option-info">
-            <span>锂电协议监控</span>
-            <small>
-              控制 battery_monitor_info 是否写入导出清单描述和 battery monitor 二进制段。
-            </small>
-          </div>
-          <label className="settings-check">
-            <input
-              aria-label="锂电协议监控：写入 ConfigUpdate.json"
-              checked={exportBatteryOptions.battery_monitor_info.config}
-              onChange={(event) =>
-                updateExportBatteryOption('battery_monitor_info', 'config', event.target.checked)
-              }
-              type="checkbox"
-            />
-            <span>配置文件</span>
-          </label>
-          <label className="settings-check">
-            <input
-              aria-label="锂电协议监控：写入 pdo_sdo_data.bin"
-              checked={exportBatteryOptions.battery_monitor_info.bin}
-              onChange={(event) =>
-                updateExportBatteryOption('battery_monitor_info', 'bin', event.target.checked)
+                updateExportBatteryOption('battery_monitor', 'bin', event.target.checked)
               }
               type="checkbox"
             />

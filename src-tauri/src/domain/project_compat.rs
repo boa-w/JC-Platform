@@ -1,18 +1,13 @@
 //! Legacy 项目文件兼容策略。
 //!
 //! 该模块集中定义写回 `.jcpro` 时需要剥离的重构专属段，避免命令层和项目层各自维护
-//! 一份规则。注意：前端当前还把 `battery_protocol` 视为 sidecar/refactor-only；为保持
-//! 既有保存和导出行为不变，后端暂不在 `.jcpro` 写回时剥离该段。
+//! 一份规则。锂电监控是正式项目协议段，不属于 refactor-only 数据。
 
 use chrono::Local;
 use serde_json::{Map, Value};
 
-const REFACTOR_ONLY_SECTIONS: &[&str] = &[
-    "signal_dictionary",
-    "private_protocol",
-    "protocol_mapping",
-    "battery_monitor_info",
-];
+const REFACTOR_ONLY_SECTIONS: &[&str] =
+    &["signal_dictionary", "private_protocol", "protocol_mapping"];
 
 const LEGACY_CONFIG_VERSION: &str = "jc001";
 
@@ -339,13 +334,12 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn sanitize_jcpro_removes_refactor_only_sections_but_keeps_battery_protocol() {
+    fn sanitize_jcpro_removes_only_unified_sidecar_sections() {
         let document = json!({
             "signal_dictionary": {},
             "private_protocol": {},
             "protocol_mapping": [],
-            "battery_monitor_info": {},
-            "battery_protocol": { "frames": [] },
+            "battery_monitor": { "frames": [] },
             "export_info": {
                 "binary_filename": "data.bin",
                 "folder_name": "release",
@@ -360,8 +354,7 @@ mod tests {
         assert!(sanitized.get("signal_dictionary").is_none());
         assert!(sanitized.get("private_protocol").is_none());
         assert!(sanitized.get("protocol_mapping").is_none());
-        assert!(sanitized.get("battery_monitor_info").is_none());
-        assert!(sanitized.get("battery_protocol").is_some());
+        assert!(sanitized.get("battery_monitor").is_some());
         assert_eq!(
             sanitized
                 .get("export_info")

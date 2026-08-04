@@ -7,7 +7,6 @@ export type NavigationKey =
   | 'protocol-mapping'
   | 'canopen-export'
   | 'ui'
-  | 'battery-protocol'
   | 'battery-monitor'
   | 'fault-code'
   | 'language'
@@ -175,8 +174,7 @@ export interface ProjectDocument {
   private_protocol: PrivateProtocolDocument;
   protocol_mapping: ProtocolMapping[];
   language_info: LanguageDocument;
-  battery_protocol: BatteryProtocol;
-  battery_monitor_info: BatteryMonitorInfo;
+  battery_monitor: BatteryMonitorProtocol;
   fault_code_info: FaultCodeInfo;
 }
 
@@ -189,6 +187,7 @@ export interface ProjectExportSettings {
 export interface UnifiedProtocolModel {
   signal_dictionary: SignalDictionary;
   canopen: CanOpenTransport;
+  battery_monitor: BatteryMonitorProtocolModel;
   private_protocol: PrivateProtocolDocument;
   mappings: ProtocolMapping[];
   validation: ProtocolValidationReport;
@@ -327,20 +326,19 @@ export interface ProtocolCompatibilityReport {
   warnings: string[];
 }
 
-export interface BatteryProtocol {
+export interface BatteryMonitorProtocol {
+  schema_version: number;
+  enabled: boolean;
+  version: number;
   default_timeout_ticks: number;
+  page_size: number;
   frames: BatteryMonitorFrame[];
   signals: BatteryMonitorSignal[];
-  dbc_content?: string;
-  [key: string]: unknown;
-}
-
-export interface BatteryMonitorInfo {
-  enabled: boolean;
-  page_size: number;
   items: BatteryMonitorItem[];
   [key: string]: unknown;
 }
+
+export type BatteryMonitorProtocolModel = BatteryMonitorProtocol;
 
 export interface FaultCodeInfo {
   schema_version?: number;
@@ -383,7 +381,8 @@ export interface FaultCodeItem {
 export interface BatteryMonitorFrame {
   frame_key: string;
   can_id: number;
-  type: number;
+  frame_type: number;
+  dlc: number;
   desc: string;
   timeout_ticks: number;
   [key: string]: unknown;
@@ -394,19 +393,17 @@ export interface BatteryMonitorSignal {
   param_id: string;
   name: string;
   inner: number;
-  type: number;
-  def: string;
   frame_key: string;
   pos: number;
   len: number;
-  show_type: number;
-  handle?: number;
-  handle_param?: string;
-  factor?: number;
-  offset?: number;
-  min?: number;
-  max?: number;
-  unit?: string;
+  byte_order: 'little_endian' | 'big_endian';
+  raw_offset: number;
+  raw_type: 'u8' | 'u16_le' | 'u32_le' | 'datetime_ymdhms';
+  value_type: 'u8' | 'u16' | 'u32' | 'f32' | 'datetime';
+  parse_resolution: number;
+  parse_offset: number;
+  parse_mask: number;
+  parse_shift: number;
   receiver?: string;
   comment?: string;
   [key: string]: unknown;
@@ -444,6 +441,7 @@ export interface BatteryMonitorItem {
   order: number;
   signal_key: string;
   name_key: string;
+  fallback_name: string;
   unit: string;
   formatter: BatteryMonitorFormatter;
   validity: BatteryMonitorValidity;
@@ -631,8 +629,7 @@ export interface ExportTargetOptions {
 }
 
 export interface ExportBatteryOptions {
-  battery_protocol: ExportTargetOptions;
-  battery_monitor_info: ExportTargetOptions;
+  battery_monitor: ExportTargetOptions;
   fault_code_info: ExportTargetOptions;
 }
 

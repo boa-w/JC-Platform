@@ -1,5 +1,8 @@
 //! 多协议模型校验。
 
+use super::battery_monitor::{
+    BatteryMonitorProtocol, BatteryRawType, BatteryValueType, BATTERY_PARSE_NO_MASK,
+};
 use super::model::{CanOpenTransport, MappingTarget, ProtocolMapping, ProtocolValidationReport};
 use crate::domain::private_protocol::PrivateProtocolDocument;
 use crate::domain::signal::SignalDictionary;
@@ -8,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 pub(crate) fn validate_protocol_model(
     signal_dictionary: &SignalDictionary,
     canopen: &CanOpenTransport,
+    battery_monitor: &BatteryMonitorProtocol,
     private_protocol: &PrivateProtocolDocument,
     mappings: &[ProtocolMapping],
 ) -> ProtocolValidationReport {
@@ -57,11 +61,146 @@ pub(crate) fn validate_protocol_model(
 
     validate_overlaps("CANopen PDO", canopen, &mut errors);
     validate_private_overlaps(private_protocol, &mut errors);
+    validate_battery_monitor(battery_monitor, &mut errors, &mut warnings);
 
     ProtocolValidationReport {
         valid: errors.is_empty(),
         errors,
         warnings,
+    }
+}
+
+fn validate_battery_monitor(
+    protocol: &BatteryMonitorProtocol,
+    errors: &mut Vec<String>,
+    warnings: &mut Vec<String>,
+) {
+    if !protocol.enabled {
+        return;
+    }
+
+    let mut frame_keys = HashSet::new();
+    for frame in &protocol.frames {
+        if frame.frame_key.trim().is_empty() {
+            errors.push("锂电监控存在空 frame_key".to_string());
+        } else if !frame_keys.insert(frame.frame_key.as_str()) {
+            errors.push(format!("锂电监控 frame_key 重复：{}", frame.frame_key));
+        }
+        if frame.dlc == 0 || frame.dlc > 8 {
+            errors.push(format!(
+                "锂电监控帧 {} 的 DLC 必须在 1..=8 内",
+                frame.frame_key
+            ));
+        }
+        if frame.frame_type == 0 && frame.can_id > 0x7ff {
+            errors.push(format!(
+                "锂电监控标准帧 {} 的 CAN ID 超过 11 位：0x{:X}",
+                frame.frame_key, frame.can_id
+            ));
+        }
+    }
+
+    let signal_keys = protocol
+        .signals
+        .iter()
+        .map(|signal| signal.signal_key.as_str())
+        .collect::<HashSet<_>>();
+    let mut seen_signal_keys = HashSet::new();
+    let mut seen_param_ids = HashSet::new();
+    for signal in &protocol.signals {
+        if signal.signal_key.trim().is_empty() {
+            errors.push("锂电监控存在空 signal_key".to_string());
+        } else if !seen_signal_keys.insert(signal.signal_key.as_str()) {
+            errors.push(format!("锂电监控 signal_key 重复：{}", signal.signal_key));
+        }
+        if !signal.param_id.trim().is_empty() && !seen_param_ids.insert(signal.param_id.as_str()) {
+            errors.push(format!("锂电监控 param_id 重复：{}", signal.param_id));
+        }
+        let Some(frame) = protocol
+            .frames
+            .iter()
+            .find(|frame| frame.frame_key == signal.frame_key)
+        else {
+            errors.push(format!(
+                "锂电信号 {} 引用了不存在的帧 {}",
+                signal.signal_key, signal.frame_key
+            ));
+            continue;
+        };
+        if signal.len == 0
+            || u32::from(signal.pos) + u32::from(signal.len) > u32::from(frame.dlc) * 8
+        {
+            errors.push(format!(
+                "锂电信号 {} 位范围超过帧 {}：pos={}, len={}, dlc={}",
+                signal.signal_key, signal.frame_key, signal.pos, signal.len, frame.dlc
+            ));
+        }
+        let raw_width = match signal.raw_type {
+            BatteryRawType::U8 => 1,
+            BatteryRawType::U16Le => 2,
+            BatteryRawType::U32Le => 4,
+            BatteryRawType::DateTimeYmdhms => 7,
+        };
+        if u16::from(signal.raw_offset) + raw_width > u16::from(frame.dlc) {
+            errors.push(format!(
+                "锂电信号 {} 的 raw_offset/raw_type 超过帧 {}：offset={}, width={}, dlc={}",
+                signal.signal_key, signal.frame_key, signal.raw_offset, raw_width, frame.dlc
+            ));
+        }
+        if signal.parse_resolution == 0.0 {
+            warnings.push(format!("锂电信号 {} 的解析倍率为 0", signal.signal_key));
+        }
+        if signal.parse_mask != BATTERY_PARSE_NO_MASK && signal.parse_shift >= 32 {
+            errors.push(format!(
+                "锂电信号 {} 的 parse_shift 无效",
+                signal.signal_key
+            ));
+        }
+        if matches!(signal.value_type, BatteryValueType::DateTime)
+            && !matches!(signal.raw_type, BatteryRawType::DateTimeYmdhms)
+        {
+            errors.push(format!(
+                "锂电信号 {} 的 value_type=datetime 必须使用 datetime_ymdhms",
+                signal.signal_key
+            ));
+        }
+    }
+
+    let mut item_keys = HashSet::new();
+    let mut orders = HashSet::new();
+    for item in &protocol.items {
+        if item.item_key.trim().is_empty() || !item_keys.insert(item.item_key.as_str()) {
+            errors.push(format!("锂电显示项 item_key 无效或重复：{}", item.item_key));
+        }
+        if !item.enabled {
+            continue;
+        }
+        if !orders.insert(item.order) {
+            warnings.push(format!("锂电显示项 order 重复：{}", item.order));
+        }
+        if !signal_keys.contains(item.signal_key.as_str()) {
+            errors.push(format!(
+                "锂电显示项 {} 引用了不存在的信号 {}",
+                item.item_key, item.signal_key
+            ));
+        }
+        if item.name_key.trim().is_empty() {
+            errors.push(format!("锂电显示项 {} 缺少 name_key", item.item_key));
+        }
+        if !item.validity.frame_key.is_empty()
+            && !frame_keys.contains(item.validity.frame_key.as_str())
+        {
+            errors.push(format!(
+                "锂电显示项 {} 引用了不存在的有效性帧 {}",
+                item.item_key, item.validity.frame_key
+            ));
+        }
+        if item.formatter.scale_den == 0 {
+            errors.push(format!(
+                "锂电显示项 {} 的 scale_den 不能为 0",
+                item.item_key
+            ));
+        }
     }
 }
 
