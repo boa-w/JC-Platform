@@ -734,7 +734,8 @@ pub fn save_json_file(path: String, content: Value) -> Result<(), String> {
 #[tauri::command]
 pub fn load_json_file(path: String) -> Result<Value, String> {
     let content = std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败：{}", e))?;
-    serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败：{}", e))
+    serde_json::from_str(content.strip_prefix('\u{FEFF}').unwrap_or(&content))
+        .map_err(|e| format!("解析 JSON 失败：{}", e))
 }
 
 /// 从指定文件路径读取文本内容。

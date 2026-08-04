@@ -35,9 +35,11 @@ pub fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T, JsonS
         path: path_ref.display().to_string(),
         source,
     })?;
-    serde_json::from_str(&content).map_err(|source| JsonStoreError::Parse {
-        path: path_ref.display().to_string(),
-        source,
+    serde_json::from_str(content.strip_prefix('\u{FEFF}').unwrap_or(&content)).map_err(|source| {
+        JsonStoreError::Parse {
+            path: path_ref.display().to_string(),
+            source,
+        }
     })
 }
 
@@ -49,4 +51,27 @@ pub fn write_json<T: Serialize>(path: impl AsRef<Path>, value: &T) -> Result<(),
         path: path_ref.display().to_string(),
         source,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_json;
+    use serde_json::Value;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn read_json_accepts_utf8_bom() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("jc-json-store-{unique}.json"));
+        fs::write(&path, "\u{FEFF}{\"enabled\":true}").expect("write test JSON");
+
+        let value: Value = read_json(&path).expect("read JSON with BOM");
+        fs::remove_file(path).expect("remove test JSON");
+
+        assert_eq!(value["enabled"], true);
+    }
 }
