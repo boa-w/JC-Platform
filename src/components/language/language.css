@@ -449,7 +449,7 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 5px 9px;
-  background: var(--surface-panel);
+  background-color: var(--surface-panel);
   color: var(--text-primary);
   font-size: 12px;
 }
@@ -464,6 +464,10 @@
 
 .lang-translate-field--language select {
   width: 168px;
+}
+
+.lang-translate-field select {
+  padding-right: 34px;
 }
 
 .lang-translate-service-state {

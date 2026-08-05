@@ -17,7 +17,7 @@
 [data-theme="dark"] .lang-filter-input,
 [data-theme="dark"] .lang-editor-add input,
 [data-theme="dark"] .lang-add-form input {
-  background: var(--control-surface);
+  background-color: var(--control-surface);
   border-color: var(--control-border);
   color: var(--control-text);
 }
@@ -41,7 +41,7 @@
 [data-theme="dark"] .lang-editor-add input:focus,
 [data-theme="dark"] .lang-add-form input:focus {
   border-color: var(--action-primary);
-  background: var(--control-surface);
+  background-color: var(--control-surface);
 }
 
 [data-theme="dark"] .config-table th {

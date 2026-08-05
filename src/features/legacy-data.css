@@ -399,7 +399,7 @@
   border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 0 9px;
-  background: var(--surface-panel);
+  background-color: var(--surface-panel);
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -612,7 +612,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   padding: 4px 6px;
-  background: transparent;
+  background-color: transparent;
   color: var(--text-primary);
   font: inherit;
   text-align: center;
@@ -622,7 +622,7 @@
 .legacy-data-table select:focus {
   outline: none;
   border-color: var(--action-primary-border);
-  background: var(--surface-panel);
+  background-color: var(--surface-panel);
 }
 
 .legacy-data-table input[type="checkbox"] {
@@ -917,12 +917,18 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
-  background: var(--surface-panel);
+  background-color: var(--surface-panel);
   color: var(--text-primary);
 }
 
 .legacy-edit-grid select {
   cursor: pointer;
+}
+
+.setting-column-preset select,
+.legacy-data-table select,
+.legacy-edit-grid select {
+  padding-right: 28px;
 }
 
 [data-theme="dark"] .legacy-data-sidebar {
@@ -994,5 +1000,5 @@
 
 [data-theme="dark"] .legacy-data-table input:focus,
 [data-theme="dark"] .legacy-data-table select:focus {
-  background: var(--sidebar-surface);
+  background-color: var(--sidebar-surface);
 }

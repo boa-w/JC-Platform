@@ -53,6 +53,47 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+/* ── Select Controls ── */
+
+select:not([multiple]) {
+  min-width: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 7px 34px 7px 10px;
+  background-color: var(--surface-control);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 15px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+select:not([multiple]):focus {
+  outline: none;
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+select:not([multiple]):disabled {
+  background-color: var(--surface-subtle);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* ── App Shell ── */
 
 .visually-hidden {
@@ -1936,7 +1977,7 @@ button.git-summary-row:disabled,
   padding: 6px 10px;
   font-size: 12px;
   color: var(--text-primary);
-  background: var(--surface-panel);
+  background-color: var(--surface-panel);
   cursor: pointer;
   transition:
     border-color 0.15s,
@@ -2753,7 +2794,7 @@ button.git-summary-row:disabled,
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 7px 10px;
-  background: white;
+  background-color: white;
   color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
@@ -3046,7 +3087,7 @@ button.git-summary-row:disabled,
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
-  background: white;
+  background-color: white;
   color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
@@ -3242,7 +3283,7 @@ button.git-summary-row:disabled,
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
-  background: white;
+  background-color: white;
   color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
@@ -3298,7 +3339,7 @@ button.git-summary-row:disabled,
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
-  background: var(--surface-panel);
+  background-color: var(--surface-panel);
   color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
@@ -3398,7 +3439,7 @@ button.git-summary-row:disabled,
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 5px 8px;
-  background: white;
+  background-color: white;
   color: var(--text-primary);
   font-size: 13px;
   transition: border-color 0.15s;
@@ -3437,7 +3478,7 @@ button.git-summary-row:disabled,
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   padding: 4px 7px;
-  background: white;
+  background-color: white;
   color: var(--text-primary);
   font-size: 12px;
   transition: border-color 0.15s;
@@ -3497,7 +3538,7 @@ button.git-summary-row:disabled,
 [data-theme="dark"] .battery-config-row select,
 [data-theme="dark"] .battery-frame-grid input,
 [data-theme="dark"] .battery-frame-grid select {
-  background: var(--control-surface);
+  background-color: var(--control-surface);
   border-color: var(--control-border);
   color: var(--control-text);
 }
@@ -3507,7 +3548,17 @@ button.git-summary-row:disabled,
 [data-theme="dark"] .battery-frame-grid input:focus,
 [data-theme="dark"] .battery-frame-grid select:focus {
   border-color: var(--action-primary);
-  background: var(--control-surface);
+  background-color: var(--control-surface);
+}
+
+.project-recent-select,
+.ui-property-grid select,
+.config-table select,
+.pdo-frame-grid select,
+.private-frame-props select,
+.battery-config-row select,
+.battery-frame-grid select {
+  padding-right: 34px;
 }
 
 /* ── Table Format Reference ── */

@@ -6,7 +6,7 @@ const distDir = join(process.cwd(), 'dist');
 const html = readFileSync(join(distDir, 'index.html'), 'utf8');
 const budgets = {
   script: 90 * 1024,
-  stylesheet: 12 * 1024,
+  stylesheet: 12.25 * 1024,
 };
 
 function resolveAsset(pattern, label) {
@@ -23,7 +23,7 @@ function verifyGzipBudget(path, budget, label) {
   const budgetKiB = budget / 1024;
   if (gzipBytes > budget) {
     throw new Error(
-      `${label} exceeds its ${budgetKiB.toFixed(0)} KiB gzip budget: ${gzipKiB.toFixed(2)} KiB.`,
+      `${label} exceeds its ${budgetKiB.toFixed(2)} KiB gzip budget: ${gzipKiB.toFixed(2)} KiB.`,
     );
   }
   return `${label}: ${rawKiB.toFixed(2)} KiB raw / ${gzipKiB.toFixed(2)} KiB gzip`;
