@@ -2,12 +2,14 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  createProject,
+  createProjectWindow,
   loadTextFile,
   loadJsonFile,
   loadProject,
   migrateProjectDocument,
+  openProjectWindow,
   parseProjectDocument,
+  releaseProjectWindow,
   saveJsonFile,
   saveProject,
   saveProjectAs,
@@ -88,6 +90,13 @@ function mergeRefactorConfigDocument(projectDocument: unknown, sidecarDocument: 
     }
   }
   return projectObject;
+}
+
+function projectWindowError(cause: unknown, t: (key: string) => string) {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  if (message === 'project_window_locked') return t('projectLifecycle.status.projectAlreadyOpen');
+  if (message === 'project_path_not_jcpro') return t('projectLifecycle.status.jcproOnly');
+  return message;
 }
 
 export function useProjectLifecycleController({
@@ -243,40 +252,66 @@ export function useProjectLifecycleController({
 
     const generation = beginOpenOperation();
     try {
-      const nextProject = await createProject({
+      const result = await createProjectWindow({
         path: selected,
         name: newProjectName,
         resolutionW: newResolutionW,
         resolutionH: newResolutionH,
       });
       if (generation !== operationGenerationRef.current) return;
-      setRefactorConfigPath(null);
-      setRefactorConfigStatus(null);
-      acceptProject(nextProject, selected);
-      await onRefreshUi(nextProject.document, nextProject.summary.path ?? selected);
+      if (result.action === 'created') {
+        setSaveStatus(t('projectLifecycle.status.openedInNewWindow'));
+        return;
+      }
+      if (result.action === 'focused') {
+        setSaveStatus(t('projectLifecycle.status.focusedExistingWindow'));
+        return;
+      }
+      await openProject(selected, true, { reuseCurrent: true });
     } catch (cause) {
       if (generation === operationGenerationRef.current) {
-        setOpenError(cause instanceof Error ? cause.message : String(cause));
+        setOpenError(projectWindowError(cause, (key) => t(key)));
       }
     } finally {
       finishOpenOperation(generation);
     }
   }
 
-  async function openProject(path = projectPath, skipDiscardConfirmation = false) {
+  async function openProject(
+    path = projectPath,
+    skipDiscardConfirmation = false,
+    options?: { reuseCurrent?: boolean },
+  ) {
+    const requestedPath = path.trim();
+    if (requestedPath === '') return;
+    if (!options?.reuseCurrent && isTauriRuntime()) {
+      try {
+        const result = await openProjectWindow(requestedPath);
+        if (result.action === 'created') {
+          setSaveStatus(t('projectLifecycle.status.openedInNewWindow'));
+        } else if (result.action === 'focused') {
+          setSaveStatus(t('projectLifecycle.status.focusedExistingWindow'));
+        }
+        if (loadedProject || result.action !== 'current') return;
+      } catch (cause) {
+        setOpenError(projectWindowError(cause, (key) => t(key)));
+        return;
+      }
+    }
     if (!skipDiscardConfirmation && !(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))) return;
     const generation = beginOpenOperation();
     try {
-      const nextProject = await loadProject(path);
-      const mounted = await findRefactorConfig(nextProject, nextProject.summary.path ?? path);
+      const nextProject = await loadProject(requestedPath);
+      const mounted = await findRefactorConfig(nextProject, nextProject.summary.path ?? requestedPath);
       if (generation !== operationGenerationRef.current) return;
       setRefactorConfigPath(mounted.path);
       setRefactorConfigStatus(mounted.status);
-      acceptProject(mounted.project, path);
-      void onRefreshUi(mounted.project.document, mounted.project.summary.path ?? path);
+      acceptProject(mounted.project, requestedPath);
+      void onRefreshUi(mounted.project.document, mounted.project.summary.path ?? requestedPath);
     } catch (cause) {
+      if (isTauriRuntime()) void releaseProjectWindow(requestedPath).catch(() => undefined);
       if (generation === operationGenerationRef.current) {
-        setOpenError(cause instanceof Error ? cause.message : String(cause));
+        setOpenError(projectWindowError(cause, (key) => t(key)));
       }
     } finally {
       finishOpenOperation(generation);
@@ -287,12 +322,12 @@ export function useProjectLifecycleController({
     const reloadPath = loadedProject?.summary.path ?? projectPath;
     if (reloadPath.trim() === '') return;
     if (!(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.reload')))) return;
-    await openProject(reloadPath, true);
+    await openProject(reloadPath, true, { reuseCurrent: true });
   }
 
   async function selectProjectFile() {
     setOpenError(null);
-    if (!(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))) return;
+    if (!loadedProject && !(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))) return;
     if (!isTauriRuntime()) {
       setOpenError(t('projectLifecycle.status.desktopFilePickerOnly'));
       return;
@@ -426,7 +461,7 @@ export function useProjectLifecycleController({
       await onRefreshGit();
       setSaveStatus(t('projectLifecycle.status.formatted', { path }));
     } catch (cause) {
-      setSaveStatus(cause instanceof Error ? cause.message : String(cause));
+      setSaveStatus(projectWindowError(cause, (key) => t(key)));
     } finally {
       setIsFormattingJcpro(false);
     }
@@ -581,7 +616,7 @@ export function useProjectLifecycleController({
         }),
       );
     } catch (cause) {
-      setSaveStatus(cause instanceof Error ? cause.message : String(cause));
+      setSaveStatus(projectWindowError(cause, (key) => t(key)));
     } finally {
       setSavingProjectAction(null);
     }

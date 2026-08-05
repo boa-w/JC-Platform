@@ -266,6 +266,13 @@ export async function installRichProjectDesktopMock(page: Page) {
           if (command === 'plugin:window|set_title') return null;
           if (command === 'plugin:app|name') return '自定义开发平台';
           if (command === 'plugin:app|version') return '0.1.0';
+          if (command === 'open_project_window') {
+            return { action: 'current', windowLabel: 'main', path: projectPath };
+          }
+          if (command === 'create_project_window') {
+            return { action: 'current', windowLabel: 'main', path: projectPath };
+          }
+          if (command === 'release_project_window') return null;
           if (command === 'load_project') return loadedProject(JSON.parse(worktreeContent));
           if (command === 'load_text_file') {
             const delay = (
@@ -366,6 +373,9 @@ export async function installRichProjectDesktopMock(page: Page) {
               window as unknown as { __SAVED_PROJECT_DOCUMENT__: unknown }
             ).__SAVED_PROJECT_DOCUMENT__ = savedDocument;
             return loadedProject(savedDocument);
+          }
+          if (command === 'save_project_as_locked') {
+            return { project: loadedProject(document), copied_resources: [], warnings: [] };
           }
           throw new Error(`Unexpected desktop command: ${command}`);
         },

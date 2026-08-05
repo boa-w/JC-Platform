@@ -55,13 +55,49 @@ use can_dbc::{ByteOrder, Dbc, MessageId, NumericValue, ValueType};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Default)]
-pub struct PendingProjectPath(Mutex<Option<String>>);
+pub struct PendingProjectPath(Mutex<HashMap<String, String>>);
+
+#[derive(Default)]
+pub struct ProjectWindowRegistry(Mutex<ProjectWindowRegistryState>);
+
+#[derive(Default)]
+struct ProjectWindowRegistryState {
+    path_to_window: HashMap<String, String>,
+    window_to_path: HashMap<String, String>,
+    next_window_id: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ProjectWindowClaim {
+    Current(String),
+    Existing(String),
+    New(String),
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectWindowAction {
+    Current,
+    Created,
+    Focused,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectWindowOpenResult {
+    pub action: ProjectWindowAction,
+    pub window_label: String,
+    pub path: String,
+}
+
+const PROJECT_WINDOW_LOCKED_ERROR: &str = "project_window_locked";
+const PROJECT_PATH_NOT_JCPRO_ERROR: &str = "project_path_not_jcpro";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SingleLanguageCsvImportRequest {
@@ -72,17 +108,179 @@ pub struct SingleLanguageCsvImportRequest {
 
 impl PendingProjectPath {
     pub fn new(path: Option<String>) -> Self {
-        Self(Mutex::new(path))
+        let mut pending = HashMap::new();
+        if let Some(path) = path {
+            pending.insert("main".to_string(), path);
+        }
+        Self(Mutex::new(pending))
     }
 
     pub fn replace(&self, path: String) {
+        self.replace_for_label("main", path);
+    }
+
+    pub fn replace_for_label(&self, label: &str, path: String) {
         if let Ok(mut pending) = self.0.lock() {
-            *pending = Some(path);
+            pending.insert(label.to_string(), path);
         }
     }
 
-    fn take(&self) -> Option<String> {
-        self.0.lock().ok()?.take()
+    fn take_for_label(&self, label: &str) -> Option<String> {
+        self.0.lock().ok()?.remove(label)
+    }
+}
+
+impl ProjectWindowRegistry {
+    fn claim_path(&self, preferred_label: Option<&str>, path: &str) -> ProjectWindowClaim {
+        let mut state = self.0.lock().expect("project window registry poisoned");
+        if let Some(owner) = state.path_to_window.get(path) {
+            if preferred_label.is_some_and(|label| label == owner) {
+                return ProjectWindowClaim::Current(owner.clone());
+            }
+            return ProjectWindowClaim::Existing(owner.clone());
+        }
+
+        if let Some(label) = preferred_label {
+            if !state.window_to_path.contains_key(label) {
+                state
+                    .path_to_window
+                    .insert(path.to_string(), label.to_string());
+                state
+                    .window_to_path
+                    .insert(label.to_string(), path.to_string());
+                return ProjectWindowClaim::Current(label.to_string());
+            }
+        }
+
+        let label = loop {
+            state.next_window_id = state.next_window_id.wrapping_add(1);
+            let candidate = format!("project-{}", state.next_window_id);
+            if !state.window_to_path.contains_key(&candidate) {
+                break candidate;
+            }
+        };
+        state.path_to_window.insert(path.to_string(), label.clone());
+        state.window_to_path.insert(label.clone(), path.to_string());
+        ProjectWindowClaim::New(label)
+    }
+
+    pub(crate) fn release_label(&self, label: &str) {
+        let Ok(mut state) = self.0.lock() else {
+            return;
+        };
+        if let Some(path) = state.window_to_path.remove(label) {
+            if state
+                .path_to_window
+                .get(&path)
+                .is_some_and(|owner| owner == label)
+            {
+                state.path_to_window.remove(&path);
+            }
+        }
+    }
+
+    fn path_owned_by_label(&self, label: &str, path: &str) -> bool {
+        self.0
+            .lock()
+            .ok()
+            .and_then(|state| state.window_to_path.get(label).cloned())
+            .is_some_and(|owned_path| owned_path == path)
+    }
+
+    fn release_path_for_label(&self, label: &str, path: &str) {
+        let Ok(mut state) = self.0.lock() else {
+            return;
+        };
+        let owns_path = state
+            .window_to_path
+            .get(label)
+            .is_some_and(|owned_path| owned_path == path);
+        if state
+            .path_to_window
+            .get(path)
+            .is_some_and(|owner| owner == label)
+        {
+            state.path_to_window.remove(path);
+        }
+        if owns_path {
+            state.window_to_path.remove(label);
+        }
+    }
+
+    fn with_save_as_lock<T, F>(
+        &self,
+        label: &str,
+        target_path: Option<&str>,
+        operation: F,
+    ) -> Result<T, String>
+    where
+        F: FnOnce() -> Result<T, String>,
+    {
+        let mut state = self.0.lock().expect("project window registry poisoned");
+        let old_path = state.window_to_path.get(label).cloned();
+
+        if let Some(target_path) = target_path {
+            if let Some(owner) = state.path_to_window.get(target_path) {
+                if owner != label {
+                    return Err(PROJECT_WINDOW_LOCKED_ERROR.to_string());
+                }
+            }
+            if old_path.as_deref() != Some(target_path) {
+                if let Some(old_path) = &old_path {
+                    if state
+                        .path_to_window
+                        .get(old_path)
+                        .is_some_and(|owner| owner == label)
+                    {
+                        state.path_to_window.remove(old_path);
+                    }
+                }
+                state
+                    .path_to_window
+                    .insert(target_path.to_string(), label.to_string());
+                state
+                    .window_to_path
+                    .insert(label.to_string(), target_path.to_string());
+            }
+        }
+
+        match operation() {
+            Ok(value) => {
+                if target_path.is_none() {
+                    if let Some(old_path) = old_path {
+                        if state
+                            .path_to_window
+                            .get(&old_path)
+                            .is_some_and(|owner| owner == label)
+                        {
+                            state.path_to_window.remove(&old_path);
+                        }
+                    }
+                    state.window_to_path.remove(label);
+                }
+                Ok(value)
+            }
+            Err(error) => {
+                if let Some(target_path) = target_path {
+                    if state
+                        .path_to_window
+                        .get(target_path)
+                        .is_some_and(|owner| owner == label)
+                    {
+                        state.path_to_window.remove(target_path);
+                    }
+                    if let Some(old_path) = old_path {
+                        state
+                            .path_to_window
+                            .insert(old_path.clone(), label.to_string());
+                        state.window_to_path.insert(label.to_string(), old_path);
+                    } else {
+                        state.window_to_path.remove(label);
+                    }
+                }
+                Err(error)
+            }
+        }
     }
 }
 
@@ -124,8 +322,239 @@ pub fn project_summary() -> ProjectSummary {
 }
 
 #[tauri::command]
-pub fn take_pending_project_path(state: tauri::State<'_, PendingProjectPath>) -> Option<String> {
-    state.take()
+pub fn take_pending_project_path(
+    window: tauri::WebviewWindow,
+    state: tauri::State<'_, PendingProjectPath>,
+) -> Option<String> {
+    state.take_for_label(window.label())
+}
+
+fn normalize_project_window_path(path: &str) -> Result<String, String> {
+    let trimmed = path.trim();
+    if !project_path_from_args([trimmed.to_string()]).is_some() {
+        return Err(PROJECT_PATH_NOT_JCPRO_ERROR.to_string());
+    }
+    let resolved = resolve_project_path(trimmed).map_err(|error| error.to_string())?;
+    Ok(normalize_project_path_key(resolved))
+}
+
+fn normalize_new_project_window_path(path: &str) -> Result<String, String> {
+    let trimmed = path.trim();
+    if !project_path_from_args([trimmed.to_string()]).is_some() {
+        return Err(PROJECT_PATH_NOT_JCPRO_ERROR.to_string());
+    }
+    let resolved = resolve_project_path(trimmed).unwrap_or_else(|_| {
+        let candidate = PathBuf::from(trimmed);
+        if candidate.is_absolute() {
+            candidate
+        } else {
+            std::env::current_dir()
+                .map(|current_dir| current_dir.join(candidate))
+                .unwrap_or_else(|_| PathBuf::from(trimmed))
+        }
+    });
+    Ok(normalize_project_path_key(resolved))
+}
+
+fn normalize_project_path_key(path: PathBuf) -> String {
+    let normalized = if path.exists() {
+        path.canonicalize().unwrap_or(path)
+    } else if let (Some(parent), Some(file_name)) = (path.parent(), path.file_name()) {
+        parent
+            .canonicalize()
+            .map(|canonical_parent| canonical_parent.join(file_name))
+            .unwrap_or(path)
+    } else {
+        path
+    };
+    let mut key = normalized.to_string_lossy().replace('\\', "/");
+    if cfg!(windows) {
+        key.make_ascii_lowercase();
+    }
+    key
+}
+
+fn focus_project_window(app: &tauri::AppHandle, label: &str) -> bool {
+    let Some(window) = app.get_webview_window(label) else {
+        return false;
+    };
+    let _ = window.unminimize();
+    let _ = window.show();
+    let _ = window.set_focus();
+    true
+}
+
+fn build_project_window(app: &tauri::AppHandle, label: &str) -> Result<(), String> {
+    WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+        .title("自定义开发平台")
+        .inner_size(1280.0, 800.0)
+        .min_inner_size(1024.0, 700.0)
+        .resizable(true)
+        .visible(true)
+        .build()
+        .map(|_| ())
+        .map_err(|error| format!("project_window_create_failed:{error}"))
+}
+
+async fn route_project_window(
+    app: &tauri::AppHandle,
+    pending: &PendingProjectPath,
+    registry: &ProjectWindowRegistry,
+    current_label: Option<&str>,
+    path: String,
+) -> Result<ProjectWindowOpenResult, String> {
+    let trimmed_path = path.trim().to_string();
+    let normalized_path = normalize_project_window_path(&trimmed_path)?;
+
+    loop {
+        match registry.claim_path(current_label, &normalized_path) {
+            ProjectWindowClaim::Current(label) => {
+                return Ok(ProjectWindowOpenResult {
+                    action: ProjectWindowAction::Current,
+                    window_label: label,
+                    path: trimmed_path,
+                });
+            }
+            ProjectWindowClaim::Existing(label) => {
+                if focus_project_window(app, &label) {
+                    return Ok(ProjectWindowOpenResult {
+                        action: ProjectWindowAction::Focused,
+                        window_label: label,
+                        path: trimmed_path,
+                    });
+                }
+                registry.release_label(&label);
+            }
+            ProjectWindowClaim::New(label) => {
+                pending.replace_for_label(&label, trimmed_path.clone());
+                if let Err(error) = build_project_window(app, &label) {
+                    pending.take_for_label(&label);
+                    registry.release_label(&label);
+                    return Err(error);
+                }
+                return Ok(ProjectWindowOpenResult {
+                    action: ProjectWindowAction::Created,
+                    window_label: label,
+                    path: trimmed_path,
+                });
+            }
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn open_project_window(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    pending: tauri::State<'_, PendingProjectPath>,
+    registry: tauri::State<'_, ProjectWindowRegistry>,
+    path: String,
+) -> Result<ProjectWindowOpenResult, String> {
+    let current_label = window.label().to_string();
+    route_project_window(&app, &pending, &registry, Some(&current_label), path).await
+}
+
+#[tauri::command]
+pub async fn create_project_window(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    pending: tauri::State<'_, PendingProjectPath>,
+    registry: tauri::State<'_, ProjectWindowRegistry>,
+    request: NewProjectRequest,
+) -> Result<ProjectWindowOpenResult, String> {
+    let current_label = window.label().to_string();
+    let target_path = request.path.trim().to_string();
+    let request = NewProjectRequest {
+        path: target_path.clone(),
+        ..request
+    };
+    let normalized_path = normalize_new_project_window_path(&target_path)?;
+
+    loop {
+        let already_owned = registry.path_owned_by_label(&current_label, &normalized_path);
+        match registry.claim_path(Some(&current_label), &normalized_path) {
+            ProjectWindowClaim::Current(label) => {
+                if already_owned {
+                    return Err(PROJECT_WINDOW_LOCKED_ERROR.to_string());
+                }
+                if let Err(error) = create_project(request.clone()) {
+                    registry.release_label(&label);
+                    return Err(error);
+                }
+                return Ok(ProjectWindowOpenResult {
+                    action: ProjectWindowAction::Current,
+                    window_label: label,
+                    path: target_path,
+                });
+            }
+            ProjectWindowClaim::Existing(label) => {
+                if focus_project_window(&app, &label) {
+                    return Ok(ProjectWindowOpenResult {
+                        action: ProjectWindowAction::Focused,
+                        window_label: label,
+                        path: target_path,
+                    });
+                }
+                registry.release_label(&label);
+            }
+            ProjectWindowClaim::New(label) => {
+                if let Err(error) = create_project(request.clone()) {
+                    registry.release_label(&label);
+                    return Err(error);
+                }
+                pending.replace_for_label(&label, target_path.clone());
+                if let Err(error) = build_project_window(&app, &label) {
+                    pending.take_for_label(&label);
+                    registry.release_label(&label);
+                    return Err(error);
+                }
+                return Ok(ProjectWindowOpenResult {
+                    action: ProjectWindowAction::Created,
+                    window_label: label,
+                    path: target_path,
+                });
+            }
+        }
+    }
+}
+
+#[tauri::command]
+pub fn release_project_window(
+    window: tauri::WebviewWindow,
+    registry: tauri::State<'_, ProjectWindowRegistry>,
+    path: String,
+) -> Result<(), String> {
+    let normalized_path = normalize_project_window_path(&path)?;
+    registry.release_path_for_label(window.label(), &normalized_path);
+    Ok(())
+}
+
+pub async fn dispatch_external_project_open(app: tauri::AppHandle, path: String) {
+    let pending = app.state::<PendingProjectPath>();
+    let registry = app.state::<ProjectWindowRegistry>();
+    let preferred_label = app.get_webview_window("main").map(|_| "main".to_string());
+    let result = route_project_window(
+        &app,
+        &pending,
+        &registry,
+        preferred_label.as_deref(),
+        path.clone(),
+    )
+    .await;
+
+    let Ok(result) = result else {
+        if let Err(error) = result {
+            eprintln!("处理外部项目打开请求失败：{error}");
+        }
+        return;
+    };
+    if result.action == ProjectWindowAction::Current {
+        pending.replace_for_label(&result.window_label, result.path.clone());
+        let _ = focus_project_window(&app, &result.window_label);
+        if let Err(error) = app.emit_to(&result.window_label, "open-project", result.path) {
+            eprintln!("发送项目打开事件失败：{error}");
+        }
+    }
 }
 
 /// 检查项目文件所属的 Git 仓库及受管配置状态。
@@ -246,6 +675,24 @@ pub fn save_project(request: SaveProjectRequest) -> Result<LoadedProject, String
 #[tauri::command]
 pub fn save_project_as(request: SaveProjectAsRequest) -> Result<SaveProjectAsReport, String> {
     save_project_as_document(request)
+}
+
+/// 桌面编辑器专用的另存为入口：成功后原子迁移当前窗口的 `.jcpro` 锁。
+#[tauri::command]
+pub fn save_project_as_locked(
+    window: tauri::WebviewWindow,
+    registry: tauri::State<'_, ProjectWindowRegistry>,
+    request: SaveProjectAsRequest,
+) -> Result<SaveProjectAsReport, String> {
+    let target_path = request.target_path.clone();
+    let target_key = if project_path_from_args([target_path.clone()]).is_some() {
+        Some(normalize_new_project_window_path(&target_path)?)
+    } else {
+        None
+    };
+    registry.with_save_as_lock(window.label(), target_key.as_deref(), || {
+        save_project_as_document(request)
+    })
 }
 
 /// 校验项目 JSON 是否包含所有必要段落。
@@ -1122,6 +1569,80 @@ mod tests {
                 "notes.json".to_string()
             ]),
             None
+        );
+    }
+
+    #[test]
+    fn project_window_registry_allows_one_owner_per_path() {
+        let registry = ProjectWindowRegistry::default();
+
+        assert_eq!(
+            registry.claim_path(Some("main"), "d:/projects/one.jcpro"),
+            ProjectWindowClaim::Current("main".to_string())
+        );
+        assert_eq!(
+            registry.claim_path(Some("main"), "d:/projects/one.jcpro"),
+            ProjectWindowClaim::Current("main".to_string())
+        );
+        assert_eq!(
+            registry.claim_path(Some("project-2"), "d:/projects/one.jcpro"),
+            ProjectWindowClaim::Existing("main".to_string())
+        );
+
+        let second = registry.claim_path(Some("main"), "d:/projects/two.jcpro");
+        assert_eq!(second, ProjectWindowClaim::New("project-1".to_string()));
+        registry.release_label("main");
+        assert_eq!(
+            registry.claim_path(Some("project-2"), "d:/projects/one.jcpro"),
+            ProjectWindowClaim::Current("project-2".to_string())
+        );
+    }
+
+    #[test]
+    fn pending_project_paths_are_scoped_to_window_labels() {
+        let pending = PendingProjectPath::new(Some("d:/projects/main.jcpro".to_string()));
+        pending.replace_for_label("project-1", "d:/projects/second.jcpro".to_string());
+
+        assert_eq!(
+            pending.take_for_label("main"),
+            Some("d:/projects/main.jcpro".to_string())
+        );
+        assert_eq!(
+            pending.take_for_label("project-1"),
+            Some("d:/projects/second.jcpro".to_string())
+        );
+        assert_eq!(pending.take_for_label("project-2"), None);
+    }
+
+    #[test]
+    fn project_window_registry_keeps_save_as_lock_atomic() {
+        let registry = ProjectWindowRegistry::default();
+        registry.claim_path(Some("main"), "d:/projects/one.jcpro");
+
+        assert_eq!(
+            registry.with_save_as_lock("main", Some("d:/projects/two.jcpro"), || {
+                Err::<(), _>("write failed".to_string())
+            }),
+            Err("write failed".to_string())
+        );
+        assert_eq!(
+            registry.claim_path(Some("project-2"), "d:/projects/one.jcpro"),
+            ProjectWindowClaim::Existing("main".to_string())
+        );
+
+        assert_eq!(
+            registry.with_save_as_lock("main", Some("d:/projects/two.jcpro"), || Ok(())),
+            Ok(())
+        );
+        assert_eq!(
+            registry.claim_path(Some("main"), "d:/projects/one.jcpro"),
+            ProjectWindowClaim::New("project-1".to_string())
+        );
+
+        assert_eq!(registry.with_save_as_lock("main", None, || Ok(())), Ok(()));
+        assert_eq!(
+            registry.claim_path(Some("project-2"), "d:/projects/two.jcpro"),
+            ProjectWindowClaim::Current("project-2".to_string())
         );
     }
 }

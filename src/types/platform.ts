@@ -604,6 +604,14 @@ export interface SaveProjectAsReport {
   warnings: string[];
 }
 
+export type ProjectWindowAction = 'current' | 'created' | 'focused';
+
+export interface ProjectWindowOpenResult {
+  action: ProjectWindowAction;
+  windowLabel: string;
+  path: string;
+}
+
 export interface LegacyTableSpec {
   kind: LegacyTableKind;
   headers: string[];

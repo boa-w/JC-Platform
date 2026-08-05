@@ -336,7 +336,7 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   await expect(main.getByRole('heading', { level: 1, name: '软件设置' })).toBeAttached();
 
   await expect(
-    main.getByRole('checkbox', { name: '锂电监控协议：写入 ConfigUpdate.json' }),
+    main.getByRole('checkbox', { name: '写入锂电监控配置' }),
   ).toHaveCount(0);
   const themeSwitch = main.getByRole('switch', { name: '深色模式' });
   await expect(themeSwitch).toHaveAttribute(
@@ -367,10 +367,10 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   const exportMain = page.getByRole('main', { name: '项目导出' });
   await expect(exportMain).toBeVisible();
   await expect(
-    exportMain.getByRole('checkbox', { name: '锂电监控协议：写入 ConfigUpdate.json' }),
+    exportMain.getByRole('checkbox', { name: '写入锂电监控配置' }),
   ).toBeVisible();
   await expect(
-    exportMain.getByRole('checkbox', { name: '故障码配置：写入 pdo_sdo_data.bin' }),
+    exportMain.getByRole('checkbox', { name: '写入故障码配置' }),
   ).toBeVisible();
   expect(await page.evaluate(() => Object.keys(localStorage))).not.toContain(
     'jc-platform.export.battery-options',
@@ -592,7 +592,7 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
     .click();
   const exportMain = page.getByRole('main', { name: '项目导出' });
   const batteryConfigSwitch = exportMain.getByRole('checkbox', {
-    name: '锂电监控协议：写入 ConfigUpdate.json',
+    name: '写入锂电监控配置',
   });
   await batteryConfigSwitch.uncheck();
   await expect(
@@ -735,6 +735,13 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
         if (command === 'plugin:window|set_title') return null;
         if (command === 'plugin:app|name') return '自定义开发平台';
         if (command === 'plugin:app|version') return '0.1.0';
+        if (command === 'open_project_window') {
+          return { action: 'current', windowLabel: 'main', path };
+        }
+        if (command === 'create_project_window') {
+          return { action: 'current', windowLabel: 'main', path };
+        }
+        if (command === 'release_project_window') return null;
         if (command === 'plugin:updater|check') {
           return {
             rid: 7,

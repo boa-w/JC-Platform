@@ -37,6 +37,7 @@ import type {
   ProjectRecoveryDraft,
   ProjectSummary,
   ProjectValidationReport,
+  ProjectWindowOpenResult,
   ProtocolCompatibilityReport,
   SaveProjectAsReport,
   SaveProjectAsRequest,
@@ -92,6 +93,20 @@ export async function getProjectSummary(): Promise<ProjectSummary> {
 
 export async function takePendingProjectPath(): Promise<string | null> {
   return invoke<string | null>('take_pending_project_path');
+}
+
+export async function openProjectWindow(path: string): Promise<ProjectWindowOpenResult> {
+  return invoke<ProjectWindowOpenResult>('open_project_window', { path });
+}
+
+export async function createProjectWindow(
+  request: NewProjectRequest,
+): Promise<ProjectWindowOpenResult> {
+  return invoke<ProjectWindowOpenResult>('create_project_window', { request });
+}
+
+export async function releaseProjectWindow(path: string): Promise<void> {
+  return invoke<void>('release_project_window', { path });
 }
 
 export async function inspectProjectGit(request: GitProjectRequest): Promise<GitProjectStatus> {
@@ -164,7 +179,7 @@ export async function saveProject(request: SaveProjectRequest): Promise<LoadedPr
 }
 
 export async function saveProjectAs(request: SaveProjectAsRequest): Promise<SaveProjectAsReport> {
-  return invoke<SaveProjectAsReport>('save_project_as', { request });
+  return invoke<SaveProjectAsReport>('save_project_as_locked', { request });
 }
 
 export async function validateProjectDocument(document: unknown): Promise<ProjectValidationReport> {

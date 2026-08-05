@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "自定义开发平台",
         "width": 1280,
         "height": 800,
