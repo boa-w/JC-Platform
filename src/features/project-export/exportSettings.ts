@@ -1,4 +1,4 @@
-import { defaultExportInfo } from '../project-document/projectDocumentDefaults';
+import { defaultExportInfo } from '../project-document/projectDocumentDefaults.ts';
 import type { ProjectExportSettings, ProjectExportTargetSettings } from '../../types/platform';
 
 export const defaultProjectExportSettings: ProjectExportSettings = defaultExportInfo;

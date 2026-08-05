@@ -1,7 +1,7 @@
 export interface SettingPreprocessDefinition {
   handle: number;
   name: string;
-  description: string;
+  descriptionKey: string;
   scaleRequired: boolean;
   offsetRequired: boolean;
   shrinking: boolean;
@@ -11,7 +11,7 @@ export const settingPreprocessDefinitions: readonly SettingPreprocessDefinition[
   {
     handle: 0,
     name: '原始数据',
-    description: '不进行缩放或偏移',
+    descriptionKey: 'settingData.preprocessing.raw',
     scaleRequired: false,
     offsetRequired: false,
     shrinking: false,
@@ -19,7 +19,7 @@ export const settingPreprocessDefinitions: readonly SettingPreprocessDefinition[
   {
     handle: 5,
     name: '缩小',
-    description: '按缩放值缩小',
+    descriptionKey: 'settingData.preprocessing.shrink',
     scaleRequired: true,
     offsetRequired: false,
     shrinking: true,
@@ -27,7 +27,7 @@ export const settingPreprocessDefinitions: readonly SettingPreprocessDefinition[
   {
     handle: 6,
     name: '放大',
-    description: '按缩放值放大',
+    descriptionKey: 'settingData.preprocessing.expand',
     scaleRequired: true,
     offsetRequired: false,
     shrinking: false,
@@ -35,7 +35,7 @@ export const settingPreprocessDefinitions: readonly SettingPreprocessDefinition[
   {
     handle: 7,
     name: '偏移',
-    description: '只应用偏移值',
+    descriptionKey: 'settingData.preprocessing.offset',
     scaleRequired: false,
     offsetRequired: true,
     shrinking: false,
@@ -43,7 +43,7 @@ export const settingPreprocessDefinitions: readonly SettingPreprocessDefinition[
   {
     handle: 1,
     name: '缩小偏移',
-    description: '先缩小，再偏移',
+    descriptionKey: 'settingData.preprocessing.shrinkOffset',
     scaleRequired: true,
     offsetRequired: true,
     shrinking: true,
@@ -51,7 +51,7 @@ export const settingPreprocessDefinitions: readonly SettingPreprocessDefinition[
   {
     handle: 2,
     name: '放大偏移',
-    description: '先放大，再偏移',
+    descriptionKey: 'settingData.preprocessing.expandOffset',
     scaleRequired: true,
     offsetRequired: true,
     shrinking: false,
@@ -59,7 +59,7 @@ export const settingPreprocessDefinitions: readonly SettingPreprocessDefinition[
   {
     handle: 3,
     name: '偏移缩小',
-    description: '先偏移，再缩小',
+    descriptionKey: 'settingData.preprocessing.offsetShrink',
     scaleRequired: true,
     offsetRequired: true,
     shrinking: true,
@@ -67,7 +67,7 @@ export const settingPreprocessDefinitions: readonly SettingPreprocessDefinition[
   {
     handle: 4,
     name: '偏移放大',
-    description: '先偏移，再放大',
+    descriptionKey: 'settingData.preprocessing.offsetExpand',
     scaleRequired: true,
     offsetRequired: true,
     shrinking: false,

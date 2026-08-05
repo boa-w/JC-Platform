@@ -62,7 +62,7 @@ export async function checkForAppUpdate(
 
 export async function installAppUpdate(options: InstallUpdateOptions = {}): Promise<boolean> {
   if (!isTauriRuntime()) {
-    throw new Error('当前环境不是 Tauri 桌面应用，无法安装更新。');
+    throw new Error('updater.errors.desktopOnly');
   }
 
   try {

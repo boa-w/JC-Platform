@@ -101,17 +101,6 @@
   border-left-color: var(--action-primary-border);
 }
 
-[data-theme="dark"] .table-format-ref {
-  background: var(--surface-subtle);
-  border-color: var(--border-default);
-}
-
-[data-theme="dark"] .table-format-chip {
-  background: var(--surface-panel);
-  border-color: var(--border-default);
-  color: var(--text-secondary);
-}
-
 [data-theme="dark"] .table-io-result {
   background: var(--surface-subtle);
   border-color: var(--border-default);

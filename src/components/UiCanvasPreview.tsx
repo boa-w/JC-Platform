@@ -1,6 +1,8 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import type { TFunction } from 'i18next';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStableCollectionKeys } from '../hooks/useStableCollectionKeys';
 import type {
   ParsedResourceOption,
@@ -23,16 +25,16 @@ interface UiCanvasPreviewProps {
 
 const DEFAULT_EXPANDED_KEYS = new Set(['root', 'main']);
 
-function handleLabel(handle: ParsedUiResource['handle']) {
-  if (handle === 'Show') return '静态图片';
-  if (handle === 'List') return '状态列表';
-  if (handle === 'Anim') return '帧动画';
-  return '未知类型';
+function handleLabelKey(handle: ParsedUiResource['handle']) {
+  if (handle === 'Show') return 'uiCanvas.handle.staticImage';
+  if (handle === 'List') return 'uiCanvas.handle.stateList';
+  if (handle === 'Anim') return 'uiCanvas.handle.frameAnimation';
+  return 'uiCanvas.handle.unknown';
 }
 
-function optionTitle(option: ParsedResourceOption, index: number) {
-  const parts = [`选项 ${index}`];
-  if (option.frame_count > 0) parts.push(`${option.frame_count} 帧`);
+function optionTitle(option: ParsedResourceOption, index: number, t: TFunction) {
+  const parts = [t('uiCanvas.option', { index })];
+  if (option.frame_count > 0) parts.push(t('uiCanvas.frames', { count: option.frame_count }));
   if (option.format) parts.push(option.format.toUpperCase());
   return parts.join(' · ');
 }
@@ -48,6 +50,7 @@ export function UiCanvasPreview({
   onRemoveOption,
   onSelectOptionSources,
 }: UiCanvasPreviewProps) {
+  const { t } = useTranslation();
   const parsedResources = useMemo(
     () =>
       report ? ([report.logo, ...report.main_items].filter(Boolean) as ParsedUiResource[]) : [],
@@ -201,13 +204,13 @@ export function UiCanvasPreview({
   return (
     <section className="ui-preview-card ui-resource-editor">
       <div className="ui-editor-header">
-        <h2 className="ui-editor-title">UI 资源编辑</h2>
+        <h2 className="ui-editor-title">{t('uiCanvas.title')}</h2>
       </div>
       <div className="ui-editor-grid">
         <aside className="ui-resource-tree-panel">
           <div className="ui-resource-tree-header">
-            <strong>资源条目</strong>
-            <span>{draftResources.length} 项</span>
+            <strong>{t('uiCanvas.resourceEntries')}</strong>
+            <span>{t('uiCanvas.itemCount', { count: draftResources.length })}</span>
           </div>
           <div className="ui-resource-tree">
             <div className="ui-tree-group">
@@ -216,7 +219,9 @@ export function UiCanvasPreview({
                 onClick={() => toggleExpanded('root')}
                 type="button"
                 aria-expanded={isRootExpanded}
-                aria-label={isRootExpanded ? '折叠 UI资源' : '展开 UI资源'}
+                aria-label={
+                  isRootExpanded ? t('uiCanvas.collapseResources') : t('uiCanvas.expandResources')
+                }
               >
                 {isRootExpanded ? (
                   <ChevronDown aria-hidden="true" size={14} />
@@ -229,8 +234,8 @@ export function UiCanvasPreview({
                 onClick={() => toggleExpanded('root')}
                 type="button"
               >
-                <span>UI资源</span>
-                <small>{draftResources.length} 项</small>
+                <span>{t('uiCanvas.resources')}</span>
+                <small>{t('uiCanvas.itemCount', { count: draftResources.length })}</small>
               </button>
             </div>
 
@@ -244,7 +249,7 @@ export function UiCanvasPreview({
                   >
                     <span>{logoResource.name}</span>
                     <small>
-                      {logoResource.key} · {handleLabel(logoResource.handle)}
+                      {logoResource.key} · {t(handleLabelKey(logoResource.handle))}
                     </small>
                   </button>
                 ) : null}
@@ -255,7 +260,9 @@ export function UiCanvasPreview({
                     onClick={() => toggleExpanded('main')}
                     type="button"
                     aria-expanded={isMainExpanded}
-                    aria-label={isMainExpanded ? '折叠 main' : '展开 main'}
+                    aria-label={
+                      isMainExpanded ? t('uiCanvas.collapseMain') : t('uiCanvas.expandMain')
+                    }
                   >
                     {isMainExpanded ? (
                       <ChevronDown aria-hidden="true" size={14} />
@@ -269,7 +276,7 @@ export function UiCanvasPreview({
                     type="button"
                   >
                     <span>main</span>
-                    <small>{mainResources.length} 项</small>
+                    <small>{t('uiCanvas.itemCount', { count: mainResources.length })}</small>
                   </button>
                 </div>
 
@@ -284,13 +291,13 @@ export function UiCanvasPreview({
                       >
                         <span>{resource.name}</span>
                         <small>
-                          {resource.key} · {handleLabel(resource.handle)} ·{' '}
-                          {resource.options.length} 选项
+                          {resource.key} · {t(handleLabelKey(resource.handle))} ·{' '}
+                          {t('uiCanvas.optionCount', { count: resource.options.length })}
                         </small>
                       </button>
                     ))}
                     {mainResources.length === 0 ? (
-                      <p className="ui-tree-empty">main 下暂无资源项</p>
+                      <p className="ui-tree-empty">{t('uiCanvas.mainEmpty')}</p>
                     ) : null}
                   </div>
                 ) : null}
@@ -328,23 +335,25 @@ export function UiCanvasPreview({
                     <span className="ui-canvas-label">
                       <strong>{resource.name}</strong>
                       <small>
-                        {resource.key} · {handleLabel(resource.handle)}
+                        {resource.key} · {t(handleLabelKey(resource.handle))}
                       </small>
                       <small>
-                        {resource.options[resource.default_option]?.frame_count ?? 0} refs
+                        {t('uiCanvas.frames', {
+                          count: resource.options[resource.default_option]?.frame_count ?? 0,
+                        })}
                       </small>
                     </span>
                   ) : null}
                   {imageSource && failedImages.has(imageSource.original) ? (
                     <small className="ui-canvas-image-error">
-                      图片加载失败：{imageSource.original}
+                      {t('uiCanvas.imageLoadFailed', { source: imageSource.original })}
                     </small>
                   ) : null}
                 </button>
               );
             })}
             {draftResources.length === 0 ? (
-              <span className="ui-canvas-empty">打开项目后显示 UI 资源</span>
+              <span className="ui-canvas-empty">{t('uiCanvas.openProjectToShow')}</span>
             ) : null}
           </div>
         </div>
@@ -354,8 +363,8 @@ export function UiCanvasPreview({
             <>
               <section className="ui-option-gallery-panel">
                 <div className="ui-panel-section-title">
-                  <strong>资源选项</strong>
-                  <span>{selected.options.length} 项</span>
+                  <strong>{t('uiCanvas.resourceOptions')}</strong>
+                  <span>{t('uiCanvas.itemCount', { count: selected.options.length })}</span>
                 </div>
                 <div className="ui-option-gallery">
                   {selected.options.map((option, index) => {
@@ -373,27 +382,33 @@ export function UiCanvasPreview({
                         >
                           {imageSource && !failedImages.has(imageSource.original) ? (
                             <img
-                              alt={optionTitle(option, index)}
+                              alt={optionTitle(option, index, t)}
                               onError={() => markImageFailed(imageSource.original)}
                               src={imageSource.converted}
                             />
                           ) : (
-                            <span>{imageSource ? '图片加载失败' : '无预览'}</span>
+                            <span>
+                              {imageSource ? t('uiCanvas.imageLoadFailedShort') : t('uiCanvas.noPreview')}
+                            </span>
                           )}
                         </button>
                         <div className="ui-option-meta">
-                          <strong>{optionTitle(option, index)}</strong>
-                          {isSelectedOption ? <span>默认</span> : null}
+                          <strong>{optionTitle(option, index, t)}</strong>
+                          {isSelectedOption ? <span>{t('uiCanvas.defaultOption')}</span> : null}
                           {option.sources.length > 0 ? (
                             <small title={option.sources[0]}>{option.sources[0]}</small>
                           ) : null}
                         </div>
                         <button
-                          aria-label={`删除 ${optionTitle(option, index)}`}
+                          aria-label={t('uiCanvas.deleteOption', {
+                            option: optionTitle(option, index, t),
+                          })}
                           className="ui-option-delete"
                           disabled={!canApply || isApplying || !onRemoveOption}
                           onClick={() => void removeOption(index)}
-                          title={`删除 ${optionTitle(option, index)}`}
+                          title={t('uiCanvas.deleteOption', {
+                            option: optionTitle(option, index, t),
+                          })}
                           type="button"
                         >
                           <Trash2 aria-hidden="true" size={14} />
@@ -402,7 +417,7 @@ export function UiCanvasPreview({
                     );
                   })}
                   {selected.options.length === 0 ? (
-                    <p className="ui-tree-empty">当前资源暂无选项</p>
+                    <p className="ui-tree-empty">{t('uiCanvas.noOptions')}</p>
                   ) : null}
                 </div>
               </section>
@@ -414,30 +429,34 @@ export function UiCanvasPreview({
                 </div>
 
                 <div className="ui-property-section">
-                  <h3>基本信息</h3>
+                  <h3>{t('uiCanvas.basicInfo')}</h3>
                   <dl className="ui-property-facts">
                     <div>
-                      <dt>类型</dt>
-                      <dd>{handleLabel(selected.handle)}</dd>
+                      <dt>{t('uiCanvas.type')}</dt>
+                      <dd>{t(handleLabelKey(selected.handle))}</dd>
                     </div>
                     <div>
-                      <dt>选项数</dt>
+                      <dt>{t('uiCanvas.optionCountLabel')}</dt>
                       <dd>{selected.options.length}</dd>
                     </div>
                     <div>
-                      <dt>导出目标</dt>
-                      <dd>{selected.dest.length > 0 ? selected.dest.join('、') : '未配置'}</dd>
+                      <dt>{t('uiCanvas.exportTarget')}</dt>
+                      <dd>
+                        {selected.dest.length > 0
+                          ? selected.dest.join(t('common.punctuation.listSeparator'))
+                          : t('uiCanvas.notConfigured')}
+                      </dd>
                     </div>
                   </dl>
                 </div>
 
                 <div className="ui-property-section">
-                  <h3>坐标尺寸</h3>
+                  <h3>{t('uiCanvas.geometry')}</h3>
                   <div className="ui-property-grid">
                     <div className="ui-property-row">
                       {(['x', 'y'] as const).map((field) => (
                         <label key={field}>
-                          {field === 'x' ? 'X 坐标' : 'Y 坐标'}
+                          {field === 'x' ? t('uiCanvas.xCoordinate') : t('uiCanvas.yCoordinate')}
                           <input
                             min="0"
                             onChange={(event) => updateSelected(field, Number(event.target.value))}
@@ -450,7 +469,7 @@ export function UiCanvasPreview({
                     <div className="ui-property-row">
                       {(['width', 'height'] as const).map((field) => (
                         <label key={field}>
-                          {field === 'width' ? '宽度' : '高度'}
+                          {field === 'width' ? t('uiCanvas.width') : t('uiCanvas.height')}
                           <input
                             min="0"
                             onChange={(event) => updateSelected(field, Number(event.target.value))}
@@ -461,7 +480,7 @@ export function UiCanvasPreview({
                       ))}
                     </div>
                     <label>
-                      默认选项
+                      {t('uiCanvas.defaultOption')}
                       <select
                         disabled={selected.options.length === 0}
                         onChange={(event) =>
@@ -471,27 +490,29 @@ export function UiCanvasPreview({
                       >
                         {selected.options.map((option, index) => (
                           <option key={selectedOptionKeys[index]} value={index}>
-                            {optionTitle(option, index)}
+                            {optionTitle(option, index, t)}
                           </option>
                         ))}
-                        {selected.options.length === 0 ? <option value={0}>无选项</option> : null}
+                        {selected.options.length === 0 ? (
+                          <option value={0}>{t('uiCanvas.noOptions')}</option>
+                        ) : null}
                       </select>
                     </label>
                   </div>
                 </div>
 
                 <div className="ui-property-section">
-                  <h3>协议关联</h3>
+                  <h3>{t('uiCanvas.protocolLink')}</h3>
                   {typeof selected.pdo_param_index === 'number' ? (
                     <button
                       className="ui-editor-btn ui-editor-btn--secondary"
                       onClick={() => onJumpToPdo?.(selected.pdo_param_index as number)}
                       type="button"
                     >
-                      跳转到 PDO 参数 {selected.pdo_param_index}
+                      {t('uiCanvas.jumpToPdo', { index: selected.pdo_param_index })}
                     </button>
                   ) : (
-                    <p className="ui-property-muted">当前资源未配置 PDO 参数关联。</p>
+                    <p className="ui-property-muted">{t('uiCanvas.noPdoLink')}</p>
                   )}
                 </div>
 
@@ -501,18 +522,18 @@ export function UiCanvasPreview({
                   onClick={() => void applySelected()}
                   type="button"
                 >
-                  {isApplying ? '写回中...' : '应用到项目文档'}
+                  {isApplying ? t('uiCanvas.applying') : t('uiCanvas.apply')}
                 </button>
 
                 <div className="ui-option-tools">
                   <label>
-                    新增资源路径（每行一个）
+                    {t('uiCanvas.newOptionSources')}
                     <textarea
                       disabled={selected.handle === 'Anim'}
                       onChange={(event) => setNewOptionSources(event.target.value)}
                       placeholder={
                         selected.handle === 'Anim'
-                          ? '动画资源新增需后端扩展'
+                          ? t('uiCanvas.animationAddUnsupported')
                           : 'image/main/resource.png'
                       }
                       value={newOptionSources}
@@ -530,7 +551,7 @@ export function UiCanvasPreview({
                       onClick={() => void selectOptionSources()}
                       type="button"
                     >
-                      选择图片
+                      {t('uiCanvas.selectImages')}
                     </button>
                     <button
                       className="ui-editor-btn ui-editor-btn--primary"
@@ -540,7 +561,7 @@ export function UiCanvasPreview({
                       onClick={() => void addOption()}
                       type="button"
                     >
-                      新增选项
+                      {t('uiCanvas.addOption')}
                     </button>
                     <button
                       className="ui-editor-btn ui-editor-btn--danger"
@@ -550,12 +571,12 @@ export function UiCanvasPreview({
                       onClick={() => void removeOption(selected.default_option)}
                       type="button"
                     >
-                      删除默认选项
+                      {t('uiCanvas.deleteDefaultOption')}
                     </button>
                   </div>
                   {selected.handle === 'Anim' ? (
                     <p className="ui-property-muted">
-                      动画资源当前支持展示、切换默认项和删除；新增动画选项需扩展后端请求结构。
+                      {t('uiCanvas.animationNote')}
                     </p>
                   ) : null}
                 </div>
@@ -563,7 +584,7 @@ export function UiCanvasPreview({
             </>
           ) : (
             <div className="empty-state" style={{ padding: '24px 12px' }}>
-              <p>点击左侧树或画布中的资源项进行编辑</p>
+              <p>{t('uiCanvas.selectResourceToEdit')}</p>
             </div>
           )}
         </aside>

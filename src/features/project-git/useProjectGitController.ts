@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   commitProjectGitVersion,
   loadProjectGitContext,
@@ -19,7 +20,7 @@ import type {
   NavigationKey,
 } from '../../types/platform';
 
-const defaultCommitMessage = '更新项目配置';
+const defaultCommitMessageKey = 'projectGit.defaultCommitMessage';
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function mergeSnapshotDocuments(projectDocument: unknown, sidecarDocument: unknown) {
@@ -50,9 +51,10 @@ export function useProjectGitController({
   onReloadWorkingTree,
   onStatusChange,
 }: UseProjectGitControllerOptions) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<GitProjectStatus | null>(null);
   const [revisions, setRevisions] = useState<GitRevision[]>([]);
-  const [message, setMessage] = useState(defaultCommitMessage);
+  const [message, setMessage] = useState(() => t(defaultCommitMessageKey));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshBusy, setRefreshBusy] = useState(false);
@@ -160,15 +162,15 @@ export function useProjectGitController({
   async function commitVersion() {
     if (!request) return;
     if (hasUnsavedChanges) {
-      setError('请先保存当前项目配置，再创建 Git 版本。');
+      setError(t('projectGit.errors.saveBeforeCommit'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
       const report = await commitProjectGitVersion({ ...request, message });
-      setMessage(defaultCommitMessage);
-      onStatusChange(`已保存 Git 版本 ${report.short_hash}：${report.subject}`);
+      setMessage(t(defaultCommitMessageKey));
+      onStatusChange(t('projectGit.status.committed', { hash: report.short_hash, subject: report.subject }));
       await refresh();
       if (showReview) await refreshReview();
     } catch (cause) {
@@ -191,10 +193,10 @@ export function useProjectGitController({
     if (
       hasUnsavedChanges &&
       !(await restoreConfirmation.ask({
-        title: '放弃未保存修改？',
-        message: '恢复历史版本会替换当前未保存修改，且无法撤销。',
-        confirmLabel: '放弃并恢复',
-        cancelLabel: '继续编辑',
+        title: t('projectGit.confirmRestore.title'),
+        message: t('projectGit.confirmRestore.message'),
+        confirmLabel: t('projectGit.confirmRestore.confirm'),
+        cancelLabel: t('projectGit.confirmRestore.cancel'),
         danger: true,
       }))
     ) {
@@ -226,18 +228,18 @@ export function useProjectGitController({
   }
 
   async function loadWorktreeFile(path: string) {
-    if (!request) throw new Error('当前没有可编辑的 Git 项目。');
-    if (reviewRevision) throw new Error('历史版本仅供查看，不能编辑。');
-    if (hasUnsavedChanges) throw new Error('请先保存或恢复主编辑器中的修改。');
+    if (!request) throw new Error(t('projectGit.errors.noEditableProject'));
+    if (reviewRevision) throw new Error(t('projectGit.errors.reviewReadOnly'));
+    if (hasUnsavedChanges) throw new Error(t('projectGit.errors.resolveUnsaved'));
     return loadProjectGitWorktreeFile(request, path);
   }
 
   async function saveWorktreeFile(path: string, content: string) {
-    if (!request) throw new Error('当前没有可编辑的 Git 项目。');
-    if (reviewRevision) throw new Error('历史版本仅供查看，不能编辑。');
-    if (hasUnsavedChanges) throw new Error('请先保存或恢复主编辑器中的修改。');
+    if (!request) throw new Error(t('projectGit.errors.noEditableProject'));
+    if (reviewRevision) throw new Error(t('projectGit.errors.reviewReadOnly'));
+    if (hasUnsavedChanges) throw new Error(t('projectGit.errors.resolveUnsaved'));
     await saveProjectGitWorktreeFile(request, path, content);
-    onStatusChange(`已保存工作区文件：${path}`);
+    onStatusChange(t('projectGit.status.worktreeSaved', { path }));
     void Promise.resolve()
       .then(() => onReloadWorkingTree())
       .then(() => Promise.all([refresh(), refreshReview(null)]))
@@ -268,7 +270,8 @@ export function useProjectGitController({
     hasUnsavedChanges ||
     status.has_staged_changes ||
     status.changed_paths.length === 0;
-  const repositoryName = status?.repo_root?.split(/[\\/]/).filter(Boolean).pop() ?? '本地仓库';
+  const repositoryName =
+    status?.repo_root?.split(/[\\/]/).filter(Boolean).pop() ?? t('projectGit.localRepository');
 
   return {
     busy,

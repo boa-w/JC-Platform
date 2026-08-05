@@ -1,5 +1,6 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   createProject,
   loadTextFile,
@@ -99,9 +100,10 @@ export function useProjectLifecycleController({
   onRefreshProtocol,
   onRefreshUi,
 }: UseProjectLifecycleControllerOptions) {
+  const { t } = useTranslation();
   const [projectPath, setProjectPath] = useState('');
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
-  const [newProjectName, setNewProjectName] = useState('新建项目');
+  const [newProjectName, setNewProjectName] = useState(() => t('projectLifecycle.newProjectName'));
   const [newResolutionW, setNewResolutionW] = useState(800);
   const [newResolutionH, setNewResolutionH] = useState(480);
   const [openError, setOpenError] = useState<string | null>(null);
@@ -149,7 +151,7 @@ export function useProjectLifecycleController({
   }
 
   function markDocumentState(hasChanges: boolean) {
-    setSaveStatus(hasChanges ? '存在未保存修改' : null);
+    setSaveStatus(hasChanges ? t('projectLifecycle.unsavedChanges') : null);
     if (hasChanges) setShowSaveModal(false);
   }
 
@@ -166,10 +168,10 @@ export function useProjectLifecycleController({
   async function confirmDiscardUnsavedChanges(action: string) {
     if (!hasUnsavedChanges) return true;
     return discardConfirmation.ask({
-      title: '放弃未保存修改？',
-      message: `当前项目存在未保存修改。${action}会放弃这些修改，且无法撤销。`,
-      confirmLabel: `放弃并${action}`,
-      cancelLabel: '继续编辑',
+      title: t('projectLifecycle.confirmDiscard.title'),
+      message: t('projectLifecycle.confirmDiscard.message', { action }),
+      confirmLabel: t('projectLifecycle.confirmDiscard.confirm', { action }),
+      cancelLabel: t('projectLifecycle.confirmDiscard.cancel'),
       danger: true,
     });
   }
@@ -198,7 +200,7 @@ export function useProjectLifecycleController({
         return {
           project: { ...project, document, validation },
           path: candidatePath,
-          status: `已自动挂载：${candidatePath}`,
+          status: t('projectLifecycle.status.autoMounted', { path: candidatePath }),
         };
       } catch {
         // Candidate sidecar is optional.
@@ -207,7 +209,7 @@ export function useProjectLifecycleController({
     return {
       project,
       path: null,
-      status: '未挂载重构配置 JSON；修改重构专属配置时会提示创建 sidecar。',
+      status: t('projectLifecycle.status.noRefactorConfig'),
     };
   }
 
@@ -224,16 +226,16 @@ export function useProjectLifecycleController({
 
   async function createNewProject() {
     setOpenError(null);
-    if (!(await confirmDiscardUnsavedChanges('创建新项目'))) return;
+    if (!(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.newProject')))) return;
     if (!isTauriRuntime()) {
-      setOpenError('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setOpenError(t('projectLifecycle.status.desktopSaveDialogOnly'));
       return;
     }
     const selected = await runSystemDialog(
       () =>
         save({
           defaultPath: `${newProjectName}.jcpro`,
-          filters: [{ name: '项目文件', extensions: ['jcpro'] }],
+          filters: [{ name: t('projectLifecycle.filters.project'), extensions: ['jcpro'] }],
         }),
       setOpenError,
     );
@@ -262,7 +264,7 @@ export function useProjectLifecycleController({
   }
 
   async function openProject(path = projectPath, skipDiscardConfirmation = false) {
-    if (!skipDiscardConfirmation && !(await confirmDiscardUnsavedChanges('打开其他项目'))) return;
+    if (!skipDiscardConfirmation && !(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))) return;
     const generation = beginOpenOperation();
     try {
       const nextProject = await loadProject(path);
@@ -284,21 +286,21 @@ export function useProjectLifecycleController({
   async function reloadProject() {
     const reloadPath = loadedProject?.summary.path ?? projectPath;
     if (reloadPath.trim() === '') return;
-    if (!(await confirmDiscardUnsavedChanges('重新加载项目'))) return;
+    if (!(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.reload')))) return;
     await openProject(reloadPath, true);
   }
 
   async function selectProjectFile() {
     setOpenError(null);
-    if (!(await confirmDiscardUnsavedChanges('打开其他项目'))) return;
+    if (!(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))) return;
     if (!isTauriRuntime()) {
-      setOpenError('系统文件选择器只能在桌面应用中使用；也可以粘贴项目路径后打开。');
+      setOpenError(t('projectLifecycle.status.desktopFilePickerOnly'));
       return;
     }
     try {
       const selected = await open({
         multiple: false,
-        filters: [{ name: '项目文件', extensions: ['jcpro'] }],
+        filters: [{ name: t('projectLifecycle.filters.project'), extensions: ['jcpro'] }],
       });
       if (typeof selected === 'string') {
         setProjectPath(selected);
@@ -316,7 +318,8 @@ export function useProjectLifecycleController({
       const report = await parseProjectDocument(loadedProject.document);
       if (generation !== operationGenerationRef.current) return;
       setProjectParseReport(report);
-      if (!report.valid) setOpenError(report.errors.join('；') || '项目解析存在问题');
+      if (!report.valid)
+        setOpenError(report.errors.join(t('common.punctuation.semicolon')) || t('projectLifecycle.status.parseFailed'));
     } catch (cause) {
       if (generation === operationGenerationRef.current) {
         setOpenError(cause instanceof Error ? cause.message : String(cause));
@@ -339,7 +342,7 @@ export function useProjectLifecycleController({
       });
       await onRefreshUi(migrated.document, loadedProject.summary.path);
       void onRefreshProtocol(migrated.document);
-      setSaveStatus(`已规范化：${migrated.migrated_version}`);
+      setSaveStatus(t('projectLifecycle.status.migrated', { version: migrated.migrated_version }));
     } catch (cause) {
       if (generation === operationGenerationRef.current) {
         setOpenError(cause instanceof Error ? cause.message : String(cause));
@@ -359,13 +362,13 @@ export function useProjectLifecycleController({
     if (!loadedProject) return false;
     if (refactorConfigPath) {
       await saveJsonFile(refactorConfigPath, refactorConfigDocument(loadedProject.document));
-      setRefactorConfigStatus(`已写回重构配置：${refactorConfigPath}`);
-      setSaveStatus(`重构专属配置已写回：${refactorConfigPath}；原 .jcpro 不会写入这些字段。`);
+      setRefactorConfigStatus(t('projectLifecycle.status.refactorWritten', { path: refactorConfigPath }));
+      setSaveStatus(t('projectLifecycle.status.refactorWrittenProject', { path: refactorConfigPath }));
       return true;
     }
     if (!isTauriRuntime()) {
       setSaveStatus(
-        '旧 .jcpro 的重构配置需要另存为 JSON；系统保存对话框只能在 Tauri 桌面应用中使用。',
+        t('projectLifecycle.status.legacyRefactorSaveAs'),
       );
       return false;
     }
@@ -379,34 +382,34 @@ export function useProjectLifecycleController({
       () =>
         save({
           defaultPath: `${baseName}.refactor-config.json`,
-          filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
+          filters: [{ name: t('projectLifecycle.filters.refactor'), extensions: ['json'] }],
         }),
       setSaveStatus,
     );
     if (!selected) return false;
     await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
     setRefactorConfigPath(selected);
-    setRefactorConfigStatus(`已挂载：${selected}`);
-    setSaveStatus(`重构专属配置已另存为：${selected}；原 .jcpro 不会写入这些字段。`);
+    setRefactorConfigStatus(t('projectLifecycle.status.mounted', { path: selected }));
+    setSaveStatus(t('projectLifecycle.status.refactorSavedAs', { path: selected }));
     return true;
   }
 
   async function formatJcproFile() {
     const path = loadedProject?.summary.path;
     if (!path) {
-      setSaveStatus('当前项目没有可格式化的文件路径。');
+      setSaveStatus(t('projectLifecycle.status.noFormatPath'));
       return;
     }
     if (!path.toLowerCase().endsWith('.jcpro')) {
-      setSaveStatus('手动格式化仅支持 .jcpro JSON 配置文件。');
+      setSaveStatus(t('projectLifecycle.status.formatJcproOnly'));
       return;
     }
     if (hasUnsavedChanges) {
-      setSaveStatus('请先保存当前项目配置，再格式化磁盘上的 .jcpro 文件。');
+      setSaveStatus(t('projectLifecycle.status.saveBeforeFormat'));
       return;
     }
     if (!isTauriRuntime()) {
-      setSaveStatus('jcpro 文件格式化只能在 Tauri 桌面应用中使用。');
+      setSaveStatus(t('projectLifecycle.status.desktopFormatOnly'));
       return;
     }
 
@@ -416,12 +419,12 @@ export function useProjectLifecycleController({
       const source = await loadTextFile(path);
       const formatted = formatJsonText(source);
       if (formatted === source) {
-        setSaveStatus('当前 .jcpro 文件已经是格式化 JSON。');
+        setSaveStatus(t('projectLifecycle.status.alreadyFormatted'));
         return;
       }
       await saveTextFile(path, formatted);
       await onRefreshGit();
-      setSaveStatus(`已格式化 jcpro JSON：${path}`);
+      setSaveStatus(t('projectLifecycle.status.formatted', { path }));
     } catch (cause) {
       setSaveStatus(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -433,14 +436,14 @@ export function useProjectLifecycleController({
     if (!loadedProject) return;
     setSaveStatus(null);
     if (!isTauriRuntime()) {
-      setRefactorConfigStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setRefactorConfigStatus(t('projectLifecycle.status.desktopFilePickerOnly'));
       return;
     }
     const selected = await runSystemDialog(
       () =>
         open({
           multiple: false,
-          filters: [{ name: '重构配置 JSON', extensions: ['json'] }],
+          filters: [{ name: t('projectLifecycle.filters.refactor'), extensions: ['json'] }],
         }),
       setRefactorConfigStatus,
     );
@@ -451,7 +454,7 @@ export function useProjectLifecycleController({
       const validation = await validateProjectDocument(document);
       const nextBaseline = cloneJson(document);
       setRefactorConfigPath(selected);
-      setRefactorConfigStatus(`已挂载：${selected}`);
+      setRefactorConfigStatus(t('projectLifecycle.status.mounted', { path: selected }));
       onApplyProject({ ...loadedProject, document, validation }, nextBaseline);
       void onRefreshProtocol(document);
     } catch (cause) {
@@ -502,8 +505,8 @@ export function useProjectLifecycleController({
       setShowSaveModal(false);
       setSaveStatus(
         isLegacyJcproProject && hasRefactorOnlyChanges
-          ? '已保存 .jcpro 兼容段，并已导出重构专属 JSON。'
-          : '已保存',
+          ? t('projectLifecycle.status.savedWithRefactor')
+          : t('projectLifecycle.status.saved'),
       );
       void onRefreshGit();
     } catch (cause) {
@@ -518,7 +521,7 @@ export function useProjectLifecycleController({
     if (!loadedProject || !sourcePath) return;
     setSaveStatus(null);
     if (!isTauriRuntime()) {
-      setSaveStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setSaveStatus(t('projectLifecycle.status.desktopSaveDialogOnly'));
       return;
     }
     const currentName =
@@ -531,14 +534,14 @@ export function useProjectLifecycleController({
             ? currentName.replace(/\.[^.]+$/, '.refactor-config.json')
             : currentName,
           filters: isRefactorSidecarSave
-            ? [{ name: '重构配置 JSON', extensions: ['json'] }]
-            : [{ name: '项目文件', extensions: ['jcpro', 'json'] }],
+            ? [{ name: t('projectLifecycle.filters.refactor'), extensions: ['json'] }]
+            : [{ name: t('projectLifecycle.filters.project'), extensions: ['jcpro', 'json'] }],
         }),
       setSaveStatus,
     );
     if (!selected) return;
     if (!isRefactorSidecarSave && selected === sourcePath) {
-      setSaveStatus('另存为目标不能与当前项目路径相同。');
+      setSaveStatus(t('projectLifecycle.status.saveAsSamePath'));
       return;
     }
 
@@ -547,11 +550,11 @@ export function useProjectLifecycleController({
       if (isRefactorSidecarSave) {
         await saveJsonFile(selected, refactorConfigDocument(loadedProject.document));
         setRefactorConfigPath(selected);
-        setRefactorConfigStatus(`已挂载：${selected}`);
+        setRefactorConfigStatus(t('projectLifecycle.status.mounted', { path: selected }));
         const validation = await validateProjectDocument(loadedProject.document);
         const nextBaseline = cloneJson(loadedProject.document);
         onApplyProject({ ...loadedProject, validation }, nextBaseline);
-        setSaveStatus(`重构专属配置已另存为：${selected}；当前 .jcpro 未写入新字段。`);
+        setSaveStatus(t('projectLifecycle.status.refactorSavedAsNoJcpro', { path: selected }));
         return;
       }
       const report = await saveProjectAs({
@@ -567,9 +570,16 @@ export function useProjectLifecycleController({
         setRefactorConfigStatus(null);
       }
       await onRefreshUi(report.project.document, report.project.summary.path ?? selected);
-      const copiedText = `已复制 ${report.copied_resources.length} 个资源`;
-      const warningText = report.warnings.length > 0 ? `，${report.warnings.length} 个警告` : '';
-      setSaveStatus(`已另存为：${selected}（${copiedText}${warningText}）`);
+      setSaveStatus(
+        t('projectLifecycle.status.savedAs', {
+          path: selected,
+          copied: report.copied_resources.length,
+          warnings:
+            report.warnings.length > 0
+              ? t('projectLifecycle.status.warningCount', { count: report.warnings.length })
+              : '',
+        }),
+      );
     } catch (cause) {
       setSaveStatus(cause instanceof Error ? cause.message : String(cause));
     } finally {

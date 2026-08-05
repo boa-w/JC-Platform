@@ -57,13 +57,13 @@ export type CommunicationIndexRadix = 'decimal' | 'hexadecimal';
 
 export interface SettingColumnPresetOption {
   value: SettingColumnPreset;
-  label: string;
+  labelKey: string;
   columns: SettingParameterColumnKey[];
 }
 
 export interface SettingParameterColumn {
   key: SettingParameterColumnKey;
-  label: string;
+  labelKey: string;
   defaultWidth: number;
   minWidth: number;
   align?: 'left' | 'center' | 'right';
@@ -73,7 +73,8 @@ export type SettingEditorInputKind = 'text' | 'number' | 'select';
 
 export type SettingEditorOption = {
   value: number | string;
-  label: string;
+  label?: string;
+  labelKey?: string;
 };
 
 export type SettingEditorVirtualField =
@@ -87,7 +88,7 @@ export type SettingEditorVirtualField =
 
 export type SettingEditorField = {
   field: SdoNodeField | SettingEditorVirtualField;
-  label: string;
+  labelKey: string;
   kind: SettingEditorInputKind;
   defaultValue: string | number;
   visibleFor?: 'all' | 'menu' | 'parameter';
@@ -95,7 +96,7 @@ export type SettingEditorField = {
 };
 
 export type SettingEditorSection = {
-  title: string;
+  titleKey: string;
   fields: SettingEditorField[];
 };
 

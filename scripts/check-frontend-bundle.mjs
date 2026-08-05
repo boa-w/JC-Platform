@@ -5,7 +5,8 @@ import { gzipSync } from 'node:zlib';
 const distDir = join(process.cwd(), 'dist');
 const html = readFileSync(join(distDir, 'index.html'), 'utf8');
 const budgets = {
-  script: 90 * 1024,
+  // The application-level i18n runtime adds a predictable baseline to the entry chunk.
+  script: 125 * 1024,
   stylesheet: 12.25 * 1024,
 };
 

@@ -17,32 +17,32 @@ export const communicationIndexRadixStorageKey =
 export const maxSettingColumnWidth = 480;
 
 export const settingParameterColumns: SettingParameterColumn[] = [
-  { key: 'select', label: '', defaultWidth: 44, minWidth: 44, align: 'center' },
-  { key: 'index', label: '', defaultWidth: 54, minWidth: 44, align: 'center' },
-  { key: 'name', label: '参数名称', defaultWidth: 180, minWidth: 120, align: 'left' },
-  { key: 'auth', label: '使用权限', defaultWidth: 96, minWidth: 76 },
-  { key: 'protocol', label: '协议类型', defaultWidth: 110, minWidth: 86 },
-  { key: 'frameId', label: '帧ID', defaultWidth: 90, minWidth: 72 },
-  { key: 'mainIndex', label: '主索引', defaultWidth: 90, minWidth: 72 },
-  { key: 'subIndex', label: '子索引', defaultWidth: 80, minWidth: 64 },
-  { key: 'access', label: '读写权限', defaultWidth: 96, minWidth: 76 },
-  { key: 'maxValue', label: '最大值', defaultWidth: 110, minWidth: 80 },
-  { key: 'minValue', label: '最小值', defaultWidth: 110, minWidth: 80 },
-  { key: 'defaultValue', label: '默认值', defaultWidth: 110, minWidth: 80 },
-  { key: 'dataType', label: '数据类型', defaultWidth: 130, minWidth: 90 },
-  { key: 'bitStart', label: 'bit开始位置', defaultWidth: 110, minWidth: 86 },
-  { key: 'bitLength', label: 'bit长度', defaultWidth: 100, minWidth: 76 },
-  { key: 'preprocess', label: '数据预处理', defaultWidth: 130, minWidth: 94 },
-  { key: 'scale', label: '缩放值', defaultWidth: 100, minWidth: 76 },
-  { key: 'offset', label: '偏移值', defaultWidth: 100, minWidth: 76 },
-  { key: 'decimals', label: '保留小数', defaultWidth: 100, minWidth: 76 },
-  { key: 'actions', label: '操作', defaultWidth: 120, minWidth: 100 },
+  { key: 'select', labelKey: '', defaultWidth: 44, minWidth: 44, align: 'center' },
+  { key: 'index', labelKey: '', defaultWidth: 54, minWidth: 44, align: 'center' },
+  { key: 'name', labelKey: 'settingData.columns.name', defaultWidth: 180, minWidth: 120, align: 'left' },
+  { key: 'auth', labelKey: 'settingData.columns.auth', defaultWidth: 96, minWidth: 76 },
+  { key: 'protocol', labelKey: 'settingData.columns.protocol', defaultWidth: 110, minWidth: 86 },
+  { key: 'frameId', labelKey: 'settingData.columns.frameId', defaultWidth: 90, minWidth: 72 },
+  { key: 'mainIndex', labelKey: 'settingData.columns.mainIndex', defaultWidth: 90, minWidth: 72 },
+  { key: 'subIndex', labelKey: 'settingData.columns.subIndex', defaultWidth: 80, minWidth: 64 },
+  { key: 'access', labelKey: 'settingData.columns.access', defaultWidth: 96, minWidth: 76 },
+  { key: 'maxValue', labelKey: 'settingData.columns.maxValue', defaultWidth: 110, minWidth: 80 },
+  { key: 'minValue', labelKey: 'settingData.columns.minValue', defaultWidth: 110, minWidth: 80 },
+  { key: 'defaultValue', labelKey: 'settingData.columns.defaultValue', defaultWidth: 110, minWidth: 80 },
+  { key: 'dataType', labelKey: 'settingData.columns.dataType', defaultWidth: 130, minWidth: 90 },
+  { key: 'bitStart', labelKey: 'settingData.columns.bitStart', defaultWidth: 110, minWidth: 86 },
+  { key: 'bitLength', labelKey: 'settingData.columns.bitLength', defaultWidth: 100, minWidth: 76 },
+  { key: 'preprocess', labelKey: 'settingData.columns.preprocess', defaultWidth: 130, minWidth: 94 },
+  { key: 'scale', labelKey: 'settingData.columns.scale', defaultWidth: 100, minWidth: 76 },
+  { key: 'offset', labelKey: 'settingData.columns.offset', defaultWidth: 100, minWidth: 76 },
+  { key: 'decimals', labelKey: 'settingData.columns.decimals', defaultWidth: 100, minWidth: 76 },
+  { key: 'actions', labelKey: 'settingData.columns.actions', defaultWidth: 120, minWidth: 100 },
 ];
 
 export const settingColumnPresetOptions: SettingColumnPresetOption[] = [
   {
     value: 'common',
-    label: '常用',
+    labelKey: 'settingData.columnPresets.common',
     columns: [
       'select',
       'index',
@@ -57,7 +57,7 @@ export const settingColumnPresetOptions: SettingColumnPresetOption[] = [
   },
   {
     value: 'communication',
-    label: '通信',
+    labelKey: 'settingData.columnPresets.communication',
     columns: [
       'select',
       'index',
@@ -73,7 +73,7 @@ export const settingColumnPresetOptions: SettingColumnPresetOption[] = [
   },
   {
     value: 'values',
-    label: '数值',
+    labelKey: 'settingData.columnPresets.values',
     columns: [
       'select',
       'index',
@@ -88,7 +88,7 @@ export const settingColumnPresetOptions: SettingColumnPresetOption[] = [
   },
   {
     value: 'processing',
-    label: '位段处理',
+    labelKey: 'settingData.columnPresets.processing',
     columns: [
       'select',
       'index',
@@ -105,34 +105,34 @@ export const settingColumnPresetOptions: SettingColumnPresetOption[] = [
   },
   {
     value: 'all',
-    label: '全部',
+    labelKey: 'settingData.columnPresets.all',
     columns: settingParameterColumns.map((column) => column.key),
   },
 ];
 
 export const sdoTypeOptions: SettingEditorOption[] = [
-  { value: 0, label: '菜单' },
-  { value: 1, label: '参数' },
+  { value: 0, labelKey: 'settingData.options.menu' },
+  { value: 1, labelKey: 'settingData.options.parameter' },
 ];
 
 export const sdoAuthOptions: SettingEditorOption[] = [
-  { value: 0, label: '普通用户' },
-  { value: 1, label: '普通用户' },
-  { value: 2, label: '管理员' },
-  { value: 3, label: '超级管理员' },
+  { value: 0, labelKey: 'settingData.options.normalUser' },
+  { value: 1, labelKey: 'settingData.options.normalUser' },
+  { value: 2, labelKey: 'settingData.options.administrator' },
+  { value: 3, labelKey: 'settingData.options.superAdministrator' },
 ];
 
 export const sdoAccessOptions: SettingEditorOption[] = [
-  { value: 0, label: '只读' },
-  { value: 1, label: '读写' },
-  { value: 2, label: '只写' },
+  { value: 0, labelKey: 'settingData.options.readOnly' },
+  { value: 1, labelKey: 'settingData.options.readWrite' },
+  { value: 2, labelKey: 'settingData.options.writeOnly' },
 ];
 
 export const sdoProtocolOptions: SettingEditorOption[] = [{ value: 0, label: 'CAN_OPEN' }];
 
 export const sdoBooleanOptions: SettingEditorOption[] = [
-  { value: 0, label: '否' },
-  { value: 1, label: '是' },
+  { value: 0, labelKey: 'settingData.options.no' },
+  { value: 1, labelKey: 'settingData.options.yes' },
 ];
 
 export const sdoDataTypeOptions: SettingEditorOption[] = settingDataTypeDefinitions.map(
@@ -157,12 +157,12 @@ export const sdoPreprocessDecimalOptions: SettingEditorOption[] =
 
 export const settingEditorSections: SettingEditorSection[] = [
   {
-    title: '基础信息',
+    titleKey: 'settingData.sections.basic',
     fields: [
-      { field: 'name', label: '名称', kind: 'text', defaultValue: '', visibleFor: 'all' },
+      { field: 'name', labelKey: 'settingData.fields.name', kind: 'text', defaultValue: '', visibleFor: 'all' },
       {
         field: 'type',
-        label: '类型',
+        labelKey: 'settingData.fields.type',
         kind: 'select',
         defaultValue: 0,
         visibleFor: 'all',
@@ -170,7 +170,7 @@ export const settingEditorSections: SettingEditorSection[] = [
       },
       {
         field: 'user_auth',
-        label: '权限',
+        labelKey: 'settingData.fields.permission',
         kind: 'select',
         defaultValue: 0,
         visibleFor: 'all',
@@ -178,7 +178,7 @@ export const settingEditorSections: SettingEditorSection[] = [
       },
       {
         field: 'name_index',
-        label: '语言索引',
+        labelKey: 'settingData.fields.languageIndex',
         kind: 'number',
         defaultValue: 0,
         visibleFor: 'all',
@@ -186,11 +186,11 @@ export const settingEditorSections: SettingEditorSection[] = [
     ],
   },
   {
-    title: '通信索引',
+    titleKey: 'settingData.sections.communicationIndex',
     fields: [
       {
         field: 'control_protocol',
-        label: '协议',
+        labelKey: 'settingData.fields.protocol',
         kind: 'select',
         defaultValue: 0,
         visibleFor: 'parameter',
@@ -198,23 +198,23 @@ export const settingEditorSections: SettingEditorSection[] = [
       },
       {
         field: 'control_rw',
-        label: '读写',
+        labelKey: 'settingData.fields.access',
         kind: 'select',
         defaultValue: 0,
         visibleFor: 'parameter',
         options: sdoAccessOptions,
       },
-      { field: 'fid', label: 'FID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
-      { field: 'mid', label: 'MID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
-      { field: 'sid', label: 'SID', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
+      { field: 'fid', labelKey: 'settingData.fields.fid', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
+      { field: 'mid', labelKey: 'settingData.fields.mid', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
+      { field: 'sid', labelKey: 'settingData.fields.sid', kind: 'number', defaultValue: 0, visibleFor: 'parameter' },
     ],
   },
   {
-    title: '默认值与范围',
+    titleKey: 'settingData.sections.defaultsAndRange',
     fields: [
       {
         field: 'control_use_default',
-        label: '使用默认值',
+        labelKey: 'settingData.fields.useDefault',
         kind: 'select',
         defaultValue: 0,
         visibleFor: 'parameter',
@@ -222,7 +222,7 @@ export const settingEditorSections: SettingEditorSection[] = [
       },
       {
         field: 'control_use_min_max',
-        label: '使用范围',
+        labelKey: 'settingData.fields.useRange',
         kind: 'select',
         defaultValue: 0,
         visibleFor: 'parameter',
@@ -230,21 +230,21 @@ export const settingEditorSections: SettingEditorSection[] = [
       },
       {
         field: 'data_max',
-        label: '最大值',
+        labelKey: 'settingData.fields.maxValue',
         kind: 'text',
         defaultValue: '',
         visibleFor: 'parameter',
       },
       {
         field: 'data_min',
-        label: '最小值',
+        labelKey: 'settingData.fields.minValue',
         kind: 'text',
         defaultValue: '',
         visibleFor: 'parameter',
       },
       {
         field: 'data_default',
-        label: '默认值',
+        labelKey: 'settingData.fields.defaultValue',
         kind: 'text',
         defaultValue: '',
         visibleFor: 'parameter',
@@ -252,11 +252,11 @@ export const settingEditorSections: SettingEditorSection[] = [
     ],
   },
   {
-    title: '设置条目',
+    titleKey: 'settingData.sections.settingEntry',
     fields: [
       {
         field: 'data_type_label',
-        label: '数据类型',
+        labelKey: 'settingData.fields.dataType',
         kind: 'select',
         defaultValue: 'u8:0',
         visibleFor: 'parameter',
@@ -264,21 +264,21 @@ export const settingEditorSections: SettingEditorSection[] = [
       },
       {
         field: 'bit_start',
-        label: 'bit开始位置',
+        labelKey: 'settingData.fields.bitStart',
         kind: 'text',
         defaultValue: '',
         visibleFor: 'parameter',
       },
       {
         field: 'bit_length',
-        label: 'bit长度',
+        labelKey: 'settingData.fields.bitLength',
         kind: 'text',
         defaultValue: '',
         visibleFor: 'parameter',
       },
       {
         field: 'preprocess_label',
-        label: '数据预处理',
+        labelKey: 'settingData.fields.preprocessing',
         kind: 'select',
         defaultValue: '原始数据:0',
         visibleFor: 'parameter',
@@ -286,21 +286,21 @@ export const settingEditorSections: SettingEditorSection[] = [
       },
       {
         field: 'scale_value',
-        label: '缩放值',
+        labelKey: 'settingData.fields.scale',
         kind: 'text',
         defaultValue: '',
         visibleFor: 'parameter',
       },
       {
         field: 'offset_value',
-        label: '偏移值',
+        labelKey: 'settingData.fields.offset',
         kind: 'text',
         defaultValue: '',
         visibleFor: 'parameter',
       },
       {
         field: 'decimals_value',
-        label: '保留小数',
+        labelKey: 'settingData.fields.decimals',
         kind: 'select',
         defaultValue: 0,
         visibleFor: 'parameter',

@@ -1,9 +1,13 @@
 import { useId, useRef } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { ConfirmDialog, ConfirmDialogHost } from '../../components/ConfirmDialog';
-import { type TestDataType, testDataLabels } from '../../data/test-data/metadata';
+import { type TestDataType, testDataLabelKeys } from '../../data/test-data/metadata';
 import type { ConfirmDialogController } from '../../hooks/useConfirmDialog';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
-import { type DocumentSectionKey, modifiedSectionLabels } from '../../modules/documentSections';
+import {
+  type DocumentSectionKey,
+  modifiedSectionLabelKeys,
+} from '../../modules/documentSections';
 import type { LoadedProject } from '../../types/platform';
 import type { ProjectRecoveryDraftController } from '../project-document';
 import { ProjectRecoveryDialog } from './ProjectRecoveryDialog';
@@ -51,6 +55,7 @@ export function DashboardDialogs({
   onCancelClose,
   onConfirmClose,
 }: DashboardDialogsProps) {
+  const { t } = useTranslation();
   const saveDialogTitleId = useId();
   const testDialogTitleId = useId();
   const saveCancelRef = useRef<HTMLButtonElement | null>(null);
@@ -84,21 +89,21 @@ export function DashboardDialogs({
             ref={saveDialogRef}
             role="dialog"
           >
-            <h3 id={saveDialogTitleId}>确认保存</h3>
-            <p>将当前所有配置修改写入项目文件：</p>
+            <h3 id={saveDialogTitleId}>{t('dashboard.dialogs.save.title')}</h3>
+            <p>{t('dashboard.dialogs.save.message')}</p>
             <div className="modal-path">{loadedProject.summary.path}</div>
             {isLegacyJcproProject && hasRefactorOnlyChanges ? (
               <p className="project-open-warning">
                 {refactorConfigPath
-                  ? `检测到重构专属配置修改，将写回已挂载 JSON：${refactorConfigPath}；原 .jcpro 只保存兼容字段。`
-                  : '检测到重构专属配置修改，将创建独立 JSON sidecar；原 .jcpro 只保存兼容字段。'}
+                  ? t('dashboard.dialogs.save.mountedSidecar', { path: refactorConfigPath })
+                  : t('dashboard.dialogs.save.newSidecar')}
               </p>
             ) : null}
             {modifiedSections.length > 0 ? (
               <div className="action-bar-pills">
                 {modifiedSections.map((section) => (
                   <span className="action-bar-pill" key={section}>
-                    {modifiedSectionLabels[section] ?? section}
+                    {t(modifiedSectionLabelKeys[section] ?? section)}
                   </span>
                 ))}
               </div>
@@ -111,7 +116,7 @@ export function DashboardDialogs({
                 onClick={cancelSaveProject}
                 type="button"
               >
-                取消
+                {t('common.actions.cancel')}
               </button>
               <button
                 className="modal-btn-confirm"
@@ -119,7 +124,11 @@ export function DashboardDialogs({
                 onClick={() => void confirmSaveProject()}
                 type="button"
               >
-                {savingProjectAction === 'save' ? '保存中...' : '确认保存'}
+                {t(
+                  savingProjectAction === 'save'
+                    ? 'common.status.saving'
+                    : 'dashboard.dialogs.save.confirm',
+                )}
               </button>
             </div>
           </div>
@@ -135,10 +144,13 @@ export function DashboardDialogs({
             ref={testDialogRef}
             role="dialog"
           >
-            <h3 id={testDialogTitleId}>确认生成测试数据</h3>
+            <h3 id={testDialogTitleId}>{t('dashboard.dialogs.testData.title')}</h3>
             <p>
-              将使用 <strong>{testDataLabels[confirmGenerateType]}</strong>{' '}
-              模板覆盖当前配置，是否继续？
+              <Trans
+                components={{ strong: <strong /> }}
+                i18nKey="dashboard.dialogs.testData.message"
+                values={{ template: t(testDataLabelKeys[confirmGenerateType]) }}
+              />
             </p>
             <div className="modal-actions">
               <button
@@ -147,10 +159,10 @@ export function DashboardDialogs({
                 ref={testCancelRef}
                 type="button"
               >
-                取消
+                {t('common.actions.cancel')}
               </button>
               <button className="modal-btn-confirm" onClick={confirmGenerateTestData} type="button">
-                确认生成
+                {t('dashboard.dialogs.testData.confirm')}
               </button>
             </div>
           </div>
@@ -159,13 +171,13 @@ export function DashboardDialogs({
 
       {showCloseConfirm ? (
         <ConfirmDialog
-          cancelLabel="继续编辑"
-          confirmLabel="放弃并关闭"
+          cancelLabel={t('dashboard.dialogs.close.continueEditing')}
+          confirmLabel={t('dashboard.dialogs.close.discardAndClose')}
           danger
-          message="当前项目存在未保存修改。关闭应用将永久放弃这些修改。"
+          message={t('dashboard.dialogs.close.message')}
           onCancel={onCancelClose}
           onConfirm={onConfirmClose}
-          title="放弃未保存修改？"
+          title={t('dashboard.dialogs.close.title')}
         />
       ) : null}
 

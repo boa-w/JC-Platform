@@ -1,6 +1,9 @@
 import { Save, ShieldCheck } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { useAppLanguage } from '../../i18n';
+import { appLanguageLabelKeys, type AppLanguage } from '../../i18n/resources';
 import type { TranslationSettingsController } from '../../stores/translationSettings';
 import './settings.css';
 
@@ -10,6 +13,8 @@ interface SettingsPageProps {
   onToggleTheme: () => void;
 }
 export function SettingsPage({ translationController, theme, onToggleTheme }: SettingsPageProps) {
+  const { t } = useTranslation();
+  const { language, supportedLanguages, changeLanguage } = useAppLanguage();
   const [pendingReset, setPendingReset] = useState<'translation' | null>(null);
   const credentialStatusId = useId();
   const {
@@ -35,10 +40,10 @@ export function SettingsPage({ translationController, theme, onToggleTheme }: Se
     credentialError ??
     credentialMessage ??
     (credentialLoading
-      ? '正在读取系统凭据库...'
+      ? t('settings.credentials.reading')
       : translationSettings.hasStoredAppKey
-        ? 'API Key 已由系统凭据库保护。'
-        : '尚未保存翻译凭据。');
+        ? t('settings.credentials.protected')
+        : t('settings.credentials.notSaved'));
   const saveCredentialsDisabled =
     credentialLoading ||
     credentialBusy ||
@@ -56,14 +61,14 @@ export function SettingsPage({ translationController, theme, onToggleTheme }: Se
     <>
       <section className="project-open-card">
         <div>
-          <h2>软件设置</h2>
-          <p>管理翻译服务与外观主题等软件级偏好设置。</p>
+          <h2>{t('settings.title')}</h2>
+          <p>{t('settings.description')}</p>
         </div>
-        <strong className="section-label--muted">翻译服务</strong>
+        <strong className="section-label--muted">{t('settings.translation.sectionTitle')}</strong>
         <div className="settings-service-panel">
           <div className="settings-service-info">
-            <span>百度翻译</span>
-            <small>用于多国语言管理页的一键条目翻译。</small>
+            <span>{t('settings.translation.baidu')}</span>
+            <small>{t('settings.translation.baiduDescription')}</small>
           </div>
           <label className="settings-field">
             <span>App ID</span>
@@ -81,7 +86,9 @@ export function SettingsPage({ translationController, theme, onToggleTheme }: Se
               autoComplete="new-password"
               disabled={credentialLoading || credentialBusy}
               placeholder={
-                translationSettings.hasStoredAppKey ? '已安全保存；输入新值可替换' : '输入 API Key'
+                translationSettings.hasStoredAppKey
+                  ? t('settings.credentials.replacePlaceholder')
+                  : t('settings.credentials.apiKeyPlaceholder')
               }
               type="password"
               value={translationSettings.baiduAppKey}
@@ -109,30 +116,55 @@ export function SettingsPage({ translationController, theme, onToggleTheme }: Se
                 type="button"
               >
                 <Save aria-hidden="true" size={14} strokeWidth={1.8} />
-                {credentialSaving ? '保存中' : '保存凭据'}
+                {t(
+                  credentialSaving
+                    ? 'settings.credentials.saving'
+                    : 'settings.credentials.save',
+                )}
               </button>
               <button
                 disabled={clearCredentialsDisabled}
                 onClick={() => setPendingReset('translation')}
                 type="button"
               >
-                {credentialClearing ? '清空中' : '清空配置'}
+                {t(
+                  credentialClearing
+                    ? 'settings.credentials.clearing'
+                    : 'settings.credentials.clear',
+                )}
               </button>
             </div>
           </div>
           <small className="settings-credential-privacy">
-            桌面端使用 Windows 凭据管理器或 macOS Keychain，不写入项目和浏览器存储。
+            {t('settings.credentials.privacy')}
           </small>
         </div>
-        <strong className="section-label--muted">外观</strong>
+        <strong className="section-label--muted">{t('settings.interfaceLanguage.sectionTitle')}</strong>
+        <label className="settings-field">
+          <span>{t('settings.interfaceLanguage.label')}</span>
+          <select
+            onChange={(event) => void changeLanguage(event.target.value as AppLanguage)}
+            value={language}
+          >
+            {supportedLanguages.map((supportedLanguage) => (
+              <option key={supportedLanguage} value={supportedLanguage}>
+                {t(appLanguageLabelKeys[supportedLanguage])}
+              </option>
+            ))}
+          </select>
+          <small>{t('settings.interfaceLanguage.description')}</small>
+        </label>
+        <strong className="section-label--muted">{t('settings.appearance.sectionTitle')}</strong>
         <div className="theme-toggle-row">
           <div className="theme-toggle-info">
-            <span>主题模式</span>
-            <small>{theme === 'dark' ? '深色模式' : '浅色模式'}</small>
+            <span>{t('settings.appearance.themeMode')}</span>
+            <small>
+              {t(theme === 'dark' ? 'settings.appearance.dark' : 'settings.appearance.light')}
+            </small>
           </div>
           <button
             aria-checked={theme === 'dark'}
-            aria-label="深色模式"
+            aria-label={t('settings.appearance.dark')}
             className="theme-toggle-btn"
             onClick={onToggleTheme}
             role="switch"
@@ -148,12 +180,12 @@ export function SettingsPage({ translationController, theme, onToggleTheme }: Se
       </section>
       {pendingReset ? (
         <ConfirmDialog
-          confirmLabel="清空配置"
+          confirmLabel={t('settings.credentials.clear')}
           danger
-          message="将从本机删除百度翻译 App ID 和 API Key。此操作无法撤销。"
+          message={t('settings.credentials.clearConfirmMessage')}
           onCancel={() => setPendingReset(null)}
           onConfirm={confirmReset}
-          title="清空翻译配置？"
+          title={t('settings.credentials.clearConfirmTitle')}
         />
       ) : null}
     </>

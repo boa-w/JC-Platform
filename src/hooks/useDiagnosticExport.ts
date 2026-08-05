@@ -1,5 +1,6 @@
 import { save } from '@tauri-apps/plugin-dialog';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { saveTextFile } from '../api/commands';
 import { buildDiagnosticReport, recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics';
 import type { BackendHealth, NavigationKey, ProjectSummary } from '../types/platform';
@@ -23,6 +24,7 @@ function diagnosticFileName() {
 }
 
 export function useDiagnosticExport(options: UseDiagnosticExportOptions) {
+  const { t } = useTranslation();
   const [isExporting, setIsExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function useDiagnosticExport(options: UseDiagnosticExportOptions) {
     setMessage(null);
     setError(null);
     if (!isTauriRuntime()) {
-      setError('诊断报告只能在 Tauri 桌面应用中导出。');
+      setError(t('diagnostics.status.desktopOnly'));
       return;
     }
 
@@ -39,7 +41,7 @@ export function useDiagnosticExport(options: UseDiagnosticExportOptions) {
       () =>
         save({
           defaultPath: diagnosticFileName(),
-          filters: [{ name: '诊断报告', extensions: ['json'] }],
+          filters: [{ name: t('diagnostics.filters.report'), extensions: ['json'] }],
         }),
       setError,
     );
@@ -49,8 +51,8 @@ export function useDiagnosticExport(options: UseDiagnosticExportOptions) {
     try {
       const report = buildDiagnosticReport(options);
       await saveTextFile(selected, `${JSON.stringify(report, null, 2)}\n`);
-      setMessage(`诊断报告已导出：${selected}`);
-      recordRuntimeDiagnostic('info', 'diagnostics.export', '诊断报告已导出');
+      setMessage(t('diagnostics.status.exported', { path: selected }));
+      recordRuntimeDiagnostic('info', 'diagnostics.export', t('diagnostics.status.exportedLog'));
     } catch (cause) {
       const nextError = cause instanceof Error ? cause.message : String(cause);
       setError(nextError);
@@ -58,7 +60,7 @@ export function useDiagnosticExport(options: UseDiagnosticExportOptions) {
     } finally {
       setIsExporting(false);
     }
-  }, [options]);
+  }, [options, t]);
 
   return { error, exportDiagnostics, isExporting, message };
 }

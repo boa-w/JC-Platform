@@ -67,6 +67,7 @@ export function TranslationServicePanel({
   onToggleLogs,
   onClearLogs,
 }: TranslationServicePanelProps) {
+  const { t } = useTranslation();
   const progressPercent =
     progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
 
@@ -74,7 +75,7 @@ export function TranslationServicePanel({
     <div className="lang-translate-panel">
       <div className="lang-translate-fields">
         <label className="lang-translate-field lang-translate-field--language">
-          <span>源语言</span>
+          <span>{t('language.service.sourceLanguage')}</span>
           <select
             value={sourceLanguage}
             onChange={(event) => onSourceLanguageChange(event.target.value)}
@@ -87,12 +88,12 @@ export function TranslationServicePanel({
           </select>
         </label>
         <label className="lang-translate-field lang-translate-field--language">
-          <span>目标语言</span>
+          <span>{t('language.service.targetLanguage')}</span>
           <select
             value={targetLanguage ?? ''}
             onChange={(event) => onTargetLanguageChange(event.target.value || null)}
           >
-            <option value="">请选择</option>
+            <option value="">{t('language.service.selectPlaceholder')}</option>
             {languages.map((language) => (
               <option key={language.code} value={language.code}>
                 {language.label} ({language.code})
@@ -101,24 +102,24 @@ export function TranslationServicePanel({
           </select>
         </label>
         <label className="lang-translate-field lang-translate-field--scope">
-          <span>范围</span>
+          <span>{t('language.service.scope')}</span>
           <select
             value={scope}
             onChange={(event) => onScopeChange(event.target.value as TranslateScope)}
           >
-            <option value="empty">仅空白目标列</option>
-            <option value="filtered">当前筛选全部</option>
-            <option value="selected">已选择条目</option>
+            <option value="empty">{t('language.service.scopes.empty')}</option>
+            <option value="filtered">{t('language.service.scopes.filtered')}</option>
+            <option value="selected">{t('language.service.scopes.selected')}</option>
           </select>
         </label>
         <div className="lang-translate-selection-state">
-          <span>已选择</span>
-          <strong>{selectedCount} 条</strong>
+          <span>{t('language.service.selected')}</span>
+          <strong>{t('language.service.itemCount', { count: selectedCount })}</strong>
         </div>
         <div className="lang-translate-service-state">
-          <span>百度翻译</span>
+          <span>{t('language.service.baidu')}</span>
           <strong className={configured ? 'ready' : 'missing'}>
-            {configured ? '已配置' : '未配置'}
+            {t(configured ? 'language.service.configured' : 'language.service.notConfigured')}
           </strong>
         </div>
       </div>
@@ -128,7 +129,7 @@ export function TranslationServicePanel({
         </span>
         {isTranslating ? (
           <button className="lang-btn lang-btn--ghost" onClick={onCancelTranslate} type="button">
-            取消
+            {t('common.actions.cancel')}
           </button>
         ) : null}
         <button
@@ -143,7 +144,7 @@ export function TranslationServicePanel({
           onClick={onTranslate}
           type="button"
         >
-          {isTranslating ? '翻译中...' : '百度翻译'}
+          {t(isTranslating ? 'language.service.translating' : 'language.service.baidu')}
         </button>
       </div>
       {progress.total > 0 ? (
@@ -153,8 +154,13 @@ export function TranslationServicePanel({
               {progress.done}/{progress.total} ({progressPercent}%)
             </span>
             <span>
-              成功 {progress.success}，失败 {progress.failed}
-              {progress.currentKey ? `，当前 ${progress.currentKey}` : ''}
+              {t('language.service.progressResult', {
+                success: progress.success,
+                failed: progress.failed,
+              })}
+              {progress.currentKey
+                ? t('language.service.currentKey', { key: progress.currentKey })
+                : ''}
             </span>
           </div>
           <div className="lang-translate-progress-bar">
@@ -167,18 +173,20 @@ export function TranslationServicePanel({
       ) : null}
       <div className="lang-translate-logbar">
         <button className="lang-btn lang-btn--ghost" onClick={onToggleLogs} type="button">
-          {showLogs ? '隐藏日志' : `翻译日志 (${logs.length})`}
+          {showLogs
+            ? t('language.service.hideLogs')
+            : t('language.service.logs', { count: logs.length })}
         </button>
         {logs.length > 0 ? (
           <button className="lang-btn lang-btn--ghost" onClick={onClearLogs} type="button">
-            清空日志
+            {t('language.service.clearLogs')}
           </button>
         ) : null}
       </div>
       {showLogs ? (
         <div className="lang-translate-log">
           {logs.length === 0 ? (
-            <span className="lang-translate-log-empty">暂无日志</span>
+            <span className="lang-translate-log-empty">{t('language.service.noLogs')}</span>
           ) : (
             logs.map((entry) => (
               <div
@@ -198,3 +206,4 @@ export function TranslationServicePanel({
 }
 
 export type { TranslateLogEntry, TranslateLogLevel, TranslateProgress, TranslateScope };
+import { useTranslation } from 'react-i18next';

@@ -24,24 +24,26 @@ export type DocumentSectionKey =
 
 export type JsonEditorKey = NavigationKey | 'sdo' | 'pdo-simple' | 'pdo-advanced';
 
-export const modifiedSectionLabels: Record<DocumentSectionKey, string> = {
-  export_info: '导出设置',
-  ui_info: 'UI 资源',
-  sdo_info: 'SDO 参数',
-  pdo_simple_send_recv: 'PDO 简化配置',
-  pdo_global_param: 'PDO 全局变量',
-  pdo_condition: 'PDO 条件表',
-  pdo_recv: 'PDO 接收帧',
-  pdo_send: 'PDO 发送帧',
-  language_info: '多国语言',
-  battery_monitor: '锂电监控协议',
-  fault_code_info: '故障代码',
-  signal_dictionary: '业务信号字典',
-  private_protocol: '私有协议',
-  protocol_mapping: '协议映射',
+export const modifiedSectionLabelKeys: Record<DocumentSectionKey, string> = {
+  export_info: 'documentSections.exportSettings',
+  ui_info: 'documentSections.uiResources',
+  sdo_info: 'documentSections.sdoParameters',
+  pdo_simple_send_recv: 'documentSections.pdoSimple',
+  pdo_global_param: 'documentSections.pdoGlobals',
+  pdo_condition: 'documentSections.pdoConditions',
+  pdo_recv: 'documentSections.pdoReceive',
+  pdo_send: 'documentSections.pdoSend',
+  language_info: 'documentSections.languages',
+  battery_monitor: 'documentSections.batteryMonitor',
+  fault_code_info: 'documentSections.faultCodes',
+  signal_dictionary: 'documentSections.signalDictionary',
+  private_protocol: 'documentSections.privateProtocol',
+  protocol_mapping: 'documentSections.protocolMapping',
 };
 
-export const trackedDocumentSections = Object.keys(modifiedSectionLabels) as DocumentSectionKey[];
+export const trackedDocumentSections = Object.keys(
+  modifiedSectionLabelKeys,
+) as DocumentSectionKey[];
 
 export const refactorOnlySections = [
   'signal_dictionary',

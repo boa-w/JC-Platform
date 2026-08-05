@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { LoadedProject, ProjectRecoveryDraft } from '../../types/platform';
 import { deepEqual } from '../../utils/projectDirty';
 import { sameProjectPath } from './projectRecoveryDraft';
@@ -23,6 +24,7 @@ export function useProjectRecoveryDraft({
   onRestoreDocument,
   onPersistenceError,
 }: UseProjectRecoveryDraftOptions) {
+  const { t } = useTranslation();
   const [candidate, setCandidate] = useState<ProjectRecoveryDraft | null>(null);
   const [isDiscarding, setIsDiscarding] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -56,9 +58,9 @@ export function useProjectRecoveryDraft({
     persistenceErrorReportedRef.current = true;
     const detail = cause instanceof Error ? cause.message : String(cause);
     persistenceErrorRef.current(
-      `无法访问恢复草稿；请及时手动保存项目。${detail ? ` ${detail}` : ''}`,
+      t('recoveryDraft.persistenceError', { detail: detail ? ` ${detail}` : '' }),
     );
-  }, []);
+  }, [t]);
 
   const clearCurrentDraft = useCallback(
     async (path = projectRef.current?.summary.path) => {
@@ -191,9 +193,9 @@ export function useProjectRecoveryDraft({
     setRestoreError(null);
     const cleared = await clearCurrentDraft(candidate.projectPath);
     if (cleared !== null) dismissCandidate();
-    else setRestoreError('无法删除恢复草稿，请重试。');
+    else setRestoreError(t('recoveryDraft.deleteFailed'));
     setIsDiscarding(false);
-  }, [candidate, clearCurrentDraft, dismissCandidate, isDiscarding]);
+  }, [candidate, clearCurrentDraft, dismissCandidate, isDiscarding, t]);
 
   const restoreCandidate = useCallback(async () => {
     if (!candidate || isRestoring) return;

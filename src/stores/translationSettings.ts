@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   clearTranslationCredentials,
   getTranslationCredentialStatus,
@@ -36,12 +37,13 @@ function browserCredentialStorage(): TranslationCredentialStorage | null {
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export function useTranslationSettings() {
+  const { t } = useTranslation();
   const desktopRuntime = isTauriRuntime();
   const [settings, setSettings] = useState<TranslationSettings>(defaultTranslationSettings);
   const [isLoading, setIsLoading] = useState(desktopRuntime);
   const [operation, setOperation] = useState<'save' | 'clear' | null>(null);
   const [message, setMessage] = useState<string | null>(
-    desktopRuntime ? null : '浏览器预览不会保存翻译凭据。',
+    desktopRuntime ? null : t('translationSettings.browserNotSaved'),
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -68,7 +70,7 @@ export function useTranslationSettings() {
           baiduAppKey: '',
           hasStoredAppKey: status.hasAppKey,
         });
-        setMessage(legacy ? '旧翻译凭据已迁移到系统凭据库。' : null);
+        setMessage(legacy ? t('translationSettings.legacyMigrated') : null);
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
       } finally {
@@ -80,7 +82,7 @@ export function useTranslationSettings() {
     return () => {
       cancelled = true;
     };
-  }, [desktopRuntime]);
+  }, [desktopRuntime, t]);
 
   const updateSetting = useCallback((key: TranslationSettingKey, value: string) => {
     setSettings((current) => ({ ...current, [key]: value }));
@@ -90,7 +92,7 @@ export function useTranslationSettings() {
 
   const saveSettings = useCallback(async () => {
     if (!desktopRuntime) {
-      setMessage('浏览器预览不会保存翻译凭据。');
+      setMessage(t('translationSettings.browserNotSaved'));
       return false;
     }
     setOperation('save');
@@ -106,7 +108,7 @@ export function useTranslationSettings() {
         baiduAppKey: '',
         hasStoredAppKey: status.hasAppKey,
       });
-      setMessage('翻译凭据已安全保存。');
+      setMessage(t('translationSettings.saved'));
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -114,7 +116,7 @@ export function useTranslationSettings() {
     } finally {
       setOperation(null);
     }
-  }, [desktopRuntime, settings.baiduAppId, settings.baiduAppKey]);
+  }, [desktopRuntime, settings.baiduAppId, settings.baiduAppKey, t]);
 
   const resetSettings = useCallback(async () => {
     setMessage(null);
@@ -131,11 +133,13 @@ export function useTranslationSettings() {
       setOperation(null);
     }
     setSettings(defaultTranslationSettings);
-    setMessage(desktopRuntime ? '翻译凭据已从系统凭据库删除。' : '浏览器预览中的输入已清空。');
+    setMessage(
+      desktopRuntime ? t('translationSettings.deleted') : t('translationSettings.browserCleared'),
+    );
     const storage = browserCredentialStorage();
     if (storage) clearLegacyTranslationSettings(storage);
     return true;
-  }, [desktopRuntime]);
+  }, [desktopRuntime, t]);
 
   const isConfigured = useMemo(
     () => settings.baiduAppId.trim() !== '' && settings.hasStoredAppKey,

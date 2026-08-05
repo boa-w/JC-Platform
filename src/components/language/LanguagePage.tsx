@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { importSingleLanguageCsv, translateBaiduText } from '../../api/commands';
 import { useOperationGuard } from '../../hooks/useOperationGuard';
 import type { LanguageDocument } from '../../types/platform';
@@ -197,6 +198,7 @@ export function LanguagePage({
   onUpdate,
   onImportFullLanguage,
 }: LanguagePageProps) {
+  const { t } = useTranslation();
   const langMainRef = useRef<HTMLDivElement | null>(null);
   const scrollTopButtonRef = useRef<HTMLButtonElement | null>(null);
   const scrollTopDragRef = useRef<FloatingButtonDragState | null>(null);
@@ -451,11 +453,11 @@ export function LanguagePage({
 
   async function handleImportSingleLanguage() {
     if (!selectedLanguage) {
-      setSingleLanguageImportStatus('请先选择目标语言。');
+      setSingleLanguageImportStatus(t('language.page.selectTargetPeriod'));
       return;
     }
     if (!isTauriRuntime()) {
-      setSingleLanguageImportStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setSingleLanguageImportStatus(t('language.page.desktopFilePickerOnly'));
       return;
     }
 
@@ -464,7 +466,7 @@ export function LanguagePage({
       () =>
         open({
           multiple: false,
-          filters: [{ name: '单语言翻译 CSV', extensions: ['csv'] }],
+          filters: [{ name: t('language.page.singleLanguageCsvFilter'), extensions: ['csv'] }],
         }),
       (message) => {
         if (importGuard.isCurrent(operation)) setSingleLanguageImportStatus(message);
@@ -482,12 +484,22 @@ export function LanguagePage({
       });
       if (!importGuard.isCurrent(operation)) return;
       if (!report.valid || !report.document) {
-        setSingleLanguageImportStatus(report.errors.join('；') || '单语言 CSV 导入失败。');
+        setSingleLanguageImportStatus(
+          report.errors.join(t('common.punctuation.semicolon')) ||
+            t('language.page.singleLanguageImportFailed'),
+        );
         return;
       }
       if (report.filled > 0) onUpdate(report.document);
       setSingleLanguageImportStatus(
-        `${getLabel(document, selectedLanguage)}：填充 ${report.filled} 条；跳过已有 ${report.skipped_existing}、未知 key ${report.skipped_unknown}、空值 ${report.skipped_empty}、重复 ${report.skipped_duplicate}。`,
+        t('language.page.singleLanguageImportResult', {
+          language: getLabel(document, selectedLanguage),
+          filled: report.filled,
+          existing: report.skipped_existing,
+          unknown: report.skipped_unknown,
+          empty: report.skipped_empty,
+          duplicate: report.skipped_duplicate,
+        }),
       );
     } catch (error) {
       if (importGuard.isCurrent(operation)) {
@@ -665,21 +677,21 @@ export function LanguagePage({
 
   function handleCancelTranslate() {
     cancelTranslateRef.current = true;
-    setTranslateStatus('正在取消，等待当前条目完成...');
-    addTranslateLog('warning', '用户请求取消翻译');
+    setTranslateStatus(t('language.page.cancelling'));
+    addTranslateLog('warning', t('language.page.cancelRequested'));
   }
 
   async function handleTranslateRows() {
     if (!selectedLanguage) {
-      setTranslateStatus('请选择目标语言');
+      setTranslateStatus(t('language.page.selectTarget'));
       return;
     }
     if (selectedLanguage === translateSourceLanguage) {
-      setTranslateStatus('目标语言需不同于源语言');
+      setTranslateStatus(t('language.page.targetMustDiffer'));
       return;
     }
     if (!isBaiduTranslateConfigured) {
-      setTranslateStatus('请先在软件设置中配置百度翻译 App ID 和 API Key');
+      setTranslateStatus(t('language.page.configureBaiduFirst'));
       return;
     }
 
@@ -695,17 +707,25 @@ export function LanguagePage({
 
     if (candidates.length === 0) {
       setTranslateStatus(
-        translateScope === 'selected' ? '请选择需要翻译的条目' : '没有需要翻译的条目',
+        t(
+          translateScope === 'selected'
+            ? 'language.page.selectItemsToTranslate'
+            : 'language.page.nothingToTranslate',
+        ),
       );
       return;
     }
 
     setIsTranslating(true);
     resetTranslateRun(candidates.length);
-    setTranslateStatus(`正在翻译 0/${candidates.length} 条...`);
+    setTranslateStatus(t('language.page.translatingProgress', { current: 0, total: candidates.length }));
     addTranslateLog(
       'info',
-      `开始翻译 ${candidates.length} 条，${translateSourceLanguage} → ${selectedLanguage}`,
+      t('language.page.translationStarted', {
+        count: candidates.length,
+        source: translateSourceLanguage,
+        target: selectedLanguage,
+      }),
     );
     const nextTranslate: Record<string, unknown> = { ...document.list_translate };
     let pendingUpdates = 0;
@@ -721,7 +741,10 @@ export function LanguagePage({
 
       for (let index = 0; index < candidates.length; index++) {
         if (cancelTranslateRef.current) {
-          addTranslateLog('warning', `已取消，剩余 ${candidates.length - index} 条未翻译`);
+          addTranslateLog(
+            'warning',
+            t('language.page.cancelledRemaining', { count: candidates.length - index }),
+          );
           break;
         }
 
@@ -731,7 +754,13 @@ export function LanguagePage({
         const sourceText = String(sourceTranslations[translateSourceLanguage] ?? '');
 
         setTranslateProgress((current) => ({ ...current, currentKey: row.key }));
-        setTranslateStatus(`正在翻译 ${index + 1}/${candidates.length}: ${row.key}`);
+        setTranslateStatus(
+          t('language.page.translatingKey', {
+            current: index + 1,
+            total: candidates.length,
+            key: row.key,
+          }),
+        );
 
         try {
           const response = await translateBaiduText({
@@ -742,7 +771,7 @@ export function LanguagePage({
 
           const translated = response.translations[0] ?? '';
           if (!translated.trim()) {
-            addTranslateLog('warning', '返回空结果，未写入', row.key);
+            addTranslateLog('warning', t('language.page.emptyResult'), row.key);
             failed += 1;
             done += 1;
             setTranslateProgress((current) => ({ ...current, done, failed }));
@@ -755,7 +784,7 @@ export function LanguagePage({
           if (pendingUpdates >= TRANSLATION_UPDATE_BATCH_SIZE) {
             flushTranslationUpdates();
           }
-          addTranslateLog('success', '翻译成功', row.key);
+          addTranslateLog('success', t('language.page.translationSuccess'), row.key);
           success += 1;
           done += 1;
           setTranslateProgress((current) => ({ ...current, done, success }));
@@ -773,14 +802,14 @@ export function LanguagePage({
       setTranslateProgress((current) => ({ ...current, currentKey: '' }));
       setTranslateStatus(
         wasCancelled
-          ? `已取消：成功 ${success} 条，失败 ${failed} 条`
-          : `翻译完成：成功 ${success} 条，失败 ${failed} 条`,
+          ? t('language.page.cancelledResult', { success, failed })
+          : t('language.page.completedResult', { success, failed }),
       );
       addTranslateLog(
         wasCancelled ? 'warning' : 'info',
         wasCancelled
-          ? `翻译取消：成功 ${success} 条，失败 ${failed} 条`
-          : `翻译完成：成功 ${success} 条，失败 ${failed} 条`,
+          ? t('language.page.cancelLog', { success, failed })
+          : t('language.page.completedResult', { success, failed }),
       );
     } catch (error) {
       flushTranslationUpdates();
@@ -889,7 +918,7 @@ export function LanguagePage({
   if (!loaded) {
     return (
       <section className="lang-page">
-        <EmptyState>请先在项目管理中打开 .jcpro 项目文件</EmptyState>
+        <EmptyState>{t('language.page.openProjectFirst')}</EmptyState>
       </section>
     );
   }
@@ -920,14 +949,14 @@ export function LanguagePage({
               onClick={() => setViewMode('editor')}
               type="button"
             >
-              编辑模式
+              {t('language.page.editorMode')}
             </button>
             <button
               className={`lang-view-toggle-btn ${viewMode === 'comparison' ? 'active' : ''}`}
               onClick={() => setViewMode('comparison')}
               type="button"
             >
-              全语言对比
+              {t('language.page.comparisonMode')}
             </button>
           </div>
           {viewMode === 'editor' ? (
@@ -939,8 +968,8 @@ export function LanguagePage({
               }}
             >
               <input
-                aria-label="新增翻译键"
-                placeholder="新增翻译键..."
+                aria-label={t('language.page.newKeyLabel')}
+                placeholder={t('language.page.newKeyPlaceholder')}
                 value={newKeyInput}
                 onChange={(event) => setNewKeyInput(event.target.value)}
               />
@@ -949,7 +978,7 @@ export function LanguagePage({
                 disabled={!newKeyInput.trim()}
                 type="submit"
               >
-                添加键
+                {t('language.page.addKey')}
               </button>
             </form>
           ) : null}
@@ -1021,11 +1050,15 @@ export function LanguagePage({
               <div className="lang-footer-progress">
                 {selectedLanguage ? (
                   <span>
-                    {getLabel(document, selectedLanguage)}: {translated}/{total} 已翻译 (
-                    {total > 0 ? Math.round((translated / total) * 100) : 0}%)
+                    {t('language.page.translationProgress', {
+                      language: getLabel(document, selectedLanguage),
+                      translated,
+                      total,
+                      percent: total > 0 ? Math.round((translated / total) * 100) : 0,
+                    })}
                   </span>
                 ) : (
-                  <span>请选择目标语言</span>
+                  <span>{t('language.page.selectTarget')}</span>
                 )}
               </div>
             </div>
@@ -1038,7 +1071,7 @@ export function LanguagePage({
           />
         )}
         <button
-          aria-label="回到顶部"
+          aria-label={t('language.page.backToTop')}
           className="lang-scroll-top"
           onClick={handleScrollTopClick}
           onPointerDown={handleScrollTopPointerDown}
@@ -1047,21 +1080,25 @@ export function LanguagePage({
           onPointerUp={handleScrollTopPointerUp}
           ref={scrollTopButtonRef}
           style={{ left: scrollTopPosition.left, top: scrollTopPosition.top }}
-          title="回到顶部"
+          title={t('language.page.backToTop')}
           type="button"
         >
           <span className="lang-scroll-top-icon">↑</span>
-          <span>顶部</span>
+          <span>{t('language.page.top')}</span>
         </button>
         {confirmDeleteSelected ? (
           <ConfirmDialog
-            title="删除已选条目"
-            message={`确定要删除已选的 ${selectedDeletableKeys.length} 个翻译条目吗？此操作会同时移除这些条目的所有语言翻译。${
+            title={t('language.page.deleteSelectedTitle')}
+            message={`${t('language.page.deleteSelectedMessage', {
+              count: selectedDeletableKeys.length,
+            })}${
               selectedTranslationKeys.size > selectedDeletableKeys.length
-                ? `另外 ${selectedTranslationKeys.size - selectedDeletableKeys.length} 个已选条目不可删除，将不会被移除。`
+                ? t('language.page.nonDeletableSelected', {
+                    count: selectedTranslationKeys.size - selectedDeletableKeys.length,
+                  })
                 : ''
             }`}
-            confirmLabel="删除"
+            confirmLabel={t('language.table.delete')}
             danger
             onConfirm={handleConfirmDeleteSelected}
             onCancel={() => setConfirmDeleteSelected(false)}

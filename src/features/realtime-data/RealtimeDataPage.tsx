@@ -1,5 +1,6 @@
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type Dispatch, type SetStateAction, useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { JsonPath } from '../../utils/projectDirty';
@@ -21,6 +22,7 @@ export function RealtimeDataPage({
   isModifiedPath,
   restoreModifiedPath,
 }: RealtimeDataPageProps) {
+  const { t } = useTranslation();
   const {
     simpleDocument: currentPdoSimpleDocument,
     advancedDocument: currentPdoAdvancedDocument,
@@ -121,9 +123,9 @@ export function RealtimeDataPage({
     return (
       <section className="legacy-edit-panel legacy-edit-panel--drawer">
         <div className="legacy-edit-panel-header">
-          <strong>全局变量</strong>
+          <strong>{t('realtimeData.globalParameters')}</strong>
           <button onClick={addPdoGlobalParam} type="button">
-            新增
+            {t('realtimeData.add')}
           </button>
         </div>
         <div className="legacy-drawer-table-frame">
@@ -131,13 +133,13 @@ export function RealtimeDataPage({
             <thead>
               <tr>
                 <th />
-                <th>参数ID</th>
-                <th>名称</th>
-                <th>默认值</th>
-                <th>保留</th>
-                <th>类型</th>
-                <th>内部变量</th>
-                <th>操作</th>
+                <th>{t('realtimeData.parameterId')}</th>
+                <th>{t('protocol.common.name')}</th>
+                <th>{t('protocol.signalDictionary.defaultValue')}</th>
+                <th>{t('realtimeData.reserved')}</th>
+                <th>{t('protocol.common.type')}</th>
+                <th>{t('realtimeData.internalVariable')}</th>
+                <th>{t('protocol.common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -153,7 +155,10 @@ export function RealtimeDataPage({
                   <td>{index + 1}</td>
                   <td>
                     <input
-                      aria-label={`全局变量 ${index + 1} 参数 ID`}
+                      aria-label={t('realtimeData.globalFieldAria', {
+                        index: index + 1,
+                        field: t('realtimeData.parameterId'),
+                      })}
                       value={item.param_id}
                       onChange={(event) =>
                         updatePdoGlobalParam(index, 'param_id', event.target.value)
@@ -162,21 +167,30 @@ export function RealtimeDataPage({
                   </td>
                   <td>
                     <input
-                      aria-label={`全局变量 ${index + 1} 名称`}
+                      aria-label={t('realtimeData.globalFieldAria', {
+                        index: index + 1,
+                        field: t('protocol.common.name'),
+                      })}
                       value={item.name}
                       onChange={(event) => updatePdoGlobalParam(index, 'name', event.target.value)}
                     />
                   </td>
                   <td>
                     <input
-                      aria-label={`全局变量 ${index + 1} 默认值`}
+                      aria-label={t('realtimeData.globalFieldAria', {
+                        index: index + 1,
+                        field: t('protocol.signalDictionary.defaultValue'),
+                      })}
                       value={item.def}
                       onChange={(event) => updatePdoGlobalParam(index, 'def', event.target.value)}
                     />
                   </td>
                   <td>
                     <input
-                      aria-label={`全局变量 ${index + 1} 保留值`}
+                      aria-label={t('realtimeData.globalFieldAria', {
+                        index: index + 1,
+                        field: t('realtimeData.reservedValue'),
+                      })}
                       type="number"
                       value={item.reserved}
                       onChange={(event) =>
@@ -186,7 +200,10 @@ export function RealtimeDataPage({
                   </td>
                   <td>
                     <input
-                      aria-label={`全局变量 ${index + 1} 类型`}
+                      aria-label={t('realtimeData.globalFieldAria', {
+                        index: index + 1,
+                        field: t('protocol.common.type'),
+                      })}
                       type="number"
                       value={item.type}
                       onChange={(event) =>
@@ -196,7 +213,10 @@ export function RealtimeDataPage({
                   </td>
                   <td>
                     <input
-                      aria-label={`全局变量 ${index + 1} 内部变量`}
+                      aria-label={t('realtimeData.globalFieldAria', {
+                        index: index + 1,
+                        field: t('realtimeData.internalVariable'),
+                      })}
                       type="number"
                       value={item.inner}
                       onChange={(event) =>
@@ -210,7 +230,7 @@ export function RealtimeDataPage({
                       onClick={() => removePdoGlobalParam(index)}
                       type="button"
                     >
-                      删除
+                      {t('protocol.common.delete')}
                     </button>
                   </td>
                 </tr>
@@ -226,9 +246,9 @@ export function RealtimeDataPage({
     return (
       <section className="legacy-edit-panel legacy-edit-panel--drawer">
         <div className="legacy-edit-panel-header">
-          <strong>条件表</strong>
+          <strong>{t('realtimeData.conditions')}</strong>
           <button onClick={addPdoCondition} type="button">
-            新增
+            {t('realtimeData.add')}
           </button>
         </div>
         {(currentPdoAdvancedDocument?.pdo_condition ?? []).map((condition, conditionIndex) => {
@@ -237,7 +257,7 @@ export function RealtimeDataPage({
           return (
             <div className="legacy-condition-row" key={conditionKey}>
               <label>
-                参数 ID
+                {t('realtimeData.parameterId')}
                 <input
                   value={condition.param_id}
                   onChange={(event) =>
@@ -246,7 +266,7 @@ export function RealtimeDataPage({
                 />
               </label>
               <label>
-                处理方式
+                {t('realtimeData.processingMethod')}
                 <input
                   type="number"
                   value={condition.process}
@@ -256,18 +276,18 @@ export function RealtimeDataPage({
                 />
               </label>
               <button onClick={() => addPdoConditionInput(conditionIndex)} type="button">
-                新增输入
+                {t('realtimeData.addInput')}
               </button>
               <button
                 className="danger"
                 onClick={() => removePdoCondition(conditionIndex)}
                 type="button"
               >
-                删除条件
+                {t('realtimeData.deleteCondition')}
               </button>
               {condition.data.map((input, inputIndex) => (
                 <label key={inputKeys[inputIndex]}>
-                  输入参数
+                  {t('realtimeData.inputParameter')}
                   <input
                     value={input.param_id}
                     onChange={(event) =>
@@ -279,7 +299,7 @@ export function RealtimeDataPage({
                     onClick={() => removePdoConditionInput(conditionIndex, inputIndex)}
                     type="button"
                   >
-                    删除
+                    {t('protocol.common.delete')}
                   </button>
                 </label>
               ))}
@@ -297,7 +317,7 @@ export function RealtimeDataPage({
       <div className="legacy-drawer-layer" role="presentation">
         <button
           className="legacy-drawer-backdrop"
-          aria-label="关闭高级配置编辑面板"
+          aria-label={t('realtimeData.drawer.close')}
           onClick={closeAdvancedPdoDrawer}
           type="button"
         />
@@ -310,19 +330,23 @@ export function RealtimeDataPage({
         >
           <div className="legacy-drawer-header">
             <div>
-              <strong id={advancedPdoDrawerTitleId}>高级 CANopen 参数</strong>
-              <p>编辑全局变量和条件表，同时保留主区域的帧/协议上下文。</p>
+              <strong id={advancedPdoDrawerTitleId}>{t('realtimeData.drawer.title')}</strong>
+              <p>{t('realtimeData.drawer.description')}</p>
             </div>
             <button
               ref={advancedPdoDrawerCloseRef}
-              aria-label="关闭高级 CANopen 参数面板"
+              aria-label={t('realtimeData.drawer.closeParameters')}
               onClick={closeAdvancedPdoDrawer}
               type="button"
             >
               ×
             </button>
           </div>
-          <div className="legacy-drawer-tabs" role="tablist" aria-label="高级 CANopen 参数分类">
+          <div
+            className="legacy-drawer-tabs"
+            role="tablist"
+            aria-label={t('realtimeData.drawer.categories')}
+          >
             <button
               aria-selected={advancedPdoDrawerTab === 'global'}
               className={advancedPdoDrawerTab === 'global' ? 'active' : ''}
@@ -330,7 +354,7 @@ export function RealtimeDataPage({
               role="tab"
               type="button"
             >
-              全局变量
+              {t('realtimeData.globalParameters')}
             </button>
             <button
               aria-selected={advancedPdoDrawerTab === 'condition'}
@@ -339,7 +363,7 @@ export function RealtimeDataPage({
               role="tab"
               type="button"
             >
-              条件表
+              {t('realtimeData.conditions')}
             </button>
           </div>
           <div className="legacy-drawer-body">
@@ -360,12 +384,14 @@ export function RealtimeDataPage({
     >
       <div className="legacy-data-sidebar">
         <div className="legacy-data-sidebar-header">
-          <div className="legacy-data-sidebar-title">菜单</div>
+          <div className="legacy-data-sidebar-title">{t('settingData.menu')}</div>
           <button
             className="legacy-sidebar-collapse-btn"
             onClick={() => setSidebarCollapsed((v) => !v)}
             type="button"
-            title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'}
+            title={t(
+              sidebarCollapsed ? 'settingData.expandSidebar' : 'settingData.collapseSidebar',
+            )}
           >
             {sidebarCollapsed ? (
               <PanelLeftOpen aria-hidden="true" size={15} strokeWidth={1.8} />
@@ -394,7 +420,7 @@ export function RealtimeDataPage({
                   size={14}
                   strokeWidth={1.8}
                 />
-                <span>{kind === 'pdo_recv' ? '接收表' : '发送表'}</span>
+                <span>{t(kind === 'pdo_recv' ? 'realtimeData.receiveTable' : 'realtimeData.sendTable')}</span>
               </button>
               {selectedRealtimeKind === kind
                 ? (realtimeMode === 'simple' ? realtimeFrames(kind) : advancedFrames(kind)).map(
@@ -438,7 +464,7 @@ export function RealtimeDataPage({
                 }}
                 type="button"
               >
-                全局变量
+                {t('realtimeData.globalParameters')}
               </button>
               <button
                 className={
@@ -452,7 +478,7 @@ export function RealtimeDataPage({
                 }}
                 type="button"
               >
-                条件表
+                {t('realtimeData.conditions')}
               </button>
             </>
           ) : null}
@@ -462,8 +488,18 @@ export function RealtimeDataPage({
         <div className="legacy-data-header">
           <div className="legacy-data-header-left">
             <strong>
-              {selectedRealtimeKind === 'pdo_recv' ? '菜单->接收表' : '菜单->发送表'}（
-              {realtimeMode === 'simple' ? '简化配置' : '高级配置'}）
+              {t('realtimeData.heading', {
+                table: t(
+                  selectedRealtimeKind === 'pdo_recv'
+                    ? 'realtimeData.menuReceive'
+                    : 'realtimeData.menuSend',
+                ),
+                mode: t(
+                  realtimeMode === 'simple'
+                    ? 'realtimeData.simpleConfiguration'
+                    : 'realtimeData.advancedConfiguration',
+                ),
+              })}
             </strong>
             <div className="legacy-mode-tabs-inline">
               <button
@@ -471,14 +507,14 @@ export function RealtimeDataPage({
                 onClick={() => setRealtimeMode('simple')}
                 type="button"
               >
-                简化配置
+                {t('realtimeData.simpleConfiguration')}
               </button>
               <button
                 className={realtimeMode === 'advanced' ? 'active' : ''}
                 onClick={() => setRealtimeMode('advanced')}
                 type="button"
               >
-                高级配置
+                {t('realtimeData.advancedConfiguration')}
               </button>
             </div>
           </div>
@@ -491,7 +527,7 @@ export function RealtimeDataPage({
               }
               type="button"
             >
-              新增帧ID
+              {t('realtimeData.addFrameId')}
             </button>
             <button
               disabled={realtimeMode === 'simple' ? !activeRealtimeFrame : !activeAdvancedFrame}
@@ -503,7 +539,7 @@ export function RealtimeDataPage({
               }}
               type="button"
             >
-              新增协议
+              {t('realtimeData.addProtocol')}
             </button>
             {realtimeMode === 'advanced' ? (
               <>
@@ -514,7 +550,7 @@ export function RealtimeDataPage({
                   }}
                   type="button"
                 >
-                  新增全局变量
+                  {t('realtimeData.addGlobalParameter')}
                 </button>
                 <button
                   onClick={() => {
@@ -523,7 +559,7 @@ export function RealtimeDataPage({
                   }}
                   type="button"
                 >
-                  新增条件
+                  {t('realtimeData.addCondition')}
                 </button>
               </>
             ) : null}
@@ -531,18 +567,18 @@ export function RealtimeDataPage({
         </div>
         <div className="legacy-data-table-wrap">
           {!currentPdoSimpleDocument && !currentPdoAdvancedDocument ? (
-            <div className="legacy-data-empty">请先在项目管理中打开 .jcpro 项目文件</div>
+            <div className="legacy-data-empty">{t('language.page.openProjectFirst')}</div>
           ) : realtimeMode === 'simple' ? (
             selectedRealtimeFrameId === null ? (
               <table className="legacy-data-table">
                 <thead>
                   <tr>
                     <th />
-                    <th>帧ID</th>
-                    <th>帧类型</th>
-                    <th>帧描述</th>
-                    <th>数据项</th>
-                    <th>操作</th>
+                    <th>{t('realtimeData.frameId')}</th>
+                    <th>{t('protocol.private.frameType')}</th>
+                    <th>{t('realtimeData.frameDescription')}</th>
+                    <th>{t('realtimeData.dataItems')}</th>
+                    <th>{t('protocol.common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -560,7 +596,15 @@ export function RealtimeDataPage({
                         <td>{index + 1}</td>
                         <td>
                           <input
-                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}帧 ${index + 1} ID`}
+                            aria-label={t('realtimeData.frameFieldAria', {
+                              direction: t(
+                                selectedRealtimeKind === 'pdo_recv'
+                                  ? 'protocol.mapping.receive'
+                                  : 'protocol.mapping.send',
+                              ),
+                              index: index + 1,
+                              field: 'ID',
+                            })}
                             inputMode="text"
                             value={formatFrameId(frame.id)}
                             onChange={(event) =>
@@ -570,7 +614,15 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <select
-                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}帧 ${index + 1} 类型`}
+                            aria-label={t('realtimeData.frameFieldAria', {
+                              direction: t(
+                                selectedRealtimeKind === 'pdo_recv'
+                                  ? 'protocol.mapping.receive'
+                                  : 'protocol.mapping.send',
+                              ),
+                              index: index + 1,
+                              field: t('protocol.common.type'),
+                            })}
                             value={frame.type}
                             onChange={(event) =>
                               updatePdoFrame(
@@ -581,13 +633,21 @@ export function RealtimeDataPage({
                               )
                             }
                           >
-                            <option value={0}>标准帧</option>
-                            <option value={1}>扩展帧</option>
+                            <option value={0}>{t('protocol.private.standardFrame')}</option>
+                            <option value={1}>{t('protocol.private.extendedFrame')}</option>
                           </select>
                         </td>
                         <td>
                           <input
-                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}帧 ${index + 1} 描述`}
+                            aria-label={t('realtimeData.frameFieldAria', {
+                              direction: t(
+                                selectedRealtimeKind === 'pdo_recv'
+                                  ? 'protocol.mapping.receive'
+                                  : 'protocol.mapping.send',
+                              ),
+                              index: index + 1,
+                              field: t('protocol.mapping.frameDescription'),
+                            })}
                             value={frame.desc}
                             onChange={(event) =>
                               updatePdoFrame(
@@ -605,11 +665,11 @@ export function RealtimeDataPage({
                             onClick={() => setSelectedRealtimeFrameId(frame.id)}
                             type="button"
                           >
-                            协议
+                            {t('protocol.mapping.protocol')}
                           </button>
                           {isModifiedPath(framePath) ? (
                             <button onClick={() => restoreModifiedPath(framePath)} type="button">
-                              恢复
+                              {t('common.actions.restore')}
                             </button>
                           ) : null}
                           <button
@@ -617,7 +677,7 @@ export function RealtimeDataPage({
                             onClick={() => removePdoFrame(selectedRealtimeKind, index)}
                             type="button"
                           >
-                            删除
+                            {t('protocol.common.delete')}
                           </button>
                         </td>
                       </tr>
@@ -630,12 +690,12 @@ export function RealtimeDataPage({
                 <thead>
                   <tr>
                     <th />
-                    <th>参数名称</th>
-                    <th>读取方式</th>
-                    <th>bit开始位置</th>
-                    <th>bit长度</th>
-                    <th>参数索引</th>
-                    <th>操作</th>
+                    <th>{t('realtimeData.parameterName')}</th>
+                    <th>{t('realtimeData.readMethod')}</th>
+                    <th>{t('settingData.columns.bitStart')}</th>
+                    <th>{t('settingData.columns.bitLength')}</th>
+                    <th>{t('realtimeData.parameterIndex')}</th>
+                    <th>{t('protocol.common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -670,7 +730,10 @@ export function RealtimeDataPage({
                         <td>{index + 1}</td>
                         <td>
                           <input
-                            aria-label={`信号 ${index + 1} 参数名称`}
+                            aria-label={t('realtimeData.signalFieldAria', {
+                              index: index + 1,
+                              field: t('realtimeData.parameterName'),
+                            })}
                             value={signal.pdo_param_name || ''}
                             onChange={(event) =>
                               updatePdoSignal(
@@ -685,7 +748,10 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <select
-                            aria-label={`信号 ${index + 1} 读取方式`}
+                            aria-label={t('realtimeData.signalFieldAria', {
+                              index: index + 1,
+                              field: t('realtimeData.readMethod'),
+                            })}
                             value={signal.show_type}
                             onChange={(event) =>
                               updatePdoSignal(
@@ -697,14 +763,17 @@ export function RealtimeDataPage({
                               )
                             }
                           >
-                            <option value={0}>按照字节取数据</option>
-                            <option value={1}>按照字节+bit位取数据</option>
-                            <option value={2}>按照bit位取数据</option>
+                            <option value={0}>{t('realtimeData.readMethods.bytes')}</option>
+                            <option value={1}>{t('realtimeData.readMethods.bytesBits')}</option>
+                            <option value={2}>{t('realtimeData.readMethods.bits')}</option>
                           </select>
                         </td>
                         <td>
                           <input
-                            aria-label={`信号 ${index + 1} bit 开始位置`}
+                            aria-label={t('realtimeData.signalFieldAria', {
+                              index: index + 1,
+                              field: t('settingData.columns.bitStart'),
+                            })}
                             type="number"
                             value={signal.pos}
                             onChange={(event) =>
@@ -720,7 +789,10 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`信号 ${index + 1} bit 长度`}
+                            aria-label={t('realtimeData.signalFieldAria', {
+                              index: index + 1,
+                              field: t('settingData.columns.bitLength'),
+                            })}
                             type="number"
                             value={signal.len}
                             onChange={(event) =>
@@ -736,7 +808,10 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`信号 ${index + 1} 参数索引`}
+                            aria-label={t('realtimeData.signalFieldAria', {
+                              index: index + 1,
+                              field: t('realtimeData.parameterIndex'),
+                            })}
                             type="number"
                             value={signal.pdo_param_index}
                             onChange={(event) =>
@@ -753,7 +828,7 @@ export function RealtimeDataPage({
                         <td>
                           {isModifiedPath(signalPath) ? (
                             <button onClick={() => restoreModifiedPath(signalPath)} type="button">
-                              恢复
+                              {t('common.actions.restore')}
                             </button>
                           ) : null}
                           <button
@@ -763,7 +838,7 @@ export function RealtimeDataPage({
                             }
                             type="button"
                           >
-                            删除
+                            {t('protocol.common.delete')}
                           </button>
                         </td>
                       </tr>
@@ -772,29 +847,37 @@ export function RealtimeDataPage({
                 </tbody>
               </table>
             ) : (
-              <div className="legacy-data-empty">请选择或新增 PDO 帧</div>
+              <div className="legacy-data-empty">{t('realtimeData.selectOrAddFrame')}</div>
             )
           ) : (
             <div className="legacy-advanced-main">
               <div className="legacy-advanced-toolbar">
                 <div className="legacy-advanced-summary">
-                  <strong>高级配置</strong>
+                  <strong>{t('realtimeData.advancedConfiguration')}</strong>
                   <span>
-                    全局变量 {currentPdoAdvancedDocument?.pdo_global_param.length ?? 0} 项
+                    {t('realtimeData.globalCount', {
+                      count: currentPdoAdvancedDocument?.pdo_global_param.length ?? 0,
+                    })}
                   </span>
-                  <span>条件 {currentPdoAdvancedDocument?.pdo_condition.length ?? 0} 项</span>
+                  <span>
+                    {t('realtimeData.conditionCount', {
+                      count: currentPdoAdvancedDocument?.pdo_condition.length ?? 0,
+                    })}
+                  </span>
                   <span>
                     {selectedAdvancedFrameId === null
-                      ? '当前：帧列表'
-                      : `当前：${formatFrameIdPadded(selectedAdvancedFrameId)} 协议`}
+                      ? t('realtimeData.currentFrameList')
+                      : t('realtimeData.currentProtocol', {
+                          id: formatFrameIdPadded(selectedAdvancedFrameId),
+                        })}
                   </span>
                 </div>
                 <div className="legacy-advanced-actions">
                   <button onClick={() => openAdvancedPdoDrawer('global')} type="button">
-                    管理全局变量
+                    {t('realtimeData.manageGlobals')}
                   </button>
                   <button onClick={() => openAdvancedPdoDrawer('condition')} type="button">
-                    管理条件表
+                    {t('realtimeData.manageConditions')}
                   </button>
                 </div>
               </div>
@@ -803,11 +886,11 @@ export function RealtimeDataPage({
                   <thead>
                     <tr>
                       <th />
-                      <th>帧ID</th>
-                      <th>帧类型</th>
-                      <th>帧描述</th>
-                      <th>数据项</th>
-                      <th>操作</th>
+                      <th>{t('realtimeData.frameId')}</th>
+                      <th>{t('protocol.private.frameType')}</th>
+                      <th>{t('realtimeData.frameDescription')}</th>
+                      <th>{t('realtimeData.dataItems')}</th>
+                      <th>{t('protocol.common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -823,7 +906,15 @@ export function RealtimeDataPage({
                         <td>{index + 1}</td>
                         <td>
                           <input
-                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}高级帧 ${index + 1} ID`}
+                            aria-label={t('realtimeData.advancedFrameFieldAria', {
+                              direction: t(
+                                selectedRealtimeKind === 'pdo_recv'
+                                  ? 'protocol.mapping.receive'
+                                  : 'protocol.mapping.send',
+                              ),
+                              index: index + 1,
+                              field: 'ID',
+                            })}
                             inputMode="text"
                             value={formatFrameId(frame.id)}
                             onChange={(event) =>
@@ -837,7 +928,15 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}高级帧 ${index + 1} 类型`}
+                            aria-label={t('realtimeData.advancedFrameFieldAria', {
+                              direction: t(
+                                selectedRealtimeKind === 'pdo_recv'
+                                  ? 'protocol.mapping.receive'
+                                  : 'protocol.mapping.send',
+                              ),
+                              index: index + 1,
+                              field: t('protocol.common.type'),
+                            })}
                             type="number"
                             value={frame.type}
                             onChange={(event) =>
@@ -852,7 +951,15 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`${selectedRealtimeKind === 'pdo_recv' ? '接收' : '发送'}高级帧 ${index + 1} 描述`}
+                            aria-label={t('realtimeData.advancedFrameFieldAria', {
+                              direction: t(
+                                selectedRealtimeKind === 'pdo_recv'
+                                  ? 'protocol.mapping.receive'
+                                  : 'protocol.mapping.send',
+                              ),
+                              index: index + 1,
+                              field: t('protocol.mapping.frameDescription'),
+                            })}
                             value={frame.desc}
                             onChange={(event) =>
                               updatePdoAdvancedFrame(
@@ -870,14 +977,14 @@ export function RealtimeDataPage({
                             onClick={() => setSelectedAdvancedFrameId(frame.id)}
                             type="button"
                           >
-                            协议
+                            {t('protocol.mapping.protocol')}
                           </button>
                           <button
                             className="danger"
                             onClick={() => removePdoAdvancedFrame(selectedRealtimeKind, index)}
                             type="button"
                           >
-                            删除
+                            {t('protocol.common.delete')}
                           </button>
                         </td>
                       </tr>
@@ -889,13 +996,13 @@ export function RealtimeDataPage({
                   <thead>
                     <tr>
                       <th />
-                      <th>参数ID</th>
-                      <th>位置</th>
-                      <th>长度</th>
-                      <th>显示类型</th>
-                      <th>句柄</th>
-                      <th>句柄参数</th>
-                      <th>操作</th>
+                      <th>{t('realtimeData.parameterId')}</th>
+                      <th>{t('realtimeData.position')}</th>
+                      <th>{t('realtimeData.length')}</th>
+                      <th>{t('realtimeData.displayType')}</th>
+                      <th>{t('realtimeData.handler')}</th>
+                      <th>{t('realtimeData.handlerParameter')}</th>
+                      <th>{t('protocol.common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -916,7 +1023,10 @@ export function RealtimeDataPage({
                         <td>{index + 1}</td>
                         <td>
                           <input
-                            aria-label={`高级信号 ${index + 1} 参数 ID`}
+                            aria-label={t('realtimeData.advancedSignalFieldAria', {
+                              index: index + 1,
+                              field: t('realtimeData.parameterId'),
+                            })}
                             value={signal.param_id}
                             onChange={(event) =>
                               updatePdoAdvancedSignal(
@@ -931,7 +1041,10 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`高级信号 ${index + 1} bit 开始位置`}
+                            aria-label={t('realtimeData.advancedSignalFieldAria', {
+                              index: index + 1,
+                              field: t('settingData.columns.bitStart'),
+                            })}
                             type="number"
                             value={signal.pos}
                             onChange={(event) =>
@@ -947,7 +1060,10 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`高级信号 ${index + 1} bit 长度`}
+                            aria-label={t('realtimeData.advancedSignalFieldAria', {
+                              index: index + 1,
+                              field: t('settingData.columns.bitLength'),
+                            })}
                             type="number"
                             value={signal.len}
                             onChange={(event) =>
@@ -963,7 +1079,10 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`高级信号 ${index + 1} 显示类型`}
+                            aria-label={t('realtimeData.advancedSignalFieldAria', {
+                              index: index + 1,
+                              field: t('realtimeData.displayType'),
+                            })}
                             type="number"
                             value={signal.show_type}
                             onChange={(event) =>
@@ -979,7 +1098,10 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`高级信号 ${index + 1} 处理器`}
+                            aria-label={t('realtimeData.advancedSignalFieldAria', {
+                              index: index + 1,
+                              field: t('realtimeData.handler'),
+                            })}
                             type="number"
                             value={signal.handle}
                             onChange={(event) =>
@@ -995,7 +1117,10 @@ export function RealtimeDataPage({
                         </td>
                         <td>
                           <input
-                            aria-label={`高级信号 ${index + 1} 处理参数`}
+                            aria-label={t('realtimeData.advancedSignalFieldAria', {
+                              index: index + 1,
+                              field: t('realtimeData.handlerParameter'),
+                            })}
                             value={signal.handle_param}
                             onChange={(event) =>
                               updatePdoAdvancedSignal(
@@ -1020,7 +1145,7 @@ export function RealtimeDataPage({
                             }
                             type="button"
                           >
-                            删除
+                            {t('protocol.common.delete')}
                           </button>
                         </td>
                       </tr>
@@ -1028,7 +1153,7 @@ export function RealtimeDataPage({
                   </tbody>
                 </table>
               ) : (
-                <div className="legacy-data-empty">请选择或新增高级 PDO 帧</div>
+                <div className="legacy-data-empty">{t('realtimeData.selectOrAddAdvancedFrame')}</div>
               )}
               {renderAdvancedPdoDrawer()}
             </div>

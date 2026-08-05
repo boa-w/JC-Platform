@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics';
 import type { UpdateInfo, UpdateProgress } from '../lib/updater';
 import { checkForAppUpdate, installAppUpdate } from '../lib/updater';
@@ -18,6 +19,7 @@ interface UseAppUpdateOptions {
 }
 
 export function useAppUpdate({ onBeforeRelaunch, onRelaunchError }: UseAppUpdateOptions = {}) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<UpdateStatus>('idle');
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [progress, setProgress] = useState<UpdateProgress | null>(null);
@@ -41,11 +43,12 @@ export function useAppUpdate({ onBeforeRelaunch, onRelaunchError }: UseAppUpdate
       return false;
     } catch (caught) {
       recordRuntimeDiagnostic('error', 'updater.check', caught);
-      setError(caught instanceof Error ? caught.message : String(caught));
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(message.startsWith('updater.') ? t(message) : message);
       setStatus('error');
       return false;
     }
-  }, []);
+  }, [t]);
 
   const installUpdate = useCallback(async () => {
     setStatus('downloading');
@@ -68,11 +71,12 @@ export function useAppUpdate({ onBeforeRelaunch, onRelaunchError }: UseAppUpdate
       return true;
     } catch (caught) {
       recordRuntimeDiagnostic('error', 'updater.install', caught);
-      setError(caught instanceof Error ? caught.message : String(caught));
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setError(message.startsWith('updater.') ? t(message) : message);
       setStatus('error');
       return false;
     }
-  }, [onBeforeRelaunch, onRelaunchError]);
+  }, [onBeforeRelaunch, onRelaunchError, t]);
 
   return {
     status,

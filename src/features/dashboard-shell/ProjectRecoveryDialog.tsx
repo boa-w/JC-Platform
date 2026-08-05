@@ -1,11 +1,12 @@
 import { useId, useRef } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import type { ProjectRecoveryDraftController } from '../project-document';
 
-function formatRecoveryTime(value: string) {
+function formatRecoveryTime(value: string, locale: string, unknownTime: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '时间未知';
-  return new Intl.DateTimeFormat('zh-CN', {
+  if (Number.isNaN(date.getTime())) return unknownTime;
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'medium',
   }).format(date);
@@ -16,6 +17,7 @@ export function ProjectRecoveryDialog({
 }: {
   controller: ProjectRecoveryDraftController;
 }) {
+  const { t, i18n } = useTranslation();
   const titleId = useId();
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -44,10 +46,20 @@ export function ProjectRecoveryDialog({
         ref={dialogRef}
         role="dialog"
       >
-        <h3 id={titleId}>恢复未保存修改</h3>
+        <h3 id={titleId}>{t('dashboard.recoveryDialog.title')}</h3>
         <p id={descriptionId}>
-          检测到 <strong>{candidate.projectName || '未命名项目'}</strong> 在{' '}
-          {formatRecoveryTime(candidate.savedAt)} 保存的恢复草稿。
+          <Trans
+            components={{ strong: <strong /> }}
+            i18nKey="dashboard.recoveryDialog.message"
+            values={{
+              project: candidate.projectName || t('dashboard.recoveryDialog.unnamedProject'),
+              time: formatRecoveryTime(
+                candidate.savedAt,
+                i18n.resolvedLanguage ?? i18n.language,
+                t('dashboard.recoveryDialog.unknownTime'),
+              ),
+            }}
+          />
         </p>
         <div className="modal-path">{candidate.projectPath}</div>
         {restoreError ? (
@@ -63,7 +75,7 @@ export function ProjectRecoveryDialog({
             ref={dismissRef}
             type="button"
           >
-            稍后
+            {t('dashboard.recoveryDialog.later')}
           </button>
           <button
             className="modal-btn-confirm modal-btn-danger"
@@ -71,7 +83,11 @@ export function ProjectRecoveryDialog({
             onClick={() => void controller.discardCandidate()}
             type="button"
           >
-            {isDiscarding ? '删除中...' : '放弃草稿'}
+            {t(
+              isDiscarding
+                ? 'common.status.deleting'
+                : 'dashboard.recoveryDialog.discardDraft',
+            )}
           </button>
           <button
             className="modal-btn-confirm"
@@ -79,7 +95,11 @@ export function ProjectRecoveryDialog({
             onClick={() => void controller.restoreCandidate()}
             type="button"
           >
-            {isRestoring ? '恢复中...' : '恢复草稿'}
+            {t(
+              isRestoring
+                ? 'common.status.restoring'
+                : 'dashboard.recoveryDialog.restoreDraft',
+            )}
           </button>
         </div>
       </div>

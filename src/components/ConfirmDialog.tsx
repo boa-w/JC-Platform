@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ConfirmDialogController } from '../hooks/useConfirmDialog';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 
@@ -15,12 +16,13 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = '确认',
-  cancelLabel = '取消',
+  confirmLabel,
+  cancelLabel,
   danger = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   const titleId = useId();
   const messageId = useId();
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
@@ -52,14 +54,14 @@ export function ConfirmDialog({
             ref={cancelButtonRef}
             type="button"
           >
-            {cancelLabel}
+            {cancelLabel ?? t('common.actions.cancel')}
           </button>
           <button
             className={`modal-btn-confirm ${danger ? 'modal-btn-danger' : ''}`}
             onClick={onConfirm}
             type="button"
           >
-            {confirmLabel}
+            {confirmLabel ?? t('common.actions.confirm')}
           </button>
         </div>
       </div>

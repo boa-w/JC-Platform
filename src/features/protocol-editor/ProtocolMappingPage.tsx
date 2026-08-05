@@ -1,4 +1,5 @@
 import { Workflow } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { ProtocolMappingTarget } from '../../types/platform';
@@ -11,6 +12,7 @@ interface ProtocolMappingPageProps {
   isModifiedPath: (path: JsonPath) => boolean;
 }
 export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMappingPageProps) {
+  const { t } = useTranslation();
   const {
     loaded: loadedProject,
     protocolMappings: currentProtocolMappings,
@@ -37,11 +39,8 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
     <section className="project-open-card">
       <div className="config-table-toolbar">
         <div>
-          <h2>协议拓扑概览</h2>
-          <p>
-            统一查看业务 Signal 到 CANopen SDO/PDO
-            与私有协议帧的映射关系，并执行帧长度、引用和重叠校验。
-          </p>
+          <h2>{t('protocol.mapping.title')}</h2>
+          <p>{t('protocol.mapping.description')}</p>
         </div>
         <div className="sample-actions">
           <button
@@ -49,42 +48,42 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
             onClick={() => void refreshUnifiedProtocol()}
             type="button"
           >
-            {isParsingUnifiedProtocol ? '解析中...' : '刷新拓扑'}
+            {t(isParsingUnifiedProtocol ? 'protocol.common.parsing' : 'protocol.mapping.refresh')}
           </button>
           <button
             disabled={!loadedProject || !unifiedProtocol}
             onClick={applyUnifiedTopology}
             type="button"
           >
-            从解析结果写入
+            {t('protocol.mapping.applyParsed')}
           </button>
           <button
             disabled={!loadedProject}
             onClick={() => addProtocolMapping('can_open_pdo')}
             type="button"
           >
-            新增 PDO 映射
+            {t('protocol.mapping.addPdo')}
           </button>
           <button
             disabled={!loadedProject}
             onClick={() => addProtocolMapping('can_open_sdo')}
             type="button"
           >
-            新增 SDO 映射
+            {t('protocol.mapping.addSdo')}
           </button>
           <button
             disabled={!loadedProject}
             onClick={() => addProtocolMapping('private_frame')}
             type="button"
           >
-            新增私有映射
+            {t('protocol.mapping.addPrivate')}
           </button>
           <button
             disabled={!loadedProject || isParsingUnifiedProtocol}
             onClick={() => void handleFlattenUnifiedProtocol()}
             type="button"
           >
-            生成旧版 PDO 段
+            {t('protocol.mapping.generateLegacyPdo')}
           </button>
         </div>
       </div>
@@ -92,21 +91,23 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
         <>
           <div className="project-open-report">
             <article>
-              <span>校验状态</span>
-              <strong>{unifiedProtocol.validation.valid ? '通过' : '存在错误'}</strong>
+              <span>{t('protocol.common.validationStatus')}</span>
+              <strong>
+                {t(unifiedProtocol.validation.valid ? 'protocol.common.passed' : 'protocol.common.hasErrors')}
+              </strong>
             </article>
             <article>
-              <span>映射总数</span>
+              <span>{t('protocol.mapping.mappingCount')}</span>
               <strong>{currentProtocolMappings.length}</strong>
             </article>
             <article>
-              <span>CANopen 帧</span>
+              <span>{t('protocol.mapping.canopenFrames')}</span>
               <strong>
                 {unifiedProtocol.canopen.pdo_recv.length + unifiedProtocol.canopen.pdo_send.length}
               </strong>
             </article>
             <article>
-              <span>私有帧</span>
+              <span>{t('protocol.mapping.privateFrames')}</span>
               <strong>{unifiedProtocol.private_protocol.frames.length}</strong>
             </article>
           </div>
@@ -125,20 +126,20 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
           ) : null}
           <section className="pdo-frame-section">
             <div className="config-table-toolbar">
-              <strong>协议映射编辑</strong>
+              <strong>{t('protocol.mapping.editorTitle')}</strong>
             </div>
             <div className="config-table-frame">
               <table className="config-table">
                 <thead>
                   <tr>
                     <th>Signal ID</th>
-                    <th>目标类型</th>
-                    <th>方向/Frame Key</th>
+                    <th>{t('protocol.mapping.targetType')}</th>
+                    <th>{t('protocol.mapping.directionFrameKey')}</th>
                     <th>Frame ID / Index</th>
                     <th>Subindex</th>
                     <th>Bit Offset</th>
                     <th>Bit Length</th>
-                    <th>操作</th>
+                    <th>{t('protocol.common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -193,7 +194,7 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
                         >
                           <option value="can_open_pdo">CANopen PDO</option>
                           <option value="can_open_sdo">CANopen SDO</option>
-                          <option value="private_frame">私有帧</option>
+                          <option value="private_frame">{t('protocol.mapping.privateFrame')}</option>
                         </select>
                       </td>
                       <td>
@@ -337,7 +338,7 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
                           onClick={() => removeProtocolMapping(mappingIndex)}
                           type="button"
                         >
-                          删除
+                          {t('protocol.common.delete')}
                         </button>
                       </td>
                     </tr>
@@ -360,15 +361,22 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
                 <article className="pdo-frame-card" key={frameKey}>
                   <div className="pdo-frame-grid">
                     <label>
-                      方向
-                      <input readOnly value={frame.direction === 'receive' ? '接收' : '发送'} />
+                      {t('protocol.mapping.direction')}
+                      <input
+                        readOnly
+                        value={t(
+                          frame.direction === 'receive'
+                            ? 'protocol.mapping.receive'
+                            : 'protocol.mapping.send',
+                        )}
+                      />
                     </label>
                     <label>
-                      帧 ID
+                      {t('protocol.private.frameId')}
                       <input readOnly value={formatFrameId(frame.frame_id)} />
                     </label>
                     <label>
-                      描述
+                      {t('protocol.mapping.frameDescription')}
                       <input readOnly value={frame.description || '-'} />
                     </label>
                   </div>
@@ -402,7 +410,7 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
           </section>
           <section className="pdo-frame-section">
             <div className="config-table-toolbar">
-              <strong>私有协议帧</strong>
+              <strong>{t('protocol.mapping.privateProtocolFrames')}</strong>
             </div>
             {privateOverviewFrames.map((frame, frameIndex) => {
               const frameKey = privateOverviewKeys[frameIndex];
@@ -414,15 +422,15 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
                 <article className="pdo-frame-card" key={frameKey}>
                   <div className="pdo-frame-grid">
                     <label>
-                      帧 Key
+                      {t('protocol.private.frameKey')}
                       <input readOnly value={frame.frame_key || '-'} />
                     </label>
                     <label>
-                      帧 ID
+                      {t('protocol.private.frameId')}
                       <input readOnly value={formatFrameId(frame.frame_id)} />
                     </label>
                     <label>
-                      名称
+                      {t('protocol.common.name')}
                       <input readOnly value={frame.name || '-'} />
                     </label>
                   </div>
@@ -433,7 +441,7 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
                           <th>Signal ID</th>
                           <th>Bit Offset</th>
                           <th>Bit Length</th>
-                          <th>字节序</th>
+                          <th>{t('protocol.common.byteOrder')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -456,7 +464,7 @@ export function ProtocolMappingPage({ controller, isModifiedPath }: ProtocolMapp
           </section>
         </>
       ) : (
-        <EmptyState icon={Workflow}>请先打开项目并刷新协议拓扑。</EmptyState>
+        <EmptyState icon={Workflow}>{t('protocol.mapping.empty')}</EmptyState>
       )}
     </section>
   );

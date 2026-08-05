@@ -1,5 +1,6 @@
 import { FolderOpen } from 'lucide-react';
 import { lazy, useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
 import { ProjectManagementPage } from '../components/project';
@@ -27,7 +28,6 @@ import { usePdoAdvancedReport } from '../features/realtime-data/usePdoAdvancedRe
 import { usePdoEditor } from '../features/realtime-data/usePdoEditor';
 import {
   TableConfigStatusPanel,
-  TableFormatReference,
   useTableConfigController,
 } from '../features/table-config';
 import {
@@ -123,9 +123,10 @@ const UiResourcePage = lazy(() =>
 );
 
 function WorkspaceLoading() {
+  const { t } = useTranslation();
   return (
     <section className="empty-state" role="status">
-      正在加载...
+      {t('common.status.loading')}
     </section>
   );
 }
@@ -159,6 +160,7 @@ export function Dashboard({
   isUpdateRelaunchAuthorized,
   onProjectLoaded,
 }: DashboardProps) {
+  const { t } = useTranslation();
   const workspaceTitleId = useId();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
@@ -257,7 +259,7 @@ export function Dashboard({
         trackedDocumentSections,
       );
       void uiResource.refreshPreview(restoredDocument, loadedProject.summary.path);
-      projectLifecycle.setSaveStatus('已恢复异常退出前的未保存修改。');
+      projectLifecycle.setSaveStatus(t('dashboard.recovery.restored'));
     },
   });
 
@@ -293,7 +295,7 @@ export function Dashboard({
       );
       void uiResource.refreshPreview(document, loadedProject.summary.path);
       projectLifecycle.setSaveStatus(
-        `已载入 Git 版本 ${revision.short_hash}，保存后将形成新的修改。`,
+        t('dashboard.gitRevisionLoaded', { hash: revision.short_hash }),
       );
     },
   });
@@ -418,13 +420,13 @@ export function Dashboard({
       tabIndex={-1}
     >
       <h1 className="visually-hidden" id={workspaceTitleId}>
-        {activeModule.title}
+        {t(activeModule.titleKey)}
       </h1>
       {desktopProjectIntegration.isProjectDragActive ? (
         <div aria-live="polite" className="project-drop-overlay" role="status">
           <FolderOpen aria-hidden="true" size={28} strokeWidth={1.6} />
-          <strong>释放以打开项目</strong>
-          <span>当前未保存修改会在打开前请求确认</span>
+          <strong>{t('dashboard.dropOverlay.title')}</strong>
+          <span>{t('dashboard.dropOverlay.message')}</span>
         </div>
       ) : null}
       <DashboardActionBar
@@ -643,7 +645,7 @@ export function Dashboard({
               translationConfigured={translationSettings.isConfigured}
               fullLanguageImportStatus={
                 tableConfig.importError ??
-                (tableConfig.importReport?.valid ? '完整语言表已导入。' : null)
+                (tableConfig.importReport?.valid ? t('dashboard.fullLanguageImported') : null)
               }
               isImportingFullLanguage={tableConfig.isImporting}
               onUpdate={updateLanguageDocument}
@@ -669,10 +671,6 @@ export function Dashboard({
 
           {activeModule.key === 'canopen-export' ? (
             <CanopenExportPage loadedProject={loadedProject} />
-          ) : null}
-
-          {activeModule.key === 'project' || activeModule.key === 'export' ? (
-            <TableFormatReference specs={tableConfig.specs} />
           ) : null}
 
           {activeModule.key === 'ui' ? (

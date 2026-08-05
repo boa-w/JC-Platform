@@ -1,4 +1,4 @@
-export { TableConfigStatusPanel, TableFormatReference } from './TableConfigPanels';
+export { TableConfigStatusPanel } from './TableConfigPanels';
 export {
   type TableConfigController,
   type TableConfigKind,

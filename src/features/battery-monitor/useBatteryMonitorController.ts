@@ -1,5 +1,6 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   exportDbc,
   importDbc,
@@ -98,6 +99,7 @@ export function useBatteryMonitorController({
   isModifiedPath,
   restoreModifiedPath,
 }: UseBatteryMonitorControllerOptions) {
+  const { t } = useTranslation();
   const loadedProject = document ? { document } : null;
   const [batteryMonitorImportStatus, setBatteryMonitorImportStatus] = useState<string | null>(null);
   const [batteryMonitorExportStatus, setBatteryMonitorExportStatus] = useState<string | null>(null);
@@ -390,22 +392,23 @@ export function useBatteryMonitorController({
   async function handleExportBatteryMonitor() {
     setBatteryMonitorExportStatus(null);
     if (!loadedProject) {
-      setBatteryMonitorExportStatus('请先打开 .jcpro 项目。');
+      setBatteryMonitorExportStatus(t('batteryMonitor.status.openProjectFirst'));
       return;
     }
     if (!isTauriRuntime()) {
-      setBatteryMonitorExportStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setBatteryMonitorExportStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
       return;
     }
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: '锂电监控协议配置', extensions: ['json'] }] }),
+      () =>
+        save({ filters: [{ name: t('batteryMonitor.filters.protocolJson'), extensions: ['json'] }] }),
       setBatteryMonitorExportStatus,
     );
     if (!selected) return;
     setIsExportingBatteryMonitor(true);
     try {
       await saveJsonFile(selected, batteryMonitorDocument());
-      setBatteryMonitorExportStatus(`已导出：${selected}`);
+      setBatteryMonitorExportStatus(t('batteryMonitor.status.exported', { path: selected }));
     } catch (error) {
       setBatteryMonitorExportStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -416,11 +419,11 @@ export function useBatteryMonitorController({
   async function handleImportBatteryMonitor() {
     setBatteryMonitorImportStatus(null);
     if (!loadedProject) {
-      setBatteryMonitorImportStatus('请先打开 .jcpro 项目。');
+      setBatteryMonitorImportStatus(t('batteryMonitor.status.openProjectFirst'));
       return;
     }
     if (!isTauriRuntime()) {
-      setBatteryMonitorImportStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setBatteryMonitorImportStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
       return;
     }
     const operation = documentGuard.begin();
@@ -428,7 +431,7 @@ export function useBatteryMonitorController({
       () =>
         open({
           multiple: false,
-          filters: [{ name: '锂电监控协议配置', extensions: ['json'] }],
+          filters: [{ name: t('batteryMonitor.filters.protocolJson'), extensions: ['json'] }],
         }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryMonitorImportStatus(message);
@@ -440,12 +443,16 @@ export function useBatteryMonitorController({
       const imported = normalizeImportedBatteryMonitor(await loadJsonFile(selected));
       if (!documentGuard.isCurrent(operation)) return;
       if (!imported) {
-        setBatteryMonitorImportStatus('无效的锂电监控协议配置文件，必须同时包含 frames、signals、items。');
+        setBatteryMonitorImportStatus(t('batteryMonitor.status.invalidProtocol'));
         return;
       }
       updateBatteryMonitorDocument(imported);
       setBatteryMonitorImportStatus(
-        `已导入 ${imported.frames.length} 帧 / ${imported.signals.length} 信号 / ${imported.items.length} 显示项`,
+        t('batteryMonitor.status.importedProtocol', {
+          frames: imported.frames.length,
+          signals: imported.signals.length,
+          items: imported.items.length,
+        }),
       );
     } catch (error) {
       if (documentGuard.isCurrent(operation)) {
@@ -458,10 +465,10 @@ export function useBatteryMonitorController({
 
   async function handleExportBatteryFramesCsv() {
     setBatteryCsvStatus(null);
-    if (!loadedProject) return setBatteryCsvStatus('请先打开 .jcpro 项目。');
-    if (!isTauriRuntime()) return setBatteryCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+    if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
+    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: '帧 CSV', extensions: ['csv'] }] }),
+      () => save({ filters: [{ name: t('batteryMonitor.filters.framesCsv'), extensions: ['csv'] }] }),
       setBatteryCsvStatus,
     );
     if (!selected) return;
@@ -469,7 +476,7 @@ export function useBatteryMonitorController({
     try {
       const { framesToCsv } = await import('../../utils/batteryCsv');
       await saveTextFile(selected, `\uFEFF${framesToCsv(batteryMonitorDocument().frames)}`);
-      setBatteryCsvStatus(`帧 CSV 已导出：${selected}`);
+      setBatteryCsvStatus(t('batteryMonitor.status.csvExported', { kind: t('batteryMonitor.kinds.frames'), path: selected }));
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -479,11 +486,11 @@ export function useBatteryMonitorController({
 
   async function handleImportBatteryFramesCsv() {
     setBatteryCsvStatus(null);
-    if (!loadedProject) return setBatteryCsvStatus('请先打开 .jcpro 项目。');
-    if (!isTauriRuntime()) return setBatteryCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+    if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
+    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
     const operation = documentGuard.begin();
     const selected = await runSystemDialog(
-      () => open({ multiple: false, filters: [{ name: '帧 CSV', extensions: ['csv'] }] }),
+      () => open({ multiple: false, filters: [{ name: t('batteryMonitor.filters.framesCsv'), extensions: ['csv'] }] }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
       },
@@ -494,7 +501,11 @@ export function useBatteryMonitorController({
       const { csvToFrames } = await import('../../utils/batteryCsv');
       const { frames, errors } = csvToFrames(await loadTextFile(selected));
       if (!documentGuard.isCurrent(operation)) return;
-      if (errors.length > 0) return setBatteryCsvStatus(`导入帧 CSV 出错：${errors.join('；')}`);
+      if (errors.length > 0)
+        return setBatteryCsvStatus(t('batteryMonitor.status.csvImportError', {
+          kind: t('batteryMonitor.kinds.frames'),
+          errors: errors.join(t('common.punctuation.semicolon')),
+        }));
       const current = batteryMonitorDocument();
       const frameKeys = new Set(frames.map((frame) => frame.frame_key));
       updateBatteryMonitorDocument({
@@ -507,7 +518,7 @@ export function useBatteryMonitorController({
           ),
         ),
       });
-      setBatteryCsvStatus(`已导入 ${frames.length} 帧`);
+      setBatteryCsvStatus(t('batteryMonitor.status.csvImported', { kind: t('batteryMonitor.kinds.frames'), count: frames.length }));
     } catch (error) {
       if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -517,10 +528,10 @@ export function useBatteryMonitorController({
 
   async function handleExportBatterySignalsCsv() {
     setBatteryCsvStatus(null);
-    if (!loadedProject) return setBatteryCsvStatus('请先打开 .jcpro 项目。');
-    if (!isTauriRuntime()) return setBatteryCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+    if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
+    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: '信号 CSV', extensions: ['csv'] }] }),
+      () => save({ filters: [{ name: t('batteryMonitor.filters.signalsCsv'), extensions: ['csv'] }] }),
       setBatteryCsvStatus,
     );
     if (!selected) return;
@@ -528,7 +539,7 @@ export function useBatteryMonitorController({
     try {
       const { signalsToCsv } = await import('../../utils/batteryCsv');
       await saveTextFile(selected, `\uFEFF${signalsToCsv(batteryMonitorDocument().signals)}`);
-      setBatteryCsvStatus(`信号 CSV 已导出：${selected}`);
+      setBatteryCsvStatus(t('batteryMonitor.status.csvExported', { kind: t('batteryMonitor.kinds.signals'), path: selected }));
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -538,11 +549,11 @@ export function useBatteryMonitorController({
 
   async function handleImportBatterySignalsCsv() {
     setBatteryCsvStatus(null);
-    if (!loadedProject) return setBatteryCsvStatus('请先打开 .jcpro 项目。');
-    if (!isTauriRuntime()) return setBatteryCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+    if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
+    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
     const operation = documentGuard.begin();
     const selected = await runSystemDialog(
-      () => open({ multiple: false, filters: [{ name: '信号 CSV', extensions: ['csv'] }] }),
+      () => open({ multiple: false, filters: [{ name: t('batteryMonitor.filters.signalsCsv'), extensions: ['csv'] }] }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
       },
@@ -553,7 +564,11 @@ export function useBatteryMonitorController({
       const { csvToSignals } = await import('../../utils/batteryCsv');
       const { signals, errors } = csvToSignals(await loadTextFile(selected));
       if (!documentGuard.isCurrent(operation)) return;
-      if (errors.length > 0) return setBatteryCsvStatus(`导入信号 CSV 出错：${errors.join('；')}`);
+      if (errors.length > 0)
+        return setBatteryCsvStatus(t('batteryMonitor.status.csvImportError', {
+          kind: t('batteryMonitor.kinds.signals'),
+          errors: errors.join(t('common.punctuation.semicolon')),
+        }));
       const current = batteryMonitorDocument();
       const signalKeys = new Set(signals.map((signal) => signal.signal_key));
       updateBatteryMonitorDocument({
@@ -561,7 +576,7 @@ export function useBatteryMonitorController({
         signals,
         items: current.items.filter((item) => signalKeys.has(item.signal_key)),
       });
-      setBatteryCsvStatus(`已导入 ${signals.length} 信号`);
+      setBatteryCsvStatus(t('batteryMonitor.status.csvImported', { kind: t('batteryMonitor.kinds.signals'), count: signals.length }));
     } catch (error) {
       if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -571,10 +586,10 @@ export function useBatteryMonitorController({
 
   async function handleExportBatteryItemsCsv() {
     setBatteryCsvStatus(null);
-    if (!loadedProject) return setBatteryCsvStatus('请先打开 .jcpro 项目。');
-    if (!isTauriRuntime()) return setBatteryCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+    if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
+    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: '显示项 CSV', extensions: ['csv'] }] }),
+      () => save({ filters: [{ name: t('batteryMonitor.filters.itemsCsv'), extensions: ['csv'] }] }),
       setBatteryCsvStatus,
     );
     if (!selected) return;
@@ -582,7 +597,7 @@ export function useBatteryMonitorController({
     try {
       const { itemsToCsv } = await import('../../utils/batteryCsv');
       await saveTextFile(selected, `\uFEFF${itemsToCsv(batteryMonitorDocument().items)}`);
-      setBatteryCsvStatus(`显示项 CSV 已导出：${selected}`);
+      setBatteryCsvStatus(t('batteryMonitor.status.csvExported', { kind: t('batteryMonitor.kinds.items'), path: selected }));
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -592,11 +607,11 @@ export function useBatteryMonitorController({
 
   async function handleImportBatteryItemsCsv() {
     setBatteryCsvStatus(null);
-    if (!loadedProject) return setBatteryCsvStatus('请先打开 .jcpro 项目。');
-    if (!isTauriRuntime()) return setBatteryCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+    if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
+    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
     const operation = documentGuard.begin();
     const selected = await runSystemDialog(
-      () => open({ multiple: false, filters: [{ name: '显示项 CSV', extensions: ['csv'] }] }),
+      () => open({ multiple: false, filters: [{ name: t('batteryMonitor.filters.itemsCsv'), extensions: ['csv'] }] }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
       },
@@ -607,14 +622,18 @@ export function useBatteryMonitorController({
       const { csvToItems } = await import('../../utils/batteryCsv');
       const { items, errors } = csvToItems(await loadTextFile(selected));
       if (!documentGuard.isCurrent(operation)) return;
-      if (errors.length > 0) return setBatteryCsvStatus(`导入显示项 CSV 出错：${errors.join('；')}`);
+      if (errors.length > 0)
+        return setBatteryCsvStatus(t('batteryMonitor.status.csvImportError', {
+          kind: t('batteryMonitor.kinds.items'),
+          errors: errors.join(t('common.punctuation.semicolon')),
+        }));
       const current = batteryMonitorDocument();
       const signalKeys = new Set(current.signals.map((signal) => signal.signal_key));
       updateBatteryMonitorDocument({
         ...current,
         items: items.filter((item) => signalKeys.has(item.signal_key)),
       });
-      setBatteryCsvStatus(`已导入 ${items.length} 显示项`);
+      setBatteryCsvStatus(t('batteryMonitor.status.csvImported', { kind: t('batteryMonitor.kinds.items'), count: items.length }));
     } catch (error) {
       if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -624,11 +643,11 @@ export function useBatteryMonitorController({
 
   async function handleImportBatteryDbc() {
     setBatteryDbcStatus(null);
-    if (!loadedProject) return setBatteryDbcStatus('请先打开 .jcpro 项目。');
-    if (!isTauriRuntime()) return setBatteryDbcStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+    if (!loadedProject) return setBatteryDbcStatus(t('batteryMonitor.status.openProjectFirst'));
+    if (!isTauriRuntime()) return setBatteryDbcStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
     const operation = documentGuard.begin();
     const selected = await runSystemDialog(
-      () => open({ multiple: false, filters: [{ name: 'DBC 文件', extensions: ['dbc'] }] }),
+      () => open({ multiple: false, filters: [{ name: t('batteryMonitor.filters.dbc'), extensions: ['dbc'] }] }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryDbcStatus(message);
       },
@@ -638,13 +657,19 @@ export function useBatteryMonitorController({
     try {
       const report = await importDbc(selected);
       if (!documentGuard.isCurrent(operation)) return;
-      if (report.errors.length > 0) return setBatteryDbcStatus(`导入 DBC 出错：${report.errors.join('；')}`);
-      if (report.frames.length === 0) return setBatteryDbcStatus('DBC 文件中未找到任何消息。');
+      if (report.errors.length > 0)
+        return setBatteryDbcStatus(t('batteryMonitor.status.dbcImportError', {
+          errors: report.errors.join(t('common.punctuation.semicolon')),
+        }));
+      if (report.frames.length === 0) return setBatteryDbcStatus(t('batteryMonitor.status.dbcNoMessages'));
       const current = batteryMonitorDocument();
       const signalKeys = new Set(report.signals.map((signal) => signal.signal_key));
       const items = current.items.filter((item) => signalKeys.has(item.signal_key));
       updateBatteryMonitorDocument({ ...current, frames: report.frames, signals: report.signals, items });
-      setBatteryDbcStatus(`已导入 ${report.frames.length} 帧 / ${report.signals.length} 信号`);
+      setBatteryDbcStatus(t('batteryMonitor.status.dbcImported', {
+        frames: report.frames.length,
+        signals: report.signals.length,
+      }));
     } catch (error) {
       if (documentGuard.isCurrent(operation)) setBatteryDbcStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -654,19 +679,19 @@ export function useBatteryMonitorController({
 
   async function handleExportBatteryDbc() {
     setBatteryDbcStatus(null);
-    if (!loadedProject) return setBatteryDbcStatus('请先打开 .jcpro 项目。');
-    if (!isTauriRuntime()) return setBatteryDbcStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+    if (!loadedProject) return setBatteryDbcStatus(t('batteryMonitor.status.openProjectFirst'));
+    if (!isTauriRuntime()) return setBatteryDbcStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
     const document = batteryMonitorDocument();
-    if (document.frames.length === 0) return setBatteryDbcStatus('没有帧可导出。');
+    if (document.frames.length === 0) return setBatteryDbcStatus(t('batteryMonitor.status.noFramesToExport'));
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: 'DBC 文件', extensions: ['dbc'] }] }),
+      () => save({ filters: [{ name: t('batteryMonitor.filters.dbc'), extensions: ['dbc'] }] }),
       setBatteryDbcStatus,
     );
     if (!selected) return;
     setIsExportingBatteryDbc(true);
     try {
       await exportDbc(selected, document.frames, document.signals);
-      setBatteryDbcStatus(`DBC 已导出：${selected}`);
+      setBatteryDbcStatus(t('batteryMonitor.status.dbcExported', { path: selected }));
     } catch (error) {
       setBatteryDbcStatus(error instanceof Error ? error.message : String(error));
     } finally {

@@ -1,5 +1,6 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { exportCanopenPackage, revealItemInDir } from '../../api/commands';
 import type { CanopenConversionReport, LoadedProject } from '../../types/platform';
 import { runSystemDialog } from '../../utils/systemDialog';
@@ -7,28 +8,36 @@ import { runSystemDialog } from '../../utils/systemDialog';
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export function useCanopenExport(loadedProject: LoadedProject | null) {
+  const { t } = useTranslation();
   const [report, setReport] = useState<CanopenConversionReport | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [statusTone, setStatusTone] = useState<'success' | 'error' | null>(null);
   const [exportDir, setExportDir] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
   async function exportPackage() {
     setStatus(null);
+    setStatusTone(null);
     setReport(null);
     setExportDir(null);
 
     if (!loadedProject) {
-      setStatus('请先打开项目，再导出 CANopen 转换包。');
+      setStatus(t('canopenExport.openProjectFirst'));
+      setStatusTone('error');
       return;
     }
     if (!isTauriRuntime()) {
-      setStatus('系统目录选择器只能在 Tauri 桌面应用中使用。');
+      setStatus(t('canopenExport.desktopDirectoryPickerOnly'));
+      setStatusTone('error');
       return;
     }
 
     const selected = await runSystemDialog(
       () => open({ directory: true, multiple: false }),
-      setStatus,
+      (message) => {
+        setStatus(message);
+        setStatusTone('error');
+      },
     );
     if (typeof selected !== 'string') return;
 
@@ -39,10 +48,16 @@ export function useCanopenExport(loadedProject: LoadedProject | null) {
       setReport(nextReport);
       setExportDir(nextExportDir);
       setStatus(
-        `已导出 CANopen 转换包：${nextReport.files.length} 个文件，${nextReport.nodes.length} 个节点，${nextReport.warnings.length} 条提示。`,
+        t('canopenExport.success', {
+          files: nextReport.files.length,
+          nodes: nextReport.nodes.length,
+          warnings: nextReport.warnings.length,
+        }),
       );
+      setStatusTone('success');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
+      setStatusTone('error');
     } finally {
       setIsExporting(false);
     }
@@ -54,6 +69,7 @@ export function useCanopenExport(loadedProject: LoadedProject | null) {
       await revealItemInDir(exportDir);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
+      setStatusTone('error');
     }
   }
 
@@ -64,5 +80,6 @@ export function useCanopenExport(loadedProject: LoadedProject | null) {
     openExportDir,
     report,
     status,
+    statusTone,
   };
 }

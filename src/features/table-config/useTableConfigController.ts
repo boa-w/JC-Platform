@@ -1,9 +1,9 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   exportTableCsv,
   exportTableWorkbook,
-  getLegacyTableSpec,
   importLanguageCsv,
   importLanguageWorkbook,
   importPdoSimpleCsv,
@@ -19,7 +19,6 @@ import { legacyTableKindForModule } from '../../modules/documentSections';
 import type {
   LanguageImportReport,
   LegacyTableKind,
-  LegacyTableSpec,
   LoadedProject,
   NavigationKey,
   PdoSimpleImportReport,
@@ -36,10 +35,10 @@ export const tableConfigSections: Record<TableConfigKind, string> = {
   language: 'language_info',
 };
 
-export const tableConfigTitles: Record<TableConfigKind, string> = {
-  sdo: 'SDO 参数配置',
-  pdoSimple: 'PDO 简化配置',
-  language: '多国语言',
+export const tableConfigTitleKeys: Record<TableConfigKind, string> = {
+  sdo: 'tableConfig.titles.sdo',
+  pdoSimple: 'tableConfig.titles.pdoSimple',
+  language: 'tableConfig.titles.language',
 };
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -55,7 +54,7 @@ export function useTableConfigController({
   loadedProject,
   applyLoadedProject,
 }: UseTableConfigControllerOptions) {
-  const [specs, setSpecs] = useState<LegacyTableSpec[]>([]);
+  const { t } = useTranslation();
   const [importReport, setImportReport] = useState<TableImportReport | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
@@ -75,24 +74,6 @@ export function useTableConfigController({
     setIsExporting(false);
   }, [projectDocument]);
 
-  useEffect(() => {
-    let active = true;
-    void Promise.all([
-      getLegacyTableSpec('sdo'),
-      getLegacyTableSpec('pdoSimple'),
-      getLegacyTableSpec('language'),
-    ])
-      .then((nextSpecs) => {
-        if (active) setSpecs(nextSpecs);
-      })
-      .catch(() => {
-        if (active && isTauriRuntime()) setImportError('表格格式规格加载失败，请重试。');
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
   async function exportableDocument(kind: TableConfigKind, document: unknown) {
     if (kind === 'sdo') return sdoDocumentTable(document);
     if (kind === 'pdoSimple') return pdoSimpleDocumentTable(document);
@@ -102,11 +83,11 @@ export function useTableConfigController({
   async function exportTable(kind: TableConfigKind, format: 'csv' | 'xml') {
     setExportStatus(null);
     if (!loadedProject) {
-      setExportStatus('请先打开 .jcpro 项目。');
+      setExportStatus(t('tableConfig.status.openProjectFirst'));
       return;
     }
     if (!isTauriRuntime()) {
-      setExportStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setExportStatus(t('tableConfig.status.desktopSaveDialogOnly'));
       return;
     }
 
@@ -116,7 +97,7 @@ export function useTableConfigController({
       () =>
         save({
           filters: [
-            { name: format === 'csv' ? 'CSV 表格' : 'Excel XML 表格', extensions: [format] },
+            { name: format === 'csv' ? t('tableConfig.filters.csv') : t('tableConfig.filters.excelXml'), extensions: [format] },
           ],
         }),
       setExportStatus,
@@ -132,7 +113,7 @@ export function useTableConfigController({
       const table = await exportableDocument(kind, document);
       if (format === 'csv') await exportTableCsv({ path, document: table });
       else await exportTableWorkbook({ path, document: table });
-      if (operationGuard.isCurrent(operation)) setExportStatus(`已导出：${path}`);
+      if (operationGuard.isCurrent(operation)) setExportStatus(t('tableConfig.status.exported', { path }));
     } catch (error) {
       if (operationGuard.isCurrent(operation)) {
         setExportStatus(error instanceof Error ? error.message : String(error));
@@ -154,11 +135,11 @@ export function useTableConfigController({
     setImportError(null);
     setImportReport(null);
     if (!loadedProject) {
-      setImportError('请先打开 .jcpro 项目。');
+      setImportError(t('tableConfig.status.openProjectFirst'));
       return;
     }
     if (!isTauriRuntime()) {
-      setImportError('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setImportError(t('tableConfig.status.desktopFilePickerOnly'));
       return;
     }
 
@@ -168,7 +149,7 @@ export function useTableConfigController({
       () =>
         open({
           multiple: false,
-          filters: [{ name: '表格文件', extensions: ['csv', 'xls', 'xlsx', 'xml'] }],
+          filters: [{ name: t('tableConfig.filters.table'), extensions: ['csv', 'xls', 'xlsx', 'xml'] }],
         }),
       setImportError,
     );
@@ -182,7 +163,9 @@ export function useTableConfigController({
       if (!operationGuard.isCurrent(operation)) return;
       setImportReport(report);
       if (!report.valid || !report.document) {
-        setImportError(report.errors.join('；') || '表格导入失败');
+        setImportError(
+          report.errors.join(t('common.punctuation.semicolon')) || t('tableConfig.status.importFailed'),
+        );
         return;
       }
 
@@ -209,7 +192,6 @@ export function useTableConfigController({
     importReport,
     isExporting,
     isImporting,
-    specs,
     exportTable,
     importTable,
   };

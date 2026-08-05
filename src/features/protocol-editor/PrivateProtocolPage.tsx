@@ -1,4 +1,5 @@
 import { RadioTower } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { JsonPath } from '../../utils/projectDirty';
@@ -11,6 +12,7 @@ interface PrivateProtocolPageProps {
 }
 
 export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProtocolPageProps) {
+  const { t } = useTranslation();
   const {
     loaded: loadedProject,
     privateProtocol: currentPrivateProtocol,
@@ -40,11 +42,8 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
     <section className="project-open-card">
       <div className="private-protocol-header">
         <div className="private-protocol-header-text">
-          <h2>私有协议</h2>
-          <p>
-            集中查看私有协议帧、校验方式、字节序和 Signal
-            载荷布局；当前会从锂电监控帧自动派生初始私有协议模型。
-          </p>
+          <h2>{t('protocol.private.title')}</h2>
+          <p>{t('protocol.private.description')}</p>
         </div>
         <div className="sample-actions">
           <button
@@ -52,7 +51,7 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
             onClick={() => void refreshUnifiedProtocol()}
             type="button"
           >
-            {isParsingUnifiedProtocol ? '解析中...' : '刷新私有协议'}
+            {t(isParsingUnifiedProtocol ? 'protocol.common.parsing' : 'protocol.private.refresh')}
           </button>
           <button
             disabled={!loadedProject}
@@ -64,31 +63,31 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
             }
             type="button"
           >
-            {currentPrivateProtocol.enabled ? '停用' : '启用'}
+            {t(currentPrivateProtocol.enabled ? 'protocol.common.disable' : 'protocol.common.enable')}
           </button>
           <button disabled={!loadedProject} onClick={addPrivateFrame} type="button">
-            新增私有帧
+            {t('protocol.private.addFrame')}
           </button>
           <button
             disabled={!loadedProject || !unifiedProtocol}
             onClick={restorePrivateProtocolFromUnified}
             type="button"
           >
-            从旧配置派生
+            {t('protocol.common.deriveFromLegacy')}
           </button>
           <button
             disabled={!loadedProject || isExportingPrivateProtocol}
             onClick={() => void handleExportPrivateProtocol()}
             type="button"
           >
-            {isExportingPrivateProtocol ? '导出中...' : '导出配置'}
+            {t(isExportingPrivateProtocol ? 'common.status.exporting' : 'protocol.common.exportConfig')}
           </button>
           <button
             disabled={!loadedProject || isImportingPrivateProtocol}
             onClick={() => void handleImportPrivateProtocol()}
             type="button"
           >
-            {isImportingPrivateProtocol ? '导入中...' : '导入配置'}
+            {t(isImportingPrivateProtocol ? 'dashboard.actionBar.importing' : 'protocol.common.importConfig')}
           </button>
         </div>
       </div>
@@ -111,15 +110,17 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
         <>
           <div className="config-summary-strip">
             <article>
-              <span>启用状态</span>
-              <strong>{currentPrivateProtocol.enabled ? '启用' : '未启用'}</strong>
+              <span>{t('protocol.common.enabledStatus')}</span>
+              <strong>
+                {t(currentPrivateProtocol.enabled ? 'protocol.common.enabled' : 'protocol.common.notEnabled')}
+              </strong>
             </article>
             <article>
-              <span>私有帧数量</span>
+              <span>{t('protocol.private.frameCount')}</span>
               <strong>{currentPrivateProtocol.frames.length}</strong>
             </article>
             <article>
-              <span>载荷 Signal</span>
+              <span>{t('protocol.private.payloadSignals')}</span>
               <strong>
                 {currentPrivateProtocol.frames.reduce(
                   (total, frame) => total + frame.payload.length,
@@ -128,8 +129,10 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
               </strong>
             </article>
             <article>
-              <span>校验状态</span>
-              <strong>{unifiedProtocol.validation.valid ? '通过' : '存在错误'}</strong>
+              <span>{t('protocol.common.validationStatus')}</span>
+              <strong>
+                {t(unifiedProtocol.validation.valid ? 'protocol.common.passed' : 'protocol.common.hasErrors')}
+              </strong>
             </article>
           </div>
           {currentPrivateProtocol.frames.map((frame, frameIndex) => {
@@ -147,7 +150,7 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                 <div className="pdo-frame-header">
                   <div className="pdo-frame-grid">
                     <label>
-                      帧 Key
+                      {t('protocol.private.frameKey')}
                       <input
                         value={frame.frame_key || ''}
                         onChange={(event) =>
@@ -159,7 +162,7 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                       />
                     </label>
                     <label>
-                      帧 ID
+                      {t('protocol.private.frameId')}
                       <input
                         inputMode="text"
                         value={formatFrameId(frame.frame_id)}
@@ -174,7 +177,7 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                       />
                     </label>
                     <label>
-                      名称
+                      {t('protocol.common.name')}
                       <input
                         value={frame.name || ''}
                         onChange={(event) =>
@@ -192,13 +195,13 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                       onClick={() => removePrivateFrame(frameIndex)}
                       type="button"
                     >
-                      删除帧
+                      {t('protocol.private.deleteFrame')}
                     </button>
                   </div>
                 </div>
                 <div className="private-frame-props">
                   <label>
-                    帧类型
+                    {t('protocol.private.frameType')}
                     <select
                       value={frame.frame_type}
                       onChange={(event) =>
@@ -208,12 +211,12 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                         }))
                       }
                     >
-                      <option value="standard">标准帧</option>
-                      <option value="extended">扩展帧</option>
+                      <option value="standard">{t('protocol.private.standardFrame')}</option>
+                      <option value="extended">{t('protocol.private.extendedFrame')}</option>
                     </select>
                   </label>
                   <label>
-                    周期/超时
+                    {t('protocol.private.periodTimeout')}
                     <input
                       type="number"
                       value={frame.cycle_ms}
@@ -226,7 +229,7 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                     />
                   </label>
                   <label>
-                    校验
+                    {t('protocol.private.checksum')}
                     <select
                       value={frame.checksum}
                       onChange={(event) =>
@@ -236,13 +239,13 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                         }))
                       }
                     >
-                      <option value="none">无</option>
+                      <option value="none">{t('protocol.common.none')}</option>
                       <option value="crc">CRC</option>
                       <option value="xor">XOR</option>
                     </select>
                   </label>
                   <label>
-                    字节序
+                    {t('protocol.common.byteOrder')}
                     <select
                       value={frame.byte_order}
                       onChange={(event) =>
@@ -258,9 +261,9 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                   </label>
                 </div>
                 <div className="config-table-toolbar">
-                  <span>载荷 Signal（{frame.payload.length}）</span>
+                  <span>{t('protocol.private.payloadTitle', { count: frame.payload.length })}</span>
                   <button onClick={() => addPrivatePayload(frameIndex)} type="button">
-                    新增载荷
+                    {t('protocol.private.addPayload')}
                   </button>
                 </div>
                 <div className="config-table-frame">
@@ -270,8 +273,8 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                         <th>Signal ID</th>
                         <th>Bit Offset</th>
                         <th>Bit Length</th>
-                        <th>字节序</th>
-                        <th>操作</th>
+                        <th>{t('protocol.common.byteOrder')}</th>
+                        <th>{t('protocol.common.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -332,7 +335,7 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
                               onClick={() => removePrivatePayload(frameIndex, mappingIndex)}
                               type="button"
                             >
-                              删除
+                              {t('protocol.common.delete')}
                             </button>
                           </td>
                         </tr>
@@ -345,7 +348,7 @@ export function PrivateProtocolPage({ controller, isModifiedPath }: PrivateProto
           })}
         </>
       ) : (
-        <EmptyState icon={RadioTower}>请先打开项目并刷新私有协议。</EmptyState>
+        <EmptyState icon={RadioTower}>{t('protocol.private.empty')}</EmptyState>
       )}
     </section>
   );

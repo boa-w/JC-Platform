@@ -1,4 +1,5 @@
 import { FileDown, FileUp, WandSparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
 import type { useCanTestData } from '../../hooks/useCanTestData';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
@@ -12,6 +13,7 @@ interface CanTestDataPageProps {
 }
 
 export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageProps) {
+  const { t } = useTranslation();
   const stableKeys = useStableCollectionKeys();
   const settingEntryKeys = stableKeys(
     'can-test-setting-entries',
@@ -22,53 +24,53 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
   return (
     <section className="table-spec-card">
       <div>
-        <h2>CAN 测试数据构建</h2>
-        <p>从当前项目 PDO/锂电配置中提取 CAN 帧，生成测试数据并导出为 TXT 文件。</p>
+        <h2>{t('canTestData.title')}</h2>
+        <p>{t('canTestData.description')}</p>
       </div>
       {loadedProject ? (
         <div className="pdo-simple-editor">
           <div className="config-summary-strip">
             <article>
-              <span>已生成帧</span>
+              <span>{t('canTestData.summary.frames')}</span>
               <strong>{canTestData.canTestFrames.length}</strong>
             </article>
             <article>
-              <span>测试用例</span>
+              <span>{t('canTestData.summary.testCases')}</span>
               <strong>
                 {canTestData.canTestCoverage?.caseCount ?? canTestData.canTestCases.length}
               </strong>
             </article>
             <article>
-              <span>信号覆盖</span>
+              <span>{t('canTestData.summary.signals')}</span>
               <strong>{canTestData.canTestCoverage?.signalCount ?? 0}</strong>
             </article>
             <article>
-              <span>设置条目</span>
+              <span>{t('canTestData.summary.settingEntries')}</span>
               <strong>
                 {canTestData.canTestCoverage?.settingEntryCount ??
                   canTestData.canTestSettingEntries.length}
               </strong>
             </article>
             <article>
-              <span>默认周期</span>
+              <span>{t('canTestData.summary.defaultCycle')}</span>
               <strong>{canTestData.canTestDefaultCycle} ms</strong>
             </article>
           </div>
           <div className="pdo-frame-grid">
             <label>
-              生成模式
+              {t('canTestData.fields.profile')}
               <select
                 value={canTestData.canTestProfile}
                 onChange={(e) => canTestData.setCanTestProfile(e.target.value as CanTestProfile)}
               >
-                <option value="smoke">快速冒烟</option>
-                <option value="boundary">边界覆盖</option>
-                <option value="fault">异常注入</option>
-                <option value="regression">全量回归</option>
+                <option value="smoke">{t('canTestData.profiles.smoke')}</option>
+                <option value="boundary">{t('canTestData.profiles.boundary')}</option>
+                <option value="fault">{t('canTestData.profiles.fault')}</option>
+                <option value="regression">{t('canTestData.profiles.regression')}</option>
               </select>
             </label>
             <label>
-              默认周期(ms)
+              {t('canTestData.fields.defaultCycleMs')}
               <input
                 type="number"
                 value={canTestData.canTestDefaultCycle}
@@ -77,7 +79,7 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
             </label>
             {canTestData.canTestCases.length > 0 ? (
               <label>
-                当前用例
+                {t('canTestData.fields.currentCase')}
                 <select
                   value={canTestData.selectedCanTestCaseIndex}
                   onChange={(e) => canTestData.selectCanTestCase(Number(e.target.value))}
@@ -98,7 +100,9 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
               type="button"
             >
               <WandSparkles aria-hidden="true" size={14} strokeWidth={1.8} />
-              {canTestData.isGeneratingCanTest ? '生成中...' : '生成'}
+              {canTestData.isGeneratingCanTest
+                ? t('canTestData.actions.generating')
+                : t('canTestData.actions.generate')}
             </button>
             <button
               disabled={canTestData.canTestFrames.length === 0}
@@ -106,7 +110,7 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
               type="button"
             >
               <FileUp aria-hidden="true" size={14} strokeWidth={1.8} />
-              导出纯帧 TXT
+              {t('canTestData.actions.exportTxt')}
             </button>
             <button
               disabled={canTestData.canTestFrames.length === 0}
@@ -114,12 +118,12 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
               type="button"
             >
               <FileUp aria-hidden="true" size={14} strokeWidth={1.8} />
-              导出 CSV
+              {t('canTestData.actions.exportCsv')}
             </button>
             <span className="action-bar-sep" />
             <button onClick={() => void canTestData.importConfig()} type="button">
               <FileDown aria-hidden="true" size={14} strokeWidth={1.8} />
-              导入配置
+              {t('canTestData.actions.importConfig')}
             </button>
             <button
               disabled={canTestData.canTestFrames.length === 0}
@@ -127,19 +131,27 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
               type="button"
             >
               <FileUp aria-hidden="true" size={14} strokeWidth={1.8} />
-              导出说明 JSON
+              {t('canTestData.actions.exportConfig')}
             </button>
           </div>
           {canTestData.canTestCoverage ? (
             <div className="config-table-toolbar" style={{ gap: 8, marginTop: 6 }}>
               <span style={{ fontSize: '0.85em', opacity: 0.75 }}>
-                场景：{canTestData.canTestCoverage.coveredScenarios.join(' / ') || '无'}
+                {t('canTestData.coverage.scenarios', {
+                  value:
+                    canTestData.canTestCoverage.coveredScenarios.join(' / ') ||
+                    t('canTestData.coverage.none'),
+                })}
               </span>
               <span style={{ fontSize: '0.85em', opacity: 0.75 }}>
-                帧次：{canTestData.canTestCoverage.generatedFrameCount}
+                {t('canTestData.coverage.generatedFrames', {
+                  count: canTestData.canTestCoverage.generatedFrameCount,
+                })}
               </span>
               <span style={{ fontSize: '0.85em', opacity: 0.75 }}>
-                设置条目次：{canTestData.canTestCoverage.generatedSettingEntryCount}
+                {t('canTestData.coverage.generatedSettingEntries', {
+                  count: canTestData.canTestCoverage.generatedSettingEntryCount,
+                })}
               </span>
             </div>
           ) : null}
@@ -154,7 +166,11 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                 <p key={warning}>{warning}</p>
               ))}
               {canTestData.canTestWarnings.length > 3 ? (
-                <p>还有 {canTestData.canTestWarnings.length - 3} 条警告，已写入导出配置。</p>
+                <p>
+                  {t('canTestData.warnings.more', {
+                    count: canTestData.canTestWarnings.length - 3,
+                  })}
+                </p>
               ) : null}
             </div>
           ) : null}
@@ -165,17 +181,17 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                   <table className="config-table">
                     <thead>
                       <tr>
-                        <th>设置项</th>
-                        <th>菜单路径</th>
-                        <th>帧ID</th>
-                        <th>主索引</th>
-                        <th>子索引</th>
-                        <th>权限</th>
-                        <th>类型</th>
-                        <th>位置</th>
-                        <th>角色</th>
-                        <th>测试值</th>
-                        <th>范围</th>
+                        <th>{t('canTestData.settingTable.item')}</th>
+                        <th>{t('canTestData.settingTable.menuPath')}</th>
+                        <th>{t('canTestData.settingTable.frameId')}</th>
+                        <th>{t('canTestData.settingTable.index')}</th>
+                        <th>{t('canTestData.settingTable.subindex')}</th>
+                        <th>{t('canTestData.settingTable.access')}</th>
+                        <th>{t('canTestData.settingTable.type')}</th>
+                        <th>{t('canTestData.settingTable.position')}</th>
+                        <th>{t('canTestData.settingTable.role')}</th>
+                        <th>{t('canTestData.settingTable.testValue')}</th>
+                        <th>{t('canTestData.settingTable.range')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -207,42 +223,44 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                 </div>
               ) : null}
               <div className="config-table-toolbar" style={{ gap: 6, marginBottom: 6 }}>
-                <span style={{ fontSize: '0.85em', opacity: 0.7 }}>信号填充：</span>
+                <span style={{ fontSize: '0.85em', opacity: 0.7 }}>
+                  {t('canTestData.signalFill.label')}
+                </span>
                 <button
                   onClick={() => canTestData.fillSignals('min')}
                   type="button"
-                  title="所有信号填最小值 0"
+                  title={t('canTestData.signalFill.minTitle')}
                 >
-                  最小值
+                  {t('canTestData.signalFill.min')}
                 </button>
                 <button
                   onClick={() => canTestData.fillSignals('max')}
                   type="button"
-                  title="所有信号填最大值（对应位宽全 1）"
+                  title={t('canTestData.signalFill.maxTitle')}
                 >
-                  最大值
+                  {t('canTestData.signalFill.max')}
                 </button>
                 <button
                   onClick={() => canTestData.fillSignals('random')}
                   type="button"
-                  title="所有信号填随机值"
+                  title={t('canTestData.signalFill.randomTitle')}
                 >
-                  随机值
+                  {t('canTestData.signalFill.random')}
                 </button>
                 <span className="action-bar-sep" />
                 <button
                   onClick={() => canTestData.fillSignals('zero')}
                   type="button"
-                  title="所有信号填 0"
+                  title={t('canTestData.signalFill.zeroTitle')}
                 >
-                  清零
+                  {t('canTestData.signalFill.zero')}
                 </button>
                 <button
                   onClick={() => canTestData.fillSignals('ff')}
                   type="button"
-                  title="所有信号原始值填 FF"
+                  title={t('canTestData.signalFill.ffTitle')}
                 >
-                  全 FF
+                  {t('canTestData.signalFill.ff')}
                 </button>
               </div>
               {canTestData.canTestFrames.map((frame, frameIndex) => {
@@ -259,10 +277,15 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                           </code>
                         </div>
                         <div className="pdo-frame-field">
-                          类型<span>{frame.frameType === 0 ? '标准帧' : '扩展帧'}</span>
+                          {t('canTestData.frame.type')}
+                          <span>
+                            {frame.frameType === 0
+                              ? t('canTestData.frame.standard')
+                              : t('canTestData.frame.extended')}
+                          </span>
                         </div>
                         <label>
-                          名称
+                          {t('canTestData.frame.name')}
                           <input
                             value={frame.name}
                             onChange={(e) =>
@@ -271,16 +294,18 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                           />
                         </label>
                         <div className="pdo-frame-field">
-                          场景<span>{frame.scenario ?? 'manual'}</span>
+                          {t('canTestData.frame.scenario')}
+                          <span>{frame.scenario ?? 'manual'}</span>
                         </div>
                         <div className="pdo-frame-field">
-                          来源<span>{frame.source ?? '-'}</span>
+                          {t('canTestData.frame.source')}
+                          <span>{frame.source ?? '-'}</span>
                         </div>
                         <div className="pdo-frame-field">
                           DLC<span>{frame.dlc}</span>
                         </div>
                         <label>
-                          周期(ms)
+                          {t('canTestData.frame.cycleMs')}
                           <input
                             type="number"
                             style={{ width: 80 }}
@@ -300,16 +325,16 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                         <table className="config-table">
                           <thead>
                             <tr>
-                              <th>信号名称</th>
-                              <th>值</th>
-                              <th>单位</th>
-                              <th>位置</th>
-                              <th>长度</th>
-                              <th>缩放</th>
-                              <th>偏移</th>
-                              <th>范围</th>
-                              <th>角色</th>
-                              <th>原始值</th>
+                              <th>{t('canTestData.signalTable.name')}</th>
+                              <th>{t('canTestData.signalTable.value')}</th>
+                              <th>{t('canTestData.signalTable.unit')}</th>
+                              <th>{t('canTestData.signalTable.position')}</th>
+                              <th>{t('canTestData.signalTable.length')}</th>
+                              <th>{t('canTestData.signalTable.scale')}</th>
+                              <th>{t('canTestData.signalTable.offset')}</th>
+                              <th>{t('canTestData.signalTable.range')}</th>
+                              <th>{t('canTestData.signalTable.role')}</th>
+                              <th>{t('canTestData.signalTable.rawValue')}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -355,16 +380,18 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
                 );
               })}
             </>
-          ) : canTestData.canTestStatus?.startsWith('已生成') ? null : (
-            <EmptyState icon={WandSparkles}>
-              点击「生成测试数据」从项目配置中构建 CAN 测试数据
-            </EmptyState>
+          ) : canTestData.canTestStatusTone === 'success' ? null : (
+            <EmptyState icon={WandSparkles}>{t('canTestData.empty')}</EmptyState>
           )}
           {canTestData.canTestStatus ? (
             <p
               aria-live="polite"
               className={
-                canTestData.canTestStatus.startsWith('已') ? 'text-success' : 'project-open-error'
+                canTestData.canTestStatusTone === 'success'
+                  ? 'text-success'
+                  : canTestData.canTestStatusTone === 'error'
+                    ? 'project-open-error'
+                    : undefined
               }
               role="status"
               style={{ marginTop: 8 }}
@@ -374,7 +401,7 @@ export function CanTestDataPage({ loadedProject, canTestData }: CanTestDataPageP
           ) : null}
         </div>
       ) : (
-        <EmptyState>请先在项目管理中打开 .jcpro 项目文件</EmptyState>
+        <EmptyState>{t('canTestData.openProjectFirst')}</EmptyState>
       )}
     </section>
   );

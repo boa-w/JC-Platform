@@ -1,5 +1,6 @@
 import { ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import {
@@ -63,6 +64,7 @@ function CommunicationIndexInput({
   value,
   onCommit,
 }: CommunicationIndexInputProps) {
+  const { t } = useTranslation();
   const hexWidth = field.field === 'mid' ? 4 : 2;
   const formattedValue = formatCommunicationIndex(value, radix, hexWidth);
   const [draft, setDraft] = useState(formattedValue);
@@ -84,7 +86,7 @@ function CommunicationIndexInput({
 
   return (
     <label>
-      {field.label}
+      {t(field.labelKey)}
       <input
         aria-invalid={isInvalid || undefined}
         inputMode={radix === 'decimal' ? 'numeric' : 'text'}
@@ -101,7 +103,11 @@ function CommunicationIndexInput({
         }}
       />
       <span className="setting-index-input-hint">
-        {radix === 'hexadecimal' ? '输入十六进制，例如 0x10' : '输入十进制，例如 16'}
+        {t(
+          radix === 'hexadecimal'
+            ? 'settingData.indexInput.hexHint'
+            : 'settingData.indexInput.decimalHint',
+        )}
       </span>
     </label>
   );
@@ -132,6 +138,7 @@ export function SettingDataPage({
   isModifiedPath,
   restoreModifiedPath,
 }: SettingDataPageProps) {
+  const { t } = useTranslation();
   const settingDrawerTitleId = useId();
   const settingDrawerDescriptionId = useId();
   const settingData = useSettingData({
@@ -260,21 +267,21 @@ export function SettingDataPage({
     return (
       <fieldset
         className={`setting-index-radix${compact ? ' setting-index-radix--compact' : ''}`}
-        aria-label="通信索引显示进制"
+        aria-label={t('settingData.indexRadix.label')}
       >
         <button
           aria-pressed={communicationIndexRadix === 'decimal'}
           onClick={() => handleCommunicationIndexRadixChange('decimal')}
           type="button"
         >
-          十进制
+          {t('settingData.indexRadix.decimal')}
         </button>
         <button
           aria-pressed={communicationIndexRadix === 'hexadecimal'}
           onClick={() => handleCommunicationIndexRadixChange('hexadecimal')}
           type="button"
         >
-          十六进制
+          {t('settingData.indexRadix.hexadecimal')}
         </button>
       </fieldset>
     );
@@ -322,10 +329,10 @@ export function SettingDataPage({
       const key = row.path.join('/');
       return (
         <input
-          aria-label={`选择参数 ${row.name}`}
+          aria-label={t('settingData.selectParameter', { name: row.name })}
           checked={selectedParameterPaths.has(key)}
           onChange={(event) => handleParameterSelectionChange(event, row)}
-          title="按住 Shift 可连续选择"
+          title={t('settingData.shiftSelectionHint')}
           type="checkbox"
         />
       );
@@ -335,13 +342,13 @@ export function SettingDataPage({
         <>
           <button
             onClick={() => settingData.openSettingEditorDrawer(row.path)}
-            title="修改参数配置定义，不写入当前运行状态"
+            title={t('settingData.editDefinitionTitle')}
             type="button"
           >
-            编辑定义
+            {t('settingData.editDefinition')}
           </button>
           <button className="danger" onClick={() => setPendingDeleteRows([row])} type="button">
-            删除
+            {t('protocol.common.delete')}
           </button>
         </>
       );
@@ -399,7 +406,7 @@ export function SettingDataPage({
         field.field === 'preprocess_label' ? parseSettingPreprocessValue(value) : null;
       return (
         <label key={field.field}>
-          {field.label}
+          {t(field.labelKey)}
           <select
             disabled={fieldDisabled}
             value={String(value)}
@@ -415,25 +422,34 @@ export function SettingDataPage({
           >
             {options.map((option) => (
               <option key={`${field.field}-${option.value}`} value={String(option.value)}>
-                {option.label}
+                {option.labelKey ? t(option.labelKey) : option.label}
               </option>
             ))}
           </select>
           {dataTypeDefinition ? (
             <span className="setting-editor-field-hint">
-              {dataTypeDefinition.description} · 配置写入 handle={dataTypeDefinition.handle}
+              {t('settingData.handleHint', {
+                description: t(dataTypeDefinition.descriptionKey),
+                handle: dataTypeDefinition.handle,
+              })}
             </span>
           ) : null}
           {preprocessDefinition ? (
             <span className="setting-editor-field-hint">
-              {preprocessDefinition.description} · 配置写入 pre_handle=
-              {preprocessDefinition.handle}
+              {t('settingData.preHandleHint', {
+                description: t(preprocessDefinition.descriptionKey),
+                handle: preprocessDefinition.handle,
+              })}
             </span>
           ) : null}
           {field.field === 'decimals_value' ? (
             <span className="setting-editor-field-hint">
-              配置写入 pre_handle_decimal=
-              {Number(value)}（{settingPreprocessDecimalName(Number(value)) ?? '未知'}）
+              {t('settingData.preHandleDecimalHint', {
+                value: Number(value),
+                name: settingPreprocessDecimalName(Number(value))
+                  ? t('settingData.decimalPlaces', { count: Number(value) })
+                  : t('settingData.unknown'),
+              })}
             </span>
           ) : null}
         </label>
@@ -442,7 +458,7 @@ export function SettingDataPage({
     if (field.kind === 'number') {
       return (
         <label key={field.field}>
-          {field.label}
+          {t(field.labelKey)}
           <input
             type="number"
             value={value}
@@ -472,12 +488,12 @@ export function SettingDataPage({
     const fieldValueValid = defaultWriteValueValid && scaleValueValid && offsetValueValid;
     return (
       <label key={field.field}>
-        {field.label}
+        {t(field.labelKey)}
         <input
           aria-invalid={!fieldValueValid || undefined}
           disabled={fieldDisabled}
           placeholder={
-            defaultWriteDefinition ? '必填，支持十进制或 0x 十六进制' : undefined
+            defaultWriteDefinition ? t('settingData.defaultWritePlaceholder') : undefined
           }
           required={Boolean(defaultWriteDefinition || preprocessValueRequired)}
           value={String(value)}
@@ -487,18 +503,34 @@ export function SettingDataPage({
         />
         {defaultWriteDefinition ? (
           <span className="setting-editor-field-hint">
-            {defaultWriteDefinition.defaultWriteBytes} 字节无符号值，不能为空且不能超出范围
+            {t('settingData.defaultWriteHint', {
+              bytes: defaultWriteDefinition.defaultWriteBytes,
+            })}
           </span>
         ) : null}
         {field.field === 'scale_value' && node.pre_handle !== 0 ? (
           <span className="setting-editor-field-hint">
-            {preprocessDefinition?.scaleRequired ? '必填' : '选填'}，整数范围 -32768～32767
-            {preprocessDefinition?.shrinking ? '，缩小模式不能为 0' : ''}
+            {t('settingData.scaleHint', {
+              requirement: t(
+                preprocessDefinition?.scaleRequired
+                  ? 'settingData.required'
+                  : 'settingData.optional',
+              ),
+              shrinking: preprocessDefinition?.shrinking
+                ? t('settingData.shrinkNonZero')
+                : '',
+            })}
           </span>
         ) : null}
         {field.field === 'offset_value' && node.pre_handle !== 0 ? (
           <span className="setting-editor-field-hint">
-            {preprocessDefinition?.offsetRequired ? '必填' : '选填'}，支持整数或小数
+            {t('settingData.offsetHint', {
+              requirement: t(
+                preprocessDefinition?.offsetRequired
+                  ? 'settingData.required'
+                  : 'settingData.optional',
+              ),
+            })}
           </span>
         ) : null}
       </label>
@@ -515,7 +547,7 @@ export function SettingDataPage({
       <div className="legacy-drawer-layer" role="presentation">
         <button
           className="legacy-drawer-backdrop"
-          aria-label="关闭设置数据编辑面板"
+          aria-label={t('settingData.drawer.close')}
           onClick={settingData.closeSettingEditorDrawer}
           type="button"
         />
@@ -530,14 +562,16 @@ export function SettingDataPage({
           <div className="legacy-drawer-header">
             <div>
               <strong id={settingDrawerTitleId}>
-                {isMenu ? '菜单编辑' : '参数编辑'}：
-                {settingData.editingSettingNode.name || '未命名'}
+                {t('settingData.drawer.title', {
+                  type: t(isMenu ? 'settingData.drawer.menuEdit' : 'settingData.drawer.parameterEdit'),
+                  name: settingData.editingSettingNode.name || t('projectManagement.unnamed'),
+                })}
               </strong>
-              <p id={settingDrawerDescriptionId}>编辑设置数据定义，不写入设备当前运行状态。</p>
+              <p id={settingDrawerDescriptionId}>{t('settingData.drawer.description')}</p>
             </div>
             <button
               ref={settingData.settingDrawerCloseRef}
-              aria-label="关闭设置数据编辑面板"
+              aria-label={t('settingData.drawer.close')}
               onClick={settingData.closeSettingEditorDrawer}
               type="button"
             >
@@ -547,7 +581,9 @@ export function SettingDataPage({
           <div className="legacy-drawer-body">
             <section className="legacy-edit-panel legacy-edit-panel--drawer">
               <div className="legacy-edit-panel-header">
-                <strong>{isMenu ? '菜单定义' : '参数定义'}</strong>
+                <strong>
+                  {t(isMenu ? 'settingData.drawer.menuDefinition' : 'settingData.drawer.parameterDefinition')}
+                </strong>
                 <div className="setting-editor-drawer-actions">
                   {settingData.isModifiedPath(editorPath) ? (
                     <button
@@ -555,7 +591,7 @@ export function SettingDataPage({
                       onClick={() => settingData.restoreModifiedPath(editorPath)}
                       type="button"
                     >
-                      恢复
+                      {t('common.actions.restore')}
                     </button>
                   ) : null}
                 </div>
@@ -564,10 +600,10 @@ export function SettingDataPage({
                 {settingData
                   .visibleSettingEditorSections(settingData.editingSettingNode)
                   .map((section) => (
-                    <section className="legacy-edit-section" key={section.title}>
+                    <section className="legacy-edit-section" key={section.titleKey}>
                       <div className="legacy-edit-section-heading">
-                        <div className="legacy-edit-section-title">{section.title}</div>
-                        {section.title === '通信索引'
+                        <div className="legacy-edit-section-title">{t(section.titleKey)}</div>
+                        {section.titleKey === 'settingData.sections.communicationIndex'
                           ? renderCommunicationIndexRadixControl(true)
                           : null}
                       </div>
@@ -595,12 +631,14 @@ export function SettingDataPage({
       >
         <div className="legacy-data-sidebar">
           <div className="legacy-data-sidebar-header">
-            <div className="legacy-data-sidebar-title">菜单</div>
+            <div className="legacy-data-sidebar-title">{t('settingData.menu')}</div>
             <button
               className="legacy-sidebar-collapse-btn"
               onClick={() => setSidebarCollapsed((v) => !v)}
               type="button"
-              title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'}
+              title={t(
+                sidebarCollapsed ? 'settingData.expandSidebar' : 'settingData.collapseSidebar',
+              )}
             >
               {sidebarCollapsed ? (
                 <PanelLeftOpen aria-hidden="true" size={15} strokeWidth={1.8} />
@@ -616,7 +654,7 @@ export function SettingDataPage({
                   clearParameterSelection();
                   settingData.setSettingSearchQuery(event.target.value);
                 }}
-                placeholder="搜索菜单或参数，例如：开关、座椅、前进"
+                placeholder={t('settingData.searchPlaceholder')}
                 value={settingData.settingSearchQuery}
               />
               {settingData.settingSearchQuery ? (
@@ -627,7 +665,7 @@ export function SettingDataPage({
                   }}
                   type="button"
                 >
-                  清空
+                  {t('projectManagement.clear')}
                 </button>
               ) : null}
             </div>
@@ -649,7 +687,10 @@ export function SettingDataPage({
                   settingData.setSelectedSettingPath(menu.key);
                 }}
                 style={{ paddingLeft: `${16 + menu.level * 22}px` }}
-                title={`${formatSettingPath(menu.pathNames)}｜参数 ${menu.parameterCount}`}
+                title={t('settingData.menuTitle', {
+                  path: formatSettingPath(menu.pathNames),
+                  count: menu.parameterCount,
+                })}
                 type="button"
               >
                 {menu.hasMenuChildren ? (
@@ -679,8 +720,8 @@ export function SettingDataPage({
             {settingData.settingMenus.length === 0 ? (
               <div className="setting-menu-empty">
                 {settingData.settingSearchQuery
-                  ? '没有匹配的菜单或参数。可试试“开关”“座椅”“前进”“P/S”。'
-                  : '暂无可显示菜单'}
+                  ? t('settingData.noMatchingMenus')
+                  : t('settingData.noMenus')}
               </div>
             ) : null}
           </div>
@@ -696,15 +737,17 @@ export function SettingDataPage({
                 ))}
               </div>
               <div className="setting-menu-summary">
-                <strong>{settingData.activeSettingNode?.name ?? '菜单'}</strong>
+                <strong>{settingData.activeSettingNode?.name ?? t('settingData.menu')}</strong>
                 <span className="setting-summary-chip">
-                  {settingData.settingParameters.length} 个参数
+                  {t('settingData.parameterCount', { count: settingData.settingParameters.length })}
                 </span>
                 <span className="setting-summary-chip">
-                  {settingData.readonlySettingParameterCount} 个只读
+                  {t('settingData.readonlyCount', { count: settingData.readonlySettingParameterCount })}
                 </span>
                 <span className="setting-summary-chip">
-                  {settingData.booleanMonitorParameterCount} 个 0/1 监测项
+                  {t('settingData.booleanMonitorCount', {
+                    count: settingData.booleanMonitorParameterCount,
+                  })}
                 </span>
               </div>
             </div>
@@ -718,7 +761,7 @@ export function SettingDataPage({
                 }
                 type="button"
               >
-                新增菜单
+                {t('settingData.addMenu')}
               </button>
               <button
                 disabled={!settingData.activeSettingNode}
@@ -727,14 +770,14 @@ export function SettingDataPage({
                 }
                 type="button"
               >
-                修改菜单
+                {t('settingData.editMenu')}
               </button>
               <button
                 disabled={!settingData.activeSettingNode}
                 onClick={() => settingData.addSdoParameter(settingData.activeSettingPathNumbers)}
                 type="button"
               >
-                新增参数
+                {t('settingData.addParameter')}
               </button>
               <button
                 className="danger"
@@ -746,15 +789,14 @@ export function SettingDataPage({
                 }}
                 type="button"
               >
-                删除菜单
+                {t('settingData.deleteMenu')}
               </button>
             </div>
           </div>
           <div className="legacy-data-table-wrap setting-data-table-wrap">
             {settingData.hasBooleanMonitorParameters ? (
               <div className="setting-help-card">
-                此菜单包含只读开关监测项。0/1
-                表示设备上报的开关状态；本页可编辑名称、索引、位段、预处理等配置定义，不能直接写入当前状态。
+                {t('settingData.booleanMonitorHelp')}
               </div>
             ) : null}
             {settingData.activeSettingNode && settingData.settingParameters.length > 0 ? (
@@ -762,7 +804,7 @@ export function SettingDataPage({
                 <div className="setting-table-toolbar">
                   <div className="setting-table-view-controls">
                     <label className="setting-column-preset">
-                      <span>列视图</span>
+                      <span>{t('settingData.columnView')}</span>
                       <select
                         value={columnPreset}
                         onChange={(event) =>
@@ -771,38 +813,45 @@ export function SettingDataPage({
                       >
                         {settingColumnPresetOptions.map((option) => (
                           <option key={option.value} value={option.value}>
-                            {option.label}
+                            {t(option.labelKey)}
                           </option>
                         ))}
                       </select>
                     </label>
                     {renderCommunicationIndexRadixControl()}
                     <button onClick={settingData.resetSettingColumnWidths} type="button">
-                      重置列宽
+                      {t('settingData.resetColumnWidths')}
                     </button>
                     <span className="setting-visible-column-count">
-                      {visibleSettingParameterColumns.length} / {settingParameterColumns.length} 列
+                      {t('settingData.visibleColumns', {
+                        visible: visibleSettingParameterColumns.length,
+                        total: settingParameterColumns.length,
+                      })}
                     </span>
                   </div>
                   <div className="setting-table-bulk-actions">
                     {selectedParameterRows.length > 0 ? (
                       <>
                         <span>
-                          已选择 <strong>{selectedParameterRows.length}</strong> 条
+                          <Trans
+                            components={{ strong: <strong /> }}
+                            i18nKey="settingData.selectedRows"
+                            values={{ count: selectedParameterRows.length }}
+                          />
                         </span>
                         <button onClick={clearParameterSelection} type="button">
-                          清除选择
+                          {t('settingData.clearSelection')}
                         </button>
                         <button
                           className="danger"
                           onClick={() => setPendingDeleteRows(selectedParameterRows)}
                           type="button"
                         >
-                          删除已选
+                          {t('language.table.deleteSelected')}
                         </button>
                       </>
                     ) : (
-                      <span>共 {settingData.settingParameters.length} 条</span>
+                      <span>{t('settingData.totalRows', { count: settingData.settingParameters.length })}</span>
                     )}
                   </div>
                 </div>
@@ -826,7 +875,7 @@ export function SettingDataPage({
                               style={settingColumnStyle(column)}
                             >
                               <input
-                                aria-label="选择当前显示的全部参数"
+                                aria-label={t('settingData.selectAllVisible')}
                                 checked={allVisibleParametersSelected}
                                 onChange={(event) =>
                                   toggleAllVisibleParameters(event.target.checked)
@@ -849,9 +898,11 @@ export function SettingDataPage({
                             className={settingColumnClassName(column)}
                             style={settingColumnStyle(column)}
                           >
-                            <span className="legacy-data-th-content">{column.label}</span>
+                            <span className="legacy-data-th-content">{t(column.labelKey)}</span>
                             <button
-                              aria-label={`调整${column.label}列宽`}
+                              aria-label={t('settingData.resizeColumn', {
+                                column: t(column.labelKey),
+                              })}
                               className="legacy-data-column-resizer"
                               onMouseDown={(event) =>
                                 settingData.handleSettingColumnResizeStart(event, column)
@@ -893,12 +944,12 @@ export function SettingDataPage({
             ) : settingData.activeSettingNode ? (
               <div className="legacy-data-empty">
                 {settingData.settingSearchQuery
-                  ? '没有找到匹配的参数。可尝试搜索“开关”“座椅”“前进”“P/S”。'
-                  : '当前菜单下没有参数。请展开左侧其它菜单，或使用搜索查找具体参数。'}
+                  ? t('settingData.noMatchingParameters')
+                  : t('settingData.noParameters')}
               </div>
             ) : (
               <div className="legacy-data-empty">
-                请先在项目管理中打开 .jcpro 项目文件，然后进入“设置数据”查看菜单和参数。
+                {t('settingData.openProjectFirst')}
               </div>
             )}
           </div>
@@ -907,13 +958,19 @@ export function SettingDataPage({
       {renderSettingEditorDrawer()}
       {pendingDeleteRows.length > 0 ? (
         <ConfirmDialog
-          title={pendingDeleteRows.length === 1 ? '删除参数' : '删除已选参数'}
+          title={t(
+            pendingDeleteRows.length === 1
+              ? 'settingData.deleteParameterTitle'
+              : 'settingData.deleteSelectedParametersTitle',
+          )}
           message={
             pendingDeleteRows.length === 1
-              ? `确定要删除参数「${pendingDeleteRows[0].name}」吗？`
-              : `确定要删除已选的 ${pendingDeleteRows.length} 个参数吗？此操作会同时移除其完整配置定义。`
+              ? t('settingData.deleteParameterMessage', { name: pendingDeleteRows[0].name })
+              : t('settingData.deleteSelectedParametersMessage', {
+                  count: pendingDeleteRows.length,
+                })
           }
-          confirmLabel="删除"
+          confirmLabel={t('protocol.common.delete')}
           danger
           onConfirm={confirmDeleteParameters}
           onCancel={() => setPendingDeleteRows([])}

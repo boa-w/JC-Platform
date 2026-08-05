@@ -1,4 +1,5 @@
 import { UiCanvasPreview } from '../../components/UiCanvasPreview';
+import { useTranslation } from 'react-i18next';
 import type { LoadedProject } from '../../types/platform';
 import type { UiResourceController } from './useUiResourceController';
 
@@ -13,11 +14,12 @@ export function UiResourcePage({
   loadedProject,
   onJumpToPdo,
 }: UiResourcePageProps) {
+  const { t } = useTranslation();
   return (
     <div aria-busy={controller.isLoading} className="ui-resource-page">
       {controller.isLoading && loadedProject ? (
         <p aria-live="polite" className="config-helper-text" role="status">
-          正在解析 UI 资源...
+          {t('uiResource.status.parsing')}
         </p>
       ) : null}
       <UiCanvasPreview

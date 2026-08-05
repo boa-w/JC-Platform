@@ -1,0 +1,1572 @@
+{
+  "app": {
+    "skipToMain": "跳转到主要内容",
+    "updateDraftSaveFailed": "无法安全保存恢复草稿，更新重启已取消。"
+  },
+  "common": {
+    "status": {
+      "loading": "正在加载...",
+      "checking": "检查中",
+      "exporting": "导出中",
+      "saving": "保存中...",
+      "deleting": "删除中...",
+      "restoring": "恢复中..."
+    },
+    "actions": {
+      "cancel": "取消",
+      "confirm": "确认",
+      "close": "关闭",
+      "save": "保存",
+      "restore": "恢复",
+      "refresh": "刷新",
+      "delete": "删除"
+    },
+    "lifecycle": {
+      "experimental": "实验性",
+      "deprecated": "废弃",
+      "experimentalDeprecated": "实验性 / 待废弃",
+      "compactExperimental": "实验",
+      "compactExperimentalDeprecated": "实验/废弃"
+    },
+    "punctuation": {
+      "semicolon": "；",
+      "listSeparator": "、"
+    }
+  },
+  "navigation": {
+    "breadcrumbLabel": "导航路径",
+    "groups": {
+      "project": "项目",
+      "data": "数据",
+      "protocol": "协议",
+      "configuration": "配置",
+      "language": "多国语言",
+      "output": "输出",
+      "system": "系统"
+    },
+    "modules": {
+      "project": {
+        "title": "项目管理",
+        "description": "负责项目创建、打开、结构检查、保存和基础目录管理。"
+      },
+      "settingData": {
+        "title": "设置数据",
+        "description": "按旧版上位机布局展示 SDO 菜单和设置参数。"
+      },
+      "realtimeData": {
+        "title": "实时数据",
+        "description": "按旧版上位机布局展示 PDO 接收表、发送表和帧明细。"
+      },
+      "signalDictionary": {
+        "title": "业务信号字典",
+        "description": "负责统一维护 Signal、数据类型、单位、缩放比例和业务含义。"
+      },
+      "privateProtocol": {
+        "title": "私有协议",
+        "description": "负责自定义帧、周期、校验方式、字节序和载荷布局。",
+        "lifecycleReason": "实验性历史扩展，仅保留兼容与迁移用途；后续协议主线聚焦 CANOpen。"
+      },
+      "protocolMapping": {
+        "title": "协议映射",
+        "description": "统一展示 CANopen、私有协议和业务 Signal 之间的映射与校验结果。",
+        "lifecycleReason": "多协议映射层仍在验证中，后续会随 CANOpen 主线重构继续收敛。"
+      },
+      "canopenExport": {
+        "title": "CANopen 导出",
+        "description": "从旧项目配置生成 CANopen EDS、vendor 扩展、模型报告和 SDO/PDO 测试帧。",
+        "lifecycleReason": "基于旧固件协议做 CANopen 兼容转换，不改动设备侧协议。"
+      },
+      "uiResources": {
+        "title": "UI 资源编辑",
+        "description": "负责设备分辨率画布、图标/动画资源、属性编辑、选项增删和资源导出路径维护。"
+      },
+      "batteryMonitor": {
+        "title": "锂电监控协议",
+        "description": "统一维护锂电监控 CAN 帧、信号解析、页面显示项、超时策略和多语言名称。"
+      },
+      "faultCode": {
+        "title": "故障代码",
+        "description": "负责故障来源帧、故障码、等级和多语言文案绑定配置。"
+      },
+      "language": {
+        "title": "多国语言",
+        "description": "负责自动收集翻译项、编辑多语言表、CSV/XLS 导入导出和导出语言资源。"
+      },
+      "canTestData": {
+        "title": "CAN 测试数据构建",
+        "description": "自动提取项目 PDO/锂电 CAN 帧，生成测试数据并导出为 TXT 文件。"
+      },
+      "export": {
+        "title": "项目导出",
+        "description": "负责生成 jc_export、复制图片资源、生成 JSON 描述和设备二进制 bin。"
+      },
+      "settings": {
+        "title": "软件设置",
+        "description": "管理导出写入控制、外观主题等软件级偏好设置。"
+      }
+    }
+  },
+  "dashboard": {
+    "recovery": {
+      "restored": "已恢复异常退出前的未保存修改。"
+    },
+    "gitRevisionLoaded": "已载入 Git 版本 {{hash}}，保存后将形成新的修改。",
+    "fullLanguageImported": "完整语言表已导入。",
+    "dropOverlay": {
+      "title": "释放以打开项目",
+      "message": "当前未保存修改会在打开前请求确认"
+    },
+    "actionBar": {
+      "noProject": "未打开项目",
+      "restoreSection": "恢复 {{section}}",
+      "toggleGitSummary": "切换 Git 版本摘要",
+      "openProjectTitle": "打开项目文件",
+      "open": "打开",
+      "reloadTitle": "重新加载当前项目",
+      "reload": "重载",
+      "restoreAllTitle": "恢复所有未保存修改",
+      "savingAs": "另存中...",
+      "saveAs": "另存为...",
+      "importTitle": "从 CSV/XLS/XLSX/XML 文件导入",
+      "importing": "导入中...",
+      "import": "导入",
+      "exportCsvTitle": "导出为 CSV 格式",
+      "exportExcelTitle": "导出为 Excel XML 格式",
+      "generateTestDataTitle": "自动构建当前页面的 CAN 测试数据",
+      "generating": "生成中...",
+      "generateTestData": "生成测试数据",
+      "hideCanvasLabelsTitle": "隐藏画布上的资源文字标注",
+      "showCanvasLabelsTitle": "显示画布上的资源文字标注",
+      "hideCanvasLabels": "隐藏标注",
+      "showCanvasLabels": "显示标注",
+      "openJsonEditor": "打开 JSON 编辑器"
+    },
+    "gitSummary": {
+      "label": "Git 版本摘要",
+      "title": "版本摘要",
+      "refresh": "刷新 Git 状态",
+      "closeLabel": "关闭 Git 版本摘要",
+      "backgroundRefresh": "正在后台刷新 Git 状态，当前信息仍可查看",
+      "changes": "变更",
+      "local": "本地",
+      "noCommits": "尚无提交",
+      "review": "审阅更改",
+      "fileCount": "{{count}} 个文件",
+      "saveFirst": "请先保存项目配置",
+      "stagedChanges": "暂存区已有其他内容",
+      "noChanges": "没有可提交的配置修改",
+      "commitTitle": "提交当前项目配置版本",
+      "committing": "提交中...",
+      "commit": "提交项目版本",
+      "remoteUnavailable": "远程同步未接入",
+      "history": "版本历史",
+      "revisionCount": "{{count}} 条",
+      "reading": "正在读取 Git 状态"
+    },
+    "dialogs": {
+      "save": {
+        "title": "确认保存",
+        "message": "将当前所有配置修改写入项目文件：",
+        "mountedSidecar": "检测到重构专属配置修改，将写回已挂载 JSON：{{path}}；原 .jcpro 只保存兼容字段。",
+        "newSidecar": "检测到重构专属配置修改，将创建独立 JSON sidecar；原 .jcpro 只保存兼容字段。",
+        "confirm": "确认保存"
+      },
+      "testData": {
+        "title": "确认生成测试数据",
+        "message": "将使用 <strong>{{template}}</strong> 模板覆盖当前配置，是否继续？",
+        "confirm": "确认生成"
+      },
+      "close": {
+        "continueEditing": "继续编辑",
+        "discardAndClose": "放弃并关闭",
+        "message": "当前项目存在未保存修改。关闭应用将永久放弃这些修改。",
+        "title": "放弃未保存修改？"
+      }
+    },
+    "recoveryDialog": {
+      "title": "恢复未保存修改",
+      "message": "检测到 <strong>{{project}}</strong> 在 {{time}} 保存的恢复草稿。",
+      "unnamedProject": "未命名项目",
+      "unknownTime": "时间未知",
+      "later": "稍后",
+      "discardDraft": "放弃草稿",
+      "restoreDraft": "恢复草稿"
+    }
+  },
+  "documentSections": {
+    "exportSettings": "导出设置",
+    "uiResources": "UI 资源",
+    "sdoParameters": "SDO 参数",
+    "pdoSimple": "PDO 简化配置",
+    "pdoGlobals": "PDO 全局变量",
+    "pdoConditions": "PDO 条件表",
+    "pdoReceive": "PDO 接收帧",
+    "pdoSend": "PDO 发送帧",
+    "languages": "多国语言",
+    "batteryMonitor": "锂电监控协议",
+    "faultCodes": "故障代码",
+    "signalDictionary": "业务信号字典",
+    "privateProtocol": "私有协议",
+    "protocolMapping": "协议映射"
+  },
+  "testData": {
+    "types": {
+      "pdoSimple": "PDO 简化配置",
+      "pdoAdvanced": "PDO 高级配置",
+      "batteryMonitor": "锂电监控协议配置"
+    }
+  },
+  "sidebar": {
+    "group": {
+      "expand": "展开",
+      "collapse": "折叠",
+      "activeTitle": "{{group}}（点击{{action}}菜单）",
+      "switchTitle": "切换到{{group}}",
+      "functionLabel": "{{group}} 功能"
+    },
+    "coreStatus": {
+      "ready": "已就绪",
+      "browserPreview": "浏览器预览",
+      "unavailable": "核心不可用",
+      "checking": "检查中"
+    },
+    "theme": {
+      "toLight": "切换到浅色主题",
+      "toDark": "切换到深色主题",
+      "switchLabel": "切换主题",
+      "light": "浅色",
+      "dark": "深色"
+    },
+    "about": {
+      "label": "关于",
+      "title": "软件版本信息",
+      "coreUnavailableLabel": "软件版本信息，核心不可用",
+      "versionInfo": "版本信息",
+      "closeVersionInfo": "关闭版本信息",
+      "appInfo": "应用信息",
+      "softwareName": "软件名称",
+      "defaultAppName": "自定义开发平台",
+      "frontendVersion": "前端版本",
+      "coreVersion": "核心版本",
+      "commitHash": "提交哈希",
+      "unknown": "unknown",
+      "coreStatus": "核心状态",
+      "projectInfo": "项目信息",
+      "currentProject": "当前项目",
+      "noProject": "未打开项目",
+      "projectPath": "项目路径"
+    },
+    "update": {
+      "sectionTitle": "软件更新",
+      "checking": "检查中",
+      "downloadPercent": "下载 {{percent}}%",
+      "downloading": "下载中",
+      "restarting": "正在重启",
+      "install": "安装更新",
+      "check": "检查更新",
+      "available": "发现新版本 {{version}}",
+      "upToDate": "当前已是最新版本",
+      "installedRestarting": "更新已安装，正在重启应用",
+      "manualCheckHint": "可手动检查新版本",
+      "openReleases": "打开发布页面",
+      "returnToSave": "返回保存",
+      "continue": "继续更新",
+      "unsavedConfirmMessage": "当前项目存在未保存修改。更新安装后应用将重启，修改会保留在恢复草稿中；建议先返回并保存项目。",
+      "confirmMessage": "更新安装完成后应用将自动重启。是否继续下载并安装？",
+      "confirmTitle": "安装并重启应用？"
+    },
+    "diagnostics": {
+      "sectionTitle": "诊断与支持",
+      "exportReport": "导出诊断报告",
+      "privacy": "项目配置内容不会写入报告。"
+    }
+  },
+  "recoveryBoundary": {
+    "appTitle": "应用遇到问题",
+    "featureTitle": "此功能暂时无法显示",
+    "appMessage": "当前界面未能正常启动。可以重试加载界面，不会强制刷新应用窗口。",
+    "featureMessage": "当前模块加载或渲染失败，其他功能仍可继续使用。重试不会刷新整个应用。",
+    "retry": "重试",
+    "technicalInfo": "技术信息"
+  },
+  "settings": {
+    "title": "软件设置",
+    "description": "管理翻译服务、界面语言与外观主题等软件级偏好设置。",
+    "translation": {
+      "sectionTitle": "翻译服务",
+      "baidu": "百度翻译",
+      "baiduDescription": "用于多国语言管理页的一键条目翻译。"
+    },
+    "credentials": {
+      "reading": "正在读取系统凭据库...",
+      "protected": "API Key 已由系统凭据库保护。",
+      "notSaved": "尚未保存翻译凭据。",
+      "replacePlaceholder": "已安全保存；输入新值可替换",
+      "apiKeyPlaceholder": "输入 API Key",
+      "saving": "保存中",
+      "save": "保存凭据",
+      "clearing": "清空中",
+      "clear": "清空配置",
+      "privacy": "桌面端使用 Windows 凭据管理器或 macOS Keychain，不写入项目和浏览器存储。",
+      "clearConfirmTitle": "清空翻译配置？",
+      "clearConfirmMessage": "将从本机删除百度翻译 App ID 和 API Key。此操作无法撤销。"
+    },
+    "interfaceLanguage": {
+      "sectionTitle": "语言与区域",
+      "label": "界面语言",
+      "description": "只显示文案完整且已经注册的语言。",
+      "options": {
+        "zhCN": "简体中文"
+      }
+    },
+    "appearance": {
+      "sectionTitle": "外观",
+      "themeMode": "主题模式",
+      "dark": "深色模式",
+      "light": "浅色模式"
+    }
+  },
+  "jsonEditor": {
+    "dragLabel": "拖动 JSON 编辑器",
+    "dragTitle": "拖动编辑器；聚焦后可使用方向键移动",
+    "title": "JSON 编辑器",
+    "format": "格式化",
+    "restoreSection": "恢复段落",
+    "apply": "应用",
+    "close": "关闭 JSON 编辑器",
+    "contentLabel": "JSON 配置内容",
+    "resizeLabel": "调整 JSON 编辑器大小",
+    "resizeTitle": "拖动调整大小；聚焦后可使用方向键调整",
+    "lockedBanner": "JSON 编辑器已打开，配置项编辑已锁定",
+    "closeEditor": "关闭编辑器"
+  },
+  "tableConfig": {
+    "titles": {
+      "sdo": "SDO 参数配置",
+      "pdoSimple": "PDO 简化配置",
+      "language": "多国语言"
+    },
+    "importValidation": "导入校验",
+    "passed": "通过",
+    "hasIssues": "存在问题",
+    "headerCount": "表头列数",
+    "targetSection": "写回段落",
+    "filters": {
+      "csv": "CSV 表格",
+      "excelXml": "Excel XML 表格",
+      "table": "表格文件"
+    },
+    "status": {
+      "openProjectFirst": "请先打开 .jcpro 项目。",
+      "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
+      "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
+      "exported": "已导出：{{path}}",
+      "importFailed": "表格导入失败"
+    }
+  },
+  "pdoAdvancedReport": {
+    "title": "PDO 高级配置校验",
+    "description": "解析全局变量、条件表、PDO 接收帧和发送帧，展示结构统计与引用校验错误。",
+    "parsing": "解析中...",
+    "parse": "解析当前高级 PDO 配置",
+    "globalParameters": "全局变量",
+    "conditions": "条件表",
+    "receiveFrames": "接收帧",
+    "sendFrames": "发送帧",
+    "status": {
+      "openProjectFirst": "请先打开 .jcpro 项目。",
+      "invalid": "高级 PDO 配置存在问题"
+    }
+  },
+  "language": {
+    "service": {
+      "sourceLanguage": "源语言",
+      "targetLanguage": "目标语言",
+      "selectPlaceholder": "请选择",
+      "scope": "范围",
+      "scopes": {
+        "empty": "仅空白目标列",
+        "filtered": "当前筛选全部",
+        "selected": "已选择条目"
+      },
+      "selected": "已选择",
+      "itemCount": "{{count}} 条",
+      "baidu": "百度翻译",
+      "configured": "已配置",
+      "notConfigured": "未配置",
+      "translating": "翻译中...",
+      "progressResult": "成功 {{success}}，失败 {{failed}}",
+      "currentKey": "，当前 {{key}}",
+      "hideLogs": "隐藏日志",
+      "logs": "翻译日志 ({{count}})",
+      "clearLogs": "清空日志",
+      "noLogs": "暂无日志"
+    },
+    "table": {
+      "dragMultiple": "拖动排序（{{count}} 条）",
+      "drag": "拖动排序",
+      "selectedSummary": "已选择 <strong>{{count}}</strong> 条",
+      "deletableCount": "，可删除 {{count}} 条",
+      "deleteSelected": "删除已选",
+      "selectVisible": "选择当前筛选条目",
+      "index": "序号",
+      "translationKey": "翻译键",
+      "empty": "暂无翻译条目",
+      "selectKey": "选择 {{key}}",
+      "editKey": "编辑翻译键 {{key}}",
+      "externalKeyTitle": "外部引用键，不写入 list_inner",
+      "configKeyTitle": "配置键，不可编辑",
+      "clickToEdit": "点击编辑",
+      "referenceBadge": "引用",
+      "dragKey": "拖动 {{key}} 调整顺序",
+      "delete": "删除"
+    },
+    "comparison": {
+      "languageNameKeyTitle": "语言名称配置键，不可编辑 key"
+    },
+    "toolbar": {
+      "searchPlaceholder": "搜索翻译键或内容...",
+      "filters": {
+        "all": "全部",
+        "translated": "已翻译",
+        "untranslated": "未翻译",
+        "modified": "已修改"
+      },
+      "totalCount": "{{count}} 条",
+      "filteredCount": "{{filtered}} / {{total}} 条",
+      "singleImportTitle": "按 key 匹配，仅填充当前语言的空白翻译",
+      "selectTargetFirst": "请先选择目标语言",
+      "importing": "导入中...",
+      "importSingle": "导入单语言 CSV",
+      "fullImportTitle": "导入包含全部语言和翻译键的 CSV、XLS、XLSX 或 XML 表格",
+      "importFull": "导入完整语言表",
+      "importHelpLabel": "查看语言导入说明",
+      "importHelpTitle": "语言导入说明",
+      "singleImportHelp": "<bold>单语言 CSV：</bold>两列即可，例如 <code>中文_zh,乌克兰语_uk</code>。按左侧 key 匹配，只填充当前目标语言的空值。",
+      "fullImportHelp": "<bold>完整语言表：</bold>用于整体替换语言配置，需包含 <codeIndex>序号</codeIndex>、<codeAuto>auto</codeAuto> 和至少一个语言列，支持 CSV、XLS、XLSX、XML。",
+      "singleImportGuarantee": "单语言导入不依赖行顺序，不覆盖已有翻译，也不会新增项目中不存在的 key。",
+      "syncKeys": "同步配置键"
+    },
+    "sidebar": {
+      "title": "语言",
+      "addLanguage": "添加语言",
+      "common": "常用语言：",
+      "custom": "自定义：",
+      "newCodeLabel": "新语言代码",
+      "codePlaceholder": "代码",
+      "newNameLabel": "新语言名称",
+      "namePlaceholder": "名称",
+      "add": "添加",
+      "editCode": "编辑语言代码 {{language}}",
+      "editName": "编辑语言名称 {{code}}",
+      "editLanguage": "编辑语言 {{language}}",
+      "editLanguageTitle": "编辑语言",
+      "deleteLanguage": "删除语言 {{language}}",
+      "deleteLanguageTitle": "删除语言",
+      "languageCount": "{{count}} 种语言",
+      "keyCount": "{{count}} 个翻译键",
+      "deleteDialogTitle": "删除语言",
+      "deleteDialogMessage": "确定要删除「{{language}}」吗？",
+      "deleteTranslationCount": "该语言已有 {{count}} 条翻译将被移除。"
+    },
+    "page": {
+      "selectTargetPeriod": "请先选择目标语言。",
+      "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
+      "singleLanguageCsvFilter": "单语言翻译 CSV",
+      "singleLanguageImportFailed": "单语言 CSV 导入失败。",
+      "singleLanguageImportResult": "{{language}}：填充 {{filled}} 条；跳过已有 {{existing}}、未知 key {{unknown}}、空值 {{empty}}、重复 {{duplicate}}。",
+      "cancelling": "正在取消，等待当前条目完成...",
+      "cancelRequested": "用户请求取消翻译",
+      "selectTarget": "请选择目标语言",
+      "targetMustDiffer": "目标语言需不同于源语言",
+      "configureBaiduFirst": "请先在软件设置中配置百度翻译 App ID 和 API Key",
+      "selectItemsToTranslate": "请选择需要翻译的条目",
+      "nothingToTranslate": "没有需要翻译的条目",
+      "translatingProgress": "正在翻译 {{current}}/{{total}} 条...",
+      "translationStarted": "开始翻译 {{count}} 条，{{source}} → {{target}}",
+      "cancelledRemaining": "已取消，剩余 {{count}} 条未翻译",
+      "translatingKey": "正在翻译 {{current}}/{{total}}: {{key}}",
+      "emptyResult": "返回空结果，未写入",
+      "translationSuccess": "翻译成功",
+      "cancelledResult": "已取消：成功 {{success}} 条，失败 {{failed}} 条",
+      "completedResult": "翻译完成：成功 {{success}} 条，失败 {{failed}} 条",
+      "cancelLog": "翻译取消：成功 {{success}} 条，失败 {{failed}} 条",
+      "openProjectFirst": "请先在项目管理中打开 .jcpro 项目文件",
+      "editorMode": "编辑模式",
+      "comparisonMode": "全语言对比",
+      "newKeyLabel": "新增翻译键",
+      "newKeyPlaceholder": "新增翻译键...",
+      "addKey": "添加键",
+      "translationProgress": "{{language}}: {{translated}}/{{total}} 已翻译 ({{percent}}%)",
+      "backToTop": "回到顶部",
+      "top": "顶部",
+      "deleteSelectedTitle": "删除已选条目",
+      "deleteSelectedMessage": "确定要删除已选的 {{count}} 个翻译条目吗？此操作会同时移除这些条目的所有语言翻译。",
+      "nonDeletableSelected": "另外 {{count}} 个已选条目不可删除，将不会被移除。"
+    }
+  },
+  "gitReview": {
+    "label": "Git 更改审阅",
+    "versionDiff": "版本差异",
+    "changes": "更改",
+    "branch": "分支",
+    "parentRevision": "父版本",
+    "worktree": "工作区",
+    "upstream": "上游 {{reference}}",
+    "editCurrentFile": "编辑当前工作区文件",
+    "saveMainEditorFirst": "请先保存或恢复主编辑器中的修改",
+    "deletedCannotEdit": "已删除文件无法编辑",
+    "editUncommittedFile": "编辑当前未提交文件",
+    "diffView": "对比视图",
+    "unifiedView": "统一对比视图",
+    "splitView": "并排对比视图",
+    "toggleAllFiles": "展开或折叠全部文件",
+    "refresh": "刷新审阅",
+    "close": "关闭审阅",
+    "saveOrCancelFirst": "请先保存或取消文件编辑",
+    "restoring": "正在恢复...",
+    "restoreWorkcopy": "恢复为工作副本",
+    "versionMessage": "版本说明",
+    "committing": "提交中...",
+    "commitVersion": "提交版本",
+    "loadingDiffEditor": "正在加载对照编辑器",
+    "readingChanges": "正在读取更改",
+    "unchangedLines": "{{count}} 行未修改",
+    "noManagedChanges": "该版本未修改受管配置文件",
+    "noChangesToReview": "没有待审阅的配置更改"
+  },
+  "gitDiff": {
+    "originalAria": "{{path}} HEAD 原始版本",
+    "currentAria": "{{path}} 当前工作区内容",
+    "revertChunkTitle": "使用左侧版本替换此差异块",
+    "revertChunkLabel": "回退此差异块",
+    "jsonFormatError": "JSON 格式错误：{{message}}",
+    "editAria": "对照编辑 {{path}}",
+    "lineStatus": "{{count}} 行{{status}}",
+    "unsaved": " · 尚未保存",
+    "synced": " · 已同步",
+    "saveFile": "保存文件",
+    "original": "HEAD 原始版本",
+    "currentEditable": "当前工作区（可编辑）"
+  },
+  "projectManagement": {
+    "openExisting": "打开现有项目",
+    "projectPathLabel": "项目文件路径",
+    "projectPathPlaceholder": "输入或粘贴 .jcpro 文件路径",
+    "opening": "打开中...",
+    "browse": "浏览",
+    "recentProjects": "最近项目",
+    "clear": "清空",
+    "selectRecent": "选择最近项目",
+    "unnamed": "未命名",
+    "openProject": "打开项目",
+    "remove": "移除",
+    "createNew": "新建项目",
+    "newProjectNameLabel": "新项目名称",
+    "projectNamePlaceholder": "项目名称",
+    "resolution": "分辨率",
+    "resolutionWidth": "项目分辨率宽度",
+    "resolutionHeight": "项目分辨率高度",
+    "createProject": "创建项目",
+    "currentProject": "当前项目",
+    "parse": "解析",
+    "completeStructure": "补齐结构",
+    "mountRefactorConfig": "挂载重构配置",
+    "saveRefactorConfig": "保存重构配置",
+    "createRefactorConfig": "创建重构配置",
+    "saveUnsavedFirst": "请先保存未保存修改",
+    "formatJcproTitle": "格式化当前 .jcpro JSON 文件",
+    "formatting": "格式化中...",
+    "formatJcpro": "格式化 jcpro JSON",
+    "name": "名称",
+    "path": "路径",
+    "validation": "校验",
+    "compatibleValid": "兼容段通过",
+    "compatibleMissing": "缺少兼容段",
+    "refactorConfig": "重构配置",
+    "notMounted": "未挂载",
+    "missingCompatibleSections": "缺少兼容段：{{sections}}",
+    "sidecarSectionsMissing": "重构专属段未在 .jcpro 中保存：{{sections}}。可通过“挂载重构配置”关联独立 JSON。",
+    "warnings": "警告：{{warnings}}",
+    "git": {
+      "title": "Git 版本管理",
+      "loading": "后台加载中...",
+      "backgroundLoading": "正在后台更新仓库状态和版本历史，窗口可继续操作。",
+      "repository": "仓库",
+      "currentVersion": "当前版本",
+      "configStatus": "配置状态",
+      "filesPending": "{{count}} 个文件待提交",
+      "synced": "已同步",
+      "processing": "处理中...",
+      "saveVersion": "保存版本",
+      "managedFiles": "受管文件：{{files}}",
+      "saveFirst": "请先保存当前项目配置，再创建 Git 版本。",
+      "stagingOccupied": "Git 暂存区已有内容。为避免混入其他改动，项目版本提交已停用。",
+      "view": "查看",
+      "noHistory": "当前项目文件还没有 Git 提交记录。",
+      "checkingRepository": "正在检查项目所在的 Git 仓库..."
+    },
+    "parseReport": {
+      "title": "解析报告",
+      "valid": "有效",
+      "yes": "是",
+      "no": "否",
+      "addedSections": "补齐段落",
+      "errors": "错误"
+    }
+  },
+  "protocol": {
+    "common": {
+      "parsing": "解析中...",
+      "deriveFromLegacy": "从旧配置派生",
+      "name": "名称",
+      "type": "类型",
+      "actions": "操作",
+      "delete": "删除",
+      "disable": "停用",
+      "enable": "启用",
+      "enabled": "启用",
+      "notEnabled": "未启用",
+      "enabledStatus": "启用状态",
+      "exportConfig": "导出配置",
+      "importConfig": "导入配置",
+      "validationStatus": "校验状态",
+      "passed": "通过",
+      "hasErrors": "存在错误",
+      "none": "无",
+      "byteOrder": "字节序"
+    },
+    "signalDictionary": {
+      "title": "业务信号字典",
+      "description": "从旧版 SDO、PDO 和锂电配置派生业务 Signal，集中查看数据类型、单位、缩放和旧系统变量索引。",
+      "refresh": "刷新字典",
+      "addSignal": "新增 Signal",
+      "signalCount": "Signal 总数",
+      "pdoMappings": "CANopen PDO 映射",
+      "sdoObjects": "SDO 对象",
+      "privateFrames": "私有协议帧",
+      "unit": "单位",
+      "scale": "缩放",
+      "defaultValue": "默认值",
+      "legacyIndex": "旧索引",
+      "source": "来源",
+      "empty": "请先打开项目并刷新业务信号字典。"
+    },
+    "private": {
+      "title": "私有协议",
+      "description": "集中查看私有协议帧、校验方式、字节序和 Signal 载荷布局；当前会从锂电监控帧自动派生初始私有协议模型。",
+      "refresh": "刷新私有协议",
+      "addFrame": "新增私有帧",
+      "frameCount": "私有帧数量",
+      "payloadSignals": "载荷 Signal",
+      "frameKey": "帧 Key",
+      "frameId": "帧 ID",
+      "deleteFrame": "删除帧",
+      "frameType": "帧类型",
+      "standardFrame": "标准帧",
+      "extendedFrame": "扩展帧",
+      "periodTimeout": "周期/超时",
+      "checksum": "校验",
+      "payloadTitle": "载荷 Signal（{{count}}）",
+      "addPayload": "新增载荷",
+      "empty": "请先打开项目并刷新私有协议。"
+    },
+    "mapping": {
+      "title": "协议拓扑概览",
+      "description": "统一查看业务 Signal 到 CANopen SDO/PDO 与私有协议帧的映射关系，并执行帧长度、引用和重叠校验。",
+      "refresh": "刷新拓扑",
+      "applyParsed": "从解析结果写入",
+      "addPdo": "新增 PDO 映射",
+      "addSdo": "新增 SDO 映射",
+      "addPrivate": "新增私有映射",
+      "generateLegacyPdo": "生成旧版 PDO 段",
+      "mappingCount": "映射总数",
+      "canopenFrames": "CANopen 帧",
+      "privateFrames": "私有帧",
+      "editorTitle": "协议映射编辑",
+      "targetType": "目标类型",
+      "directionFrameKey": "方向/Frame Key",
+      "protocol": "协议",
+      "privateFrame": "私有帧",
+      "direction": "方向",
+      "receive": "接收",
+      "send": "发送",
+      "frameDescription": "描述",
+      "privateProtocolFrames": "私有协议帧",
+      "empty": "请先打开项目并刷新协议拓扑。"
+    },
+    "filters": {
+      "privateJson": "私有协议配置"
+    },
+    "status": {
+      "mappingValidationFailed": "协议映射校验存在问题",
+      "openProjectFirst": "请先打开 .jcpro 项目。",
+      "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
+      "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
+      "exported": "已导出：{{path}}",
+      "invalidPrivateConfig": "无效的私有协议配置文件。",
+      "importedPrivate": "已导入 {{count}} 个私有帧",
+      "flattenFailed": "生成旧版 PDO 段失败",
+      "flattened": "已更新：{{sections}}"
+    }
+  },
+  "canopenExport": {
+    "title": "CANopen 导出",
+    "description": "基于「数据 / 设置数据」生成 SDO 对象，纳入能匹配 CANopen 默认 PDO 连接集的实时 PDO，并导出覆盖 SDO 通道与 PDO 帧的协议 DBC；无法归属到 Node-ID 的自定义实时帧会被排除。",
+    "exportPackage": "导出 CANopen 包",
+    "openDirectory": "打开 CANopen 目录",
+    "firmwareProtocol": "固件协议",
+    "unchanged": "保持不变",
+    "sdoRequestRule": "SDO 请求规则",
+    "exportDirectory": "导出目录",
+    "notExported": "尚未导出",
+    "outputFiles": "输出文件",
+    "nodes": "CANopen 节点",
+    "edsFiles": "EDS 文件",
+    "pdoCount": "PDO 数",
+    "bitfieldMappings": "位域映射",
+    "conversionWarnings": "转换提示",
+    "nodeSummary": "节点转换摘要",
+    "sdoRequestCobId": "SDO 请求 COB-ID",
+    "sdoResponseCobId": "SDO 响应 COB-ID",
+    "objectCount": "对象数",
+    "bitfieldExtensions": "位域扩展",
+    "emptyReport": "点击「导出 CANopen 包」生成 EDS、model、vendor 扩展、协议 DBC、SDO 对象映射、位域映射和 SDO/PDO 测试帧。",
+    "moreWarnings": "还有 {{count}} 条提示，详见 conversion_report.json。",
+    "openProjectPageFirst": "请先在项目管理中打开 .jcpro 项目文件。",
+    "openProjectFirst": "请先打开项目，再导出 CANopen 转换包。",
+    "desktopDirectoryPickerOnly": "系统目录选择器只能在 Tauri 桌面应用中使用。",
+    "success": "已导出 CANopen 转换包：{{files}} 个文件，{{nodes}} 个节点，{{warnings}} 条提示。"
+  },
+  "settingData": {
+    "indexInput": {
+      "hexHint": "输入十六进制，例如 0x10",
+      "decimalHint": "输入十进制，例如 16"
+    },
+    "indexRadix": {
+      "label": "通信索引显示进制",
+      "decimal": "十进制",
+      "hexadecimal": "十六进制"
+    },
+    "selectParameter": "选择参数 {{name}}",
+    "shiftSelectionHint": "按住 Shift 可连续选择",
+    "editDefinitionTitle": "修改参数配置定义，不写入当前运行状态",
+    "editDefinition": "编辑定义",
+    "handleHint": "{{description}} · 配置写入 handle={{handle}}",
+    "preHandleHint": "{{description}} · 配置写入 pre_handle={{handle}}",
+    "preHandleDecimalHint": "配置写入 pre_handle_decimal={{value}}（{{name}}）",
+    "decimalPlaces": "{{count}}位",
+    "unknown": "未知",
+    "defaultWritePlaceholder": "必填，支持十进制或 0x 十六进制",
+    "defaultWriteHint": "{{bytes}} 字节无符号值，不能为空且不能超出范围",
+    "required": "必填",
+    "optional": "选填",
+    "shrinkNonZero": "，缩小模式不能为 0",
+    "scaleHint": "{{requirement}}，整数范围 -32768～32767{{shrinking}}",
+    "offsetHint": "{{requirement}}，支持整数或小数",
+    "drawer": {
+      "close": "关闭设置数据编辑面板",
+      "title": "{{type}}：{{name}}",
+      "menuEdit": "菜单编辑",
+      "parameterEdit": "参数编辑",
+      "description": "编辑设置数据定义，不写入设备当前运行状态。",
+      "menuDefinition": "菜单定义",
+      "parameterDefinition": "参数定义"
+    },
+    "menu": "菜单",
+    "expandSidebar": "展开侧栏",
+    "collapseSidebar": "折叠侧栏",
+    "searchPlaceholder": "搜索菜单或参数，例如：开关、座椅、前进",
+    "menuTitle": "{{path}}｜参数 {{count}}",
+    "noMatchingMenus": "没有匹配的菜单或参数。可试试“开关”“座椅”“前进”“P/S”。",
+    "noMenus": "暂无可显示菜单",
+    "parameterCount": "{{count}} 个参数",
+    "readonlyCount": "{{count}} 个只读",
+    "booleanMonitorCount": "{{count}} 个 0/1 监测项",
+    "addMenu": "新增菜单",
+    "editMenu": "修改菜单",
+    "addParameter": "新增参数",
+    "deleteMenu": "删除菜单",
+    "booleanMonitorHelp": "此菜单包含只读开关监测项。0/1 表示设备上报的开关状态；本页可编辑名称、索引、位段、预处理等配置定义，不能直接写入当前状态。",
+    "columnView": "列视图",
+    "resetColumnWidths": "重置列宽",
+    "visibleColumns": "{{visible}} / {{total}} 列",
+    "selectedRows": "已选择 <strong>{{count}}</strong> 条",
+    "clearSelection": "清除选择",
+    "totalRows": "共 {{count}} 条",
+    "selectAllVisible": "选择当前显示的全部参数",
+    "resizeColumn": "调整{{column}}列宽",
+    "noMatchingParameters": "没有找到匹配的参数。可尝试搜索“开关”“座椅”“前进”“P/S”。",
+    "noParameters": "当前菜单下没有参数。请展开左侧其它菜单，或使用搜索查找具体参数。",
+    "openProjectFirst": "请先在项目管理中打开 .jcpro 项目文件，然后进入“设置数据”查看菜单和参数。",
+    "deleteParameterTitle": "删除参数",
+    "deleteSelectedParametersTitle": "删除已选参数",
+    "deleteParameterMessage": "确定要删除参数「{{name}}」吗？",
+    "deleteSelectedParametersMessage": "确定要删除已选的 {{count}} 个参数吗？此操作会同时移除其完整配置定义。",
+    "columns": {
+      "name": "参数名称",
+      "auth": "使用权限",
+      "protocol": "协议类型",
+      "frameId": "帧ID",
+      "mainIndex": "主索引",
+      "subIndex": "子索引",
+      "access": "读写权限",
+      "maxValue": "最大值",
+      "minValue": "最小值",
+      "defaultValue": "默认值",
+      "dataType": "数据类型",
+      "bitStart": "bit开始位置",
+      "bitLength": "bit长度",
+      "preprocess": "数据预处理",
+      "scale": "缩放值",
+      "offset": "偏移值",
+      "decimals": "保留小数",
+      "actions": "操作"
+    },
+    "columnPresets": {
+      "common": "常用",
+      "communication": "通信",
+      "values": "数值",
+      "processing": "位段处理",
+      "all": "全部"
+    },
+    "options": {
+      "menu": "菜单",
+      "parameter": "参数",
+      "normalUser": "普通用户",
+      "administrator": "管理员",
+      "superAdministrator": "超级管理员",
+      "readOnly": "只读",
+      "readWrite": "读写",
+      "writeOnly": "只写",
+      "no": "否",
+      "yes": "是"
+    },
+    "sections": {
+      "basic": "基础信息",
+      "communicationIndex": "通信索引",
+      "defaultsAndRange": "默认值与范围",
+      "settingEntry": "设置条目"
+    },
+    "fields": {
+      "name": "名称",
+      "type": "类型",
+      "permission": "权限",
+      "languageIndex": "语言索引",
+      "protocol": "协议",
+      "access": "读写",
+      "fid": "FID",
+      "mid": "MID",
+      "sid": "SID",
+      "useDefault": "使用默认值",
+      "useRange": "使用范围",
+      "maxValue": "最大值",
+      "minValue": "最小值",
+      "defaultValue": "默认值",
+      "dataType": "数据类型",
+      "bitStart": "bit开始位置",
+      "bitLength": "bit长度",
+      "preprocessing": "数据预处理",
+      "scale": "缩放值",
+      "offset": "偏移值",
+      "decimals": "保留小数"
+    },
+    "dataTypes": {
+      "u8": "8 位无符号整数",
+      "s8": "8 位有符号整数",
+      "u16": "16 位无符号整数",
+      "s16": "16 位有符号整数",
+      "u32": "32 位无符号整数",
+      "s32": "32 位有符号整数",
+      "string": "字符串",
+      "default4": "写入 4 字节默认数据",
+      "default2": "写入 2 字节默认数据",
+      "default1": "写入 1 字节默认数据",
+      "bits32": "32 位位段数据",
+      "bits16": "16 位位段数据",
+      "bits8": "8 位位段数据"
+    },
+    "preprocessing": {
+      "raw": "不进行缩放或偏移",
+      "shrink": "按缩放值缩小",
+      "expand": "按缩放值放大",
+      "offset": "只应用偏移值",
+      "shrinkOffset": "先缩小，再偏移",
+      "expandOffset": "先放大，再偏移",
+      "offsetShrink": "先偏移，再缩小",
+      "offsetExpand": "先偏移，再放大"
+    }
+  },
+  "realtimeData": {
+    "globalParameters": "全局变量",
+    "add": "新增",
+    "parameterId": "参数ID",
+    "reserved": "保留",
+    "reservedValue": "保留值",
+    "internalVariable": "内部变量",
+    "globalFieldAria": "全局变量 {{index}} {{field}}",
+    "conditions": "条件表",
+    "processingMethod": "处理方式",
+    "addInput": "新增输入",
+    "deleteCondition": "删除条件",
+    "inputParameter": "输入参数",
+    "drawer": {
+      "close": "关闭高级配置编辑面板",
+      "title": "高级 CANopen 参数",
+      "description": "编辑全局变量和条件表，同时保留主区域的帧/协议上下文。",
+      "closeParameters": "关闭高级 CANopen 参数面板",
+      "categories": "高级 CANopen 参数分类"
+    },
+    "receiveTable": "接收表",
+    "sendTable": "发送表",
+    "menuReceive": "菜单->接收表",
+    "menuSend": "菜单->发送表",
+    "heading": "{{table}}（{{mode}}）",
+    "simpleConfiguration": "简化配置",
+    "advancedConfiguration": "高级配置",
+    "addFrameId": "新增帧ID",
+    "addProtocol": "新增协议",
+    "addGlobalParameter": "新增全局变量",
+    "addCondition": "新增条件",
+    "frameId": "帧ID",
+    "frameDescription": "帧描述",
+    "dataItems": "数据项",
+    "frameFieldAria": "{{direction}}帧 {{index}} {{field}}",
+    "parameterName": "参数名称",
+    "readMethod": "读取方式",
+    "parameterIndex": "参数索引",
+    "signalFieldAria": "信号 {{index}} {{field}}",
+    "readMethods": {
+      "bytes": "按照字节取数据",
+      "bytesBits": "按照字节+bit位取数据",
+      "bits": "按照bit位取数据"
+    },
+    "selectOrAddFrame": "请选择或新增 PDO 帧",
+    "globalCount": "全局变量 {{count}} 项",
+    "conditionCount": "条件 {{count}} 项",
+    "currentFrameList": "当前：帧列表",
+    "currentProtocol": "当前：{{id}} 协议",
+    "manageGlobals": "管理全局变量",
+    "manageConditions": "管理条件表",
+    "advancedFrameFieldAria": "{{direction}}高级帧 {{index}} {{field}}",
+    "position": "位置",
+    "length": "长度",
+    "displayType": "显示类型",
+    "handler": "句柄",
+    "handlerParameter": "句柄参数",
+    "advancedSignalFieldAria": "高级信号 {{index}} {{field}}",
+    "selectOrAddAdvancedFrame": "请选择或新增高级 PDO 帧"
+  },
+  "canTestData": {
+    "title": "CAN 测试数据构建",
+    "description": "从当前项目 PDO/锂电配置中提取 CAN 帧，生成测试数据并导出为 TXT 文件。",
+    "summary": {
+      "frames": "已生成帧",
+      "testCases": "测试用例",
+      "signals": "信号覆盖",
+      "settingEntries": "设置条目",
+      "defaultCycle": "默认周期"
+    },
+    "fields": {
+      "profile": "生成模式",
+      "defaultCycleMs": "默认周期(ms)",
+      "currentCase": "当前用例"
+    },
+    "profiles": {
+      "smoke": "快速冒烟",
+      "boundary": "边界覆盖",
+      "fault": "异常注入",
+      "regression": "全量回归"
+    },
+    "actions": {
+      "generating": "生成中...",
+      "generate": "生成",
+      "exportTxt": "导出纯帧 TXT",
+      "exportCsv": "导出 CSV",
+      "importConfig": "导入配置",
+      "exportConfig": "导出说明 JSON"
+    },
+    "coverage": {
+      "scenarios": "场景：{{value}}",
+      "none": "无",
+      "generatedFrames": "帧次：{{count}}",
+      "generatedSettingEntries": "设置条目次：{{count}}"
+    },
+    "warnings": {
+      "more": "还有 {{count}} 条警告，已写入导出配置。"
+    },
+    "settingTable": {
+      "item": "设置项",
+      "menuPath": "菜单路径",
+      "frameId": "帧ID",
+      "index": "主索引",
+      "subindex": "子索引",
+      "access": "权限",
+      "type": "类型",
+      "position": "位置",
+      "role": "角色",
+      "testValue": "测试值",
+      "range": "范围"
+    },
+    "signalFill": {
+      "label": "信号填充：",
+      "min": "最小值",
+      "minTitle": "所有信号填最小值 0",
+      "max": "最大值",
+      "maxTitle": "所有信号填最大值（对应位宽全 1）",
+      "random": "随机值",
+      "randomTitle": "所有信号填随机值",
+      "zero": "清零",
+      "zeroTitle": "所有信号填 0",
+      "ff": "全 FF",
+      "ffTitle": "所有信号原始值填 FF"
+    },
+    "frame": {
+      "type": "类型",
+      "standard": "标准帧",
+      "extended": "扩展帧",
+      "name": "名称",
+      "scenario": "场景",
+      "source": "来源",
+      "cycleMs": "周期(ms)"
+    },
+    "signalTable": {
+      "name": "信号名称",
+      "value": "值",
+      "unit": "单位",
+      "position": "位置",
+      "length": "长度",
+      "scale": "缩放",
+      "offset": "偏移",
+      "range": "范围",
+      "role": "角色",
+      "rawValue": "原始值"
+    },
+    "empty": "点击“生成测试数据”从项目配置中构建 CAN 测试数据",
+    "openProjectFirst": "请先在项目管理中打开 .jcpro 项目文件",
+    "generatedStatus": "已生成 {{cases}} 个用例、{{frames}} 帧、{{entries}} 个设置条目",
+    "viewingCase": "正在查看 {{id}} · {{title}}",
+    "fillStatus": {
+      "zero": "已将所有信号清零",
+      "min": "已将所有信号设为最小值",
+      "max": "已将所有信号设为最大值",
+      "random": "已为所有信号生成随机值",
+      "ff": "已将所有信号原始值设为 FF"
+    },
+    "manualCaseTitle": "当前手动帧",
+    "generateFirst": "请先生成 CAN 测试数据。",
+    "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
+    "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
+    "textFileFilter": "CAN 测试纯帧",
+    "csvFileFilter": "CAN 测试数据",
+    "configFileFilter": "CAN 测试说明",
+    "exported": "已导出：{{path}}",
+    "exportedCsv": "CSV 已导出：{{path}}",
+    "exportedConfig": "说明配置已导出：{{path}}",
+    "noValidFrames": "配置文件中没有有效的 CAN 帧。",
+    "importedFrames": "已导入 {{count}} 帧"
+  },
+  "faultCode": {
+    "title": "故障代码",
+    "openProjectDescription": "打开项目后可编辑故障来源帧、故障码和多语言文案绑定。",
+    "description": "配置会随项目导出写入 data.bin，设备端优先读取动态配置。",
+    "enabled": "启用",
+    "disabled": "停用",
+    "severity": {
+      "info": "信息",
+      "warning": "警告",
+      "fault": "故障",
+      "critical": "严重"
+    },
+    "meta": {
+      "schemaVersion": "结构版本",
+      "binaryVersion": "二进制版本",
+      "sourceCount": "来源数量",
+      "codeCount": "故障码数量"
+    },
+    "sourceRules": {
+      "title": "来源规则",
+      "enabled": "启用",
+      "key": "来源 Key",
+      "name": "名称",
+      "id": "来源 ID",
+      "type": "类型",
+      "frameType": "帧类型",
+      "codeByte": "取码字节",
+      "clearCode": "清除码",
+      "invalidCodes": "无效码"
+    },
+    "actions": {
+      "addSource": "新增来源",
+      "exportCsv": "导出 CSV",
+      "importCsv": "导入 CSV",
+      "column": "操作"
+    },
+    "frameTypes": {
+      "standard": "标准帧",
+      "extended": "扩展帧"
+    },
+    "batch": {
+      "title": "批量管理",
+      "source": "复制来源",
+      "target": "目标来源",
+      "copy": "批量复制",
+      "currentFilter": "当前筛选：",
+      "allSources": "全部来源 {{count}} 条",
+      "filteredSource": "{{source}} {{count}} 条",
+      "translationKey": "翻译 Key",
+      "independentKey": "创建独立翻译 Key",
+      "sharedKey": "复用原翻译 Key",
+      "completeKeys": "补齐 Key/i18n",
+      "enable": "批量启用",
+      "disable": "批量禁用",
+      "deleteFiltered": "删除筛选项"
+    },
+    "codes": {
+      "title": "故障码",
+      "source": "来源",
+      "allSources": "全部来源 ({{count}})",
+      "add": "新增故障码",
+      "enabled": "启用",
+      "type": "类型",
+      "codeByte": "取码字节",
+      "severity": "等级",
+      "messageKey": "文案 Key",
+      "zhText": "中文文案",
+      "emptyForSource": "当前来源下没有故障码"
+    },
+    "readonly": {
+      "canId": "CAN ID 由来源规则决定",
+      "type": "类型由来源规则决定",
+      "codeByte": "取码字节由来源规则决定"
+    },
+    "clone": {
+      "noOtherSources": "无其他来源",
+      "copyToSource": "复制到来源"
+    },
+    "i18n": {
+      "searchPlaceholder": "搜索 i18n key / 文案",
+      "clearSearch": "清空搜索",
+      "clear": "清空",
+      "noEntries": "暂无可绑定 i18n",
+      "focusToSelect": "聚焦选择已有 i18n",
+      "noMatches": "无匹配 i18n",
+      "selectExisting": "选择已有 i18n",
+      "addEntryFirst": "请先在语言表中添加条目",
+      "matchCount": "{{matched}}/{{total}} 个匹配{{limited}}",
+      "limited": "，仅显示前 {{count}} 个"
+    },
+    "duplicates": {
+      "code": "{{canId}} 下故障码 {{code}} 重复 {{count}} 次",
+      "messageKey": "文案 Key “{{key}}”重复 {{count}} 次",
+      "row": "{{source}} 来源下已存在相同故障码",
+      "messageKeyRow": "已存在相同文案 Key"
+    },
+    "aria": {
+      "sourceEnabled": "来源 {{index}} 启用",
+      "sourceKey": "来源 {{index}} Key",
+      "sourceName": "来源 {{index}} 名称",
+      "sourceId": "来源 {{index}} ID",
+      "sourceType": "来源 {{index}} 类型字符",
+      "sourceCanId": "来源 {{index}} CAN ID",
+      "sourceFrameType": "来源 {{index}} 帧类型",
+      "sourceCodeByte": "来源 {{index}} 取码字节",
+      "sourceClearCode": "来源 {{index}} 清除码",
+      "sourceInvalidCodes": "来源 {{index}} 无效码",
+      "codeEnabled": "故障码 {{index}} 启用",
+      "codeSource": "故障码 {{index}} 来源",
+      "codeValue": "故障码 {{index}} Code",
+      "codeSeverity": "故障码 {{index}} 等级",
+      "i18nSearch": "故障码 {{index}} 搜索 i18n",
+      "i18nBinding": "故障码 {{index}} 绑定 i18n",
+      "messageKey": "故障码 {{index}} 文案 Key",
+      "zhText": "故障码 {{index}} 中文文案",
+      "cloneTarget": "故障码 {{index}} 复制目标来源"
+    },
+    "confirmDelete": {
+      "title": "删除筛选结果？",
+      "message": "将删除当前筛选范围内的 {{count}} 条故障码。保存项目后此操作将无法撤销。",
+      "confirm": "删除 {{count}} 条"
+    },
+    "status": {
+      "selectCopySources": "请选择要复制的来源和目标来源",
+      "copySourcesMustDiffer": "批量复制的来源和目标来源不能相同",
+      "noCopyableCodes": "没有可复制的故障码，已跳过 {{count}} 条目标来源已存在的故障码",
+      "copiedCodes": "已从 {{source}} 复制 {{count}} 条到 {{target}}{{keyMode}}{{skipped}}",
+      "keyMode": {
+        "shared": "，复用原翻译 Key",
+        "independent": "，已创建独立翻译 Key"
+      },
+      "skippedDuplicates": "，跳过 {{count}} 条重复故障码",
+      "noCodesToComplete": "当前筛选范围内没有故障码可补齐",
+      "completedCodes": "已补齐当前筛选范围 {{count}} 条故障码的来源参数、文案 Key 和 i18n 条目{{changed}}",
+      "changedCodes": "，其中 {{count}} 条发生字段更新",
+      "noCodesToUpdate": "当前筛选范围内没有故障码可操作",
+      "updatedEnabled": "已{{state}}当前筛选范围 {{count}} 条故障码",
+      "noCodesToDelete": "当前筛选范围内没有故障码可删除",
+      "deletedCodes": "已删除当前筛选范围 {{count}} 条故障码",
+      "selectCloneTarget": "请先选择要复制到的故障来源",
+      "cloneTargetMustDiffer": "目标来源不能与当前来源相同",
+      "targetAlreadyHasCode": "{{target}} 已存在故障码 {{code}}",
+      "clonedCode": "已将故障码 {{code}} 复制到 {{target}}",
+      "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
+      "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
+      "sourcesExported": "来源规则 CSV 已导出：{{path}}",
+      "sourcesImportError": "导入来源规则 CSV 出错：{{errors}}",
+      "sourcesImported": "已导入 {{count}} 条来源规则",
+      "codesExported": "故障码 CSV 已导出：{{path}}",
+      "codesImportError": "导入故障码 CSV 出错：{{errors}}",
+      "codesImported": "已导入 {{count}} 条故障码，并同步多语言文案"
+    },
+    "filters": {
+      "sourcesCsv": "故障来源 CSV",
+      "codesCsv": "故障码 CSV"
+    }
+  },
+  "batteryMonitor": {
+    "title": "锂电监控协议",
+    "description": "帧、解析规则、显示项和多语言名称均从 battery_monitor 单一配置段维护。",
+    "enabled": "启用",
+    "disabled": "停用",
+    "enableTitle": "启用或停用锂电监控协议",
+    "summary": {
+      "status": "状态",
+      "framesSignals": "帧 / 信号",
+      "enabledItems": "启用显示项",
+      "configSection": "配置段"
+    },
+    "fields": {
+      "defaultTimeout": "默认超时 tick",
+      "pageSize": "每页数量"
+    },
+    "actions": {
+      "exporting": "导出中...",
+      "importing": "导入中...",
+      "exportJson": "导出 JSON",
+      "importJson": "导入 JSON",
+      "exportFramesCsv": "导出帧 CSV",
+      "importFramesCsv": "导入帧 CSV",
+      "exportSignalsCsv": "导出信号 CSV",
+      "importSignalsCsv": "导入信号 CSV",
+      "exportItemsCsv": "导出显示项 CSV",
+      "importItemsCsv": "导入显示项 CSV",
+      "exportDbc": "导出 DBC",
+      "importDbc": "导入 DBC",
+      "addFrame": "新增帧",
+      "addSignal": "新增信号",
+      "addItem": "新增显示项",
+      "column": "操作"
+    },
+    "frames": {
+      "title": "CAN 帧（{{count}}）",
+      "type": "类型",
+      "description": "描述",
+      "timeout": "超时 tick"
+    },
+    "signals": {
+      "title": "信号解析规则（{{count}}）"
+    },
+    "items": {
+      "title": "页面显示项（{{count}}）",
+      "enabled": "启用",
+      "order": "顺序",
+      "signal": "信号",
+      "zhName": "中文名称",
+      "unit": "单位",
+      "format": "格式",
+      "offset": "偏移",
+      "scale": "缩放分子 / 分母",
+      "decimals": "小数",
+      "validity": "有效帧 / 超时",
+      "frameTimeout": "帧超时"
+    },
+    "frameTypes": {
+      "standard": "标准帧",
+      "extended": "扩展帧"
+    },
+    "byteOrder": {
+      "little": "小端",
+      "big": "大端"
+    },
+    "rawTypes": {
+      "u8": "U8",
+      "u16Le": "U16 LE",
+      "u32Le": "U32 LE",
+      "datetimeYmdhms": "年月日时分秒"
+    },
+    "valueTypes": {
+      "u8": "U8",
+      "u16": "U16",
+      "u32": "U32",
+      "f32": "F32",
+      "datetime": "日期时间"
+    },
+    "signalHeaders": {
+      "signalKey": "信号标识",
+      "paramId": "参数标识",
+      "name": "信号名称",
+      "frame": "所属 CAN 帧",
+      "posLen": "起始位 / 位长度",
+      "rawOffset": "原始字节偏移",
+      "rawType": "原始数据类型",
+      "valueType": "解析值类型",
+      "byteOrder": "数据字节序",
+      "resolution": "解析倍率",
+      "offset": "解析偏移",
+      "mask": "位掩码",
+      "shift": "位移"
+    },
+    "formatters": {
+      "linear": "线性",
+      "boolText": "布尔文本",
+      "hex": "十六进制",
+      "datetime": "日期时间"
+    },
+    "kinds": {
+      "frames": "帧",
+      "signals": "信号",
+      "items": "显示项"
+    },
+    "filters": {
+      "protocolJson": "锂电监控协议配置",
+      "framesCsv": "帧 CSV",
+      "signalsCsv": "信号 CSV",
+      "itemsCsv": "显示项 CSV",
+      "dbc": "DBC 文件"
+    },
+    "status": {
+      "openProjectFirst": "请先打开 .jcpro 项目。",
+      "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
+      "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
+      "exported": "已导出：{{path}}",
+      "invalidProtocol": "无效的锂电监控协议配置文件，必须同时包含 frames、signals、items。",
+      "importedProtocol": "已导入 {{frames}} 帧 / {{signals}} 信号 / {{items}} 显示项",
+      "csvExported": "{{kind}} CSV 已导出：{{path}}",
+      "csvImportError": "导入{{kind}} CSV 出错：{{errors}}",
+      "csvImported": "已导入 {{count}} {{kind}}",
+      "dbcImportError": "导入 DBC 出错：{{errors}}",
+      "dbcNoMessages": "DBC 文件中未找到任何消息。",
+      "dbcImported": "已导入 {{frames}} 帧 / {{signals}} 信号",
+      "noFramesToExport": "没有帧可导出。",
+      "dbcExported": "DBC 已导出：{{path}}"
+    },
+    "openProjectFirst": "请先在项目管理中打开 .jcpro 项目文件"
+  },
+  "uiCanvas": {
+    "title": "UI 资源编辑",
+    "resourceEntries": "资源条目",
+    "resources": "UI资源",
+    "itemCount": "{{count}} 项",
+    "optionCount": "{{count}} 选项",
+    "handle": {
+      "staticImage": "静态图片",
+      "stateList": "状态列表",
+      "frameAnimation": "帧动画",
+      "unknown": "未知类型"
+    },
+    "option": "选项 {{index}}",
+    "frames": "{{count}} 帧",
+    "collapseResources": "折叠 UI资源",
+    "expandResources": "展开 UI资源",
+    "collapseMain": "折叠 main",
+    "expandMain": "展开 main",
+    "mainEmpty": "main 下暂无资源项",
+    "imageLoadFailed": "图片加载失败：{{source}}",
+    "imageLoadFailedShort": "图片加载失败",
+    "noPreview": "无预览",
+    "openProjectToShow": "打开项目后显示 UI 资源",
+    "resourceOptions": "资源选项",
+    "defaultOption": "默认",
+    "deleteOption": "删除 {{option}}",
+    "noOptions": "当前资源暂无选项",
+    "basicInfo": "基本信息",
+    "type": "类型",
+    "optionCountLabel": "选项数",
+    "exportTarget": "导出目标",
+    "notConfigured": "未配置",
+    "geometry": "坐标尺寸",
+    "xCoordinate": "X 坐标",
+    "yCoordinate": "Y 坐标",
+    "width": "宽度",
+    "height": "高度",
+    "protocolLink": "协议关联",
+    "jumpToPdo": "跳转到 PDO 参数 {{index}}",
+    "noPdoLink": "当前资源未配置 PDO 参数关联。",
+    "applying": "写回中...",
+    "apply": "应用到项目文档",
+    "newOptionSources": "新增资源路径（每行一个）",
+    "animationAddUnsupported": "动画资源新增需后端扩展",
+    "selectImages": "选择图片",
+    "addOption": "新增选项",
+    "deleteDefaultOption": "删除默认选项",
+    "animationNote": "动画资源当前支持展示、切换默认项和删除；新增动画选项需扩展后端请求结构。",
+    "selectResourceToEdit": "点击左侧树或画布中的资源项进行编辑"
+  },
+  "projectLifecycle": {
+    "newProjectName": "新建项目",
+    "unsavedChanges": "存在未保存修改",
+    "actions": {
+      "newProject": "创建新项目",
+      "openOther": "打开其他项目",
+      "reload": "重新加载项目"
+    },
+    "confirmDiscard": {
+      "title": "放弃未保存修改？",
+      "message": "当前项目存在未保存修改。{{action}}会放弃这些修改，且无法撤销。",
+      "confirm": "放弃并{{action}}",
+      "cancel": "继续编辑"
+    },
+    "filters": {
+      "project": "项目文件",
+      "refactor": "重构配置 JSON"
+    },
+    "status": {
+      "autoMounted": "已自动挂载：{{path}}",
+      "noRefactorConfig": "未挂载重构配置 JSON；修改重构专属配置时会提示创建 sidecar。",
+      "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
+      "desktopFilePickerOnly": "系统文件选择器只能在桌面应用中使用；也可以粘贴项目路径后打开。",
+      "parseFailed": "项目解析存在问题",
+      "migrated": "已规范化：{{version}}",
+      "refactorWritten": "已写回重构配置：{{path}}",
+      "refactorWrittenProject": "重构专属配置已写回：{{path}}；原 .jcpro 不会写入这些字段。",
+      "legacyRefactorSaveAs": "旧 .jcpro 的重构配置需要另存为 JSON；系统保存对话框只能在 Tauri 桌面应用中使用。",
+      "mounted": "已挂载：{{path}}",
+      "refactorSavedAs": "重构专属配置已另存为：{{path}}；原 .jcpro 不会写入这些字段。",
+      "noFormatPath": "当前项目没有可格式化的文件路径。",
+      "formatJcproOnly": "手动格式化仅支持 .jcpro JSON 配置文件。",
+      "saveBeforeFormat": "请先保存当前项目配置，再格式化磁盘上的 .jcpro 文件。",
+      "desktopFormatOnly": "jcpro 文件格式化只能在 Tauri 桌面应用中使用。",
+      "alreadyFormatted": "当前 .jcpro 文件已经是格式化 JSON。",
+      "formatted": "已格式化 jcpro JSON：{{path}}",
+      "savedWithRefactor": "已保存 .jcpro 兼容段，并已导出重构专属 JSON。",
+      "saved": "已保存",
+      "saveAsSamePath": "另存为目标不能与当前项目路径相同。",
+      "refactorSavedAsNoJcpro": "重构专属配置已另存为：{{path}}；当前 .jcpro 未写入新字段。",
+      "savedAs": "已另存为：{{path}}（已复制 {{copied}} 个资源{{warnings}}）",
+      "warningCount": "，{{count}} 个警告"
+    }
+  },
+  "projectGit": {
+    "defaultCommitMessage": "更新项目配置",
+    "localRepository": "本地仓库",
+    "errors": {
+      "saveBeforeCommit": "请先保存当前项目配置，再创建 Git 版本。",
+      "noEditableProject": "当前没有可编辑的 Git 项目。",
+      "reviewReadOnly": "历史版本仅供查看，不能编辑。",
+      "resolveUnsaved": "请先保存或恢复主编辑器中的修改。"
+    },
+    "status": {
+      "committed": "已保存 Git 版本 {{hash}}：{{subject}}",
+      "worktreeSaved": "已保存工作区文件：{{path}}"
+    },
+    "confirmRestore": {
+      "title": "放弃未保存修改？",
+      "message": "恢复历史版本会替换当前未保存修改，且无法撤销。",
+      "confirm": "放弃并恢复",
+      "cancel": "继续编辑"
+    }
+  },
+  "projectExport": {
+    "title": "项目导出",
+    "description": "生成项目资源、配置 JSON 和设备二进制，并检查导出结果。",
+    "openDirectory": "打开导出目录",
+    "openDirectoryShort": "打开目录",
+    "basePath": "项目目录",
+    "selectBasePath": "选择目录",
+    "folderName": "导出文件夹",
+    "jsonFilename": "JSON 文件名",
+    "binFilename": "二进制文件名",
+    "restoreDefaultNames": "恢复默认名称",
+    "restoreAllDefaults": "恢复全部默认值",
+    "writeControls": {
+      "title": "写入控制",
+      "description": "分别控制配置段和二进制文件是否写入导出包。",
+      "restoreAllDefaults": "恢复全部默认值",
+      "item": "项目段",
+      "writeConfig": "写入配置",
+      "writeBin": "写入二进制",
+      "batteryDescription": "锂电监控协议",
+      "batteryConfigAria": "写入锂电监控配置",
+      "configFile": "配置文件",
+      "batteryBinAria": "写入锂电监控二进制",
+      "binFile": "二进制文件",
+      "faultCodes": "故障码",
+      "faultDescription": "故障代码配置",
+      "faultConfigAria": "写入故障码配置",
+      "faultBinAria": "写入故障码二进制"
+    },
+    "result": {
+      "title": "导出结果",
+      "binarySizeCrc": "二进制大小 / CRC"
+    },
+    "imageCopy": "UI 图片复制",
+    "exportRoot": "导出根目录",
+    "jsonFile": "JSON 文件",
+    "binFile": "二进制文件",
+    "tools": {
+      "title": "导出工具",
+      "copyImages": "复制 UI 图片",
+      "binaryReport": "生成二进制报告",
+      "compareBin": "对比二进制",
+      "referenceCompare": "参考二进制对比"
+    },
+    "copyCount": "复制资源数",
+    "size": "大小",
+    "languageCount": "语言数量",
+    "generatedReferenceSize": "生成文件大小",
+    "firstDiffOffset": "首个差异偏移",
+    "generatedReferenceByte": "生成文件字节",
+    "filters": {
+      "binary": "设备二进制"
+    },
+    "errors": {
+      "uiCopy": "UI 图片复制存在问题",
+      "binaryBuild": "二进制构建报告存在问题",
+      "binaryMismatch": "新旧二进制不一致",
+      "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
+      "desktopDirectoryPickerOnly": "系统目录选择器只能在 Tauri 桌面应用中使用。"
+    }
+  },
+  "translationSettings": {
+    "browserNotSaved": "浏览器预览不会保存翻译凭据。",
+    "legacyMigrated": "旧翻译凭据已迁移到系统凭据库。",
+    "saved": "翻译凭据已安全保存。",
+    "deleted": "翻译凭据已从系统凭据库删除。",
+    "browserCleared": "浏览器预览中的输入已清空。"
+  },
+  "uiResource": {
+    "filters": {
+      "images": "图片资源"
+    },
+    "status": {
+      "applyFailed": "UI 资源写回失败",
+      "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
+      "addOptionFailed": "UI 资源选项新增失败",
+      "removeOptionFailed": "UI 资源选项删除失败",
+      "parsing": "正在解析 UI 资源..."
+    }
+  },
+  "recoveryDraft": {
+    "persistenceError": "无法访问恢复草稿；请及时手动保存项目。{{detail}}",
+    "deleteFailed": "无法删除恢复草稿，请重试。"
+  },
+  "diagnostics": {
+    "filters": {
+      "report": "诊断报告"
+    },
+    "status": {
+      "desktopOnly": "诊断报告只能在 Tauri 桌面应用中导出。",
+      "exported": "诊断报告已导出：{{path}}",
+      "exportedLog": "诊断报告已导出"
+    }
+  },
+  "updater": {
+    "errors": {
+      "invalidSignature": "更新签名配置无效，请联系软件维护人员。",
+      "noRelease": "当前更新通道尚未发布可用版本。",
+      "network": "无法连接更新服务，请检查网络后重试。",
+      "checkFailed": "检查更新失败",
+      "desktopOnly": "当前环境不是 Tauri 桌面应用，无法安装更新。"
+    }
+  }
+}

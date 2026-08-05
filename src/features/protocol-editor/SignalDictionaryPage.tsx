@@ -1,4 +1,5 @@
 import { ListTree } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { SignalDefinition } from '../../types/platform';
@@ -11,6 +12,7 @@ interface SignalDictionaryPageProps {
 }
 
 export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDictionaryPageProps) {
+  const { t } = useTranslation();
   const {
     loaded: loadedProject,
     signalDictionary: currentSignalDictionary,
@@ -31,11 +33,8 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
     <section className="project-open-card">
       <div className="config-table-toolbar">
         <div>
-          <h2>业务信号字典</h2>
-          <p>
-            从旧版 SDO、PDO 和锂电配置派生业务
-            Signal，集中查看数据类型、单位、缩放和旧系统变量索引。
-          </p>
+          <h2>{t('protocol.signalDictionary.title')}</h2>
+          <p>{t('protocol.signalDictionary.description')}</p>
         </div>
         <div className="sample-actions">
           <button
@@ -43,17 +42,21 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
             onClick={() => void refreshUnifiedProtocol()}
             type="button"
           >
-            {isParsingUnifiedProtocol ? '解析中...' : '刷新字典'}
+            {t(
+              isParsingUnifiedProtocol
+                ? 'protocol.common.parsing'
+                : 'protocol.signalDictionary.refresh',
+            )}
           </button>
           <button disabled={!loadedProject} onClick={addSignalDefinition} type="button">
-            新增 Signal
+            {t('protocol.signalDictionary.addSignal')}
           </button>
           <button
             disabled={!loadedProject || !unifiedProtocol}
             onClick={restoreSignalDictionaryFromUnified}
             type="button"
           >
-            从旧配置派生
+            {t('protocol.common.deriveFromLegacy')}
           </button>
         </div>
       </div>
@@ -66,11 +69,11 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
         <>
           <div className="project-open-report">
             <article>
-              <span>Signal 总数</span>
+              <span>{t('protocol.signalDictionary.signalCount')}</span>
               <strong>{currentSignalDictionary.signals.length}</strong>
             </article>
             <article>
-              <span>CANopen PDO 映射</span>
+              <span>{t('protocol.signalDictionary.pdoMappings')}</span>
               <strong>
                 {unifiedProtocol.canopen.pdo_recv.reduce(
                   (total, frame) => total + frame.mappings.length,
@@ -83,11 +86,11 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
               </strong>
             </article>
             <article>
-              <span>SDO 对象</span>
+              <span>{t('protocol.signalDictionary.sdoObjects')}</span>
               <strong>{unifiedProtocol.canopen.sdo_objects.length}</strong>
             </article>
             <article>
-              <span>私有协议帧</span>
+              <span>{t('protocol.signalDictionary.privateFrames')}</span>
               <strong>{currentPrivateProtocol.frames.length}</strong>
             </article>
           </div>
@@ -96,14 +99,14 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
               <thead>
                 <tr>
                   <th>Signal ID</th>
-                  <th>名称</th>
-                  <th>类型</th>
-                  <th>单位</th>
-                  <th>缩放</th>
-                  <th>默认值</th>
-                  <th>旧索引</th>
-                  <th>来源</th>
-                  <th>操作</th>
+                  <th>{t('protocol.common.name')}</th>
+                  <th>{t('protocol.common.type')}</th>
+                  <th>{t('protocol.signalDictionary.unit')}</th>
+                  <th>{t('protocol.signalDictionary.scale')}</th>
+                  <th>{t('protocol.signalDictionary.defaultValue')}</th>
+                  <th>{t('protocol.signalDictionary.legacyIndex')}</th>
+                  <th>{t('protocol.signalDictionary.source')}</th>
+                  <th>{t('protocol.common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -253,7 +256,7 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
                         onClick={() => removeSignalDefinition(signalIndex)}
                         type="button"
                       >
-                        删除
+                        {t('protocol.common.delete')}
                       </button>
                     </td>
                   </tr>
@@ -263,7 +266,7 @@ export function SignalDictionaryPage({ controller, isModifiedPath }: SignalDicti
           </div>
         </>
       ) : (
-        <EmptyState icon={ListTree}>请先打开项目并刷新业务信号字典。</EmptyState>
+        <EmptyState icon={ListTree}>{t('protocol.signalDictionary.empty')}</EmptyState>
       )}
     </section>
   );

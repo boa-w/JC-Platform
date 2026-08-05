@@ -26,6 +26,6 @@ export function getTestData(type: TestDataType): TestDataResult {
 }
 
 export { batteryMonitorTestData } from './battery-monitor';
-export { type TestDataType, testDataLabels } from './metadata';
+export { type TestDataType, testDataLabelKeys } from './metadata';
 export { pdoAdvancedTestData } from './pdo-advanced';
 export { pdoSimpleTestData } from './pdo-simple';

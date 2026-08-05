@@ -3561,41 +3561,6 @@ button.git-summary-row:disabled,
   padding-right: 34px;
 }
 
-/* ── Table Format Reference ── */
-
-.table-format-ref {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  background: var(--surface-subtle);
-}
-
-.table-format-ref strong {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
-.table-format-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.table-format-chip {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--surface-panel);
-  border: 1px solid var(--border-default);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
 /* ── Table IO Result ── */
 
 .table-io-result {

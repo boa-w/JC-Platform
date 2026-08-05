@@ -26,10 +26,10 @@ export type ModuleLifecycle = 'stable' | 'experimental' | 'deprecated' | 'experi
 
 export interface FeatureModule {
   key: NavigationKey;
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
   lifecycle?: ModuleLifecycle;
-  lifecycleReason?: string;
+  lifecycleReasonKey?: string;
 }
 
 export interface BackendHealth {

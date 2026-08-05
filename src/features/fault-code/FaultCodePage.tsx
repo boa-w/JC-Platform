@@ -1,5 +1,6 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { loadTextFile, saveTextFile } from '../../api/commands';
 import { ConfirmDialogHost } from '../../components/ConfirmDialog';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -54,10 +55,10 @@ interface FaultCodePageProps {
 }
 
 const severityOptions = [
-  { value: 'info', label: '信息' },
-  { value: 'warning', label: '警告' },
-  { value: 'fault', label: '故障' },
-  { value: 'critical', label: '严重' },
+  { value: 'info', labelKey: 'faultCode.severity.info' },
+  { value: 'warning', labelKey: 'faultCode.severity.warning' },
+  { value: 'fault', labelKey: 'faultCode.severity.fault' },
+  { value: 'critical', labelKey: 'faultCode.severity.critical' },
 ];
 
 type BatchCopyI18nMode = 'independent' | 'shared';
@@ -79,6 +80,7 @@ function fallbackFaultCodeRowKey(item: FaultCodeItem) {
 }
 
 export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePageProps) {
+  const { t } = useTranslation();
   const [csvStatus, setCsvStatus] = useState<string | null>(null);
   const [isCsvBusy, setIsCsvBusy] = useState(false);
   const document = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
@@ -109,6 +111,21 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   const duplicateMessageKeys = useMemo(
     () => buildDuplicateMessageKeyHints(codes, messageKeyDraftByRow),
     [codes, messageKeyDraftByRow],
+  );
+  const duplicateMessages = useMemo(
+    () => [
+      ...duplicateFaultCodes.duplicateGroups.map((group) =>
+        t('faultCode.duplicates.code', {
+          canId: hexOrDecimal(group.canId),
+          code: group.code,
+          count: group.count,
+        }),
+      ),
+      ...duplicateMessageKeys.duplicateGroups.map((group) =>
+        t('faultCode.duplicates.messageKey', { key: group.key, count: group.count }),
+      ),
+    ],
+    [duplicateFaultCodes, duplicateMessageKeys, t],
   );
   const i18nKeys = useMemo(() => languageEntryKeys(language), [language]);
   const sourceFilterKeys = useMemo(() => new Set(sources.map(sourceKeyFor)), [sources]);
@@ -390,11 +407,11 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     const source = sources.find((item) => sourceKeyFor(item) === batchSourceKey);
     const target = sources.find((item) => sourceKeyFor(item) === batchTargetSourceKey);
     if (!source || !target) {
-      setCsvStatus('请选择要复制的来源和目标来源');
+      setCsvStatus(t('faultCode.status.selectCopySources'));
       return;
     }
     if (sourceKeyFor(source) === sourceKeyFor(target)) {
-      setCsvStatus('批量复制的来源和目标来源不能相同');
+      setCsvStatus(t('faultCode.status.copySourcesMustDiffer'));
       return;
     }
 
@@ -436,23 +453,27 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     }
 
     if (newCodes.length === 0) {
-      setCsvStatus(`没有可复制的故障码，已跳过 ${skipped} 条目标来源已存在的故障码`);
+      setCsvStatus(t('faultCode.status.noCopyableCodes', { count: skipped }));
       return;
     }
 
     clearFaultCodeRowDrafts();
     updateFaultCode({ ...faultCode, codes: [...codes, ...newCodes] }, nextLanguage);
     setCsvStatus(
-      `已从 ${sourceOptionLabel(source)} 复制 ${newCodes.length} 条到 ${sourceOptionLabel(target)}${
-        batchCopyI18nMode === 'shared' ? '，复用原翻译 Key' : '，已创建独立翻译 Key'
-      }${skipped > 0 ? `，跳过 ${skipped} 条重复故障码` : ''}`,
+      t('faultCode.status.copiedCodes', {
+        source: sourceOptionLabel(source),
+        target: sourceOptionLabel(target),
+        count: newCodes.length,
+        keyMode: t(`faultCode.status.keyMode.${batchCopyI18nMode}`),
+        skipped: skipped > 0 ? t('faultCode.status.skippedDuplicates', { count: skipped }) : '',
+      }),
     );
   }
 
   function batchEnsureVisibleKeys() {
     const indexes = new Set(visibleCodeIndexes());
     if (indexes.size === 0) {
-      setCsvStatus('当前筛选范围内没有故障码可补齐');
+      setCsvStatus(t('faultCode.status.noCodesToComplete'));
       return;
     }
 
@@ -478,35 +499,41 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     clearFaultCodeRowDrafts();
     updateFaultCode({ ...faultCode, codes: nextCodes }, nextLanguage);
     setCsvStatus(
-      `已补齐当前筛选范围 ${indexes.size} 条故障码的来源参数、文案 Key 和 i18n 条目${
-        changed > 0 ? `，其中 ${changed} 条发生字段更新` : ''
-      }`,
+      t('faultCode.status.completedCodes', {
+        count: indexes.size,
+        changed: changed > 0 ? t('faultCode.status.changedCodes', { count: changed }) : '',
+      }),
     );
   }
 
   function batchSetVisibleEnabled(enabled: boolean) {
     const indexes = new Set(visibleCodeIndexes());
     if (indexes.size === 0) {
-      setCsvStatus('当前筛选范围内没有故障码可操作');
+      setCsvStatus(t('faultCode.status.noCodesToUpdate'));
       return;
     }
     updateFaultCode({
       ...faultCode,
       codes: codes.map((item, index) => (indexes.has(index) ? { ...item, enabled } : item)),
     });
-    setCsvStatus(`已${enabled ? '启用' : '禁用'}当前筛选范围 ${indexes.size} 条故障码`);
+    setCsvStatus(
+      t('faultCode.status.updatedEnabled', {
+        state: enabled ? t('faultCode.enabled') : t('faultCode.disabled'),
+        count: indexes.size,
+      }),
+    );
   }
 
   async function batchRemoveVisibleCodes() {
     const indexes = new Set(visibleCodeIndexes());
     if (indexes.size === 0) {
-      setCsvStatus('当前筛选范围内没有故障码可删除');
+      setCsvStatus(t('faultCode.status.noCodesToDelete'));
       return;
     }
     const confirmed = await deleteConfirmation.ask({
-      title: '删除筛选结果？',
-      message: `将删除当前筛选范围内的 ${indexes.size} 条故障码。保存项目后此操作将无法撤销。`,
-      confirmLabel: `删除 ${indexes.size} 条`,
+      title: t('faultCode.confirmDelete.title'),
+      message: t('faultCode.confirmDelete.message', { count: indexes.size }),
+      confirmLabel: t('faultCode.confirmDelete.confirm', { count: indexes.size }),
       danger: true,
     });
     if (!confirmed) {
@@ -518,7 +545,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       ...faultCode,
       codes: codes.filter((_, index) => !indexes.has(index)),
     });
-    setCsvStatus(`已删除当前筛选范围 ${indexes.size} 条故障码`);
+    setCsvStatus(t('faultCode.status.deletedCodes', { count: indexes.size }));
   }
 
   function cloneCodeToSource(index: number) {
@@ -534,11 +561,11 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     const targetSource =
       sources.find((source) => sourceKeyFor(source) === selectedSourceKey) ?? fallbackTargetSource;
     if (!targetSource) {
-      setCsvStatus('请先选择要复制到的故障来源');
+      setCsvStatus(t('faultCode.status.selectCloneTarget'));
       return;
     }
     if (currentSource && sourceKeyFor(currentSource) === sourceKeyFor(targetSource)) {
-      setCsvStatus('目标来源不能与当前来源相同');
+      setCsvStatus(t('faultCode.status.cloneTargetMustDiffer'));
       return;
     }
 
@@ -549,7 +576,12 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       return source?.can_id === targetCanId && clampFaultCode(numberValue(candidate.code)) === code;
     });
     if (duplicatedInTarget) {
-      setCsvStatus(`${sourceOptionLabel(targetSource)} 已存在故障码 ${code}`);
+      setCsvStatus(
+        t('faultCode.status.targetAlreadyHasCode', {
+          target: sourceOptionLabel(targetSource),
+          code,
+        }),
+      );
       return;
     }
 
@@ -575,7 +607,9 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       ...current.slice(insertIndex),
     ]);
     updateFaultCode({ ...faultCode, codes: nextCodes }, nextLanguage);
-    setCsvStatus(`已将故障码 ${code} 复制到 ${sourceOptionLabel(targetSource)}`);
+    setCsvStatus(
+      t('faultCode.status.clonedCode', { code, target: sourceOptionLabel(targetSource) }),
+    );
   }
 
   function removeCode(index: number) {
@@ -592,11 +626,11 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   async function exportSourcesCsv() {
     setCsvStatus(null);
     if (!isTauriRuntime()) {
-      setCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setCsvStatus(t('faultCode.status.desktopSaveDialogOnly'));
       return;
     }
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: '故障来源 CSV', extensions: ['csv'] }] }),
+      () => save({ filters: [{ name: t('faultCode.filters.sourcesCsv'), extensions: ['csv'] }] }),
       setCsvStatus,
     );
     if (!selected) return;
@@ -604,7 +638,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     setIsCsvBusy(true);
     try {
       await saveTextFile(selected, `\uFEFF${faultSourcesToCsv(sources)}`);
-      setCsvStatus(`来源规则 CSV 已导出：${selected}`);
+      setCsvStatus(t('faultCode.status.sourcesExported', { path: selected }));
     } catch (error) {
       setCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -615,14 +649,14 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   async function importSourcesCsv() {
     setCsvStatus(null);
     if (!isTauriRuntime()) {
-      setCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setCsvStatus(t('faultCode.status.desktopFilePickerOnly'));
       return;
     }
     const selected = await runSystemDialog(
       () =>
         open({
           multiple: false,
-          filters: [{ name: '故障来源 CSV', extensions: ['csv'] }],
+          filters: [{ name: t('faultCode.filters.sourcesCsv'), extensions: ['csv'] }],
         }),
       setCsvStatus,
     );
@@ -633,11 +667,15 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       const text = await loadTextFile(selected);
       const { sources: nextSources, errors } = csvToFaultSources(text);
       if (errors.length > 0) {
-        setCsvStatus(`导入来源规则 CSV 出错：${errors.join('；')}`);
+        setCsvStatus(
+          t('faultCode.status.sourcesImportError', {
+            errors: errors.join(t('common.punctuation.semicolon')),
+          }),
+        );
         return;
       }
       updateFaultCode({ ...faultCode, sources: nextSources.map(normalizeSource) });
-      setCsvStatus(`已导入 ${nextSources.length} 条来源规则`);
+      setCsvStatus(t('faultCode.status.sourcesImported', { count: nextSources.length }));
     } catch (error) {
       setCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -648,11 +686,11 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   async function exportCodesCsv() {
     setCsvStatus(null);
     if (!isTauriRuntime()) {
-      setCsvStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setCsvStatus(t('faultCode.status.desktopSaveDialogOnly'));
       return;
     }
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: '故障码 CSV', extensions: ['csv'] }] }),
+      () => save({ filters: [{ name: t('faultCode.filters.codesCsv'), extensions: ['csv'] }] }),
       setCsvStatus,
     );
     if (!selected) return;
@@ -660,7 +698,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     setIsCsvBusy(true);
     try {
       await saveTextFile(selected, `\uFEFF${faultCodesToCsv(codes, sources, language)}`);
-      setCsvStatus(`故障码 CSV 已导出：${selected}`);
+      setCsvStatus(t('faultCode.status.codesExported', { path: selected }));
     } catch (error) {
       setCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -671,14 +709,14 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   async function importCodesCsv() {
     setCsvStatus(null);
     if (!isTauriRuntime()) {
-      setCsvStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setCsvStatus(t('faultCode.status.desktopFilePickerOnly'));
       return;
     }
     const selected = await runSystemDialog(
       () =>
         open({
           multiple: false,
-          filters: [{ name: '故障码 CSV', extensions: ['csv'] }],
+          filters: [{ name: t('faultCode.filters.codesCsv'), extensions: ['csv'] }],
         }),
       setCsvStatus,
     );
@@ -689,14 +727,18 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       const text = await loadTextFile(selected);
       const { codes: nextCodes, language: nextLanguage, errors } = csvToFaultCodes(text, language);
       if (errors.length > 0) {
-        setCsvStatus(`导入故障码 CSV 出错：${errors.join('；')}`);
+        setCsvStatus(
+          t('faultCode.status.codesImportError', {
+            errors: errors.join(t('common.punctuation.semicolon')),
+          }),
+        );
         return;
       }
       updateFaultCode(
         { ...faultCode, codes: nextCodes.map((item) => normalizeCode(item, sources)) },
         nextLanguage,
       );
-      setCsvStatus(`已导入 ${nextCodes.length} 条故障码，并同步多语言文案`);
+      setCsvStatus(t('faultCode.status.codesImported', { count: nextCodes.length }));
     } catch (error) {
       setCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -708,8 +750,8 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     return (
       <section className="table-spec-card">
         <div>
-          <h2>故障代码</h2>
-          <p>打开项目后可编辑故障来源帧、故障码和多语言文案绑定。</p>
+          <h2>{t('faultCode.title')}</h2>
+          <p>{t('faultCode.openProjectDescription')}</p>
         </div>
       </section>
     );
@@ -720,8 +762,8 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       <section className="table-spec-card">
         <div className="fault-code-header">
           <div>
-            <h2>故障代码</h2>
-            <p>配置会随项目导出写入 data.bin，设备端优先读取动态配置。</p>
+            <h2>{t('faultCode.title')}</h2>
+            <p>{t('faultCode.description')}</p>
           </div>
           <label className="settings-check">
             <input
@@ -729,16 +771,16 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               onChange={(event) => updateRoot('enabled', event.target.checked)}
               type="checkbox"
             />
-            <span>启用</span>
+            <span>{t('faultCode.enabled')}</span>
           </label>
         </div>
         <div className="structured-list fault-code-meta">
           <label>
-            结构版本
+            {t('faultCode.meta.schemaVersion')}
             <input readOnly value={faultCode.schema_version ?? 1} />
           </label>
           <label>
-            二进制版本
+            {t('faultCode.meta.binaryVersion')}
             <input
               min={1}
               type="number"
@@ -747,11 +789,11 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
             />
           </label>
           <label>
-            来源数量
+            {t('faultCode.meta.sourceCount')}
             <input readOnly value={sources.length} />
           </label>
           <label>
-            故障码数量
+            {t('faultCode.meta.codeCount')}
             <input readOnly value={codes.length} />
           </label>
         </div>
@@ -764,16 +806,16 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
 
       <section className="table-spec-card">
         <div className="config-table-toolbar">
-          <strong>来源规则</strong>
+          <strong>{t('faultCode.sourceRules.title')}</strong>
           <div className="fault-code-toolbar-actions">
             <button type="button" onClick={addSource}>
-              新增来源
+              {t('faultCode.actions.addSource')}
             </button>
             <button disabled={isCsvBusy} type="button" onClick={() => void exportSourcesCsv()}>
-              导出 CSV
+              {t('faultCode.actions.exportCsv')}
             </button>
             <button disabled={isCsvBusy} type="button" onClick={() => void importSourcesCsv()}>
-              导入 CSV
+              {t('faultCode.actions.importCsv')}
             </button>
           </div>
         </div>
@@ -781,17 +823,17 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
           <table className="config-table fault-code-source-table">
             <thead>
               <tr>
-                <th>启用</th>
-                <th>来源 Key</th>
-                <th>名称</th>
-                <th>来源 ID</th>
-                <th>类型</th>
+                <th>{t('faultCode.sourceRules.enabled')}</th>
+                <th>{t('faultCode.sourceRules.key')}</th>
+                <th>{t('faultCode.sourceRules.name')}</th>
+                <th>{t('faultCode.sourceRules.id')}</th>
+                <th>{t('faultCode.sourceRules.type')}</th>
                 <th>CAN ID</th>
-                <th>帧类型</th>
-                <th>取码字节</th>
-                <th>清除码</th>
-                <th>无效码</th>
-                <th>操作</th>
+                <th>{t('faultCode.sourceRules.frameType')}</th>
+                <th>{t('faultCode.sourceRules.codeByte')}</th>
+                <th>{t('faultCode.sourceRules.clearCode')}</th>
+                <th>{t('faultCode.sourceRules.invalidCodes')}</th>
+                <th>{t('faultCode.actions.column')}</th>
               </tr>
             </thead>
             <tbody>
@@ -799,7 +841,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                 <tr key={`${sourceKeyFor(source)}-${source.source_id}-${source.can_id}`}>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} 启用`}
+                      aria-label={t('faultCode.aria.sourceEnabled', { index: index + 1 })}
                       checked={source.enabled ?? true}
                       type="checkbox"
                       onChange={(event) => updateSource(index, { enabled: event.target.checked })}
@@ -807,7 +849,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} Key`}
+                      aria-label={t('faultCode.aria.sourceKey', { index: index + 1 })}
                       value={sourceKeyFor(source)}
                       onChange={(event) =>
                         updateSource(index, { source_key: event.target.value.trim() })
@@ -816,14 +858,14 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} 名称`}
+                      aria-label={t('faultCode.aria.sourceName', { index: index + 1 })}
                       value={source.name ?? ''}
                       onChange={(event) => updateSource(index, { name: event.target.value })}
                     />
                   </td>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} ID`}
+                      aria-label={t('faultCode.aria.sourceId', { index: index + 1 })}
                       min={1}
                       type="number"
                       value={source.source_id}
@@ -834,7 +876,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} 类型字符`}
+                      aria-label={t('faultCode.aria.sourceType', { index: index + 1 })}
                       maxLength={1}
                       value={source.type_char}
                       onChange={(event) =>
@@ -846,7 +888,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} CAN ID`}
+                      aria-label={t('faultCode.aria.sourceCanId', { index: index + 1 })}
                       value={source.can_id}
                       onChange={(event) =>
                         updateSource(index, { can_id: numberValue(event.target.value) })
@@ -856,19 +898,19 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <select
-                      aria-label={`来源 ${index + 1} 帧类型`}
+                      aria-label={t('faultCode.aria.sourceFrameType', { index: index + 1 })}
                       value={source.frame_type ?? source.type ?? 0}
                       onChange={(event) =>
                         updateSource(index, { frame_type: numberValue(event.target.value) })
                       }
                     >
-                      <option value={0}>标准帧</option>
-                      <option value={1}>扩展帧</option>
+                      <option value={0}>{t('faultCode.frameTypes.standard')}</option>
+                      <option value={1}>{t('faultCode.frameTypes.extended')}</option>
                     </select>
                   </td>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} 取码字节`}
+                      aria-label={t('faultCode.aria.sourceCodeByte', { index: index + 1 })}
                       min={0}
                       max={7}
                       type="number"
@@ -880,7 +922,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} 清除码`}
+                      aria-label={t('faultCode.aria.sourceClearCode', { index: index + 1 })}
                       min={0}
                       max={255}
                       type="number"
@@ -892,7 +934,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <input
-                      aria-label={`来源 ${index + 1} 无效码`}
+                      aria-label={t('faultCode.aria.sourceInvalidCodes', { index: index + 1 })}
                       value={codeListText(source.invalid_codes)}
                       onChange={(event) =>
                         updateSource(index, { invalid_codes: parseCodeList(event.target.value) })
@@ -901,7 +943,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   </td>
                   <td>
                     <button className="danger" type="button" onClick={() => removeSource(index)}>
-                      删除
+                      {t('common.actions.delete')}
                     </button>
                   </td>
                 </tr>
@@ -913,10 +955,10 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
 
       <section className="table-spec-card">
         <div className="config-table-toolbar">
-          <strong>批量管理</strong>
+          <strong>{t('faultCode.batch.title')}</strong>
           <div className="fault-code-toolbar-actions">
             <label className="fault-code-source-filter">
-              复制来源
+              {t('faultCode.batch.source')}
               <select
                 value={batchSourceKey}
                 onChange={(event) => setBatchSourceKey(event.target.value)}
@@ -929,7 +971,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               </select>
             </label>
             <label className="fault-code-source-filter">
-              目标来源
+              {t('faultCode.batch.target')}
               <select
                 value={batchTargetSourceKey}
                 onChange={(event) => setBatchTargetSourceKey(event.target.value)}
@@ -942,34 +984,37 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               </select>
             </label>
             <button disabled={sources.length < 2} type="button" onClick={batchCopySourceToTarget}>
-              批量复制
+              {t('faultCode.batch.copy')}
             </button>
           </div>
         </div>
         <div className="fault-code-batch-panel">
           <div className="fault-code-batch-summary">
-            当前筛选：
+            {t('faultCode.batch.currentFilter')}
             <strong>
               {effectiveSourceFilter === 'all'
-                ? `全部来源 ${codes.length} 条`
-                : `${sourceLabelForKey(sources, effectiveSourceFilter)} ${visibleCodeRows.length} 条`}
+                ? t('faultCode.batch.allSources', { count: codes.length })
+                : t('faultCode.batch.filteredSource', {
+                    source: sourceLabelForKey(sources, effectiveSourceFilter),
+                    count: visibleCodeRows.length,
+                  })}
             </strong>
           </div>
           <fieldset className="fault-code-batch-mode">
-            <legend>翻译 Key</legend>
+            <legend>{t('faultCode.batch.translationKey')}</legend>
             <button
               className={batchCopyI18nMode === 'independent' ? 'active' : undefined}
               type="button"
               onClick={() => setBatchCopyI18nMode('independent')}
             >
-              创建独立翻译 Key
+              {t('faultCode.batch.independentKey')}
             </button>
             <button
               className={batchCopyI18nMode === 'shared' ? 'active' : undefined}
               type="button"
               onClick={() => setBatchCopyI18nMode('shared')}
             >
-              复用原翻译 Key
+              {t('faultCode.batch.sharedKey')}
             </button>
           </fieldset>
           <div className="fault-code-batch-actions">
@@ -978,21 +1023,21 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               type="button"
               onClick={batchEnsureVisibleKeys}
             >
-              补齐 Key/i18n
+              {t('faultCode.batch.completeKeys')}
             </button>
             <button
               disabled={visibleCodeRows.length === 0}
               type="button"
               onClick={() => batchSetVisibleEnabled(true)}
             >
-              批量启用
+              {t('faultCode.batch.enable')}
             </button>
             <button
               disabled={visibleCodeRows.length === 0}
               type="button"
               onClick={() => batchSetVisibleEnabled(false)}
             >
-              批量禁用
+              {t('faultCode.batch.disable')}
             </button>
             <button
               className="danger"
@@ -1000,7 +1045,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               type="button"
               onClick={batchRemoveVisibleCodes}
             >
-              删除筛选项
+              {t('faultCode.batch.deleteFiltered')}
             </button>
           </div>
         </div>
@@ -1008,15 +1053,15 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
 
       <section className="table-spec-card">
         <div className="config-table-toolbar">
-          <strong>故障码</strong>
+          <strong>{t('faultCode.codes.title')}</strong>
           <div className="fault-code-toolbar-actions">
             <label className="fault-code-source-filter">
-              来源
+              {t('faultCode.codes.source')}
               <select
                 value={effectiveSourceFilter}
                 onChange={(event) => setSourceFilter(event.target.value)}
               >
-                <option value="all">全部来源 ({codes.length})</option>
+                <option value="all">{t('faultCode.codes.allSources', { count: codes.length })}</option>
                 {sources.map((source) => {
                   const key = sourceKeyFor(source);
                   return (
@@ -1028,35 +1073,35 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               </select>
             </label>
             <button type="button" onClick={addCode}>
-              新增故障码
+              {t('faultCode.codes.add')}
             </button>
             <button disabled={isCsvBusy} type="button" onClick={() => void exportCodesCsv()}>
-              导出 CSV
+              {t('faultCode.actions.exportCsv')}
             </button>
             <button disabled={isCsvBusy} type="button" onClick={() => void importCodesCsv()}>
-              导入 CSV
+              {t('faultCode.actions.importCsv')}
             </button>
           </div>
         </div>
-        {duplicateFaultCodes.messages.length > 0 || duplicateMessageKeys.messages.length > 0 ? (
+        {duplicateMessages.length > 0 ? (
           <div className="fault-code-duplicate-alert">
-            {[...duplicateFaultCodes.messages, ...duplicateMessageKeys.messages].join('；')}
+            {duplicateMessages.join(t('common.punctuation.semicolon'))}
           </div>
         ) : null}
         <div className="config-table-frame">
           <table className="config-table fault-code-table">
             <thead>
               <tr>
-                <th>启用</th>
-                <th>来源</th>
+                <th>{t('faultCode.codes.enabled')}</th>
+                <th>{t('faultCode.codes.source')}</th>
                 <th>CAN ID</th>
-                <th>类型</th>
-                <th>取码字节</th>
+                <th>{t('faultCode.codes.type')}</th>
+                <th>{t('faultCode.codes.codeByte')}</th>
                 <th>Code</th>
-                <th>等级</th>
-                <th>文案 Key</th>
-                <th>中文文案</th>
-                <th>操作</th>
+                <th>{t('faultCode.codes.severity')}</th>
+                <th>{t('faultCode.codes.messageKey')}</th>
+                <th>{t('faultCode.codes.zhText')}</th>
+                <th>{t('faultCode.actions.column')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1103,7 +1148,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                   >
                     <td>
                       <input
-                        aria-label={`故障码 ${index + 1} 启用`}
+                        aria-label={t('faultCode.aria.codeEnabled', { index: index + 1 })}
                         checked={item.enabled ?? true}
                         type="checkbox"
                         onChange={(event) => updateCode(index, { enabled: event.target.checked })}
@@ -1111,7 +1156,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                     </td>
                     <td>
                       <select
-                        aria-label={`故障码 ${index + 1} 来源`}
+                        aria-label={t('faultCode.aria.codeSource', { index: index + 1 })}
                         value={item.source_key ?? codeSourceKey}
                         onChange={(event) => updateCode(index, { source_key: event.target.value })}
                       >
@@ -1123,23 +1168,32 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       </select>
                     </td>
                     <td>
-                      <span className="fault-code-readonly-value" title="CAN ID 由来源规则决定">
+                      <span
+                        className="fault-code-readonly-value"
+                        title={t('faultCode.readonly.canId')}
+                      >
                         {codeCanId}
                       </span>
                     </td>
                     <td>
-                      <span className="fault-code-readonly-value" title="类型由来源规则决定">
+                      <span
+                        className="fault-code-readonly-value"
+                        title={t('faultCode.readonly.type')}
+                      >
                         {codeTypeChar || '-'}
                       </span>
                     </td>
                     <td>
-                      <span className="fault-code-readonly-value" title="取码字节由来源规则决定">
+                      <span
+                        className="fault-code-readonly-value"
+                        title={t('faultCode.readonly.codeByte')}
+                      >
                         {codeByte}
                       </span>
                     </td>
                     <td>
                       <input
-                        aria-label={`故障码 ${index + 1} Code`}
+                        aria-label={t('faultCode.aria.codeValue', { index: index + 1 })}
                         min={0}
                         max={255}
                         type="number"
@@ -1150,19 +1204,21 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       />
                       {isDuplicate && duplicateCanId !== null ? (
                         <small className="fault-code-duplicate-hint">
-                          {hexOrDecimal(duplicateCanId)} 来源下已存在相同故障码
+                          {t('faultCode.duplicates.row', {
+                            source: hexOrDecimal(duplicateCanId),
+                          })}
                         </small>
                       ) : null}
                     </td>
                     <td>
                       <select
-                        aria-label={`故障码 ${index + 1} 等级`}
+                        aria-label={t('faultCode.aria.codeSeverity', { index: index + 1 })}
                         value={item.severity ?? 'fault'}
                         onChange={(event) => updateCode(index, { severity: event.target.value })}
                       >
                         {severityOptions.map((option) => (
                           <option key={option.value} value={option.value}>
-                            {option.label}
+                            {t(option.labelKey)}
                           </option>
                         ))}
                       </select>
@@ -1171,9 +1227,9 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                       <div className="fault-code-i18n-cell">
                         <div className="fault-code-i18n-search-row">
                           <input
-                            aria-label={`故障码 ${index + 1} 搜索 i18n`}
+                            aria-label={t('faultCode.aria.i18nSearch', { index: index + 1 })}
                             disabled={i18nKeys.length === 0}
-                            placeholder="搜索 i18n key / 文案"
+                            placeholder={t('faultCode.i18n.searchPlaceholder')}
                             type="search"
                             value={i18nSearchText}
                             onFocus={() => setActiveI18nRow(index)}
@@ -1186,18 +1242,18 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                           />
                           {i18nSearchText ? (
                             <button
-                              title="清空搜索"
+                              title={t('faultCode.i18n.clearSearch')}
                               type="button"
                               onClick={() =>
                                 setI18nSearchByRow((current) => ({ ...current, [index]: '' }))
                               }
                             >
-                              清空
+                              {t('faultCode.i18n.clear')}
                             </button>
                           ) : null}
                         </div>
                         <select
-                          aria-label={`故障码 ${index + 1} 绑定 i18n`}
+                          aria-label={t('faultCode.aria.i18nBinding', { index: index + 1 })}
                           disabled={i18nKeys.length === 0}
                           value={selectedI18nKey}
                           onFocus={() => setActiveI18nRow(index)}
@@ -1205,12 +1261,12 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                         >
                           <option value="">
                             {i18nKeys.length === 0
-                              ? '暂无可绑定 i18n'
+                              ? t('faultCode.i18n.noEntries')
                               : !isI18nPickerActive
-                                ? '聚焦选择已有 i18n'
+                                ? t('faultCode.i18n.focusToSelect')
                                 : filteredI18nKeys.length === 0
-                                  ? '无匹配 i18n'
-                                  : '选择已有 i18n'}
+                                  ? t('faultCode.i18n.noMatches')
+                                  : t('faultCode.i18n.selectExisting')}
                           </option>
                           {visibleI18nKeys.map((entryKey) => (
                             <option key={entryKey} value={entryKey}>
@@ -1220,17 +1276,19 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                         </select>
                         <small className="fault-code-i18n-meta">
                           {i18nKeys.length === 0
-                            ? '请先在语言表中添加条目'
+                            ? t('faultCode.i18n.addEntryFirst')
                             : isI18nPickerActive
-                              ? `${filteredI18nKeys.length}/${i18nKeys.length} 个匹配${
-                                  isI18nResultLimited
-                                    ? `，仅显示前 ${maxVisibleI18nOptions} 个`
-                                    : ''
-                                }`
-                              : selectedI18nKey || '聚焦后选择已有 i18n'}
+                              ? t('faultCode.i18n.matchCount', {
+                                  matched: filteredI18nKeys.length,
+                                  total: i18nKeys.length,
+                                  limited: isI18nResultLimited
+                                    ? t('faultCode.i18n.limited', { count: maxVisibleI18nOptions })
+                                    : '',
+                                })
+                              : selectedI18nKey || t('faultCode.i18n.focusToSelect')}
                         </small>
                         <input
-                          aria-label={`故障码 ${index + 1} 文案 Key`}
+                          aria-label={t('faultCode.aria.messageKey', { index: index + 1 })}
                           value={messageKeyDraftByRow[index] ?? key}
                           onBlur={() => commitMessageKeyDraft(index)}
                           onChange={(event) =>
@@ -1251,13 +1309,15 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                           }}
                         />
                         {isDuplicateMessageKey ? (
-                          <small className="fault-code-duplicate-hint">已存在相同文案 Key</small>
+                          <small className="fault-code-duplicate-hint">
+                            {t('faultCode.duplicates.messageKeyRow')}
+                          </small>
                         ) : null}
                       </div>
                     </td>
                     <td>
                       <input
-                        aria-label={`故障码 ${index + 1} 中文文案`}
+                        aria-label={t('faultCode.aria.zhText', { index: index + 1 })}
                         value={languageText(language, key) || item.name || ''}
                         onChange={(event) => updateCodeText(index, event.target.value)}
                       />
@@ -1265,7 +1325,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                     <td>
                       <div className="fault-code-row-actions">
                         <select
-                          aria-label={`故障码 ${index + 1} 复制目标来源`}
+                          aria-label={t('faultCode.aria.cloneTarget', { index: index + 1 })}
                           disabled={cloneSourceOptions.length === 0}
                           value={selectedCloneSource}
                           onChange={(event) =>
@@ -1276,7 +1336,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                           }
                         >
                           {cloneSourceOptions.length === 0 ? (
-                            <option value="">无其他来源</option>
+                            <option value="">{t('faultCode.clone.noOtherSources')}</option>
                           ) : null}
                           {cloneSourceOptions.map((source) => (
                             <option key={sourceKeyFor(source)} value={sourceKeyFor(source)}>
@@ -1289,10 +1349,10 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                           type="button"
                           onClick={() => cloneCodeToSource(index)}
                         >
-                          复制到来源
+                          {t('faultCode.clone.copyToSource')}
                         </button>
                         <button className="danger" type="button" onClick={() => removeCode(index)}>
-                          删除
+                          {t('common.actions.delete')}
                         </button>
                       </div>
                     </td>
@@ -1302,7 +1362,9 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
               {visibleCodeRows.length === 0 ? (
                 <tr>
                   <td colSpan={10}>
-                    <div className="fault-code-empty-filter">当前来源下没有故障码</div>
+                    <div className="fault-code-empty-filter">
+                      {t('faultCode.codes.emptyForSource')}
+                    </div>
                   </td>
                 </tr>
               ) : null}

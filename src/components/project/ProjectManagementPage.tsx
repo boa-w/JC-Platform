@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Braces } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type {
   GitProjectStatus,
   GitRevision,
@@ -102,6 +103,7 @@ export function ProjectManagementPage({
   handleCommitProjectVersion,
   handlePreviewProjectVersion,
 }: ProjectManagementPageProps) {
+  const { t } = useTranslation();
   const projectBusy = isOpening || isFormattingJcpro;
 
   return (
@@ -109,15 +111,15 @@ export function ProjectManagementPage({
       {/* Open project */}
       <div className="project-section">
         <div className="project-section-header">
-          <strong>打开现有项目</strong>
+          <strong>{t('projectManagement.openExisting')}</strong>
           <span className="project-section-hint">.jcpro</span>
         </div>
         <div className="project-open-row">
           <input
-            aria-label="项目文件路径"
+            aria-label={t('projectManagement.projectPathLabel')}
             className="project-open-input"
             disabled={projectBusy}
-            placeholder="输入或粘贴 .jcpro 文件路径"
+            placeholder={t('projectManagement.projectPathPlaceholder')}
             value={projectPath}
             onChange={(event) => setProjectPath(event.target.value)}
             onKeyDown={(event) => {
@@ -131,7 +133,7 @@ export function ProjectManagementPage({
               onClick={() => void handleSelectProjectFile()}
               disabled={projectBusy}
             >
-              {isOpening ? '打开中...' : '浏览'}
+              {t(isOpening ? 'projectManagement.opening' : 'projectManagement.browse')}
             </button>
             <button
               className="project-open-btn project-open-btn--secondary"
@@ -139,7 +141,7 @@ export function ProjectManagementPage({
               onClick={() => void handleOpenProject()}
               disabled={projectBusy || projectPath.trim() === ''}
             >
-              打开
+              {t('dashboard.actionBar.open')}
             </button>
           </div>
         </div>
@@ -154,31 +156,31 @@ export function ProjectManagementPage({
       {recentProjects.length > 0 ? (
         <div className="project-section">
           <div className="project-section-header">
-            <strong>最近项目</strong>
+            <strong>{t('projectManagement.recentProjects')}</strong>
             <button
               className="project-link-btn"
               disabled={recentProjects.length === 0}
               onClick={clearRecentProjects}
               type="button"
             >
-              清空
+              {t('projectManagement.clear')}
             </button>
           </div>
           <div className="project-recent-row">
             <select
-              aria-label="最近项目"
+              aria-label={t('projectManagement.recentProjects')}
               className="project-recent-select"
               value={selectedRecentProjectPath}
               onChange={(event) => setProjectPath(event.target.value)}
               disabled={projectBusy}
-              title={selectedRecentProjectPath || '选择最近项目'}
+              title={selectedRecentProjectPath || t('projectManagement.selectRecent')}
             >
               <option value="" disabled>
-                选择最近项目
+                {t('projectManagement.selectRecent')}
               </option>
               {recentProjects.map((item) => (
                 <option key={item.path} value={item.path}>
-                  {`${item.name || '未命名'} - ${item.path}`}
+                  {`${item.name || t('projectManagement.unnamed')} - ${item.path}`}
                 </option>
               ))}
             </select>
@@ -189,7 +191,7 @@ export function ProjectManagementPage({
                 onClick={() => void handleOpenProject(selectedRecentProjectPath)}
                 disabled={projectBusy || selectedRecentProjectPath === ''}
               >
-                打开项目
+                {t('projectManagement.openProject')}
               </button>
               <button
                 className="project-open-btn project-open-btn--secondary"
@@ -197,7 +199,7 @@ export function ProjectManagementPage({
                 onClick={() => removeRecentProject(selectedRecentProjectPath)}
                 disabled={projectBusy || selectedRecentProjectPath === ''}
               >
-                移除
+                {t('projectManagement.remove')}
               </button>
             </div>
           </div>
@@ -207,21 +209,21 @@ export function ProjectManagementPage({
       {/* Create project */}
       <div className="project-section">
         <div className="project-section-header">
-          <strong>新建项目</strong>
+          <strong>{t('projectManagement.createNew')}</strong>
         </div>
         <div className="project-create-form">
           <input
-            aria-label="新项目名称"
+            aria-label={t('projectManagement.newProjectNameLabel')}
             className="project-create-name"
-            placeholder="项目名称"
+            placeholder={t('projectManagement.projectNamePlaceholder')}
             value={newProjectName}
             onChange={(event) => setNewProjectName(event.target.value)}
           />
           <div className="project-create-bottom">
             <div className="project-create-resolution">
-              <span className="project-create-label">分辨率</span>
+              <span className="project-create-label">{t('projectManagement.resolution')}</span>
               <input
-                aria-label="项目分辨率宽度"
+                aria-label={t('projectManagement.resolutionWidth')}
                 className="project-create-num"
                 min="1"
                 type="number"
@@ -230,7 +232,7 @@ export function ProjectManagementPage({
               />
               <span className="project-create-x">×</span>
               <input
-                aria-label="项目分辨率高度"
+                aria-label={t('projectManagement.resolutionHeight')}
                 className="project-create-num"
                 min="1"
                 type="number"
@@ -244,7 +246,7 @@ export function ProjectManagementPage({
               onClick={() => void handleCreateProject()}
               type="button"
             >
-              创建项目
+              {t('projectManagement.createProject')}
             </button>
           </div>
         </div>
@@ -254,7 +256,7 @@ export function ProjectManagementPage({
       {loadedProject ? (
         <div className="project-section">
           <div className="project-section-header">
-            <strong>当前项目</strong>
+            <strong>{t('projectManagement.currentProject')}</strong>
             <div className="project-info-actions">
               <button
                 className="project-link-btn"
@@ -262,7 +264,7 @@ export function ProjectManagementPage({
                 onClick={() => void handleParseProject()}
                 type="button"
               >
-                解析
+                {t('projectManagement.parse')}
               </button>
               <button
                 className="project-link-btn"
@@ -270,7 +272,7 @@ export function ProjectManagementPage({
                 onClick={() => void handleMigrateProject()}
                 type="button"
               >
-                补齐结构
+                {t('projectManagement.completeStructure')}
               </button>
               <button
                 className="project-link-btn"
@@ -278,7 +280,7 @@ export function ProjectManagementPage({
                 onClick={() => void handleMountRefactorConfig()}
                 type="button"
               >
-                挂载重构配置
+                {t('projectManagement.mountRefactorConfig')}
               </button>
               <button
                 className="project-link-btn project-link-btn--icon"
@@ -286,7 +288,11 @@ export function ProjectManagementPage({
                 onClick={() => void handleCreateRefactorConfig()}
                 type="button"
               >
-                {refactorConfigPath ? '保存重构配置' : '创建重构配置'}
+                {t(
+                  refactorConfigPath
+                    ? 'projectManagement.saveRefactorConfig'
+                    : 'projectManagement.createRefactorConfig',
+                )}
               </button>
               <button
                 className="project-link-btn project-link-btn--icon"
@@ -298,38 +304,48 @@ export function ProjectManagementPage({
                 onClick={() => void handleFormatJcproFile()}
                 title={
                   hasUnsavedChanges
-                    ? '请先保存未保存修改'
-                    : '格式化当前 .jcpro JSON 文件'
+                    ? t('projectManagement.saveUnsavedFirst')
+                    : t('projectManagement.formatJcproTitle')
                 }
                 type="button"
               >
                 <Braces aria-hidden="true" size={13} strokeWidth={1.8} />
-                {isFormattingJcpro ? '格式化中...' : '格式化 jcpro JSON'}
+                {t(
+                  isFormattingJcpro
+                    ? 'projectManagement.formatting'
+                    : 'projectManagement.formatJcpro',
+                )}
               </button>
             </div>
           </div>
           <div className="project-info-grid">
             <div className="project-info-item">
-              <span>名称</span>
+              <span>{t('projectManagement.name')}</span>
               <strong>{loadedProject.summary.name}</strong>
             </div>
             <div className="project-info-item">
-              <span>分辨率</span>
+              <span>{t('projectManagement.resolution')}</span>
               <strong>{loadedProject.summary.deviceResolution}</strong>
             </div>
             <div className="project-info-item">
-              <span>路径</span>
+              <span>{t('projectManagement.path')}</span>
               <strong className="project-info-path">{loadedProject.summary.path}</strong>
             </div>
             <div className="project-info-item">
-              <span>校验</span>
+              <span>{t('projectManagement.validation')}</span>
               <strong className={effectiveProjectValid ? 'text-success' : 'text-danger'}>
-                {effectiveProjectValid ? '兼容段通过' : '缺少兼容段'}
+                {t(
+                  effectiveProjectValid
+                    ? 'projectManagement.compatibleValid'
+                    : 'projectManagement.compatibleMissing',
+                )}
               </strong>
             </div>
             <div className="project-info-item">
-              <span>重构配置</span>
-              <strong className="project-info-path">{refactorConfigPath ?? '未挂载'}</strong>
+              <span>{t('projectManagement.refactorConfig')}</span>
+              <strong className="project-info-path">
+                {refactorConfigPath ?? t('projectManagement.notMounted')}
+              </strong>
             </div>
           </div>
           {refactorConfigStatus ? (
@@ -343,18 +359,23 @@ export function ProjectManagementPage({
           ) : null}
           {compatibleMissingSections.length > 0 ? (
             <p className="project-open-error" role="alert">
-              缺少兼容段：{compatibleMissingSections.join('、')}
+              {t('projectManagement.missingCompatibleSections', {
+                sections: compatibleMissingSections.join(t('common.punctuation.listSeparator')),
+              })}
             </p>
           ) : null}
           {!refactorConfigPath && sidecarMissingSections.length > 0 ? (
             <p className="project-open-warning">
-              重构专属段未在 .jcpro 中保存：{sidecarMissingSections.join('、')}
-              。可通过“挂载重构配置”关联独立 JSON。
+              {t('projectManagement.sidecarSectionsMissing', {
+                sections: sidecarMissingSections.join(t('common.punctuation.listSeparator')),
+              })}
             </p>
           ) : null}
           {loadedProject.validation.warnings.length > 0 ? (
             <p className="project-open-warning">
-              警告：{loadedProject.validation.warnings.join('；')}
+              {t('projectManagement.warnings', {
+                warnings: loadedProject.validation.warnings.join(t('common.punctuation.semicolon')),
+              })}
             </p>
           ) : null}
         </div>
@@ -369,46 +390,48 @@ export function ProjectManagementPage({
           }}
         >
           <div className="project-section-header">
-            <strong>Git 版本管理</strong>
+            <strong>{t('projectManagement.git.title')}</strong>
             <button
               className="project-link-btn"
               disabled={gitBusy || gitLoading || projectBusy}
               onClick={() => void refreshProjectGit()}
               type="button"
             >
-              {gitLoading ? '后台加载中...' : '刷新'}
+              {t(gitLoading ? 'projectManagement.git.loading' : 'common.actions.refresh')}
             </button>
           </div>
           {gitStatus?.available ? (
             <>
               {gitLoading ? (
                 <p className="git-loading-status" role="status">
-                  正在后台更新仓库状态和版本历史，窗口可继续操作。
+                  {t('projectManagement.git.backgroundLoading')}
                 </p>
               ) : null}
               <div className="project-info-grid">
                 <div className="project-info-item">
-                  <span>仓库</span>
+                  <span>{t('projectManagement.git.repository')}</span>
                   <strong className="project-info-path">{gitStatus.repo_root}</strong>
                 </div>
                 <div className="project-info-item">
-                  <span>分支</span>
+                  <span>{t('gitReview.branch')}</span>
                   <strong>{gitStatus.branch}</strong>
                 </div>
                 <div className="project-info-item">
-                  <span>当前版本</span>
+                  <span>{t('projectManagement.git.currentVersion')}</span>
                   <strong className="project-info-path">
-                    {gitStatus.head_short_hash ?? '尚无提交'}
+                    {gitStatus.head_short_hash ?? t('dashboard.gitSummary.noCommits')}
                   </strong>
                 </div>
                 <div className="project-info-item">
-                  <span>配置状态</span>
+                  <span>{t('projectManagement.git.configStatus')}</span>
                   <strong
                     className={gitStatus.changed_paths.length > 0 ? 'text-warning' : 'text-success'}
                   >
                     {gitStatus.changed_paths.length > 0
-                      ? `${gitStatus.changed_paths.length} 个文件待提交`
-                      : '已同步'}
+                      ? t('projectManagement.git.filesPending', {
+                          count: gitStatus.changed_paths.length,
+                        })
+                      : t('projectManagement.git.synced')}
                   </strong>
                 </div>
               </div>
@@ -417,7 +440,7 @@ export function ProjectManagementPage({
                   className="git-version-input"
                   maxLength={120}
                   onChange={(event) => setGitMessage(event.target.value)}
-                  placeholder="版本说明"
+                  placeholder={t('gitReview.versionMessage')}
                   value={gitMessage}
                 />
                 <button
@@ -433,16 +456,20 @@ export function ProjectManagementPage({
                   onClick={() => void handleCommitProjectVersion()}
                   type="button"
                 >
-                  {gitBusy ? '处理中...' : '保存版本'}
+                  {t(gitBusy ? 'projectManagement.git.processing' : 'projectManagement.git.saveVersion')}
                 </button>
               </div>
-              <p className="git-managed-paths">受管文件：{gitStatus.managed_paths.join('、')}</p>
+              <p className="git-managed-paths">
+                {t('projectManagement.git.managedFiles', {
+                  files: gitStatus.managed_paths.join(t('common.punctuation.listSeparator')),
+                })}
+              </p>
               {hasUnsavedChanges ? (
-                <p className="project-open-warning">请先保存当前项目配置，再创建 Git 版本。</p>
+                <p className="project-open-warning">{t('projectManagement.git.saveFirst')}</p>
               ) : null}
               {gitStatus.has_staged_changes ? (
                 <p className="project-open-warning">
-                  Git 暂存区已有内容。为避免混入其他改动，项目版本提交已停用。
+                  {t('projectManagement.git.stagingOccupied')}
                 </p>
               ) : null}
               {gitStatus.warning ? (
@@ -450,8 +477,8 @@ export function ProjectManagementPage({
               ) : null}
               <div className="git-history">
                 <div className="git-history-header">
-                  <strong>版本历史</strong>
-                  <span>{gitRevisions.length} 条</span>
+                  <strong>{t('dashboard.gitSummary.history')}</strong>
+                  <span>{t('dashboard.gitSummary.revisionCount', { count: gitRevisions.length })}</span>
                 </div>
                 {gitRevisions.length > 0 ? (
                   <div className="git-history-list">
@@ -470,13 +497,13 @@ export function ProjectManagementPage({
                           onClick={() => void handlePreviewProjectVersion(revision)}
                           type="button"
                         >
-                          查看
+                          {t('projectManagement.git.view')}
                         </button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="git-history-empty">当前项目文件还没有 Git 提交记录。</p>
+                  <p className="git-history-empty">{t('projectManagement.git.noHistory')}</p>
                 )}
               </div>
             </>
@@ -484,8 +511,8 @@ export function ProjectManagementPage({
             <p className="git-history-empty">
               {gitStatus?.warning ??
                 (gitLoading
-                  ? '正在后台更新仓库状态和版本历史，窗口可继续操作。'
-                  : '正在检查项目所在的 Git 仓库...')}
+                  ? t('projectManagement.git.backgroundLoading')
+                  : t('projectManagement.git.checkingRepository'))}
             </p>
           )}
           {gitError ? (
@@ -500,21 +527,25 @@ export function ProjectManagementPage({
       {projectParseReport ? (
         <div className="project-section">
           <div className="project-section-header">
-            <strong>解析报告</strong>
+            <strong>{t('projectManagement.parseReport.title')}</strong>
           </div>
           <div className="project-info-grid">
             <div className="project-info-item">
-              <span>有效</span>
+              <span>{t('projectManagement.parseReport.valid')}</span>
               <strong className={projectParseReport.valid ? 'text-success' : 'text-danger'}>
-                {projectParseReport.valid ? '是' : '否'}
+                {t(
+                  projectParseReport.valid
+                    ? 'projectManagement.parseReport.yes'
+                    : 'projectManagement.parseReport.no',
+                )}
               </strong>
             </div>
             <div className="project-info-item">
-              <span>补齐段落</span>
+              <span>{t('projectManagement.parseReport.addedSections')}</span>
               <strong>{projectParseReport.added_sections.length}</strong>
             </div>
             <div className="project-info-item">
-              <span>错误</span>
+              <span>{t('projectManagement.parseReport.errors')}</span>
               <strong className={projectParseReport.errors.length > 0 ? 'text-danger' : undefined}>
                 {projectParseReport.errors.length}
               </strong>

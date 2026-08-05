@@ -20,8 +20,12 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TestDataType } from '../../data/test-data/metadata';
-import { type DocumentSectionKey, modifiedSectionLabels } from '../../modules/documentSections';
+import {
+  type DocumentSectionKey,
+  modifiedSectionLabelKeys,
+} from '../../modules/documentSections';
 import type {
   FeatureModule,
   GitProjectStatus,
@@ -116,6 +120,7 @@ export function DashboardActionBar({
   onShowGitHistory,
   onCommitGitVersion: handleCommitProjectVersion,
 }: DashboardActionBarProps) {
+  const { t } = useTranslation();
   const gitSummaryId = useId();
   const [showGitSummary, setShowGitSummary] = useState(false);
   const gitSummaryRef = useRef<HTMLDivElement | null>(null);
@@ -193,9 +198,9 @@ export function DashboardActionBar({
               }`}
             />
             <span className="action-bar-project">
-              {loadedProject?.summary.name || '未打开项目'}
+              {loadedProject?.summary.name || t('dashboard.actionBar.noProject')}
             </span>
-            <span className="action-bar-module">{activeModule.title}</span>
+            <span className="action-bar-module">{t(activeModule.titleKey)}</span>
           </div>
           {modifiedSections.length > 0 ? (
             <div className="action-bar-pills">
@@ -205,9 +210,11 @@ export function DashboardActionBar({
                   key={section}
                   onClick={() => restoreModifiedPath([section])}
                   type="button"
-                  title={`恢复 ${modifiedSectionLabels[section] ?? section}`}
+                  title={t('dashboard.actionBar.restoreSection', {
+                    section: t(modifiedSectionLabelKeys[section] ?? section),
+                  })}
                 >
-                  {modifiedSectionLabels[section] ?? section}
+                  {t(modifiedSectionLabelKeys[section] ?? section)}
                 </button>
               ))}
             </div>
@@ -225,7 +232,7 @@ export function DashboardActionBar({
             disabled={isFormattingJcpro}
             onClick={() => setShowGitSummary((visible) => !visible)}
             ref={gitSummaryTriggerRef}
-            title="切换 Git 版本摘要"
+            title={t('dashboard.actionBar.toggleGitSummary')}
             type="button"
           >
             <GitBranch aria-hidden="true" size={14} strokeWidth={1.8} />
@@ -242,10 +249,10 @@ export function DashboardActionBar({
               disabled={isOpening || isFormattingJcpro}
               onClick={() => void handleSelectProjectFile()}
               type="button"
-              title="打开项目文件"
+              title={t('dashboard.actionBar.openProjectTitle')}
             >
               <FolderOpen aria-hidden="true" size={14} strokeWidth={1.8} />
-              打开
+              {t('dashboard.actionBar.open')}
             </button>
             <button
               className="action-bar-btn action-bar-btn--ghost"
@@ -256,10 +263,10 @@ export function DashboardActionBar({
               }
               onClick={() => void handleReloadProject()}
               type="button"
-              title="重新加载当前项目"
+              title={t('dashboard.actionBar.reloadTitle')}
             >
               <RefreshCw aria-hidden="true" size={14} strokeWidth={1.8} />
-              重载
+              {t('dashboard.actionBar.reload')}
             </button>
           </div>
           <span className="action-bar-sep" />
@@ -269,10 +276,10 @@ export function DashboardActionBar({
               disabled={!hasUnsavedChanges || isSavingProject || isFormattingJcpro}
               onClick={restoreAllChanges}
               type="button"
-              title="恢复所有未保存修改"
+              title={t('dashboard.actionBar.restoreAllTitle')}
             >
               <Undo2 aria-hidden="true" size={14} strokeWidth={1.8} />
-              恢复
+              {t('common.actions.restore')}
             </button>
             <button
               className="action-bar-btn action-bar-btn--ghost"
@@ -281,7 +288,11 @@ export function DashboardActionBar({
               type="button"
             >
               <SaveAll aria-hidden="true" size={14} strokeWidth={1.8} />
-              {savingProjectAction === 'saveAs' ? '另存中...' : '另存为...'}
+              {t(
+                savingProjectAction === 'saveAs'
+                  ? 'dashboard.actionBar.savingAs'
+                  : 'dashboard.actionBar.saveAs',
+              )}
             </button>
             <button
               className="action-bar-btn action-bar-btn--save"
@@ -295,7 +306,9 @@ export function DashboardActionBar({
               type="button"
             >
               <SaveIcon aria-hidden="true" size={14} strokeWidth={1.8} />
-              {savingProjectAction === 'save' ? '保存中...' : '保存'}
+              {t(
+                savingProjectAction === 'save' ? 'common.status.saving' : 'common.actions.save',
+              )}
             </button>
           </div>
           <span className="action-bar-sep" />
@@ -307,10 +320,14 @@ export function DashboardActionBar({
                   disabled={!loadedProject || isImportingTable || isFormattingJcpro}
                   onClick={() => void handleImportTableConfig(currentLegacyTableKind)}
                   type="button"
-                  title="从 CSV/XLS/XLSX/XML 文件导入"
+                  title={t('dashboard.actionBar.importTitle')}
                 >
                   <FileDown aria-hidden="true" size={14} strokeWidth={1.8} />
-                  {isImportingTable ? '导入中...' : '导入'}
+                  {t(
+                    isImportingTable
+                      ? 'dashboard.actionBar.importing'
+                      : 'dashboard.actionBar.import',
+                  )}
                 </button>
               ) : null}
               <button
@@ -318,7 +335,7 @@ export function DashboardActionBar({
                 disabled={!loadedProject || isExportingTable || isFormattingJcpro}
                 onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'csv')}
                 type="button"
-                title="导出为 CSV 格式"
+                title={t('dashboard.actionBar.exportCsvTitle')}
               >
                 CSV
               </button>
@@ -327,7 +344,7 @@ export function DashboardActionBar({
                 disabled={!loadedProject || isExportingTable || isFormattingJcpro}
                 onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'xml')}
                 type="button"
-                title="导出为 Excel XML 格式"
+                title={t('dashboard.actionBar.exportExcelTitle')}
               >
                 Excel
               </button>
@@ -341,10 +358,14 @@ export function DashboardActionBar({
               disabled={!loadedProject || generatingTestKey !== null || isFormattingJcpro}
               onClick={handleRequestTestData}
               type="button"
-              title="自动构建当前页面的 CAN 测试数据"
+              title={t('dashboard.actionBar.generateTestDataTitle')}
             >
               <WandSparkles aria-hidden="true" size={14} strokeWidth={1.8} />
-              {generatingTestKey !== null ? '生成中...' : '生成测试数据'}
+              {t(
+                generatingTestKey !== null
+                  ? 'dashboard.actionBar.generating'
+                  : 'dashboard.actionBar.generateTestData',
+              )}
             </button>
           ) : null}
           {activeModule.key === 'ui' ? (
@@ -353,10 +374,18 @@ export function DashboardActionBar({
                 showCanvasLabels ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'
               }`}
               onClick={onToggleCanvasLabels}
-              title={showCanvasLabels ? '隐藏画布上的资源文字标注' : '显示画布上的资源文字标注'}
+              title={t(
+                showCanvasLabels
+                  ? 'dashboard.actionBar.hideCanvasLabelsTitle'
+                  : 'dashboard.actionBar.showCanvasLabelsTitle',
+              )}
               type="button"
             >
-              {showCanvasLabels ? '隐藏标注' : '显示标注'}
+              {t(
+                showCanvasLabels
+                  ? 'dashboard.actionBar.hideCanvasLabels'
+                  : 'dashboard.actionBar.showCanvasLabels',
+              )}
             </button>
           ) : null}
           {(
@@ -377,7 +406,7 @@ export function DashboardActionBar({
               disabled={!loadedProject || isFormattingJcpro}
               onClick={onToggleJsonEditor}
               type="button"
-              title="打开 JSON 编辑器"
+              title={t('dashboard.actionBar.openJsonEditor')}
             >
               <Braces aria-hidden="true" size={14} strokeWidth={1.8} />
             </button>
@@ -392,7 +421,7 @@ export function DashboardActionBar({
 
       {showGitSummary ? (
         <div
-          aria-label="Git 版本摘要"
+          aria-label={t('dashboard.gitSummary.label')}
           className="git-summary-popover"
           id={gitSummaryId}
           ref={gitSummaryRef}
@@ -400,22 +429,22 @@ export function DashboardActionBar({
           aria-busy={gitLoading}
         >
           <div className="git-summary-header">
-            <span>版本摘要</span>
+            <span>{t('dashboard.gitSummary.title')}</span>
             <div className="git-summary-header-actions">
               <button
-                aria-label="刷新 Git 状态"
+                aria-label={t('dashboard.gitSummary.refresh')}
                 className={gitLoading ? 'is-spinning' : undefined}
                 disabled={gitBusy || gitLoading || !loadedProject || isFormattingJcpro}
                 onClick={() => void refreshProjectGit()}
-                title="刷新 Git 状态"
+                title={t('dashboard.gitSummary.refresh')}
                 type="button"
               >
                 <RefreshCw aria-hidden="true" size={15} strokeWidth={1.8} />
               </button>
               <button
-                aria-label="关闭 Git 版本摘要"
+                aria-label={t('dashboard.gitSummary.closeLabel')}
                 onClick={() => setShowGitSummary(false)}
-                title="关闭"
+                title={t('common.actions.close')}
                 type="button"
               >
                 <X aria-hidden="true" size={16} strokeWidth={1.8} />
@@ -426,12 +455,14 @@ export function DashboardActionBar({
           {!loadedProject ? (
             <div className="git-summary-empty">
               <FolderGit2 aria-hidden="true" size={18} strokeWidth={1.6} />
-              <span>未打开项目</span>
+              <span>{t('dashboard.actionBar.noProject')}</span>
             </div>
           ) : gitStatus?.available ? (
             <div className="git-summary-body">
               {gitLoading ? (
-                <p className="git-summary-loading" role="status">正在后台刷新 Git 状态，当前信息仍可查看</p>
+                <p className="git-summary-loading" role="status">
+                  {t('dashboard.gitSummary.backgroundRefresh')}
+                </p>
               ) : null}
               <button
                 className="git-summary-row"
@@ -440,7 +471,7 @@ export function DashboardActionBar({
                 type="button"
               >
                 <FileDiff aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">变更</span>
+                <span className="git-summary-row-label">{t('dashboard.gitSummary.changes')}</span>
                 <span className="git-summary-change-count">
                   <strong>+{gitStatus.additions}</strong>
                   <em>-{gitStatus.deletions}</em>
@@ -455,7 +486,7 @@ export function DashboardActionBar({
                 type="button"
               >
                 <FolderGit2 aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">本地</span>
+                <span className="git-summary-row-label">{t('dashboard.gitSummary.local')}</span>
                 <span className="git-summary-row-value">{gitRepositoryName}</span>
                 <ChevronRight aria-hidden="true" size={15} strokeWidth={1.7} />
               </button>
@@ -469,7 +500,7 @@ export function DashboardActionBar({
                 <GitBranch aria-hidden="true" size={17} strokeWidth={1.7} />
                 <span className="git-summary-row-label">{gitStatus.branch}</span>
                 <span className="git-summary-row-value git-summary-hash">
-                  {gitStatus.head_short_hash ?? '尚无提交'}
+                  {gitStatus.head_short_hash ?? t('dashboard.gitSummary.noCommits')}
                 </span>
                 <ChevronRight aria-hidden="true" size={15} strokeWidth={1.7} />
               </button>
@@ -483,9 +514,9 @@ export function DashboardActionBar({
                 type="button"
               >
                 <ScanSearch aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">审阅更改</span>
+                <span className="git-summary-row-label">{t('dashboard.gitSummary.review')}</span>
                 <span className="git-summary-row-value">
-                  {gitStatus.changed_paths.length} 个文件
+                  {t('dashboard.gitSummary.fileCount', { count: gitStatus.changed_paths.length })}
                 </span>
                 <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.7} />
               </button>
@@ -496,24 +527,28 @@ export function DashboardActionBar({
                 onClick={() => void handleCommitProjectVersion()}
                 title={
                   hasUnsavedChanges
-                    ? '请先保存项目配置'
+                    ? t('dashboard.gitSummary.saveFirst')
                     : gitStatus.has_staged_changes
-                      ? '暂存区已有其他内容'
+                      ? t('dashboard.gitSummary.stagedChanges')
                       : gitStatus.changed_paths.length === 0
-                        ? '没有可提交的配置修改'
-                        : '提交当前项目配置版本'
+                        ? t('dashboard.gitSummary.noChanges')
+                        : t('dashboard.gitSummary.commitTitle')
                 }
                 type="button"
               >
                 <GitCommitHorizontal aria-hidden="true" size={17} strokeWidth={1.7} />
                 <span className="git-summary-row-label">
-                  {gitBusy ? '提交中...' : '提交项目版本'}
+                  {t(
+                    gitBusy ? 'dashboard.gitSummary.committing' : 'dashboard.gitSummary.commit',
+                  )}
                 </span>
               </button>
 
               <div className="git-summary-row git-summary-row--muted">
                 <CloudOff aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">远程同步未接入</span>
+                <span className="git-summary-row-label">
+                  {t('dashboard.gitSummary.remoteUnavailable')}
+                </span>
               </div>
 
               <button
@@ -523,8 +558,10 @@ export function DashboardActionBar({
                 type="button"
               >
                 <History aria-hidden="true" size={17} strokeWidth={1.7} />
-                <span className="git-summary-row-label">版本历史</span>
-                <span className="git-summary-row-value">{gitRevisions.length} 条</span>
+                <span className="git-summary-row-label">{t('dashboard.gitSummary.history')}</span>
+                <span className="git-summary-row-value">
+                  {t('dashboard.gitSummary.revisionCount', { count: gitRevisions.length })}
+                </span>
                 <ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.7} />
               </button>
 
@@ -537,7 +574,7 @@ export function DashboardActionBar({
           ) : (
             <div className="git-summary-empty git-summary-empty--stacked">
               <FolderGit2 aria-hidden="true" size={18} strokeWidth={1.6} />
-              <span>{gitError ?? gitStatus?.warning ?? '正在读取 Git 状态'}</span>
+              <span>{gitError ?? gitStatus?.warning ?? t('dashboard.gitSummary.reading')}</span>
             </div>
           )}
         </div>

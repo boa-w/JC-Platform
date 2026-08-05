@@ -1,5 +1,6 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Component, type ErrorInfo, type ReactNode, Suspense } from 'react';
+import { appI18n } from '../i18n';
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics';
 
 interface RecoveryBoundaryProps {
@@ -33,11 +34,15 @@ class RecoveryBoundary extends Component<RecoveryBoundaryProps, RecoveryBoundary
           <AlertTriangle size={24} strokeWidth={1.8} />
         </span>
         <div className="recovery-boundary-copy">
-          {isAppFailure ? <h1>应用遇到问题</h1> : <h2>此功能暂时无法显示</h2>}
+          {isAppFailure ? (
+            <h1>{appI18n.t('recoveryBoundary.appTitle')}</h1>
+          ) : (
+            <h2>{appI18n.t('recoveryBoundary.featureTitle')}</h2>
+          )}
           <p>
             {isAppFailure
-              ? '当前界面未能正常启动。可以重试加载界面，不会强制刷新应用窗口。'
-              : '当前模块加载或渲染失败，其他功能仍可继续使用。重试不会刷新整个应用。'}
+              ? appI18n.t('recoveryBoundary.appMessage')
+              : appI18n.t('recoveryBoundary.featureMessage')}
           </p>
         </div>
         <button
@@ -46,10 +51,10 @@ class RecoveryBoundary extends Component<RecoveryBoundaryProps, RecoveryBoundary
           type="button"
         >
           <RefreshCw size={16} aria-hidden="true" />
-          重试
+          {appI18n.t('recoveryBoundary.retry')}
         </button>
         <details className="recovery-boundary-details">
-          <summary>技术信息</summary>
+          <summary>{appI18n.t('recoveryBoundary.technicalInfo')}</summary>
           <code>{this.state.error.message || this.state.error.name}</code>
         </details>
       </>

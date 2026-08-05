@@ -1,5 +1,6 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   flattenUnifiedProtocolDocument,
   loadJsonFile,
@@ -38,6 +39,7 @@ export function useProtocolEditor({
   updateProjectSections,
   applyDocument,
 }: UseProtocolEditorOptions) {
+  const { t } = useTranslation();
   const [unifiedProtocol, setUnifiedProtocol] = useState<UnifiedProtocolModel | null>(null);
   const [unifiedProtocolError, setUnifiedProtocolError] = useState<string | null>(null);
   const [isParsingUnifiedProtocol, setIsParsingUnifiedProtocol] = useState(false);
@@ -91,7 +93,10 @@ export function useProtocolEditor({
         if (generation !== refreshGenerationRef.current) return null;
         setUnifiedProtocol(report);
         if (!report.validation.valid) {
-          setUnifiedProtocolError(report.validation.errors.join('；') || '协议映射校验存在问题');
+          setUnifiedProtocolError(
+            report.validation.errors.join(t('common.punctuation.semicolon')) ||
+              t('protocol.status.mappingValidationFailed'),
+          );
         }
         return report;
       } catch (error) {
@@ -103,7 +108,7 @@ export function useProtocolEditor({
         if (generation === refreshGenerationRef.current) setIsParsingUnifiedProtocol(false);
       }
     },
-    [document],
+    [document, t],
   );
 
   useEffect(() => {
@@ -243,15 +248,15 @@ export function useProtocolEditor({
   async function exportPrivateProtocol() {
     setPrivateProtocolExportStatus(null);
     if (!document) {
-      setPrivateProtocolExportStatus('请先打开 .jcpro 项目。');
+      setPrivateProtocolExportStatus(t('protocol.status.openProjectFirst'));
       return;
     }
     if (!isTauriRuntime()) {
-      setPrivateProtocolExportStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setPrivateProtocolExportStatus(t('protocol.status.desktopSaveDialogOnly'));
       return;
     }
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: '私有协议配置', extensions: ['json'] }] }),
+      () => save({ filters: [{ name: t('protocol.filters.privateJson'), extensions: ['json'] }] }),
       setPrivateProtocolExportStatus,
     );
     if (!selected) return;
@@ -259,7 +264,7 @@ export function useProtocolEditor({
     setIsExportingPrivateProtocol(true);
     try {
       await saveJsonFile(selected, privateProtocol);
-      setPrivateProtocolExportStatus(`已导出：${selected}`);
+      setPrivateProtocolExportStatus(t('protocol.status.exported', { path: selected }));
     } catch (error) {
       setPrivateProtocolExportStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -270,11 +275,11 @@ export function useProtocolEditor({
   async function importPrivateProtocol() {
     setPrivateProtocolImportStatus(null);
     if (!document) {
-      setPrivateProtocolImportStatus('请先打开 .jcpro 项目。');
+      setPrivateProtocolImportStatus(t('protocol.status.openProjectFirst'));
       return;
     }
     if (!isTauriRuntime()) {
-      setPrivateProtocolImportStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setPrivateProtocolImportStatus(t('protocol.status.desktopFilePickerOnly'));
       return;
     }
     const targetDocument = document;
@@ -283,7 +288,7 @@ export function useProtocolEditor({
       () =>
         open({
           multiple: false,
-          filters: [{ name: '私有协议配置', extensions: ['json'] }],
+          filters: [{ name: t('protocol.filters.privateJson'), extensions: ['json'] }],
         }),
       setPrivateProtocolImportStatus,
     );
@@ -296,11 +301,11 @@ export function useProtocolEditor({
         return;
       }
       if (!data || typeof data.enabled !== 'boolean' || !Array.isArray(data.frames)) {
-        setPrivateProtocolImportStatus('无效的私有协议配置文件。');
+        setPrivateProtocolImportStatus(t('protocol.status.invalidPrivateConfig'));
         return;
       }
       updatePrivateProtocol(data);
-      setPrivateProtocolImportStatus(`已导入 ${data.frames.length} 个私有帧`);
+      setPrivateProtocolImportStatus(t('protocol.status.importedPrivate', { count: data.frames.length }));
     } catch (error) {
       setPrivateProtocolImportStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -372,11 +377,17 @@ export function useProtocolEditor({
         return;
       }
       if (!report.valid) {
-        setUnifiedProtocolError(report.errors.join('；') || '生成旧版 PDO 段失败');
+        setUnifiedProtocolError(
+          report.errors.join(t('common.punctuation.semicolon')) || t('protocol.status.flattenFailed'),
+        );
         return;
       }
       applyDocument(report.document);
-      setProtocolFlattenStatus(`已更新：${report.updated_sections.join('、')}`);
+      setProtocolFlattenStatus(
+        t('protocol.status.flattened', {
+          sections: report.updated_sections.join(t('common.punctuation.listSeparator')),
+        }),
+      );
       if (report.warnings.length > 0) setUnifiedProtocolError(report.warnings.join('；'));
       void refreshUnifiedProtocol(report.document);
     } catch (error) {

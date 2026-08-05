@@ -1,4 +1,5 @@
 import { findGroupForKey } from '../data/navigation';
+import { useTranslation } from 'react-i18next';
 import type { FeatureModule, ModuleLifecycle, NavigationKey } from '../types/platform';
 
 interface BreadcrumbProps {
@@ -7,14 +8,15 @@ interface BreadcrumbProps {
   onNavigate: (key: NavigationKey) => void;
 }
 
-function lifecycleLabel(lifecycle?: ModuleLifecycle) {
-  if (lifecycle === 'experimental-deprecated') return '实验性 / 待废弃';
-  if (lifecycle === 'experimental') return '实验性';
-  if (lifecycle === 'deprecated') return '废弃';
+function lifecycleLabelKey(lifecycle?: ModuleLifecycle) {
+  if (lifecycle === 'experimental-deprecated') return 'common.lifecycle.experimentalDeprecated';
+  if (lifecycle === 'experimental') return 'common.lifecycle.experimental';
+  if (lifecycle === 'deprecated') return 'common.lifecycle.deprecated';
   return null;
 }
 
 export function Breadcrumb({ activeKey, modules, onNavigate }: BreadcrumbProps) {
+  const { t } = useTranslation();
   const group = findGroupForKey(activeKey);
   if (!group) return null;
 
@@ -22,28 +24,28 @@ export function Breadcrumb({ activeKey, modules, onNavigate }: BreadcrumbProps) 
   const groupEntryKey = group.keys[0];
 
   return (
-    <nav className="breadcrumb" aria-label="导航路径">
+    <nav className="breadcrumb" aria-label={t('navigation.breadcrumbLabel')}>
       {groupEntryKey === activeKey ? (
-        <span className="breadcrumb-group">{group.label}</span>
+        <span className="breadcrumb-group">{t(group.labelKey)}</span>
       ) : (
         <button
           className="breadcrumb-group breadcrumb-group--link"
           onClick={() => onNavigate(groupEntryKey)}
           type="button"
         >
-          {group.label}
+          {t(group.labelKey)}
         </button>
       )}
       <span className="breadcrumb-sep">/</span>
       <span aria-current="page" className="breadcrumb-current">
-        {currentModule?.title ?? activeKey}
+        {currentModule ? t(currentModule.titleKey) : activeKey}
       </span>
-      {lifecycleLabel(currentModule?.lifecycle) ? (
+      {lifecycleLabelKey(currentModule?.lifecycle) ? (
         <span
           className={`module-lifecycle-badge module-lifecycle-badge--${currentModule?.lifecycle}`}
-          title={currentModule?.lifecycleReason}
+          title={currentModule?.lifecycleReasonKey ? t(currentModule.lifecycleReasonKey) : undefined}
         >
-          {lifecycleLabel(currentModule?.lifecycle)}
+          {t(lifecycleLabelKey(currentModule?.lifecycle) ?? '')}
         </span>
       ) : null}
     </nav>

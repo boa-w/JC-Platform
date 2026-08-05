@@ -1,16 +1,28 @@
 import type { NavigationKey } from '../types/platform';
 
 export interface NavGroup {
-  label: string;
+  id: string;
+  labelKey: string;
   accentToken: `--navigation-accent-${string}`;
   keys: NavigationKey[];
 }
 
 export const navGroups: NavGroup[] = [
-  { label: '项目', accentToken: '--navigation-accent-project', keys: ['project'] },
-  { label: '数据', accentToken: '--navigation-accent-data', keys: ['setting-data', 'realtime-data'] },
   {
-    label: '协议',
+    id: 'project',
+    labelKey: 'navigation.groups.project',
+    accentToken: '--navigation-accent-project',
+    keys: ['project'],
+  },
+  {
+    id: 'data',
+    labelKey: 'navigation.groups.data',
+    accentToken: '--navigation-accent-data',
+    keys: ['setting-data', 'realtime-data'],
+  },
+  {
+    id: 'protocol',
+    labelKey: 'navigation.groups.protocol',
     accentToken: '--navigation-accent-protocol',
     keys: [
       'signal-dictionary',
@@ -21,13 +33,29 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: '配置',
+    id: 'configuration',
+    labelKey: 'navigation.groups.configuration',
     accentToken: '--navigation-accent-config',
     keys: ['ui', 'fault-code'],
   },
-  { label: '多国语言', accentToken: '--navigation-accent-language', keys: ['language'] },
-  { label: '输出', accentToken: '--navigation-accent-output', keys: ['export', 'can-test-data'] },
-  { label: '系统', accentToken: '--navigation-accent-system', keys: ['settings'] },
+  {
+    id: 'language',
+    labelKey: 'navigation.groups.language',
+    accentToken: '--navigation-accent-language',
+    keys: ['language'],
+  },
+  {
+    id: 'output',
+    labelKey: 'navigation.groups.output',
+    accentToken: '--navigation-accent-output',
+    keys: ['export', 'can-test-data'],
+  },
+  {
+    id: 'system',
+    labelKey: 'navigation.groups.system',
+    accentToken: '--navigation-accent-system',
+    keys: ['settings'],
+  },
 ];
 
 export function findGroupForKey(key: NavigationKey): NavGroup | undefined {

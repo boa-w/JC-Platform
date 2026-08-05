@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   GitDiffLine,
   GitReviewFile,
@@ -118,6 +119,7 @@ export function GitReviewWorkspace({
   onSaveWorkingTreeFile,
   onClose,
 }: GitReviewWorkspaceProps) {
+  const { t } = useTranslation();
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set());
   const [activePath, setActivePath] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<GitReviewViewMode>(loadViewMode);
@@ -212,11 +214,11 @@ export function GitReviewWorkspace({
   }
 
   return (
-    <section aria-label="Git 更改审阅" className="git-review-workspace">
+    <section aria-label={t('gitReview.label')} className="git-review-workspace">
       <aside className="git-review-sidebar">
         <div className="git-review-sidebar-header">
           <div>
-            <span>{revision ? '版本差异' : '更改'}</span>
+            <span>{t(revision ? 'gitReview.versionDiff' : 'gitReview.changes')}</span>
             <strong>{report?.files.length ?? 0}</strong>
           </div>
           <span className="git-review-stats">
@@ -256,23 +258,27 @@ export function GitReviewWorkspace({
           <div className="git-review-branch-info">
             <div>
               <GitBranch aria-hidden="true" size={17} strokeWidth={1.8} />
-              <strong>{revision?.short_hash ?? report?.branch ?? statusBranch ?? '分支'}</strong>
+              <strong>
+                {revision?.short_hash ?? report?.branch ?? statusBranch ?? t('gitReview.branch')}
+              </strong>
               <span className="git-review-stats">
                 <strong>+{report?.additions ?? 0}</strong>
                 <em>-{report?.deletions ?? 0}</em>
               </span>
             </div>
             <p>
-              {revision ? (report?.base_ref ?? '父版本') : 'HEAD'}
+              {revision ? (report?.base_ref ?? t('gitReview.parentRevision')) : 'HEAD'}
               <span>→</span>
-              {revision?.short_hash ?? '工作区'}
-              {!revision && report?.base_ref ? <small>上游 {report.base_ref}</small> : null}
+              {revision?.short_hash ?? t('gitReview.worktree')}
+              {!revision && report?.base_ref ? (
+                <small>{t('gitReview.upstream', { reference: report.base_ref })}</small>
+              ) : null}
             </p>
           </div>
           <div className="git-review-toolbar-actions">
             {!revision ? (
               <button
-                aria-label="编辑当前工作区文件"
+                aria-label={t('gitReview.editCurrentFile')}
                 disabled={
                   !canEditWorkingTree ||
                   !activeFile ||
@@ -283,61 +289,61 @@ export function GitReviewWorkspace({
                 onClick={() => void openWorkingTreeEditor()}
                 title={
                   !canEditWorkingTree
-                    ? '请先保存或恢复主编辑器中的修改'
+                    ? t('gitReview.saveMainEditorFirst')
                     : activeFile?.status === 'deleted'
-                      ? '已删除文件无法编辑'
-                      : '编辑当前未提交文件'
+                      ? t('gitReview.deletedCannotEdit')
+                      : t('gitReview.editUncommittedFile')
                 }
                 type="button"
               >
                 <Pencil aria-hidden="true" size={15} strokeWidth={1.7} />
               </button>
             ) : null}
-            <fieldset aria-label="对比视图" className="git-review-view-switch">
+            <fieldset aria-label={t('gitReview.diffView')} className="git-review-view-switch">
               <button
-                aria-label="统一对比视图"
+                aria-label={t('gitReview.unifiedView')}
                 aria-pressed={viewMode === 'unified'}
                 className={viewMode === 'unified' ? 'active' : undefined}
                 onClick={() => updateViewMode('unified')}
-                title="统一对比视图"
+                title={t('gitReview.unifiedView')}
                 type="button"
               >
                 <Rows3 aria-hidden="true" size={15} strokeWidth={1.7} />
               </button>
               <button
-                aria-label="并排对比视图"
+                aria-label={t('gitReview.splitView')}
                 aria-pressed={viewMode === 'split'}
                 className={viewMode === 'split' ? 'active' : undefined}
                 onClick={() => updateViewMode('split')}
-                title="并排对比视图"
+                title={t('gitReview.splitView')}
                 type="button"
               >
                 <Columns2 aria-hidden="true" size={15} strokeWidth={1.7} />
               </button>
             </fieldset>
             <button
-              aria-label="展开或折叠全部文件"
+              aria-label={t('gitReview.toggleAllFiles')}
               disabled={!report?.files.length}
               onClick={toggleAllFiles}
-              title="展开或折叠全部文件"
+              title={t('gitReview.toggleAllFiles')}
               type="button"
             >
               <ChevronsUpDown aria-hidden="true" size={16} strokeWidth={1.7} />
             </button>
             <button
-              aria-label="刷新审阅"
+              aria-label={t('gitReview.refresh')}
               disabled={busy || editorFile !== null}
               onClick={onRefresh}
-              title="刷新审阅"
+              title={t('gitReview.refresh')}
               type="button"
             >
               <RefreshCw aria-hidden="true" size={16} strokeWidth={1.7} />
             </button>
             <button
-              aria-label="关闭审阅"
+              aria-label={t('gitReview.close')}
               disabled={editorDirty || editorBusy}
               onClick={onClose}
-              title={editorDirty ? '请先保存或取消文件编辑' : '关闭审阅'}
+              title={t(editorDirty ? 'gitReview.saveOrCancelFirst' : 'gitReview.close')}
               type="button"
             >
               <X aria-hidden="true" size={17} strokeWidth={1.7} />
@@ -356,16 +362,16 @@ export function GitReviewWorkspace({
               </div>
               <button disabled={commitBusy} onClick={onRestore} type="button">
                 <RotateCcw aria-hidden="true" size={16} strokeWidth={1.8} />
-                {commitBusy ? '正在恢复...' : '恢复为工作副本'}
+                {t(commitBusy ? 'gitReview.restoring' : 'gitReview.restoreWorkcopy')}
               </button>
             </div>
           ) : (
             <div className="git-review-commit-bar">
               <input
-                aria-label="版本说明"
+                aria-label={t('gitReview.versionMessage')}
                 maxLength={120}
                 onChange={(event) => onMessageChange(event.target.value)}
-                placeholder="版本说明"
+                placeholder={t('gitReview.versionMessage')}
                 value={message}
               />
               <button
@@ -374,7 +380,7 @@ export function GitReviewWorkspace({
                 type="button"
               >
                 <GitCommitHorizontal aria-hidden="true" size={16} strokeWidth={1.8} />
-                {commitBusy ? '提交中...' : '提交版本'}
+                {t(commitBusy ? 'gitReview.committing' : 'gitReview.commitVersion')}
               </button>
             </div>
           )}
@@ -386,7 +392,7 @@ export function GitReviewWorkspace({
               fallback={
                 <div className="git-review-empty" role="status">
                   <RefreshCw aria-hidden="true" className="git-review-spin" size={22} />
-                  <span>正在加载对照编辑器</span>
+                  <span>{t('gitReview.loadingDiffEditor')}</span>
                 </div>
               }
             >
@@ -402,7 +408,7 @@ export function GitReviewWorkspace({
           ) : busy && !report ? (
             <div className="git-review-empty">
               <RefreshCw aria-hidden="true" className="git-review-spin" size={22} />
-              <span>正在读取更改</span>
+              <span>{t('gitReview.readingChanges')}</span>
             </div>
           ) : error || editorError ? (
             <div className="git-review-empty git-review-empty--error" role="alert">
@@ -452,7 +458,7 @@ export function GitReviewWorkspace({
                               <ChevronDown aria-hidden="true" size={14} strokeWidth={1.7} />
                               <span>
                                 {unchanged > 0
-                                  ? `${unchanged} 行未修改`
+                                  ? t('gitReview.unchangedLines', { count: unchanged })
                                   : `${hunk.old_start} → ${hunk.new_start}`}
                               </span>
                             </div>
@@ -510,7 +516,9 @@ export function GitReviewWorkspace({
           ) : (
             <div className="git-review-empty">
               <Check aria-hidden="true" size={24} strokeWidth={1.8} />
-              <strong>{revision ? '该版本未修改受管配置文件' : '没有待审阅的配置更改'}</strong>
+              <strong>
+                {t(revision ? 'gitReview.noManagedChanges' : 'gitReview.noChangesToReview')}
+              </strong>
             </div>
           )}
         </div>

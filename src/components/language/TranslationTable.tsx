@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import type { LanguageDocument } from '../../types/platform';
 import { TranslationValueInput } from './TranslationValueInput';
 import type { TranslationRow } from './types';
@@ -50,6 +51,7 @@ export function TranslationTable({
   selectedDeletableCount,
   onRequestDeleteSelected,
 }: TranslationTableProps) {
+  const { t } = useTranslation();
   const [editingKeyIndex, setEditingKeyIndex] = useState<number | null>(null);
   const [keyDraft, setKeyDraft] = useState('');
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -180,9 +182,9 @@ export function TranslationTable({
   function dragHandleTitle(row: TranslationRow) {
     const selectedRows = rows.filter((item) => selectedKeys.has(item.key));
     if (selectedKeys.has(row.key) && selectedRows.length > 1) {
-      return `拖动排序（${selectedRows.length} 条）`;
+      return t('language.table.dragMultiple', { count: selectedRows.length });
     }
-    return '拖动排序';
+    return t('language.table.drag');
   }
 
   function handleRowSelectionChange(event: ChangeEvent<HTMLInputElement>, row: TranslationRow) {
@@ -195,9 +197,13 @@ export function TranslationTable({
       {selectedKeys.size > 0 ? (
         <div className="lang-table-bulkbar">
           <span>
-            已选择 <strong>{selectedKeys.size}</strong> 条
+            <Trans
+              components={{ strong: <strong /> }}
+              i18nKey="language.table.selectedSummary"
+              values={{ count: selectedKeys.size }}
+            />
             {selectedDeletableCount !== selectedKeys.size
-              ? `，可删除 ${selectedDeletableCount} 条`
+              ? t('language.table.deletableCount', { count: selectedDeletableCount })
               : ''}
           </span>
           <button
@@ -206,7 +212,7 @@ export function TranslationTable({
             onClick={onRequestDeleteSelected}
             type="button"
           >
-            删除已选
+            {t('language.table.deleteSelected')}
           </button>
         </div>
       ) : null}
@@ -215,7 +221,7 @@ export function TranslationTable({
           <tr>
             <th className="lang-table-th-select">
               <input
-                aria-label="选择当前筛选条目"
+                aria-label={t('language.table.selectVisible')}
                 checked={allVisibleSelected}
                 ref={(element) => {
                   if (element) element.indeterminate = someVisibleSelected && !allVisibleSelected;
@@ -224,8 +230,8 @@ export function TranslationTable({
                 type="checkbox"
               />
             </th>
-            <th className="lang-table-th-index">序号</th>
-            <th className="lang-table-th-key">翻译键</th>
+            <th className="lang-table-th-index">{t('language.table.index')}</th>
+            <th className="lang-table-th-key">{t('language.table.translationKey')}</th>
             <th className="lang-table-th-source">{getLabel(document, sourceLanguage)}</th>
             {targetLanguage && targetLanguage !== sourceLanguage ? (
               <th className="lang-table-th-target">{getLabel(document, targetLanguage)}</th>
@@ -240,7 +246,7 @@ export function TranslationTable({
                 className="lang-table-empty"
                 colSpan={targetLanguage && targetLanguage !== sourceLanguage ? 6 : 5}
               >
-                暂无翻译条目
+                {t('language.table.empty')}
               </td>
             </tr>
           ) : null}
@@ -276,7 +282,7 @@ export function TranslationTable({
               >
                 <td className="lang-table-cell-select">
                   <input
-                    aria-label={`选择 ${row.key}`}
+                    aria-label={t('language.table.selectKey', { key: row.key })}
                     checked={isSelected}
                     disabled={row.isConfigKey}
                     onChange={(event) => handleRowSelectionChange(event, row)}
@@ -287,7 +293,7 @@ export function TranslationTable({
                 <td className="lang-table-cell-key">
                   {editingKeyIndex === row.index ? (
                     <input
-                      aria-label={`编辑翻译键 ${row.key}`}
+                      aria-label={t('language.table.editKey', { key: row.key })}
                       className="lang-table-key-input editing"
                       disabled={isReadonlyKey}
                       value={keyDraft}
@@ -305,15 +311,17 @@ export function TranslationTable({
                       onClick={() => !isReadonlyKey && startEditKey(row.index, row.key)}
                       title={
                         row.isExternalKey
-                          ? '外部引用键，不写入 list_inner'
+                          ? t('language.table.externalKeyTitle')
                           : row.isConfigKey
-                            ? '配置键，不可编辑'
-                            : '点击编辑'
+                            ? t('language.table.configKeyTitle')
+                            : t('language.table.clickToEdit')
                       }
                       type="button"
                     >
                       {row.key}
-                      {row.isExternalKey ? <span className="lang-key-badge">引用</span> : null}
+                      {row.isExternalKey ? (
+                        <span className="lang-key-badge">{t('language.table.referenceBadge')}</span>
+                      ) : null}
                     </button>
                   )}
                 </td>
@@ -341,14 +349,14 @@ export function TranslationTable({
                       className="lang-btn lang-btn--icon"
                       onClick={() => onRestoreKey(row.key)}
                       type="button"
-                      title="恢复"
+                      title={t('common.actions.restore')}
                     >
                       ↩
                     </button>
                   ) : null}
                   {!isReadonlyKey ? (
                     <button
-                      aria-label={`拖动 ${row.key} 调整顺序`}
+                      aria-label={t('language.table.dragKey', { key: row.key })}
                       className="lang-btn lang-btn--icon lang-drag-handle"
                       onDragStart={cancelNativeDrag}
                       onPointerDown={(event) => beginDrag(event, row)}
@@ -363,7 +371,7 @@ export function TranslationTable({
                       className="lang-btn lang-btn--icon lang-btn--danger"
                       onClick={() => onRemoveKey(row.index)}
                       type="button"
-                      title="删除"
+                      title={t('language.table.delete')}
                     >
                       ×
                     </button>

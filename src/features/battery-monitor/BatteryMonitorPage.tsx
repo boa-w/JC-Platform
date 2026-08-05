@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { LanguageDocument, LoadedProject } from '../../types/platform';
@@ -11,41 +12,41 @@ interface BatteryMonitorPageProps {
 }
 
 const rawTypeOptions = [
-  ['u8', 'U8'],
-  ['u16_le', 'U16 LE'],
-  ['u32_le', 'U32 LE'],
-  ['datetime_ymdhms', '年月日时分秒'],
+  ['u8', 'batteryMonitor.rawTypes.u8'],
+  ['u16_le', 'batteryMonitor.rawTypes.u16Le'],
+  ['u32_le', 'batteryMonitor.rawTypes.u32Le'],
+  ['datetime_ymdhms', 'batteryMonitor.rawTypes.datetimeYmdhms'],
 ] as const;
 
 const valueTypeOptions = [
-  ['u8', 'U8'],
-  ['u16', 'U16'],
-  ['u32', 'U32'],
-  ['f32', 'F32'],
-  ['datetime', '日期时间'],
+  ['u8', 'batteryMonitor.valueTypes.u8'],
+  ['u16', 'batteryMonitor.valueTypes.u16'],
+  ['u32', 'batteryMonitor.valueTypes.u32'],
+  ['f32', 'batteryMonitor.valueTypes.f32'],
+  ['datetime', 'batteryMonitor.valueTypes.datetime'],
 ] as const;
 
 const batterySignalHeaders = [
-  ['signal_key', '信号标识'],
-  ['param_id', '参数标识'],
-  ['名称', '信号名称'],
-  ['帧', '所属 CAN 帧'],
-  ['pos / len', '起始位 / 位长度'],
-  ['raw offset', '原始字节偏移'],
-  ['raw type', '原始数据类型'],
-  ['value type', '解析值类型'],
-  ['字节序', '数据字节序'],
-  ['resolution', '解析倍率'],
-  ['offset', '解析偏移'],
-  ['mask', '位掩码'],
-  ['shift', '位移'],
+  ['signal_key', 'batteryMonitor.signalHeaders.signalKey'],
+  ['param_id', 'batteryMonitor.signalHeaders.paramId'],
+  ['name', 'batteryMonitor.signalHeaders.name'],
+  ['frame', 'batteryMonitor.signalHeaders.frame'],
+  ['pos / len', 'batteryMonitor.signalHeaders.posLen'],
+  ['raw offset', 'batteryMonitor.signalHeaders.rawOffset'],
+  ['raw type', 'batteryMonitor.signalHeaders.rawType'],
+  ['value type', 'batteryMonitor.signalHeaders.valueType'],
+  ['byte order', 'batteryMonitor.signalHeaders.byteOrder'],
+  ['resolution', 'batteryMonitor.signalHeaders.resolution'],
+  ['offset', 'batteryMonitor.signalHeaders.offset'],
+  ['mask', 'batteryMonitor.signalHeaders.mask'],
+  ['shift', 'batteryMonitor.signalHeaders.shift'],
 ] as const;
 
 const formatterOptions = [
-  ['linear', '线性'],
-  ['bool_text', '布尔文本'],
-  ['hex', '十六进制'],
-  ['datetime', '日期时间'],
+  ['linear', 'batteryMonitor.formatters.linear'],
+  ['bool_text', 'batteryMonitor.formatters.boolText'],
+  ['hex', 'batteryMonitor.formatters.hex'],
+  ['datetime', 'batteryMonitor.formatters.datetime'],
 ] as const;
 
 function parseMask(value: string) {
@@ -66,6 +67,7 @@ function languageDocumentFor(project: LoadedProject | null): LanguageDocument {
 }
 
 export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitorPageProps) {
+  const { t } = useTranslation();
   const {
     currentBatteryMonitorDocument,
     batteryMonitorExportStatus,
@@ -118,8 +120,8 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
     <section className="table-spec-card">
       <div className="private-protocol-header">
         <div className="private-protocol-header-text">
-          <h2>锂电监控协议</h2>
-          <p>帧、解析规则、显示项和多语言名称均从 battery_monitor 单一配置段维护。</p>
+          <h2>{t('batteryMonitor.title')}</h2>
+          <p>{t('batteryMonitor.description')}</p>
         </div>
         <div className="sample-actions">
           <button
@@ -127,14 +129,18 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
             onClick={() => void handleExportBatteryMonitor()}
             type="button"
           >
-            {isExportingBatteryMonitor ? '导出中...' : '导出 JSON'}
+            {isExportingBatteryMonitor
+              ? t('batteryMonitor.actions.exporting')
+              : t('batteryMonitor.actions.exportJson')}
           </button>
           <button
             disabled={!loadedProject || isImportingBatteryMonitor}
             onClick={() => void handleImportBatteryMonitor()}
             type="button"
           >
-            {isImportingBatteryMonitor ? '导入中...' : '导入 JSON'}
+            {isImportingBatteryMonitor
+              ? t('batteryMonitor.actions.importing')
+              : t('batteryMonitor.actions.importJson')}
           </button>
           <span className="action-bar-sep" />
           <button
@@ -142,42 +148,42 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
             onClick={() => void handleExportBatteryFramesCsv()}
             type="button"
           >
-            导出帧 CSV
+            {t('batteryMonitor.actions.exportFramesCsv')}
           </button>
           <button
             disabled={!loadedProject || isImportingBatteryCsv}
             onClick={() => void handleImportBatteryFramesCsv()}
             type="button"
           >
-            导入帧 CSV
+            {t('batteryMonitor.actions.importFramesCsv')}
           </button>
           <button
             disabled={!loadedProject || isExportingBatteryCsv}
             onClick={() => void handleExportBatterySignalsCsv()}
             type="button"
           >
-            导出信号 CSV
+            {t('batteryMonitor.actions.exportSignalsCsv')}
           </button>
           <button
             disabled={!loadedProject || isImportingBatteryCsv}
             onClick={() => void handleImportBatterySignalsCsv()}
             type="button"
           >
-            导入信号 CSV
+            {t('batteryMonitor.actions.importSignalsCsv')}
           </button>
           <button
             disabled={!loadedProject || isExportingBatteryCsv}
             onClick={() => void handleExportBatteryItemsCsv()}
             type="button"
           >
-            导出显示项 CSV
+            {t('batteryMonitor.actions.exportItemsCsv')}
           </button>
           <button
             disabled={!loadedProject || isImportingBatteryCsv}
             onClick={() => void handleImportBatteryItemsCsv()}
             type="button"
           >
-            导入显示项 CSV
+            {t('batteryMonitor.actions.importItemsCsv')}
           </button>
           <span className="action-bar-sep" />
           <button
@@ -185,14 +191,18 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
             onClick={() => void handleExportBatteryDbc()}
             type="button"
           >
-            {isExportingBatteryDbc ? '导出中...' : '导出 DBC'}
+            {isExportingBatteryDbc
+              ? t('batteryMonitor.actions.exporting')
+              : t('batteryMonitor.actions.exportDbc')}
           </button>
           <button
             disabled={!loadedProject || isImportingBatteryDbc}
             onClick={() => void handleImportBatteryDbc()}
             type="button"
           >
-            {isImportingBatteryDbc ? '导入中...' : '导入 DBC'}
+            {isImportingBatteryDbc
+              ? t('batteryMonitor.actions.importing')
+              : t('batteryMonitor.actions.importDbc')}
           </button>
         </div>
       </div>
@@ -220,39 +230,43 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
         <div className="pdo-simple-editor battery-monitor-editor">
           <div className="config-summary-strip">
             <article>
-              <span>状态</span>
-              <strong>{currentBatteryMonitorDocument.enabled ? '启用' : '停用'}</strong>
+              <span>{t('batteryMonitor.summary.status')}</span>
+              <strong>
+                {currentBatteryMonitorDocument.enabled
+                  ? t('batteryMonitor.enabled')
+                  : t('batteryMonitor.disabled')}
+              </strong>
             </article>
             <article>
-              <span>帧 / 信号</span>
+              <span>{t('batteryMonitor.summary.framesSignals')}</span>
               <strong>
                 {currentBatteryMonitorDocument.frames.length} / {currentBatteryMonitorDocument.signals.length}
               </strong>
             </article>
             <article>
-              <span>启用显示项</span>
+              <span>{t('batteryMonitor.summary.enabledItems')}</span>
               <strong>
                 {currentBatteryMonitorDocument.items.filter((item) => item.enabled).length} /{' '}
                 {currentBatteryMonitorDocument.items.length}
               </strong>
             </article>
             <article>
-              <span>配置段</span>
+              <span>{t('batteryMonitor.summary.configSection')}</span>
               <strong>battery_monitor</strong>
             </article>
           </div>
 
           <div className="battery-config-row">
-            <label title="启用或停用锂电监控协议">
-              启用
+            <label title={t('batteryMonitor.enableTitle')}>
+              {t('batteryMonitor.enabled')}
               <select
                 value={currentBatteryMonitorDocument.enabled ? 1 : 0}
                 onChange={(event) =>
                   updateBatteryMonitorField('enabled', Number(event.target.value) === 1)
                 }
               >
-                <option value={1}>启用</option>
-                <option value={0}>停用</option>
+                <option value={1}>{t('batteryMonitor.enabled')}</option>
+                <option value={0}>{t('batteryMonitor.disabled')}</option>
               </select>
             </label>
             <label>
@@ -276,7 +290,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
               />
             </label>
             <label>
-              默认超时 tick
+              {t('batteryMonitor.fields.defaultTimeout')}
               <input
                 min={0}
                 type="number"
@@ -287,7 +301,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
               />
             </label>
             <label>
-              每页数量
+              {t('batteryMonitor.fields.pageSize')}
               <input
                 min={1}
                 type="number"
@@ -299,9 +313,13 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
 
           <section className="pdo-frame-section">
             <div className="config-table-toolbar">
-              <strong>CAN 帧（{currentBatteryMonitorDocument.frames.length}）</strong>
+              <strong>
+                {t('batteryMonitor.frames.title', {
+                  count: currentBatteryMonitorDocument.frames.length,
+                })}
+              </strong>
               <button onClick={addBatteryFrame} type="button">
-                新增帧
+                {t('batteryMonitor.actions.addFrame')}
               </button>
             </div>
             <div className="config-table-frame">
@@ -310,11 +328,11 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                   <tr>
                     <th>frame_key</th>
                     <th>CAN ID</th>
-                    <th>类型</th>
+                    <th>{t('batteryMonitor.frames.type')}</th>
                     <th>DLC</th>
-                    <th>描述</th>
-                    <th>超时 tick</th>
-                    <th>操作</th>
+                    <th>{t('batteryMonitor.frames.description')}</th>
+                    <th>{t('batteryMonitor.frames.timeout')}</th>
+                    <th>{t('batteryMonitor.actions.column')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -344,8 +362,8 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           value={frame.frame_type}
                           onChange={(event) => updateBatteryFrame(index, 'frame_type', Number(event.target.value))}
                         >
-                          <option value={0}>标准帧</option>
-                          <option value={1}>扩展帧</option>
+                          <option value={0}>{t('batteryMonitor.frameTypes.standard')}</option>
+                          <option value={1}>{t('batteryMonitor.frameTypes.extended')}</option>
                         </select>
                       </td>
                       <td>
@@ -378,11 +396,11 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                             onClick={() => restoreModifiedPath(['battery_monitor', 'frames', index])}
                             type="button"
                           >
-                            恢复
+                            {t('common.actions.restore')}
                           </button>
                         ) : null}
                         <button className="danger" onClick={() => removeBatteryFrame(index)} type="button">
-                          删除
+                          {t('common.actions.delete')}
                         </button>
                       </td>
                     </tr>
@@ -394,22 +412,26 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
 
           <section className="pdo-frame-section">
             <div className="config-table-toolbar">
-              <strong>信号解析规则（{currentBatteryMonitorDocument.signals.length}）</strong>
+              <strong>
+                {t('batteryMonitor.signals.title', {
+                  count: currentBatteryMonitorDocument.signals.length,
+                })}
+              </strong>
               <button onClick={addBatterySignal} type="button">
-                新增信号
+                {t('batteryMonitor.actions.addSignal')}
               </button>
             </div>
             <div className="config-table-frame">
               <table className="config-table battery-monitor-signal-table">
                 <thead>
                   <tr>
-                    {batterySignalHeaders.map(([key, label]) => (
+                    {batterySignalHeaders.map(([key, labelKey]) => (
                       <th key={key} scope="col">
                         <span className="battery-signal-header-code">{key}</span>
-                        <span className="battery-signal-header-label">{label}</span>
+                        <span className="battery-signal-header-label">{t(labelKey)}</span>
                       </th>
                     ))}
-                    <th scope="col">操作</th>
+                    <th scope="col">{t('batteryMonitor.actions.column')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -479,9 +501,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           value={signal.raw_type}
                           onChange={(event) => updateBatterySignal(index, 'raw_type', event.target.value)}
                         >
-                          {rawTypeOptions.map(([value, label]) => (
+                          {rawTypeOptions.map(([value, labelKey]) => (
                             <option key={value} value={value}>
-                              {label}
+                              {t(labelKey)}
                             </option>
                           ))}
                         </select>
@@ -491,9 +513,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           value={signal.value_type}
                           onChange={(event) => updateBatterySignal(index, 'value_type', event.target.value)}
                         >
-                          {valueTypeOptions.map(([value, label]) => (
+                          {valueTypeOptions.map(([value, labelKey]) => (
                             <option key={value} value={value}>
-                              {label}
+                              {t(labelKey)}
                             </option>
                           ))}
                         </select>
@@ -503,8 +525,8 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           value={signal.byte_order}
                           onChange={(event) => updateBatterySignal(index, 'byte_order', event.target.value)}
                         >
-                          <option value="little_endian">小端</option>
-                          <option value="big_endian">大端</option>
+                          <option value="little_endian">{t('batteryMonitor.byteOrder.little')}</option>
+                          <option value="big_endian">{t('batteryMonitor.byteOrder.big')}</option>
                         </select>
                       </td>
                       <td>
@@ -544,11 +566,11 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                             onClick={() => restoreModifiedPath(['battery_monitor', 'signals', index])}
                             type="button"
                           >
-                            恢复
+                            {t('common.actions.restore')}
                           </button>
                         ) : null}
                         <button className="danger" onClick={() => removeBatterySignal(index)} type="button">
-                          删除
+                          {t('common.actions.delete')}
                         </button>
                       </td>
                     </tr>
@@ -560,29 +582,33 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
 
           <section className="pdo-frame-section">
             <div className="config-table-toolbar">
-              <strong>页面显示项（{currentBatteryMonitorDocument.items.length}）</strong>
+              <strong>
+                {t('batteryMonitor.items.title', {
+                  count: currentBatteryMonitorDocument.items.length,
+                })}
+              </strong>
               <button onClick={addBatteryItem} type="button">
-                新增显示项
+                {t('batteryMonitor.actions.addItem')}
               </button>
             </div>
             <div className="config-table-frame">
               <table className="config-table">
                 <thead>
                   <tr>
-                    <th>启用</th>
-                    <th>顺序</th>
+                    <th>{t('batteryMonitor.items.enabled')}</th>
+                    <th>{t('batteryMonitor.items.order')}</th>
                     <th>item_key</th>
-                    <th>信号</th>
+                    <th>{t('batteryMonitor.items.signal')}</th>
                     <th>name_key</th>
-                    <th>中文名称</th>
+                    <th>{t('batteryMonitor.items.zhName')}</th>
                     <th>fallback</th>
-                    <th>单位</th>
-                    <th>格式</th>
-                    <th>偏移</th>
-                    <th>缩放分子 / 分母</th>
-                    <th>小数</th>
-                    <th>有效帧 / 超时</th>
-                    <th>操作</th>
+                    <th>{t('batteryMonitor.items.unit')}</th>
+                    <th>{t('batteryMonitor.items.format')}</th>
+                    <th>{t('batteryMonitor.items.offset')}</th>
+                    <th>{t('batteryMonitor.items.scale')}</th>
+                    <th>{t('batteryMonitor.items.decimals')}</th>
+                    <th>{t('batteryMonitor.items.validity')}</th>
+                    <th>{t('batteryMonitor.actions.column')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -660,9 +686,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                             value={item.formatter.kind}
                             onChange={(event) => updateBatteryItemFormatter(index, 'kind', event.target.value)}
                           >
-                            {formatterOptions.map(([value, label]) => (
+                            {formatterOptions.map(([value, labelKey]) => (
                               <option key={value} value={value}>
-                                {label}
+                                {t(labelKey)}
                               </option>
                             ))}
                           </select>
@@ -709,7 +735,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           </select>
                           <input
                             min={0}
-                            placeholder="帧超时"
+                            placeholder={t('batteryMonitor.items.frameTimeout')}
                             type="number"
                             value={item.validity.timeout_ticks ?? ''}
                             onChange={(event) =>
@@ -724,11 +750,11 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                               onClick={() => restoreModifiedPath(['battery_monitor', 'items', index])}
                               type="button"
                             >
-                              恢复
+                              {t('common.actions.restore')}
                             </button>
                           ) : null}
                           <button className="danger" onClick={() => removeBatteryItem(index)} type="button">
-                            删除
+                            {t('common.actions.delete')}
                           </button>
                         </td>
                       </tr>
@@ -740,7 +766,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
           </section>
         </div>
       ) : (
-        <EmptyState>请先在项目管理中打开 .jcpro 项目文件</EmptyState>
+        <EmptyState>{t('batteryMonitor.openProjectFirst')}</EmptyState>
       )}
     </section>
   );

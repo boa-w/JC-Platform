@@ -1,5 +1,6 @@
 import { GripHorizontal, X } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import './json-editor.css';
 
@@ -26,6 +27,7 @@ export function JsonEditorPopup({
   onApply,
   onClose,
 }: JsonEditorPopupProps) {
+  const { t } = useTranslation();
   const [size, setSize] = useState({ w: 520, h: 420 });
   const [position, setPosition] = useState({ x: 0, y: 64 });
   const initialized = useRef(false);
@@ -127,7 +129,7 @@ export function JsonEditorPopup({
         <div className="json-popup-header">
           <div className="json-popup-title">
             <button
-              aria-label="拖动 JSON 编辑器"
+              aria-label={t('jsonEditor.dragLabel')}
               className="json-popup-drag-handle"
               onKeyDown={(event) => {
                 const offsets: Record<string, [number, number]> = {
@@ -145,28 +147,28 @@ export function JsonEditorPopup({
                 }));
               }}
               onMouseDown={handleDragStart}
-              title="拖动编辑器；聚焦后可使用方向键移动"
+              title={t('jsonEditor.dragTitle')}
               type="button"
             >
               <GripHorizontal aria-hidden="true" size={16} />
             </button>
-            <strong id={titleId}>JSON 编辑器</strong>
+            <strong id={titleId}>{t('jsonEditor.title')}</strong>
           </div>
           <div className="json-popup-actions">
             <button className="lang-btn" onClick={onFormat} type="button">
-              格式化
+              {t('jsonEditor.format')}
             </button>
             <button className="lang-btn" disabled={!canRestore} onClick={onRestore} type="button">
-              恢复段落
+              {t('jsonEditor.restoreSection')}
             </button>
             <button className="lang-btn lang-btn--primary" onClick={onApply} type="button">
-              应用
+              {t('jsonEditor.apply')}
             </button>
             <button
-              aria-label="关闭 JSON 编辑器"
+              aria-label={t('jsonEditor.close')}
               className="lang-btn lang-btn--icon"
               onClick={onClose}
-              title="关闭 JSON 编辑器"
+              title={t('jsonEditor.close')}
               type="button"
             >
               <X aria-hidden="true" size={15} />
@@ -174,7 +176,7 @@ export function JsonEditorPopup({
           </div>
         </div>
         <textarea
-          aria-label="JSON 配置内容"
+          aria-label={t('jsonEditor.contentLabel')}
           className="json-popup-editor"
           onChange={(event) => onTextChange(event.target.value)}
           ref={editorRef}
@@ -186,7 +188,7 @@ export function JsonEditorPopup({
           </p>
         ) : null}
         <button
-          aria-label="调整 JSON 编辑器大小"
+          aria-label={t('jsonEditor.resizeLabel')}
           className="json-popup-resize-handle"
           onKeyDown={(event) => {
             const offsets: Record<string, [number, number]> = {
@@ -204,15 +206,15 @@ export function JsonEditorPopup({
             }));
           }}
           onMouseDown={handleResizeStart}
-          title="拖动调整大小；聚焦后可使用方向键调整"
+          title={t('jsonEditor.resizeTitle')}
           type="button"
         />
       </div>
 
       <div className="json-active-banner">
-        <span>JSON 编辑器已打开，配置项编辑已锁定</span>
+        <span>{t('jsonEditor.lockedBanner')}</span>
         <button onClick={onClose} type="button">
-          关闭编辑器
+          {t('jsonEditor.closeEditor')}
         </button>
       </div>
     </>

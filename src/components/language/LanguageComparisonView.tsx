@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { LanguageDocument } from '../../types/platform';
 import type { LanguageIndex } from './useLanguageIndex';
 
@@ -24,6 +25,7 @@ export function LanguageComparisonView({
   languageIndex,
   onUpdate,
 }: LanguageComparisonViewProps) {
+  const { t } = useTranslation();
   const [editingCell, setEditingCell] = useState<{ key: string; code: string } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [editingKeyIndex, setEditingKeyIndex] = useState<number | null>(null);
@@ -249,8 +251,8 @@ export function LanguageComparisonView({
         <table className="lang-comparison-table">
           <thead>
             <tr>
-              <th className="lang-comparison-th-index">序号</th>
-              <th className="lang-comparison-th-key">翻译键</th>
+              <th className="lang-comparison-th-index">{t('language.table.index')}</th>
+              <th className="lang-comparison-th-key">{t('language.table.translationKey')}</th>
               {document.list_code_language.map((code) => (
                 <th className="lang-comparison-th-lang" key={code}>
                   <span className="lang-comparison-th-code">{code}</span>
@@ -267,7 +269,7 @@ export function LanguageComparisonView({
                   className="lang-comparison-empty"
                   colSpan={document.list_code_language.length + 3}
                 >
-                  暂无翻译条目
+                  {t('language.table.empty')}
                 </td>
               </tr>
             ) : null}
@@ -308,15 +310,19 @@ export function LanguageComparisonView({
                         onClick={() => !isReadonlyKey && startEditKey(actualIndex, key)}
                         title={
                           isExternalKey
-                            ? '外部引用键，不写入 list_inner'
+                            ? t('language.table.externalKeyTitle')
                             : isConfigKey
-                              ? '语言名称配置键，不可编辑 key'
-                              : '点击编辑'
+                              ? t('language.comparison.languageNameKeyTitle')
+                              : t('language.table.clickToEdit')
                         }
                         type="button"
                       >
                         {key}
-                        {isExternalKey ? <span className="lang-key-badge">引用</span> : null}
+                        {isExternalKey ? (
+                          <span className="lang-key-badge">
+                            {t('language.table.referenceBadge')}
+                          </span>
+                        ) : null}
                       </button>
                     )}
                   </td>
@@ -357,12 +363,12 @@ export function LanguageComparisonView({
                   <td className="lang-comparison-cell-actions">
                     {!isReadonlyKey ? (
                       <button
-                        aria-label={`拖动 ${key} 调整顺序`}
+                        aria-label={t('language.table.dragKey', { key })}
                         className="lang-btn lang-btn--icon lang-drag-handle"
                         onDragStart={cancelNativeDrag}
                         onPointerDown={(event) => beginDrag(event, actualIndex)}
                         type="button"
-                        title="拖动排序"
+                        title={t('language.table.drag')}
                       >
                         ↕
                       </button>
@@ -372,7 +378,7 @@ export function LanguageComparisonView({
                         className="lang-btn lang-btn--icon lang-btn--danger"
                         onClick={() => handleRemoveKey(actualIndex)}
                         type="button"
-                        title="删除"
+                        title={t('language.table.delete')}
                       >
                         ×
                       </button>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { LanguageDocument } from '../../types/platform';
 import { ConfirmDialog } from '../ConfirmDialog';
 import type { LanguageProgress } from './types';
@@ -49,6 +50,7 @@ export function LanguageSidebar({
   onUpdateLanguage,
   onRemoveLanguage,
 }: LanguageSidebarProps) {
+  const { t } = useTranslation();
   const [newCode, setNewCode] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -123,12 +125,12 @@ export function LanguageSidebar({
   return (
     <aside className="lang-sidebar">
       <div className="lang-sidebar-header">
-        <h3>语言</h3>
+        <h3>{t('language.sidebar.title')}</h3>
         <button
           className="lang-btn lang-btn--icon"
           onClick={() => setShowAdd(!showAdd)}
           type="button"
-          title="添加语言"
+          title={t('language.sidebar.addLanguage')}
         >
           {showAdd ? '×' : '+'}
         </button>
@@ -137,7 +139,7 @@ export function LanguageSidebar({
       {showAdd ? (
         <div className="lang-sidebar-add">
           <div className="lang-sidebar-add-common">
-            <span className="lang-sidebar-add-label">常用语言：</span>
+            <span className="lang-sidebar-add-label">{t('language.sidebar.common')}</span>
             <div className="lang-sidebar-add-chips">
               {availableLanguages.slice(0, 8).map((lang) => (
                 <button
@@ -153,18 +155,18 @@ export function LanguageSidebar({
             </div>
           </div>
           <div className="lang-sidebar-add-custom">
-            <span className="lang-sidebar-add-label">自定义：</span>
+            <span className="lang-sidebar-add-label">{t('language.sidebar.custom')}</span>
             <div className="lang-sidebar-add-form">
               <input
-                aria-label="新语言代码"
-                placeholder="代码"
+                aria-label={t('language.sidebar.newCodeLabel')}
+                placeholder={t('language.sidebar.codePlaceholder')}
                 value={newCode}
                 onChange={(e) => setNewCode(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               />
               <input
-                aria-label="新语言名称"
-                placeholder="名称"
+                aria-label={t('language.sidebar.newNameLabel')}
+                placeholder={t('language.sidebar.namePlaceholder')}
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
@@ -175,7 +177,7 @@ export function LanguageSidebar({
                 onClick={handleAdd}
                 type="button"
               >
-                添加
+                {t('language.sidebar.add')}
               </button>
             </div>
           </div>
@@ -197,7 +199,7 @@ export function LanguageSidebar({
                 <div className="lang-sidebar-edit">
                   <div className="lang-sidebar-item-header">
                     <input
-                      aria-label={`编辑语言代码 ${lang.label}`}
+                      aria-label={t('language.sidebar.editCode', { language: lang.label })}
                       className="lang-sidebar-edit-input lang-sidebar-edit-code"
                       value={editCode}
                       onChange={(e) => setEditCode(e.target.value)}
@@ -209,7 +211,7 @@ export function LanguageSidebar({
                       disabled={isZh}
                     />
                     <input
-                      aria-label={`编辑语言名称 ${lang.code}`}
+                      aria-label={t('language.sidebar.editName', { code: lang.code })}
                       className="lang-sidebar-edit-input lang-sidebar-edit-label"
                       value={editLabel}
                       onChange={(e) => setEditLabel(e.target.value)}
@@ -254,20 +256,20 @@ export function LanguageSidebar({
                   {!isZh ? (
                     <div className="lang-sidebar-item-actions">
                       <button
-                        aria-label={`编辑语言 ${lang.label}`}
+                        aria-label={t('language.sidebar.editLanguage', { language: lang.label })}
                         className="lang-sidebar-action-btn"
                         onClick={() => startEditLang(lang.code)}
                         type="button"
-                        title="编辑语言"
+                        title={t('language.sidebar.editLanguageTitle')}
                       >
                         ✎
                       </button>
                       <button
-                        aria-label={`删除语言 ${lang.label}`}
+                        aria-label={t('language.sidebar.deleteLanguage', { language: lang.label })}
                         className="lang-sidebar-remove"
                         onClick={() => setConfirmDelete(lang.code)}
                         type="button"
-                        title="删除语言"
+                        title={t('language.sidebar.deleteLanguageTitle')}
                       >
                         ×
                       </button>
@@ -281,15 +283,17 @@ export function LanguageSidebar({
       </div>
 
       <div className="lang-sidebar-footer">
-        <span>{document.list_code_language.length} 种语言</span>
-        <span>{totalKeys} 个翻译键</span>
+        <span>{t('language.sidebar.languageCount', { count: document.list_code_language.length })}</span>
+        <span>{t('language.sidebar.keyCount', { count: totalKeys })}</span>
       </div>
 
       {confirmDelete ? (
         <ConfirmDialog
-          title="删除语言"
-          message={`确定要删除「${deleteTarget}」吗？${deleteCount > 0 ? `该语言已有 ${deleteCount} 条翻译将被移除。` : ''}`}
-          confirmLabel="删除"
+          title={t('language.sidebar.deleteDialogTitle')}
+          message={`${t('language.sidebar.deleteDialogMessage', { language: deleteTarget })}${
+            deleteCount > 0 ? t('language.sidebar.deleteTranslationCount', { count: deleteCount }) : ''
+          }`}
+          confirmLabel={t('language.table.delete')}
           danger
           onConfirm={handleConfirmDelete}
           onCancel={() => setConfirmDelete(null)}

@@ -1,5 +1,6 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   buildProjectBinaryReport,
   compareProjectBinaryReport,
@@ -37,6 +38,7 @@ export function useProjectExport({
   projectPath,
   updateProjectDocument,
 }: UseProjectExportOptions) {
+  const { t } = useTranslation();
   const [outputDir, setOutputDir] = useState(() => projectDirectory(projectPath));
   const exportSettings = useMemo(() => readProjectExportSettings(document), [document]);
   const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
@@ -89,7 +91,11 @@ export function useProjectExport({
         folder_name: exportSettings.folder_name,
       });
       setImageCopyReport(report);
-      if (!report.valid) setError(report.errors.join('；') || 'UI 图片复制存在问题');
+      if (!report.valid)
+        setError(
+          report.errors.join(t('common.punctuation.semicolon')) ||
+            t('projectExport.errors.uiCopy'),
+        );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -101,7 +107,11 @@ export function useProjectExport({
     try {
       const report = await buildProjectBinaryReport(document);
       setBinaryReport(report);
-      if (!report.valid) setError(report.errors.join('；') || '二进制构建报告存在问题');
+      if (!report.valid)
+        setError(
+          report.errors.join(t('common.punctuation.semicolon')) ||
+            t('projectExport.errors.binaryBuild'),
+        );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -111,7 +121,7 @@ export function useProjectExport({
     setError(null);
     setBinaryCompareReport(null);
     if (!isTauriRuntime()) {
-      setError('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setError(t('projectExport.errors.desktopFilePickerOnly'));
       return;
     }
 
@@ -119,7 +129,7 @@ export function useProjectExport({
       () =>
         open({
           multiple: false,
-          filters: [{ name: '设备二进制', extensions: ['bin'] }],
+          filters: [{ name: t('projectExport.filters.binary'), extensions: ['bin'] }],
         }),
       setError,
     );
@@ -132,7 +142,11 @@ export function useProjectExport({
       });
       setBinaryCompareReport(report);
       setBinaryReport(report.build);
-      if (!report.valid || !report.same) setError(report.errors.join('；') || '新旧二进制不一致');
+      if (!report.valid || !report.same)
+        setError(
+          report.errors.join(t('common.punctuation.semicolon')) ||
+            t('projectExport.errors.binaryMismatch'),
+        );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -141,7 +155,7 @@ export function useProjectExport({
   async function selectOutputDir() {
     setError(null);
     if (!isTauriRuntime()) {
-      setError('系统目录选择器只能在 Tauri 桌面应用中使用。');
+      setError(t('projectExport.errors.desktopDirectoryPickerOnly'));
       return;
     }
     const selected = await runSystemDialog(

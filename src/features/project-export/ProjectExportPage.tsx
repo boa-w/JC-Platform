@@ -1,4 +1,5 @@
 import { RotateCcw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ProjectExportController } from './useProjectExport';
 import './project-export.css';
 
@@ -7,6 +8,7 @@ interface ProjectExportPageProps {
 }
 
 export function ProjectExportPage({ controller }: ProjectExportPageProps) {
+  const { t } = useTranslation();
   const {
     outputDir: exportOutputDir,
     setOutputDir: setExportOutputDir,
@@ -39,8 +41,8 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
     <section className="export-card">
       <div className="export-header">
         <div>
-          <h2>项目导出</h2>
-          <p>默认在项目文件同级目录生成导出包；文件夹名和文件名随项目配置保存。</p>
+          <h2>{t('projectExport.title')}</h2>
+          <p>{t('projectExport.description')}</p>
         </div>
         {exportReport ? (
           <button
@@ -48,32 +50,32 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
             type="button"
             onClick={() => void handleOpenExportDir(exportReport.export_root)}
           >
-            打开导出目录
+            {t('projectExport.openDirectory')}
           </button>
         ) : null}
       </div>
       <div className="export-form">
         <label>
-          导出基路径
+          {t('projectExport.basePath')}
           <input
             value={exportOutputDir}
             onChange={(event) => setExportOutputDir(event.target.value)}
           />
         </label>
         <button type="button" onClick={() => void handleSelectExportDir()} disabled={isExporting}>
-          选择基路径
+          {t('projectExport.selectBasePath')}
         </button>
         <button
           type="button"
           onClick={handleExportPackage}
           disabled={isExporting || exportOutputDir.trim() === ''}
         >
-          {isExporting ? '导出中...' : '执行项目导出'}
+          {t(isExporting ? 'common.status.exporting' : 'projectExport.execute')}
         </button>
       </div>
       <div className="export-filename-grid">
         <label>
-          导出文件夹名
+          {t('projectExport.folderName')}
           <input
             value={exportFolderName}
             onChange={(event) => setExportFolderName(event.target.value)}
@@ -81,7 +83,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
           />
         </label>
         <label>
-          JSON 文件名
+          {t('projectExport.jsonFilename')}
           <input
             value={exportManifestFilename}
             onChange={(event) => setExportManifestFilename(event.target.value)}
@@ -89,7 +91,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
           />
         </label>
         <label>
-          Bin 文件名
+          {t('projectExport.binFilename')}
           <input
             value={exportBinaryFilename}
             onChange={(event) => setExportBinaryFilename(event.target.value)}
@@ -103,14 +105,14 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
           disabled={isExporting}
         >
           <RotateCcw size={14} aria-hidden="true" />
-          恢复默认命名
+          {t('projectExport.restoreDefaultNames')}
         </button>
       </div>
       <section className="export-write-controls">
         <div className="export-write-controls__header">
           <div>
-            <strong className="section-label--muted">导出写入控制</strong>
-            <p>开关随当前项目保存，并同时作用于项目导出、二进制报告和 bin 对比。</p>
+            <strong className="section-label--muted">{t('projectExport.writeControls.title')}</strong>
+            <p>{t('projectExport.writeControls.description')}</p>
           </div>
           <button
             className="export-naming-reset"
@@ -118,20 +120,20 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
             onClick={handleResetExportSettings}
             disabled={isExporting}
           >
-            恢复全部默认
+            {t('projectExport.restoreAllDefaults')}
           </button>
         </div>
         <div className="export-option-grid">
-          <div className="export-option-grid__head">配置项</div>
-          <div className="export-option-grid__head">写入 ConfigUpdate.json</div>
-          <div className="export-option-grid__head">写入 pdo_sdo_data.bin</div>
+          <div className="export-option-grid__head">{t('projectExport.writeControls.item')}</div>
+          <div className="export-option-grid__head">{t('projectExport.writeControls.writeConfig')}</div>
+          <div className="export-option-grid__head">{t('projectExport.writeControls.writeBin')}</div>
           <div className="export-option-info">
-            <span>锂电监控协议</span>
-            <small>battery_monitor 配置描述与独立二进制段。</small>
+            <span>{t('navigation.modules.batteryMonitor.title')}</span>
+            <small>{t('projectExport.writeControls.batteryDescription')}</small>
           </div>
           <label className="export-check">
             <input
-              aria-label="锂电监控协议：写入 ConfigUpdate.json"
+              aria-label={t('projectExport.writeControls.batteryConfigAria')}
               checked={batteryMonitorExport.config}
               disabled={isExporting}
               onChange={(event) =>
@@ -139,11 +141,11 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
               }
               type="checkbox"
             />
-            <span>配置文件</span>
+            <span>{t('projectExport.writeControls.configFile')}</span>
           </label>
           <label className="export-check">
             <input
-              aria-label="锂电监控协议：写入 pdo_sdo_data.bin"
+              aria-label={t('projectExport.writeControls.batteryBinAria')}
               checked={batteryMonitorExport.bin}
               disabled={isExporting}
               onChange={(event) =>
@@ -151,15 +153,15 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
               }
               type="checkbox"
             />
-            <span>bin 文件</span>
+            <span>{t('projectExport.writeControls.binFile')}</span>
           </label>
           <div className="export-option-info">
-            <span>故障码配置</span>
-            <small>fault_code_info 清单描述与独立 fault code 二进制段。</small>
+            <span>{t('projectExport.writeControls.faultCodes')}</span>
+            <small>{t('projectExport.writeControls.faultDescription')}</small>
           </div>
           <label className="export-check">
             <input
-              aria-label="故障码配置：写入 ConfigUpdate.json"
+              aria-label={t('projectExport.writeControls.faultConfigAria')}
               checked={faultCodeExport.config}
               disabled={isExporting}
               onChange={(event) =>
@@ -167,11 +169,11 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
               }
               type="checkbox"
             />
-            <span>配置文件</span>
+            <span>{t('projectExport.writeControls.configFile')}</span>
           </label>
           <label className="export-check">
             <input
-              aria-label="故障码配置：写入 pdo_sdo_data.bin"
+              aria-label={t('projectExport.writeControls.faultBinAria')}
               checked={faultCodeExport.bin}
               disabled={isExporting}
               onChange={(event) =>
@@ -179,7 +181,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
               }
               type="checkbox"
             />
-            <span>bin 文件</span>
+            <span>{t('projectExport.writeControls.binFile')}</span>
           </label>
         </div>
       </section>
@@ -191,56 +193,58 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
       {exportReport ? (
         <section className="export-result-panel">
           <div className="export-result-header">
-            <strong className="section-label--muted">导出结果</strong>
-            <span>{exportReport.valid ? '有效' : '存在问题'}</span>
+            <strong className="section-label--muted">{t('projectExport.result.title')}</strong>
+            <span>{t(exportReport.valid ? 'projectExport.valid' : 'projectExport.hasIssues')}</span>
           </div>
           <div className="export-report export-report--primary">
             <article>
-              <span>二进制大小 / CRC</span>
+              <span>{t('projectExport.result.binarySizeCrc')}</span>
               <strong>
                 {exportReport.binary.file_size} bytes / {exportReport.binary.crc}
               </strong>
             </article>
             <article>
-              <span>图片复制</span>
-              <strong>{exportReport.copied_images.length} 个文件</strong>
+              <span>{t('projectExport.imageCopy')}</span>
+              <strong>{t('dashboard.gitSummary.fileCount', { count: exportReport.copied_images.length })}</strong>
             </article>
             <article className="export-report__wide">
-              <span>导出根目录</span>
+              <span>{t('projectExport.exportRoot')}</span>
               <strong>{exportReport.export_root}</strong>
             </article>
             <article className="export-report__wide">
-              <span>JSON 文件</span>
+              <span>{t('projectExport.jsonFile')}</span>
               <strong>{exportReport.manifest_path}</strong>
             </article>
             <article className="export-report__wide">
-              <span>Bin 文件</span>
+              <span>{t('projectExport.binFile')}</span>
               <strong>{exportReport.binary_path}</strong>
             </article>
           </div>
           {exportReport.errors.length > 0 ? (
             <p className="export-error export-message" role="alert">
-              {exportReport.errors.join('；')}
+              {exportReport.errors.join(t('common.punctuation.semicolon'))}
             </p>
           ) : null}
           {exportReport.warnings.length > 0 ? (
-            <p className="export-warning export-message">{exportReport.warnings.join('；')}</p>
+            <p className="export-warning export-message">
+              {exportReport.warnings.join(t('common.punctuation.semicolon'))}
+            </p>
           ) : null}
         </section>
       ) : null}
       <div className="section-divider" />
       <section className="export-tools-section">
         <div className="export-tools-header">
-          <strong className="section-label--muted">辅助工具</strong>
+          <strong className="section-label--muted">{t('projectExport.tools.title')}</strong>
           <div className="sample-actions">
             <button type="button" onClick={() => void handleCopyUiImages()}>
-              仅复制 UI 图片
+              {t('projectExport.tools.copyImages')}
             </button>
             <button type="button" onClick={() => void handleBuildBinaryReport()}>
-              生成二进制报告
+              {t('projectExport.tools.binaryReport')}
             </button>
             <button type="button" onClick={() => void handleCompareBinary()}>
-              选择参考 bin 对比
+              {t('projectExport.tools.compareBin')}
             </button>
           </div>
         </div>
@@ -248,31 +252,37 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
           {imageCopyReport ? (
             <section className="export-result-panel">
               <div className="export-result-header">
-                <strong>图片复制</strong>
+                <strong>{t('projectExport.imageCopy')}</strong>
                 <button
                   type="button"
                   onClick={() => void handleOpenExportDir(imageCopyReport.export_root)}
                 >
-                  打开目录
+                  {t('projectExport.openDirectoryShort')}
                 </button>
               </div>
               <div className="export-report">
                 <article>
-                  <span>有效</span>
-                  <strong>{imageCopyReport.valid ? '是' : '否'}</strong>
+                  <span>{t('projectManagement.parseReport.valid')}</span>
+                  <strong>
+                    {t(
+                      imageCopyReport.valid
+                        ? 'projectManagement.parseReport.yes'
+                        : 'projectManagement.parseReport.no',
+                    )}
+                  </strong>
                 </article>
                 <article>
-                  <span>复制数量</span>
+                  <span>{t('projectExport.copyCount')}</span>
                   <strong>{imageCopyReport.copied_files.length}</strong>
                 </article>
                 <article className="export-report__wide">
-                  <span>导出根目录</span>
+                  <span>{t('projectExport.exportRoot')}</span>
                   <strong>{imageCopyReport.export_root}</strong>
                 </article>
               </div>
               {imageCopyReport.warnings.length > 0 ? (
                 <p className="export-warning export-message">
-                  {imageCopyReport.warnings.join('；')}
+                  {imageCopyReport.warnings.join(t('common.punctuation.semicolon'))}
                 </p>
               ) : null}
             </section>
@@ -280,12 +290,12 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
           {binaryReport ? (
             <section className="export-result-panel">
               <div className="export-result-header">
-                <strong>二进制报告</strong>
-                <span>{binaryReport.valid ? '有效' : '存在问题'}</span>
+                <strong>{t('projectExport.tools.binaryReport')}</strong>
+                <span>{t(binaryReport.valid ? 'projectExport.valid' : 'projectExport.hasIssues')}</span>
               </div>
               <div className="export-report">
                 <article>
-                  <span>大小</span>
+                  <span>{t('projectExport.size')}</span>
                   <strong>{binaryReport.file_size} bytes</strong>
                 </article>
                 <article>
@@ -293,34 +303,38 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
                   <strong>{binaryReport.crc}</strong>
                 </article>
                 <article>
-                  <span>语言数量</span>
+                  <span>{t('projectExport.languageCount')}</span>
                   <strong>{binaryReport.data_description.language_code.length}</strong>
                 </article>
               </div>
               {binaryReport.warnings.length > 0 ? (
-                <p className="export-warning export-message">{binaryReport.warnings.join('；')}</p>
+                <p className="export-warning export-message">
+                  {binaryReport.warnings.join(t('common.punctuation.semicolon'))}
+                </p>
               ) : null}
             </section>
           ) : null}
           {binaryCompareReport ? (
             <section className="export-result-panel">
               <div className="export-result-header">
-                <strong>参考 bin 对比</strong>
-                <span>{binaryCompareReport.same ? '一致' : '不一致'}</span>
+                <strong>{t('projectExport.tools.referenceCompare')}</strong>
+                <span>
+                  {t(binaryCompareReport.same ? 'projectExport.same' : 'projectExport.different')}
+                </span>
               </div>
               <div className="export-report">
                 <article>
-                  <span>生成/参考大小</span>
+                  <span>{t('projectExport.generatedReferenceSize')}</span>
                   <strong>
                     {binaryCompareReport.generated_size} / {binaryCompareReport.legacy_size}
                   </strong>
                 </article>
                 <article>
-                  <span>首个差异偏移</span>
+                  <span>{t('projectExport.firstDiffOffset')}</span>
                   <strong>{binaryCompareReport.first_diff_offset ?? '-'}</strong>
                 </article>
                 <article>
-                  <span>生成/参考字节</span>
+                  <span>{t('projectExport.generatedReferenceByte')}</span>
                   <strong>
                     {binaryCompareReport.generated_byte ?? '-'} /{' '}
                     {binaryCompareReport.legacy_byte ?? '-'}

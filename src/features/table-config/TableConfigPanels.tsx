@@ -1,8 +1,8 @@
-import type { LegacyTableSpec } from '../../types/platform';
+import { useTranslation } from 'react-i18next';
 import {
   type TableConfigController,
   tableConfigSections,
-  tableConfigTitles,
+  tableConfigTitleKeys,
 } from './useTableConfigController';
 
 interface TableConfigStatusPanelProps {
@@ -10,28 +10,15 @@ interface TableConfigStatusPanelProps {
 }
 
 export function TableConfigStatusPanel({ controller }: TableConfigStatusPanelProps) {
+  const { t } = useTranslation();
   const kind = controller.currentKind;
   if (!kind) return null;
 
   return (
     <section className="table-spec-card">
       <div>
-        <h2>{tableConfigTitles[kind]}</h2>
-        <p>
-          {kind === 'language'
-            ? '单语言 CSV 与完整语言表请使用语言列表内的两个独立导入入口。'
-            : '导入/导出操作请使用顶部工具栏按钮。支持 CSV、XLS、XLSX、XML 格式。'}
-        </p>
+        <h2>{t(tableConfigTitleKeys[kind])}</h2>
       </div>
-      {controller.specs
-        .filter((spec) => spec.kind === kind)
-        .map((spec) => (
-          <TableFormat
-            key={spec.kind}
-            spec={spec}
-            title={`表头格式（${spec.headers.length} 列）`}
-          />
-        ))}
       {kind !== 'language' && controller.importError ? (
         <p className="project-open-error" role="alert">
           {controller.importError}
@@ -40,17 +27,17 @@ export function TableConfigStatusPanel({ controller }: TableConfigStatusPanelPro
       {kind !== 'language' && controller.importReport ? (
         <div className="table-io-result">
           <div className="table-io-result-row">
-            <span>导入校验</span>
+            <span>{t('tableConfig.importValidation')}</span>
             <strong className={controller.importReport.valid ? 'text-success' : 'text-danger'}>
-              {controller.importReport.valid ? '通过' : '存在问题'}
+              {t(controller.importReport.valid ? 'tableConfig.passed' : 'tableConfig.hasIssues')}
             </strong>
           </div>
           <div className="table-io-result-row">
-            <span>表头列数</span>
+            <span>{t('tableConfig.headerCount')}</span>
             <strong>{controller.importReport.table.actual_headers.length}</strong>
           </div>
           <div className="table-io-result-row">
-            <span>写回段落</span>
+            <span>{t('tableConfig.targetSection')}</span>
             <strong>{tableConfigSections[kind]}</strong>
           </div>
         </div>
@@ -61,49 +48,5 @@ export function TableConfigStatusPanel({ controller }: TableConfigStatusPanelPro
         </p>
       ) : null}
     </section>
-  );
-}
-
-interface TableFormatReferenceProps {
-  specs: LegacyTableSpec[];
-}
-
-export function TableFormatReference({ specs }: TableFormatReferenceProps) {
-  return (
-    <section className="table-spec-card">
-      <div>
-        <h2>表格格式参考</h2>
-        <p>SDO、PDO 简化表和多语言表的表头定义，导入前可快速确认目标格式。</p>
-      </div>
-      {specs.map((spec) => (
-        <TableFormat key={spec.kind} spec={spec} title={tableSpecTitle(spec)} />
-      ))}
-    </section>
-  );
-}
-
-function tableSpecTitle(spec: LegacyTableSpec) {
-  const name =
-    spec.kind === 'sdo' ? 'SDO 参数表' : spec.kind === 'pdoSimple' ? 'PDO 简化表' : '多语言表';
-  return `${name}（${spec.headers.length} 列）`;
-}
-
-interface TableFormatProps {
-  spec: LegacyTableSpec;
-  title: string;
-}
-
-function TableFormat({ spec, title }: TableFormatProps) {
-  return (
-    <div className="table-format-ref">
-      <strong>{title}</strong>
-      <div className="table-format-chips">
-        {spec.headers.map((header) => (
-          <span className="table-format-chip" key={header}>
-            {header}
-          </span>
-        ))}
-      </div>
-    </div>
   );
 }

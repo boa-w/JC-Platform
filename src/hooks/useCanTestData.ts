@@ -1,5 +1,6 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { generateCanTestData, loadJsonFile, saveJsonFile, saveTextFile } from '../api/commands';
 import type {
   CanTestCase,
@@ -15,6 +16,7 @@ import { runSystemDialog } from '../utils/systemDialog';
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export function useCanTestData(sourceDocument: unknown | null) {
+  const { t } = useTranslation();
   const [canTestFrames, setCanTestFrames] = useState<CanTestFrame[]>([]);
   const [canTestSettingEntries, setCanTestSettingEntries] = useState<CanTestSettingEntry[]>([]);
   const [canTestCases, setCanTestCases] = useState<CanTestCase[]>([]);
@@ -24,6 +26,9 @@ export function useCanTestData(sourceDocument: unknown | null) {
   const [selectedCanTestCaseIndex, setSelectedCanTestCaseIndex] = useState(0);
   const [canTestDefaultCycle, setCanTestDefaultCycle] = useState(100);
   const [canTestStatus, setCanTestStatus] = useState<string | null>(null);
+  const [canTestStatusTone, setCanTestStatusTone] = useState<'success' | 'error' | 'neutral' | null>(
+    null,
+  );
   const [isGeneratingCanTest, setIsGeneratingCanTest] = useState(false);
   const sourceDocumentRef = useRef(sourceDocument);
   const generationRef = useRef(0);
@@ -39,6 +44,7 @@ export function useCanTestData(sourceDocument: unknown | null) {
     setCanTestWarnings([]);
     setSelectedCanTestCaseIndex(0);
     setCanTestStatus(null);
+    setCanTestStatusTone(null);
     setIsGeneratingCanTest(false);
   }, [sourceDocument]);
 
@@ -78,13 +84,15 @@ export function useCanTestData(sourceDocument: unknown | null) {
 
   async function generate(loadedProject: LoadedProject | null) {
     if (!loadedProject) {
-      setCanTestStatus('请先打开 .jcpro 项目。');
+      setCanTestStatus(t('canTestData.openProjectFirst'));
+      setCanTestStatusTone('error');
       return;
     }
     const targetDocument = loadedProject.document;
     const generation = ++generationRef.current;
     setIsGeneratingCanTest(true);
     setCanTestStatus(null);
+    setCanTestStatusTone(null);
     try {
       const result = await generateCanTestData(targetDocument, canTestProfile);
       if (generation !== generationRef.current || targetDocument !== sourceDocumentRef.current) {
@@ -105,11 +113,17 @@ export function useCanTestData(sourceDocument: unknown | null) {
       setCanTestFrames(frames);
       setCanTestSettingEntries(settingEntries);
       setCanTestStatus(
-        `已生成 ${result.coverage?.caseCount ?? cases.length} 个测试用例，${result.coverage?.generatedFrameCount ?? result.frameCount} 帧次，${result.coverage?.generatedSettingEntryCount ?? settingEntries.length} 个设置条目`,
+        t('canTestData.generatedStatus', {
+          cases: result.coverage?.caseCount ?? cases.length,
+          frames: result.coverage?.generatedFrameCount ?? result.frameCount,
+          entries: result.coverage?.generatedSettingEntryCount ?? settingEntries.length,
+        }),
       );
+      setCanTestStatusTone('success');
     } catch (error) {
       if (generation === generationRef.current) {
         setCanTestStatus(error instanceof Error ? error.message : String(error));
+        setCanTestStatusTone('error');
       }
     } finally {
       if (generation === generationRef.current) setIsGeneratingCanTest(false);
@@ -169,7 +183,8 @@ export function useCanTestData(sourceDocument: unknown | null) {
     setSelectedCanTestCaseIndex(index);
     setCanTestFrames(normalizeFrames(testCase.frames));
     setCanTestSettingEntries(normalizeSettingEntries(testCase.settingEntries));
-    setCanTestStatus(`正在查看：${testCase.caseId} ${testCase.title}`);
+    setCanTestStatus(t('canTestData.viewingCase', { id: testCase.caseId, title: testCase.title }));
+    setCanTestStatusTone('neutral');
   }
 
   function fillSignals(mode: 'min' | 'max' | 'random' | 'zero' | 'ff') {
@@ -192,14 +207,15 @@ export function useCanTestData(sourceDocument: unknown | null) {
         return { ...frame, signals: newSignals, data: newData };
       }),
     );
-    const labels: Record<string, string> = {
-      zero: '全部清零',
-      min: '填充最小值',
-      max: '填充最大值',
-      random: '填充随机值',
-      ff: '全填 FF',
+    const labelKeys: Record<string, string> = {
+      zero: 'canTestData.fillStatus.zero',
+      min: 'canTestData.fillStatus.min',
+      max: 'canTestData.fillStatus.max',
+      random: 'canTestData.fillStatus.random',
+      ff: 'canTestData.fillStatus.ff',
     };
-    setCanTestStatus(`已${labels[mode]}`);
+    setCanTestStatus(t(labelKeys[mode]));
+    setCanTestStatusTone('success');
   }
 
   function exportableCases() {
@@ -208,7 +224,7 @@ export function useCanTestData(sourceDocument: unknown | null) {
       : [
           {
             caseId: 'TC-MANUAL-001',
-            title: '当前手动帧',
+            title: t('canTestData.manualCaseTitle'),
             scenario: 'manual',
             description: '',
             tags: [],
@@ -239,16 +255,21 @@ export function useCanTestData(sourceDocument: unknown | null) {
 
   async function exportTxt(loadedProject: LoadedProject | null) {
     if (!loadedProject || canTestFrames.length === 0) {
-      setCanTestStatus('请先生成测试数据。');
+      setCanTestStatus(t('canTestData.generateFirst'));
+      setCanTestStatusTone('error');
       return;
     }
     if (!isTauriRuntime()) {
-      setCanTestStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setCanTestStatus(t('canTestData.desktopSaveDialogOnly'));
+      setCanTestStatusTone('error');
       return;
     }
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: '文本文件', extensions: ['txt'] }] }),
-      setCanTestStatus,
+      () => save({ filters: [{ name: t('canTestData.textFileFilter'), extensions: ['txt'] }] }),
+      (message) => {
+        setCanTestStatus(message);
+        setCanTestStatusTone('error');
+      },
     );
     if (typeof selected !== 'string') return;
 
@@ -259,24 +280,31 @@ export function useCanTestData(sourceDocument: unknown | null) {
 
     try {
       await saveTextFile(selected, lines.join('\n'));
-      setCanTestStatus(`已导出：${selected}`);
+      setCanTestStatus(t('canTestData.exported', { path: selected }));
+      setCanTestStatusTone('success');
     } catch (error) {
       setCanTestStatus(error instanceof Error ? error.message : String(error));
+      setCanTestStatusTone('error');
     }
   }
 
   async function exportCsv(loadedProject: LoadedProject | null) {
     if (!loadedProject || canTestFrames.length === 0) {
-      setCanTestStatus('请先生成测试数据。');
+      setCanTestStatus(t('canTestData.generateFirst'));
+      setCanTestStatusTone('error');
       return;
     }
     if (!isTauriRuntime()) {
-      setCanTestStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setCanTestStatus(t('canTestData.desktopSaveDialogOnly'));
+      setCanTestStatusTone('error');
       return;
     }
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: 'CSV 文件', extensions: ['csv'] }] }),
-      setCanTestStatus,
+      () => save({ filters: [{ name: t('canTestData.csvFileFilter'), extensions: ['csv'] }] }),
+      (message) => {
+        setCanTestStatus(message);
+        setCanTestStatusTone('error');
+      },
     );
     if (typeof selected !== 'string') return;
 
@@ -291,24 +319,32 @@ export function useCanTestData(sourceDocument: unknown | null) {
 
     try {
       await saveTextFile(selected, lines.join('\n'));
-      setCanTestStatus(`已导出 CSV：${selected}`);
+      setCanTestStatus(t('canTestData.exportedCsv', { path: selected }));
+      setCanTestStatusTone('success');
     } catch (error) {
       setCanTestStatus(error instanceof Error ? error.message : String(error));
+      setCanTestStatusTone('error');
     }
   }
 
   async function exportConfig() {
     if (canTestFrames.length === 0) {
-      setCanTestStatus('请先生成测试数据。');
+      setCanTestStatus(t('canTestData.generateFirst'));
+      setCanTestStatusTone('error');
       return;
     }
     if (!isTauriRuntime()) {
-      setCanTestStatus('系统保存对话框只能在 Tauri 桌面应用中使用。');
+      setCanTestStatus(t('canTestData.desktopSaveDialogOnly'));
+      setCanTestStatusTone('error');
       return;
     }
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }] }),
-      setCanTestStatus,
+      () =>
+        save({ filters: [{ name: t('canTestData.configFileFilter'), extensions: ['json'] }] }),
+      (message) => {
+        setCanTestStatus(message);
+        setCanTestStatusTone('error');
+      },
     );
     if (typeof selected !== 'string') return;
 
@@ -323,24 +359,30 @@ export function useCanTestData(sourceDocument: unknown | null) {
         coverage: canTestCoverage,
         warnings: canTestWarnings,
       });
-      setCanTestStatus(`已导出配置：${selected}`);
+      setCanTestStatus(t('canTestData.exportedConfig', { path: selected }));
+      setCanTestStatusTone('success');
     } catch (error) {
       setCanTestStatus(error instanceof Error ? error.message : String(error));
+      setCanTestStatusTone('error');
     }
   }
 
   async function importConfig() {
     if (!isTauriRuntime()) {
-      setCanTestStatus('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setCanTestStatus(t('canTestData.desktopFilePickerOnly'));
+      setCanTestStatusTone('error');
       return;
     }
     const selected = await runSystemDialog(
       () =>
         open({
           multiple: false,
-          filters: [{ name: 'CAN 测试配置文件', extensions: ['json'] }],
+          filters: [{ name: t('canTestData.configFileFilter'), extensions: ['json'] }],
         }),
-      setCanTestStatus,
+      (message) => {
+        setCanTestStatus(message);
+        setCanTestStatusTone('error');
+      },
     );
     if (typeof selected !== 'string') return;
 
@@ -356,7 +398,8 @@ export function useCanTestData(sourceDocument: unknown | null) {
         warnings?: string[];
       };
       if (!config.frames || !Array.isArray(config.frames)) {
-        setCanTestStatus('配置文件中没有有效的帧数据。');
+        setCanTestStatus(t('canTestData.noValidFrames'));
+        setCanTestStatusTone('error');
         return;
       }
       setCanTestFrames(normalizeFrames(config.frames));
@@ -373,9 +416,11 @@ export function useCanTestData(sourceDocument: unknown | null) {
       setSelectedCanTestCaseIndex(0);
       if (config.profile) setCanTestProfile(config.profile);
       if (config.defaultCycleMs) setCanTestDefaultCycle(config.defaultCycleMs);
-      setCanTestStatus(`已导入 ${config.frames.length} 个 CAN 帧`);
+      setCanTestStatus(t('canTestData.importedFrames', { count: config.frames.length }));
+      setCanTestStatusTone('success');
     } catch (error) {
       setCanTestStatus(error instanceof Error ? error.message : String(error));
+      setCanTestStatusTone('error');
     }
   }
 
@@ -391,7 +436,7 @@ export function useCanTestData(sourceDocument: unknown | null) {
     canTestDefaultCycle,
     setCanTestDefaultCycle,
     canTestStatus,
-    setCanTestStatus,
+    canTestStatusTone,
     isGeneratingCanTest,
     generate,
     updateFrame,

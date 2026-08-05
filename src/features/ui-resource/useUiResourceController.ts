@@ -1,5 +1,6 @@
 import { open } from '@tauri-apps/plugin-dialog';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   addUiResourceOptionDocument,
   parseUiResources,
@@ -82,6 +83,7 @@ export function useUiResourceController({
   loadedProject,
   applyLoadedProject,
 }: UseUiResourceControllerOptions) {
+  const { t } = useTranslation();
   const [report, setReport] = useState<UiResourceParseReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isApplying, setIsApplying] = useState(false);
@@ -164,21 +166,21 @@ export function useUiResourceController({
   async function applyResource(resource: Omit<UiResourceUpdateRequest, 'document'>) {
     await runDocumentMutation(
       (document) => updateUiResourceDocument({ document, ...resource }),
-      'UI 资源写回失败',
+      t('uiResource.status.applyFailed'),
     );
   }
 
   async function selectOptionSources() {
     setError(null);
     if (!isTauriRuntime()) {
-      setError('系统文件选择器只能在 Tauri 桌面应用中使用。');
+      setError(t('uiResource.status.desktopFilePickerOnly'));
       return [];
     }
     const selected = await runSystemDialog(
       () =>
         open({
           multiple: true,
-          filters: [{ name: '图片资源', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }],
+          filters: [{ name: t('uiResource.filters.images'), extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }],
         }),
       setError,
     );
@@ -189,14 +191,14 @@ export function useUiResourceController({
   async function addOption(key: string, sources: string[]) {
     await runDocumentMutation(
       (document) => addUiResourceOptionDocument({ document, key, sources }),
-      'UI 资源选项新增失败',
+      t('uiResource.status.addOptionFailed'),
     );
   }
 
   async function removeOption(key: string, optionIndex: number) {
     await runDocumentMutation(
       (document) => removeUiResourceOptionDocument({ document, key, option_index: optionIndex }),
-      'UI 资源选项删除失败',
+      t('uiResource.status.removeOptionFailed'),
     );
   }
 

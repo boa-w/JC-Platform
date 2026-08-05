@@ -6,6 +6,7 @@ import { EditorView, keymap } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { Braces, Pencil, Save } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { GitWorktreeFileContent } from '../../types/platform';
 import { formatJsonText } from '../../utils/jsonFormat';
 import { lineDiffChanges } from './lineDiff';
@@ -27,6 +28,7 @@ export function GitWorktreeDiffEditor({
   onSave,
   onCancel,
 }: GitWorktreeDiffEditorProps) {
+  const { t } = useTranslation();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const mergeRef = useRef<MergeView | null>(null);
   const saveRef = useRef(onSave);
@@ -66,14 +68,18 @@ export function GitWorktreeDiffEditor({
           ...sharedExtensions,
           EditorState.readOnly.of(true),
           EditorView.editable.of(false),
-          EditorView.contentAttributes.of({ 'aria-label': `${file.path} HEAD 原始版本` }),
+          EditorView.contentAttributes.of({
+            'aria-label': t('gitDiff.originalAria', { path: file.path }),
+          }),
         ],
       },
       b: {
         doc: file.current_content,
         extensions: [
           ...sharedExtensions,
-          EditorView.contentAttributes.of({ 'aria-label': `${file.path} 当前工作区内容` }),
+          EditorView.contentAttributes.of({
+            'aria-label': t('gitDiff.currentAria', { path: file.path }),
+          }),
           keymap.of([
             {
               key: 'Mod-s',
@@ -107,8 +113,8 @@ export function GitWorktreeDiffEditor({
         button.type = 'button';
         button.className = 'git-review-revert-chunk';
         button.textContent = '→';
-        button.title = '使用左侧版本替换此差异块';
-        button.setAttribute('aria-label', '回退此差异块');
+        button.title = t('gitDiff.revertChunkTitle');
+        button.setAttribute('aria-label', t('gitDiff.revertChunkLabel'));
         return button;
       },
       revertControls: 'a-to-b',
@@ -120,7 +126,7 @@ export function GitWorktreeDiffEditor({
       mergeRef.current = null;
       dirtyChangeRef.current(false);
     };
-  }, [file]);
+  }, [file, t]);
 
   function formatFile() {
     const view = mergeRef.current?.b;
@@ -130,7 +136,11 @@ export function GitWorktreeDiffEditor({
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: formatted } });
       setFormatError(null);
     } catch (cause) {
-      setFormatError(`JSON 格式错误：${cause instanceof Error ? cause.message : String(cause)}`);
+      setFormatError(
+        t('gitDiff.jsonFormatError', {
+          message: cause instanceof Error ? cause.message : String(cause),
+        }),
+      );
     }
   }
 
@@ -140,24 +150,27 @@ export function GitWorktreeDiffEditor({
   }
 
   return (
-    <section aria-label={`对照编辑 ${file.path}`} className="git-review-file-editor">
+    <section aria-label={t('gitDiff.editAria', { path: file.path })} className="git-review-file-editor">
       <header>
         <div>
           <Pencil aria-hidden="true" size={16} strokeWidth={1.8} />
           <span>
             <strong>{file.path}</strong>
             <small>
-              {lineCount} 行{dirty ? ' · 尚未保存' : ' · 已同步'}
+              {t('gitDiff.lineStatus', {
+                count: lineCount,
+                status: t(dirty ? 'gitDiff.unsaved' : 'gitDiff.synced'),
+              })}
             </small>
           </span>
         </div>
         <div className="git-review-editor-actions">
           <button disabled={busy} onClick={formatFile} type="button">
             <Braces aria-hidden="true" size={15} strokeWidth={1.8} />
-            格式化
+            {t('jsonEditor.format')}
           </button>
           <button disabled={busy} onClick={onCancel} type="button">
-            取消
+            {t('common.actions.cancel')}
           </button>
           <button
             className="git-review-editor-save"
@@ -166,13 +179,13 @@ export function GitWorktreeDiffEditor({
             type="button"
           >
             <Save aria-hidden="true" size={15} strokeWidth={1.8} />
-            {busy ? '保存中...' : '保存文件'}
+            {t(busy ? 'common.status.saving' : 'gitDiff.saveFile')}
           </button>
         </div>
       </header>
       <div className="git-review-editor-labels" aria-hidden="true">
-        <span>HEAD 原始版本</span>
-        <span>当前工作区（可编辑）</span>
+        <span>{t('gitDiff.original')}</span>
+        <span>{t('gitDiff.currentEditable')}</span>
       </div>
       <div className="git-review-merge-editor" ref={hostRef} />
       {error || formatError ? <p role="alert">{error ?? formatError}</p> : null}

@@ -321,17 +321,15 @@ export function buildDuplicateFaultCodeHints(sources: FaultCodeSource[], codes: 
   });
 
   const duplicateIndexes = new Set<number>();
-  const messages: string[] = [];
+  const duplicateGroups: Array<{ canId: number; code: number; count: number }> = [];
 
   for (const group of groups.values()) {
     if (group.indexes.length <= 1) continue;
     for (const index of group.indexes) duplicateIndexes.add(index);
-    messages.push(
-      `${hexOrDecimal(group.canId)} 下故障码 ${group.code} 重复 ${group.indexes.length} 次`,
-    );
+    duplicateGroups.push({ canId: group.canId, code: group.code, count: group.indexes.length });
   }
 
-  return { duplicateIndexes, messages };
+  return { duplicateIndexes, duplicateGroups };
 }
 
 export function buildDuplicateMessageKeyHints(
@@ -355,13 +353,13 @@ export function buildDuplicateMessageKeyHints(
   });
 
   const duplicateIndexes = new Set<number>();
-  const messages: string[] = [];
+  const duplicateGroups: Array<{ key: string; count: number }> = [];
 
   for (const group of groups.values()) {
     if (group.indexes.length <= 1) continue;
     for (const index of group.indexes) duplicateIndexes.add(index);
-    messages.push(`文案 Key "${group.key}" 重复 ${group.indexes.length} 次`);
+    duplicateGroups.push({ key: group.key, count: group.indexes.length });
   }
 
-  return { duplicateIndexes, messages };
+  return { duplicateIndexes, duplicateGroups };
 }

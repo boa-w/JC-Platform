@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getBackendHealth, getProjectSummary } from './api/commands';
 import { Sidebar } from './components/Sidebar';
 import { featureModules } from './data/modules';
@@ -13,6 +14,7 @@ import './styles/app.css';
 import './styles/theme-dark.css';
 
 export default function App() {
+  const { t } = useTranslation();
   const [activeKey, setActiveKey] = useState<NavigationKey>(defaultNavigationKey);
   const [health, setHealth] = useState<BackendHealth | null>(null);
   const [project, setProject] = useState<ProjectSummary | null>(null);
@@ -42,10 +44,10 @@ export default function App() {
   const authorizeUpdateRelaunch = useCallback(async () => {
     const persisted = await recoveryDraftFlushRef.current();
     if (!persisted) {
-      throw new Error('无法安全保存恢复草稿，更新重启已取消。');
+      throw new Error(t('app.updateDraftSaveFailed'));
     }
     updateRelaunchAuthorizedRef.current = true;
-  }, []);
+  }, [t]);
 
   const updateRecoveryDraftFlush = useCallback((handler: () => Promise<boolean>) => {
     recoveryDraftFlushRef.current = handler;
@@ -60,7 +62,7 @@ export default function App() {
   return (
     <div className="app-shell">
       <a className="skip-link" href={`#${workspaceId}`}>
-        跳转到主要内容
+        {t('app.skipToMain')}
       </a>
       <Sidebar
         modules={featureModules}

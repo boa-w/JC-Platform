@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { parsePdoAdvancedProject } from '../../api/commands';
 import type { PdoAdvancedParseReport } from '../../types/platform';
 
 export function usePdoAdvancedReport(document: unknown | null) {
+  const { t } = useTranslation();
   const [report, setReport] = useState<PdoAdvancedParseReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -21,7 +23,7 @@ export function usePdoAdvancedReport(document: unknown | null) {
   async function parse() {
     const targetDocument = document;
     if (!targetDocument) {
-      setError('请先打开 .jcpro 项目。');
+      setError(t('pdoAdvancedReport.status.openProjectFirst'));
       return;
     }
 
@@ -36,7 +38,10 @@ export function usePdoAdvancedReport(document: unknown | null) {
       }
       setReport(nextReport);
       if (!nextReport.valid) {
-        setError(nextReport.errors.join('；') || '高级 PDO 配置存在问题');
+        setError(
+          nextReport.errors.join(t('common.punctuation.semicolon')) ||
+            t('pdoAdvancedReport.status.invalid'),
+        );
       }
     } catch (cause) {
       if (generation === generationRef.current) {
