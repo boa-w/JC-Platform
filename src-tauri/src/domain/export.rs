@@ -17,6 +17,7 @@ use crate::domain::pdo::{
     parse_pdo_advanced_document, PdoAdvancedDocument, PdoAdvancedFrame, PdoAdvancedSignal,
     PdoGlobalParam,
 };
+use crate::domain::project::ProjectExportSettings;
 use crate::domain::protocol::battery_monitor::{
     BatteryByteOrder, BatteryMonitorProtocol, BatteryRawType, BatteryValueType,
 };
@@ -36,38 +37,6 @@ pub struct ExportPackage {
     pub warnings: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExportTargetOptions {
-    pub config: bool,
-    pub bin: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExportBatteryOptions {
-    pub battery_monitor: ExportTargetOptions,
-    #[serde(default = "default_enabled_export_target")]
-    pub fault_code_info: ExportTargetOptions,
-}
-
-impl Default for ExportBatteryOptions {
-    fn default() -> Self {
-        Self {
-            battery_monitor: ExportTargetOptions {
-                config: true,
-                bin: true,
-            },
-            fault_code_info: default_enabled_export_target(),
-        }
-    }
-}
-
-fn default_enabled_export_target() -> ExportTargetOptions {
-    ExportTargetOptions {
-        config: true,
-        bin: true,
-    }
-}
-
 /// 导出计划请求 —— 指定项目文档和输出目录。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExportPlanRequest {
@@ -81,8 +50,6 @@ pub struct ExportPlanRequest {
     pub manifest_filename: Option<String>,
     #[serde(default)]
     pub binary_filename: Option<String>,
-    #[serde(default)]
-    pub export_options: ExportBatteryOptions,
 }
 
 /// 导出计划报告 —— 描述将要创建的目录、文件和资源清单。
@@ -144,8 +111,6 @@ pub struct BinaryBuildReport {
 pub struct BinaryCompareRequest {
     pub document: Value,
     pub legacy_binary_path: String,
-    #[serde(default)]
-    pub export_options: ExportBatteryOptions,
 }
 
 /// 二进制比较报告 —— 标记是否一致及首个差异位置。
@@ -308,8 +273,8 @@ pub fn build_export_plan(request: ExportPlanRequest) -> ExportPlanReport {
     let mut warnings = Vec::new();
     let ui_report = parse_ui_info(request.project_path.as_deref(), &request.document);
     errors.extend(ui_report.errors);
-    let binary_report =
-        build_project_binary_with_options(&request.document, &request.export_options);
+    let export_settings = project_export_settings(&request.document);
+    let binary_report = build_project_binary(&request.document);
     warnings.extend(binary_report.warnings.clone());
     errors.extend(binary_report.errors.clone());
 
@@ -351,7 +316,7 @@ pub fn build_export_plan(request: ExportPlanRequest) -> ExportPlanReport {
         })
         .unwrap_or_default();
     let data_description = if binary_report.valid {
-        manifest_data_description(&binary_report.data_description, &request.export_options)
+        manifest_data_description(&binary_report.data_description, &export_settings)
     } else {
         DataDescriptionPlan::empty(language_code)
     };
@@ -380,7 +345,8 @@ pub fn build_export_plan(request: ExportPlanRequest) -> ExportPlanReport {
 /// 执行完整导出：创建目录 → 拷贝图片 → 写入二进制 → 生成清单。
 pub fn export_project_package(request: ExportPlanRequest) -> ProjectExportReport {
     let plan = build_export_plan(request.clone());
-    let binary = build_project_binary_with_options(&request.document, &request.export_options);
+    let export_settings = project_export_settings(&request.document);
+    let binary = build_project_binary(&request.document);
     let mut errors = plan.errors.clone();
     let mut warnings = plan.warnings.clone();
     errors.extend(binary.errors.clone());
@@ -428,7 +394,8 @@ pub fn export_project_package(request: ExportPlanRequest) -> ProjectExportReport
     if errors.is_empty() {
         let manifest = build_config_update_manifest(
             &request,
-            &manifest_data_description(&binary.data_description, &request.export_options),
+            &manifest_data_description(&binary.data_description, &export_settings),
+            &export_settings,
             &mut warnings,
             &mut errors,
         );
@@ -531,7 +498,7 @@ fn copy_ui_images_without_clean(request: ExportPlanRequest) -> UiImageCopyReport
 
 /// 将新生成的二进制与旧版文件逐字节比较，报告首个差异位置。
 pub fn compare_project_binary(request: BinaryCompareRequest) -> BinaryCompareReport {
-    let build = build_project_binary_with_options(&request.document, &request.export_options);
+    let build = build_project_binary(&request.document);
     let mut errors = build.errors.clone();
     let legacy_bytes = match fs::read(&request.legacy_binary_path) {
         Ok(bytes) => bytes,
@@ -573,12 +540,13 @@ pub fn compare_project_binary(request: BinaryCompareRequest) -> BinaryCompareRep
 ///
 /// PDO 与锂电监控分别构建，锂电帧不再投影到普通 PDO 表。
 pub fn build_project_binary(document: &Value) -> BinaryBuildReport {
-    build_project_binary_with_options(document, &ExportBatteryOptions::default())
+    let export_settings = project_export_settings(document);
+    build_project_binary_from_settings(document, &export_settings)
 }
 
-pub fn build_project_binary_with_options(
+fn build_project_binary_from_settings(
     document: &Value,
-    options: &ExportBatteryOptions,
+    export_settings: &ProjectExportSettings,
 ) -> BinaryBuildReport {
     let language_code = document
         .get("language_info")
@@ -594,7 +562,7 @@ pub fn build_project_binary_with_options(
         .unwrap_or_default();
 
     let mut errors = Vec::new();
-    let battery_enabled = options.battery_monitor.bin && battery_monitor_enabled(document);
+    let battery_enabled = export_settings.battery_monitor.bin && battery_monitor_enabled(document);
     let pdo_report = parse_pdo_advanced_document(document);
     if !battery_enabled {
         errors.extend(pdo_report.errors.clone());
@@ -603,7 +571,8 @@ pub fn build_project_binary_with_options(
     if let Some(pdo_document) = pdo_report.document.as_ref() {
         if battery_enabled || pdo_document_has_content(pdo_document) {
             let pdo_document = pdo_document.clone();
-            let mut report = build_binary_from_pdo(document, &pdo_document, language_code, options);
+            let mut report =
+                build_binary_from_pdo(document, &pdo_document, language_code, export_settings);
             report.errors.extend(errors);
             report.valid = report.errors.is_empty();
             return report;
@@ -611,7 +580,8 @@ pub fn build_project_binary_with_options(
     }
 
     if let Some(pdo_document) = build_pdo_document_from_simple(document) {
-        let mut report = build_binary_from_pdo(document, &pdo_document, language_code, options);
+        let mut report =
+            build_binary_from_pdo(document, &pdo_document, language_code, export_settings);
         report.errors.extend(errors);
         report.valid = report.errors.is_empty();
         return report;
@@ -630,13 +600,13 @@ pub fn build_project_binary_with_options(
 
 fn manifest_data_description(
     data_description: &DataDescriptionPlan,
-    options: &ExportBatteryOptions,
+    export_settings: &ProjectExportSettings,
 ) -> DataDescriptionPlan {
     let mut description = data_description.clone();
-    if !options.battery_monitor.bin {
+    if !export_settings.battery_monitor.config || !export_settings.battery_monitor.bin {
         description = description.without_battery_monitor();
     }
-    if !(options.fault_code_info.config && options.fault_code_info.bin) {
+    if !export_settings.fault_code_info.config || !export_settings.fault_code_info.bin {
         description = description.without_fault_code();
     }
     description
@@ -645,6 +615,7 @@ fn manifest_data_description(
 fn build_config_update_manifest(
     request: &ExportPlanRequest,
     data_description: &DataDescriptionPlan,
+    export_settings: &ProjectExportSettings,
     warnings: &mut Vec<String>,
     errors: &mut Vec<String>,
 ) -> Value {
@@ -662,13 +633,44 @@ fn build_config_update_manifest(
         "screen_src".to_string(),
         build_legacy_screen_src(request, warnings, errors),
     );
-    manifest.insert("data_description".to_string(), json!(data_description));
-    if request.export_options.battery_monitor.config {
+    let mut manifest_data_description = json!(data_description);
+    omit_disabled_export_descriptions(&mut manifest_data_description, export_settings);
+    manifest.insert("data_description".to_string(), manifest_data_description);
+    if export_settings.battery_monitor.config {
         if let Some(battery_monitor) = request.document.get("battery_monitor") {
             manifest.insert("battery_monitor".to_string(), battery_monitor.clone());
         }
     }
     Value::Object(manifest)
+}
+
+fn omit_disabled_export_descriptions(
+    data_description: &mut Value,
+    export_settings: &ProjectExportSettings,
+) {
+    let Some(object) = data_description.as_object_mut() else {
+        return;
+    };
+    if !export_settings.battery_monitor.config {
+        for key in [
+            "battery_monitor_base_addr",
+            "battery_monitor_item_total",
+            "battery_monitor_frame_total",
+            "battery_monitor_version",
+        ] {
+            object.remove(key);
+        }
+    }
+    if !export_settings.fault_code_info.config {
+        for key in [
+            "fault_code_base_addr",
+            "fault_code_version",
+            "fault_source_total",
+            "fault_code_total",
+        ] {
+            object.remove(key);
+        }
+    }
 }
 
 fn build_legacy_screen_src(
@@ -887,7 +889,7 @@ fn build_binary_from_pdo(
     source_document: &Value,
     document: &PdoAdvancedDocument,
     language_code: Vec<String>,
-    options: &ExportBatteryOptions,
+    export_settings: &ProjectExportSettings,
 ) -> BinaryBuildReport {
     let mut bytes = Vec::new();
     let mut warnings = Vec::new();
@@ -938,7 +940,7 @@ fn build_binary_from_pdo(
         .iter()
         .flat_map(|condition| condition.data.iter().map(|input| input.param_id.clone()))
         .collect::<HashSet<_>>();
-    let language_entries = collect_language_entries(source_document, options);
+    let language_entries = collect_language_entries(source_document, export_settings);
 
     if !document.pdo_condition.is_empty() {
         description.global_condition_base_addr = bytes.len() as isize;
@@ -983,7 +985,7 @@ fn build_binary_from_pdo(
         description.pdo_send_total = document.pdo_send.len();
     }
 
-    let battery_bytes = if options.battery_monitor.bin {
+    let battery_bytes = if export_settings.battery_monitor.bin {
         build_battery_monitor_bytes(
             source_document,
             bytes.len(),
@@ -1001,7 +1003,7 @@ fn build_binary_from_pdo(
         bytes.extend(battery_bytes);
     }
 
-    let fault_code_bytes = if options.fault_code_info.bin {
+    let fault_code_bytes = if export_settings.fault_code_info.bin {
         build_fault_code_bytes(
             source_document,
             bytes.len(),
@@ -1059,7 +1061,10 @@ struct SdoBinaryNode {
     bytes: Vec<u8>,
 }
 
-fn collect_language_entries(document: &Value, options: &ExportBatteryOptions) -> Vec<String> {
+fn collect_language_entries(
+    document: &Value,
+    export_settings: &ProjectExportSettings,
+) -> Vec<String> {
     let mut entries = Vec::new();
     if let Some(language_info) = document.get("language_info") {
         if let Some(items) = language_info.get("list_inner").and_then(Value::as_array) {
@@ -1071,10 +1076,10 @@ fn collect_language_entries(document: &Value, options: &ExportBatteryOptions) ->
     if let Some(sdo_info) = document.get("sdo_info") {
         collect_sdo_names(sdo_info, &mut entries);
     }
-    if options.battery_monitor.bin {
+    if export_settings.battery_monitor.bin {
         collect_battery_monitor_language_entries(document, &mut entries);
     }
-    if options.fault_code_info.bin {
+    if export_settings.fault_code_info.bin {
         collect_fault_code_language_entries(document, &mut entries);
     }
     entries.push(String::new());
@@ -2361,6 +2366,14 @@ fn join_fs_path(base: &str, child: &str) -> String {
     path.to_string_lossy().into_owned()
 }
 
+fn project_export_settings(document: &Value) -> ProjectExportSettings {
+    document
+        .get("export_info")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default()
+}
+
 fn export_root(request: &ExportPlanRequest) -> String {
     let output_dir = request.output_dir.trim().to_string();
     let output_dir = if output_dir.is_empty() {
@@ -2457,15 +2470,21 @@ mod tests {
         })
     }
 
-    fn build_battery_monitor_manifest(options: ExportBatteryOptions) -> (BinaryBuildReport, Value) {
-        let document = enabled_battery_monitor_document();
-        let binary = build_project_binary_with_options(&document, &options);
+    fn build_battery_monitor_manifest(config: bool, bin: bool) -> (BinaryBuildReport, Value) {
+        let mut document = enabled_battery_monitor_document();
+        document["export_info"] = json!({
+            "battery_monitor": { "config": config, "bin": bin },
+            "fault_code_info": { "config": true, "bin": true }
+        });
+        let binary = build_project_binary(&document);
         assert!(
             binary.valid,
             "unexpected export errors: {:?}",
             binary.errors
         );
-        let data_description = manifest_data_description(&binary.data_description, &options);
+        let export_settings = project_export_settings(&document);
+        let data_description =
+            manifest_data_description(&binary.data_description, &export_settings);
         let mut warnings = Vec::new();
         let mut errors = Vec::new();
         let manifest = build_config_update_manifest(
@@ -2476,9 +2495,9 @@ mod tests {
                 folder_name: None,
                 manifest_filename: None,
                 binary_filename: None,
-                export_options: options,
             },
             &data_description,
+            &export_settings,
             &mut warnings,
             &mut errors,
         );
@@ -2500,8 +2519,8 @@ mod tests {
     }
 
     #[test]
-    fn export_battery_options_default_keeps_legacy_export_behavior() {
-        let options = ExportBatteryOptions::default();
+    fn project_export_settings_default_enables_all_targets() {
+        let options = ProjectExportSettings::default();
 
         assert!(options.battery_monitor.config);
         assert!(options.battery_monitor.bin);
@@ -2589,6 +2608,48 @@ mod tests {
             1
         );
         assert_eq!(report.bytes[code_table_addr + 4], 2);
+
+        let mut config_off = document.clone();
+        config_off["export_info"] = json!({
+            "battery_monitor": { "config": true, "bin": true },
+            "fault_code_info": { "config": false, "bin": true }
+        });
+        let config_off_report = build_project_binary(&config_off);
+        assert!(config_off_report.data_description.fault_code_base_addr >= 0);
+        let config_off_manifest = manifest_data_description(
+            &config_off_report.data_description,
+            &project_export_settings(&config_off),
+        );
+        assert_eq!(config_off_manifest.fault_code_base_addr, -1);
+        assert_eq!(config_off_manifest.fault_source_total, 0);
+        assert_eq!(config_off_manifest.fault_code_total, 0);
+        let mut config_off_manifest_value = json!(config_off_manifest);
+        omit_disabled_export_descriptions(
+            &mut config_off_manifest_value,
+            &project_export_settings(&config_off),
+        );
+        let config_off_manifest_object = config_off_manifest_value.as_object().unwrap();
+        for key in [
+            "fault_code_base_addr",
+            "fault_code_version",
+            "fault_source_total",
+            "fault_code_total",
+        ] {
+            assert!(
+                config_off_manifest_object.get(key).is_none(),
+                "unexpected key: {key}"
+            );
+        }
+
+        let mut bin_off = document.clone();
+        bin_off["export_info"] = json!({
+            "battery_monitor": { "config": true, "bin": true },
+            "fault_code_info": { "config": true, "bin": false }
+        });
+        let bin_off_report = build_project_binary(&bin_off);
+        assert_eq!(bin_off_report.data_description.fault_code_base_addr, -1);
+        assert_eq!(bin_off_report.data_description.fault_source_total, 0);
+        assert_eq!(bin_off_report.data_description.fault_code_total, 0);
     }
 
     #[test]
@@ -2695,7 +2756,6 @@ mod tests {
             folder_name: None,
             manifest_filename: None,
             binary_filename: None,
-            export_options: ExportBatteryOptions::default(),
         });
 
         let export_root = join_fs_path("out", "jc_export");
@@ -2744,7 +2804,6 @@ mod tests {
             folder_name: None,
             manifest_filename: Some("../release_config".to_string()),
             binary_filename: Some("release_data".to_string()),
-            export_options: ExportBatteryOptions::default(),
         });
 
         assert_eq!(
@@ -2788,7 +2847,6 @@ mod tests {
             folder_name: None,
             manifest_filename: None,
             binary_filename: None,
-            export_options: ExportBatteryOptions::default(),
         });
 
         assert_eq!(
@@ -2832,7 +2890,6 @@ mod tests {
             folder_name: Some("request_folder".to_string()),
             manifest_filename: Some("request_manifest".to_string()),
             binary_filename: Some("request_binary".to_string()),
-            export_options: ExportBatteryOptions::default(),
         });
 
         assert_eq!(report.export_root, join_fs_path("out", "request_folder"));
@@ -2871,7 +2928,7 @@ mod tests {
         });
 
         assert_eq!(
-            collect_language_entries(&document, &ExportBatteryOptions::default()),
+            collect_language_entries(&document, &ProjectExportSettings::default()),
             vec!["中文", "English", "参数A", "菜单根", "参数B", ""]
         );
     }
@@ -2893,7 +2950,7 @@ mod tests {
         });
 
         assert_eq!(
-            collect_language_entries(&document, &ExportBatteryOptions::default()),
+            collect_language_entries(&document, &ProjectExportSettings::default()),
             vec!["中文", "English", "参数A", "参数B", ""]
         );
     }
@@ -2912,7 +2969,7 @@ mod tests {
         });
 
         assert_eq!(
-            collect_language_entries(&document, &ExportBatteryOptions::default()),
+            collect_language_entries(&document, &ProjectExportSettings::default()),
             vec!["", "中文", "菜单根", ""]
         );
     }
@@ -2929,7 +2986,7 @@ mod tests {
                 "children": []
             }
         });
-        let entries = collect_language_entries(&document, &ExportBatteryOptions::default());
+        let entries = collect_language_entries(&document, &ProjectExportSettings::default());
         let bytes = menu_item_bytes(document.get("sdo_info").unwrap(), &entries, 1, 0);
 
         assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 3);
@@ -3108,7 +3165,7 @@ mod tests {
     #[test]
     fn build_project_binary_can_skip_battery_monitor_bin() {
         let battery_monitor = default_battery_monitor_protocol();
-        let document = json!({
+        let mut document = json!({
             "language_info": language_info_without_selected_languages(),
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
@@ -3118,10 +3175,12 @@ mod tests {
             "pdo_send": [],
             "battery_monitor": battery_monitor
         });
-        let mut options = ExportBatteryOptions::default();
-        options.battery_monitor.bin = false;
+        document["export_info"] = json!({
+            "battery_monitor": { "config": true, "bin": false },
+            "fault_code_info": { "config": true, "bin": true }
+        });
 
-        let report = build_project_binary_with_options(&document, &options);
+        let report = build_project_binary(&document);
 
         assert!(
             report.valid,
@@ -3137,57 +3196,64 @@ mod tests {
     #[test]
     fn battery_monitor_config_and_bin_flags_control_manifest_independently() {
         for (config, bin) in [(false, false), (false, true), (true, false)] {
-            let mut options = ExportBatteryOptions::default();
-            options.battery_monitor.config = config;
-            options.battery_monitor.bin = bin;
-
-            let (binary, manifest) = build_battery_monitor_manifest(options);
+            let (binary, manifest) = build_battery_monitor_manifest(config, bin);
             let data_description = manifest
                 .get("data_description")
                 .and_then(Value::as_object)
                 .expect("manifest data_description");
 
             assert_eq!(manifest.get("battery_monitor").is_some(), config);
-            assert_eq!(
-                data_description
-                    .get("battery_monitor_base_addr")
-                    .and_then(Value::as_i64),
-                Some(if bin {
-                    binary.data_description.battery_monitor_base_addr as i64
-                } else {
-                    -1
-                })
-            );
-            assert_eq!(
-                data_description
-                    .get("battery_monitor_frame_total")
-                    .and_then(Value::as_u64),
-                Some(if bin {
-                    binary.data_description.battery_monitor_frame_total as u64
-                } else {
-                    0
-                })
-            );
-            assert_eq!(
-                data_description
-                    .get("battery_monitor_item_total")
-                    .and_then(Value::as_u64),
-                Some(if bin {
-                    binary.data_description.battery_monitor_item_total as u64
-                } else {
-                    0
-                })
-            );
-            assert_eq!(
-                data_description
-                    .get("battery_monitor_version")
-                    .and_then(Value::as_u64),
-                Some(if bin {
-                    binary.data_description.battery_monitor_version as u64
-                } else {
-                    0
-                })
-            );
+            if config {
+                assert_eq!(
+                    data_description
+                        .get("battery_monitor_base_addr")
+                        .and_then(Value::as_i64),
+                    Some(if bin {
+                        binary.data_description.battery_monitor_base_addr as i64
+                    } else {
+                        -1
+                    })
+                );
+                assert_eq!(
+                    data_description
+                        .get("battery_monitor_frame_total")
+                        .and_then(Value::as_u64),
+                    Some(if bin {
+                        binary.data_description.battery_monitor_frame_total as u64
+                    } else {
+                        0
+                    })
+                );
+                assert_eq!(
+                    data_description
+                        .get("battery_monitor_item_total")
+                        .and_then(Value::as_u64),
+                    Some(if bin {
+                        binary.data_description.battery_monitor_item_total as u64
+                    } else {
+                        0
+                    })
+                );
+                assert_eq!(
+                    data_description
+                        .get("battery_monitor_version")
+                        .and_then(Value::as_u64),
+                    Some(if bin {
+                        binary.data_description.battery_monitor_version as u64
+                    } else {
+                        0
+                    })
+                );
+            } else {
+                for key in [
+                    "battery_monitor_base_addr",
+                    "battery_monitor_frame_total",
+                    "battery_monitor_item_total",
+                    "battery_monitor_version",
+                ] {
+                    assert!(data_description.get(key).is_none(), "unexpected key: {key}");
+                }
+            }
         }
     }
 

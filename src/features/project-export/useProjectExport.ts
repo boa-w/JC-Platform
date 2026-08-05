@@ -10,8 +10,8 @@ import {
 import type {
   BinaryBuildReport,
   BinaryCompareReport,
-  ExportBatteryOptions,
   ProjectExportReport,
+  ProjectExportTargetSettings,
   UiImageCopyReport,
 } from '../../types/platform';
 import { runSystemDialog } from '../../utils/systemDialog';
@@ -24,16 +24,17 @@ import {
 interface UseProjectExportOptions {
   document: unknown;
   projectPath?: string;
-  exportOptions: ExportBatteryOptions;
   updateProjectDocument: (section: string, value: unknown) => void;
 }
+
+type ExportTargetKey = 'battery_monitor' | 'fault_code_info';
+type ExportTargetField = keyof ProjectExportTargetSettings;
 
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 export function useProjectExport({
   document,
   projectPath,
-  exportOptions,
   updateProjectDocument,
 }: UseProjectExportOptions) {
   const [outputDir, setOutputDir] = useState(() => projectDirectory(projectPath));
@@ -53,7 +54,27 @@ export function useProjectExport({
     updateProjectDocument('export_info', { ...exportSettings, [key]: value });
   }
 
+  function updateExportTarget(target: ExportTargetKey, field: ExportTargetField, value: boolean) {
+    updateProjectDocument('export_info', {
+      ...exportSettings,
+      [target]: {
+        ...exportSettings[target],
+        [field]: value,
+      },
+    });
+  }
+
   function resetExportNaming() {
+    const { folder_name, manifest_filename, binary_filename } = defaultProjectExportSettings;
+    updateProjectDocument('export_info', {
+      ...exportSettings,
+      folder_name,
+      manifest_filename,
+      binary_filename,
+    });
+  }
+
+  function resetExportSettings() {
     updateProjectDocument('export_info', defaultProjectExportSettings);
   }
 
@@ -78,7 +99,7 @@ export function useProjectExport({
     setError(null);
     setBinaryCompareReport(null);
     try {
-      const report = await buildProjectBinaryReport(document, exportOptions);
+      const report = await buildProjectBinaryReport(document);
       setBinaryReport(report);
       if (!report.valid) setError(report.errors.join('；') || '二进制构建报告存在问题');
     } catch (cause) {
@@ -108,7 +129,6 @@ export function useProjectExport({
       const report = await compareProjectBinaryReport({
         document,
         legacy_binary_path: selected,
-        export_options: exportOptions,
       });
       setBinaryCompareReport(report);
       setBinaryReport(report.build);
@@ -143,7 +163,6 @@ export function useProjectExport({
         folder_name: exportSettings.folder_name,
         manifest_filename: exportSettings.manifest_filename,
         binary_filename: exportSettings.binary_filename,
-        export_options: exportOptions,
       });
       setExportReport(report);
     } catch (cause) {
@@ -170,6 +189,9 @@ export function useProjectExport({
     setManifestFilename: (value: string) => updateExportSetting('manifest_filename', value),
     binaryFilename: exportSettings.binary_filename,
     setBinaryFilename: (value: string) => updateExportSetting('binary_filename', value),
+    batteryMonitorExport: exportSettings.battery_monitor,
+    faultCodeExport: exportSettings.fault_code_info,
+    updateExportTarget,
     exportReport,
     imageCopyReport,
     binaryReport,
@@ -181,6 +203,7 @@ export function useProjectExport({
     compareBinary,
     selectOutputDir,
     resetExportNaming,
+    resetExportSettings,
     exportPackage,
     openExportDir,
   };

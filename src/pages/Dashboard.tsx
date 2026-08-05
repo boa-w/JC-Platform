@@ -36,7 +36,6 @@ import {
 } from '../features/ui-resource/useUiResourceController';
 import { useCanTestData } from '../hooks/useCanTestData';
 import { trackedDocumentSections } from '../modules/documentSections';
-import { useExportBatteryOptions } from '../stores/exportSettings';
 import { useTranslationSettings } from '../stores/translationSettings';
 import type {
   BackendHealth,
@@ -190,11 +189,6 @@ export function Dashboard({
     updateProjectSections,
   } = projectDocument;
   const canTestData = useCanTestData(loadedProject?.document ?? null);
-  const {
-    options: exportBatteryOptions,
-    updateOption: updateExportBatteryOption,
-    resetOptions: resetExportBatteryOptions,
-  } = useExportBatteryOptions();
   const translationSettings = useTranslationSettings();
   const pdoEditor = usePdoEditor({
     document: loadedProject?.document ?? null,
@@ -223,7 +217,6 @@ export function Dashboard({
   const projectExport = useProjectExport({
     document: loadedProject?.document ?? uiResourcePreviewDocument,
     projectPath: loadedProject?.summary.path,
-    exportOptions: exportBatteryOptions,
     updateProjectDocument,
   });
   const batteryMonitorController = useBatteryMonitorController({
@@ -691,9 +684,6 @@ export function Dashboard({
           ) : null}
           {activeModule.key === 'settings' ? (
             <SettingsPage
-              exportOptions={exportBatteryOptions}
-              onUpdateExportOption={updateExportBatteryOption}
-              onResetExportOptions={resetExportBatteryOptions}
               translationController={translationSettings}
               theme={theme}
               onToggleTheme={onToggleTheme}

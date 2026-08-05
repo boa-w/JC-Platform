@@ -1,5 +1,6 @@
 import { RotateCcw } from 'lucide-react';
 import type { ProjectExportController } from './useProjectExport';
+import './project-export.css';
 
 interface ProjectExportPageProps {
   controller: ProjectExportController;
@@ -15,6 +16,9 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
     setManifestFilename: setExportManifestFilename,
     binaryFilename: exportBinaryFilename,
     setBinaryFilename: setExportBinaryFilename,
+    batteryMonitorExport,
+    faultCodeExport,
+    updateExportTarget,
     exportReport,
     imageCopyReport,
     binaryReport,
@@ -26,6 +30,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
     compareBinary: handleCompareBinary,
     selectOutputDir: handleSelectExportDir,
     resetExportNaming: handleResetExportNaming,
+    resetExportSettings: handleResetExportSettings,
     exportPackage: handleExportPackage,
     openExportDir: handleOpenExportDir,
   } = controller;
@@ -35,9 +40,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
       <div className="export-header">
         <div>
           <h2>项目导出</h2>
-          <p>
-            默认在项目文件同级目录生成导出包；文件夹名和文件名随项目配置保存。
-          </p>
+          <p>默认在项目文件同级目录生成导出包；文件夹名和文件名随项目配置保存。</p>
         </div>
         {exportReport ? (
           <button
@@ -103,6 +106,83 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
           恢复默认命名
         </button>
       </div>
+      <section className="export-write-controls">
+        <div className="export-write-controls__header">
+          <div>
+            <strong className="section-label--muted">导出写入控制</strong>
+            <p>开关随当前项目保存，并同时作用于项目导出、二进制报告和 bin 对比。</p>
+          </div>
+          <button
+            className="export-naming-reset"
+            type="button"
+            onClick={handleResetExportSettings}
+            disabled={isExporting}
+          >
+            恢复全部默认
+          </button>
+        </div>
+        <div className="export-option-grid">
+          <div className="export-option-grid__head">配置项</div>
+          <div className="export-option-grid__head">写入 ConfigUpdate.json</div>
+          <div className="export-option-grid__head">写入 pdo_sdo_data.bin</div>
+          <div className="export-option-info">
+            <span>锂电监控协议</span>
+            <small>battery_monitor 配置描述与独立二进制段。</small>
+          </div>
+          <label className="export-check">
+            <input
+              aria-label="锂电监控协议：写入 ConfigUpdate.json"
+              checked={batteryMonitorExport.config}
+              disabled={isExporting}
+              onChange={(event) =>
+                updateExportTarget('battery_monitor', 'config', event.target.checked)
+              }
+              type="checkbox"
+            />
+            <span>配置文件</span>
+          </label>
+          <label className="export-check">
+            <input
+              aria-label="锂电监控协议：写入 pdo_sdo_data.bin"
+              checked={batteryMonitorExport.bin}
+              disabled={isExporting}
+              onChange={(event) =>
+                updateExportTarget('battery_monitor', 'bin', event.target.checked)
+              }
+              type="checkbox"
+            />
+            <span>bin 文件</span>
+          </label>
+          <div className="export-option-info">
+            <span>故障码配置</span>
+            <small>fault_code_info 清单描述与独立 fault code 二进制段。</small>
+          </div>
+          <label className="export-check">
+            <input
+              aria-label="故障码配置：写入 ConfigUpdate.json"
+              checked={faultCodeExport.config}
+              disabled={isExporting}
+              onChange={(event) =>
+                updateExportTarget('fault_code_info', 'config', event.target.checked)
+              }
+              type="checkbox"
+            />
+            <span>配置文件</span>
+          </label>
+          <label className="export-check">
+            <input
+              aria-label="故障码配置：写入 pdo_sdo_data.bin"
+              checked={faultCodeExport.bin}
+              disabled={isExporting}
+              onChange={(event) =>
+                updateExportTarget('fault_code_info', 'bin', event.target.checked)
+              }
+              type="checkbox"
+            />
+            <span>bin 文件</span>
+          </label>
+        </div>
+      </section>
       {exportError ? (
         <p className="export-error" role="alert">
           {exportError}

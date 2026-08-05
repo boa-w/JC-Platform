@@ -1,13 +1,22 @@
-import type { ProjectExportSettings } from '../../types/platform';
+import { defaultExportInfo } from '../project-document/projectDocumentDefaults';
+import type { ProjectExportSettings, ProjectExportTargetSettings } from '../../types/platform';
 
-export const defaultProjectExportSettings: ProjectExportSettings = {
-  folder_name: 'jc_export',
-  manifest_filename: 'ConfigUpdate.json',
-  binary_filename: 'pdo_sdo_data.bin',
-};
+export const defaultProjectExportSettings: ProjectExportSettings = defaultExportInfo;
 
 function configuredName(value: unknown, fallback: string) {
   return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function configuredFlag(value: unknown, fallback: boolean) {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function configuredTarget(value: unknown, fallback: ProjectExportTargetSettings) {
+  const source = value as Record<string, unknown> | null;
+  return {
+    config: configuredFlag(source?.config, fallback.config),
+    bin: configuredFlag(source?.bin, fallback.bin),
+  };
 }
 
 export function readProjectExportSettings(document: unknown): ProjectExportSettings {
@@ -21,6 +30,14 @@ export function readProjectExportSettings(document: unknown): ProjectExportSetti
     binary_filename: configuredName(
       source?.binary_filename,
       defaultProjectExportSettings.binary_filename,
+    ),
+    battery_monitor: configuredTarget(
+      source?.battery_monitor,
+      defaultProjectExportSettings.battery_monitor,
+    ),
+    fault_code_info: configuredTarget(
+      source?.fault_code_info,
+      defaultProjectExportSettings.fault_code_info,
     ),
   };
 }

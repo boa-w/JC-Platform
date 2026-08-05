@@ -1,0 +1,78 @@
+.export-write-controls {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.export-write-controls__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.export-write-controls__header p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.export-option-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(130px, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--border-subtle);
+}
+
+.export-option-grid__head,
+.export-option-info,
+.export-check {
+  padding: 10px 12px;
+  background: var(--surface-panel);
+}
+
+.export-option-grid__head {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.export-option-info {
+  display: grid;
+}
+
+.export-option-info span {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.export-option-info small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.export-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.export-check input {
+  accent-color: var(--action-primary);
+}
+
+@media (max-width: 860px) {
+  .export-write-controls__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

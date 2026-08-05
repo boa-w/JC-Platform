@@ -754,6 +754,7 @@ fn number_list(value: &Value) -> Vec<i64> {
 fn required_project_sections() -> &'static [&'static str] {
     &[
         "project",
+        "export_info",
         "device",
         "ui_info",
         "pdo_simple_send_recv",
@@ -787,6 +788,7 @@ fn default_section_value(section: &str) -> Value {
             "create_time": "",
             "update_time": ""
         }),
+        "export_info" => json!(ProjectExportSettings::default()),
         "device" => json!({
             "resolution_w": 0,
             "resolution_h": 0
@@ -933,6 +935,10 @@ pub struct ProjectExportSettings {
     pub manifest_filename: String,
     #[serde(default = "default_binary_filename")]
     pub binary_filename: String,
+    #[serde(default)]
+    pub battery_monitor: ProjectExportTargetSettings,
+    #[serde(default)]
+    pub fault_code_info: ProjectExportTargetSettings,
 }
 
 impl Default for ProjectExportSettings {
@@ -941,8 +947,31 @@ impl Default for ProjectExportSettings {
             folder_name: default_export_folder_name(),
             manifest_filename: default_manifest_filename(),
             binary_filename: default_binary_filename(),
+            battery_monitor: ProjectExportTargetSettings::default(),
+            fault_code_info: ProjectExportTargetSettings::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectExportTargetSettings {
+    #[serde(default = "default_export_enabled")]
+    pub config: bool,
+    #[serde(default = "default_export_enabled")]
+    pub bin: bool,
+}
+
+impl Default for ProjectExportTargetSettings {
+    fn default() -> Self {
+        Self {
+            config: true,
+            bin: true,
+        }
+    }
+}
+
+fn default_export_enabled() -> bool {
+    true
 }
 
 fn default_export_folder_name() -> String {

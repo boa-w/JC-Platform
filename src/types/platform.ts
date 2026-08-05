@@ -182,6 +182,13 @@ export interface ProjectExportSettings {
   folder_name: string;
   manifest_filename: string;
   binary_filename: string;
+  battery_monitor: ProjectExportTargetSettings;
+  fault_code_info: ProjectExportTargetSettings;
+}
+
+export interface ProjectExportTargetSettings {
+  config: boolean;
+  bin: boolean;
 }
 
 export interface UnifiedProtocolModel {
@@ -623,16 +630,6 @@ export interface ExportTableRequest {
   document: TableDocument;
 }
 
-export interface ExportTargetOptions {
-  config: boolean;
-  bin: boolean;
-}
-
-export interface ExportBatteryOptions {
-  battery_monitor: ExportTargetOptions;
-  fault_code_info: ExportTargetOptions;
-}
-
 export interface ExportPlanRequest {
   project_path?: string;
   output_dir: string;
@@ -640,7 +637,6 @@ export interface ExportPlanRequest {
   folder_name?: string;
   manifest_filename?: string;
   binary_filename?: string;
-  export_options?: ExportBatteryOptions;
 }
 
 export interface BinaryBuildReport {
@@ -656,7 +652,6 @@ export interface BinaryBuildReport {
 export interface BinaryCompareRequest {
   document: unknown;
   legacy_binary_path: string;
-  export_options?: ExportBatteryOptions;
 }
 
 export interface BinaryCompareReport {

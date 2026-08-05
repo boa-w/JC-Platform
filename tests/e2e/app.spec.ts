@@ -90,7 +90,9 @@ test('formats the loaded jcpro file from project management', async ({ page }) =
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '重载', exact: true }),
   ).toBeDisabled();
-  await expect(page.getByText(`已格式化 jcpro JSON：${richProjectPath}`, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(`已格式化 jcpro JSON：${richProjectPath}`, { exact: true }),
+  ).toBeVisible();
 
   const formattedFile = await page.evaluate(
     () =>
@@ -265,9 +267,12 @@ test('meets the serious accessibility baseline across every workspace', async ({
 test('honors the reduced motion preference', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: '系统', exact: true }).click();
-  await page.getByRole('button', { name: '恢复默认' }).click();
+  const settings = page.getByRole('main', { name: '软件设置' });
+  await settings.getByRole('textbox', { name: 'App ID' }).fill('reduced-motion-app');
+  await settings.getByRole('textbox', { name: 'API Key' }).fill('reduced-motion-secret');
+  await settings.getByRole('button', { name: '清空配置' }).click();
 
-  const dialog = page.getByRole('dialog', { name: '恢复导出默认设置？' });
+  const dialog = page.getByRole('dialog', { name: '清空翻译配置？' });
   await expect(dialog.locator('..')).toHaveCSS('animation-duration', '0.001s');
   await expect(dialog.getByRole('button', { name: '取消' })).toHaveCSS(
     'transition-duration',
@@ -332,7 +337,7 @@ test('supports keyboard navigation and named settings controls', async ({ page }
 
   await expect(
     main.getByRole('checkbox', { name: '锂电监控协议：写入 ConfigUpdate.json' }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   const themeSwitch = main.getByRole('switch', { name: '深色模式' });
   await expect(themeSwitch).toHaveAttribute(
     'aria-checked',
@@ -350,17 +355,26 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   ).not.toContain('browser-preview-secret');
   await expect(main.getByRole('button', { name: '保存凭据' })).toBeDisabled();
 
-  await main.getByRole('button', { name: '恢复默认' }).click();
-  const resetDialog = page.getByRole('dialog', { name: '恢复导出默认设置？' });
-  await expect(resetDialog.getByRole('button', { name: '取消' })).toBeFocused();
-  await resetDialog.getByRole('button', { name: '取消' }).click();
-  await expect(resetDialog).toBeHidden();
-
   await main.getByRole('button', { name: '清空配置' }).click();
   const clearDialog = page.getByRole('dialog', { name: '清空翻译配置？' });
   await expect(clearDialog).toContainText('此操作无法撤销');
   await clearDialog.getByRole('button', { name: '取消' }).click();
   await expect(clearDialog).toBeHidden();
+
+  await page.getByRole('button', { name: '输出', exact: true }).click();
+  const exportNavigation = page.getByRole('navigation', { name: '输出 功能' });
+  await exportNavigation.getByRole('button', { name: '项目导出', exact: true }).click();
+  const exportMain = page.getByRole('main', { name: '项目导出' });
+  await expect(exportMain).toBeVisible();
+  await expect(
+    exportMain.getByRole('checkbox', { name: '锂电监控协议：写入 ConfigUpdate.json' }),
+  ).toBeVisible();
+  await expect(
+    exportMain.getByRole('checkbox', { name: '故障码配置：写入 pdo_sdo_data.bin' }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => Object.keys(localStorage))).not.toContain(
+    'jc-platform.export.battery-options',
+  );
 });
 
 test('surfaces desktop-only actions as accessible errors in browser preview', async ({ page }) => {
@@ -570,6 +584,36 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
   ).toBeDisabled();
+
+  await page.getByRole('button', { name: '输出', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '输出 功能' })
+    .getByRole('button', { name: '项目导出', exact: true })
+    .click();
+  const exportMain = page.getByRole('main', { name: '项目导出' });
+  const batteryConfigSwitch = exportMain.getByRole('checkbox', {
+    name: '锂电监控协议：写入 ConfigUpdate.json',
+  });
+  await batteryConfigSwitch.uncheck();
+  await expect(
+    page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press('Control+s');
+  const exportSaveDialog = page.getByRole('dialog', { name: '确认保存' });
+  await exportSaveDialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(exportSaveDialog).toBeHidden();
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __SAVED_PROJECT_DOCUMENT__?: {
+              export_info?: { battery_monitor?: { config?: boolean; bin?: boolean } };
+            };
+          }
+        ).__SAVED_PROJECT_DOCUMENT__?.export_info?.battery_monitor,
+    ),
+  ).toMatchObject({ config: false, bin: true });
 });
 
 test('supports accessible Git review and comparison views', async ({ page }) => {

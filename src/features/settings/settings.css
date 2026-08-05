@@ -1,55 +1,8 @@
 /* ── Settings Controls ── */
 
-.settings-option-grid {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(150px, 1fr));
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--border-subtle);
-}
-
-.settings-option-grid__head,
-.settings-option-info,
-.settings-check {
-  background: var(--surface-subtle);
-  padding: 10px 14px;
-}
-
-.settings-option-grid__head {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-.settings-option-info {
-  display: grid;
-  gap: 2px;
-}
-
-.settings-option-info span {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.settings-option-info small,
 .settings-option-footer {
   font-size: 12px;
   color: var(--text-muted);
-}
-
-.settings-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-.settings-check input {
-  accent-color: var(--action-primary);
 }
 
 .settings-option-footer {

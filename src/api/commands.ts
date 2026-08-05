@@ -12,7 +12,6 @@ import type {
   CanopenConversionReport,
   CanTestGenerateResponse,
   DbcImportReport,
-  ExportBatteryOptions,
   ExportPlanReport,
   ExportPlanRequest,
   ExportTableRequest,
@@ -379,14 +378,8 @@ export async function compareProjectBinaryReport(
   return invoke<BinaryCompareReport>('compare_project_binary_report', { request });
 }
 
-export async function buildProjectBinaryReport(
-  document: unknown,
-  exportOptions?: ExportBatteryOptions,
-): Promise<BinaryBuildReport> {
-  return invoke<BinaryBuildReport>('build_project_binary_report', {
-    document,
-    export_options: exportOptions,
-  });
+export async function buildProjectBinaryReport(document: unknown): Promise<BinaryBuildReport> {
+  return invoke<BinaryBuildReport>('build_project_binary_report', { document });
 }
 
 export async function revealItemInDir(path: string): Promise<void> {

@@ -29,7 +29,14 @@ const LEGACY_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
 ];
 
 const PROJECT_FIELD_ORDER: &[&str] = &["name", "create_time", "update_time", "from", "base_path"];
-const EXPORT_INFO_FIELD_ORDER: &[&str] = &["folder_name", "manifest_filename", "binary_filename"];
+const EXPORT_INFO_FIELD_ORDER: &[&str] = &[
+    "folder_name",
+    "manifest_filename",
+    "binary_filename",
+    "battery_monitor",
+    "fault_code_info",
+];
+const EXPORT_TARGET_FIELD_ORDER: &[&str] = &["config", "bin"];
 const DEVICE_FIELD_ORDER: &[&str] = &[
     "type",
     "version",
@@ -141,7 +148,7 @@ fn update_project_update_time(document: &mut Value, timestamp: &str) {
 
 fn order_legacy_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "project", PROJECT_FIELD_ORDER);
-    order_child_object(&mut document, "export_info", EXPORT_INFO_FIELD_ORDER);
+    order_export_info(&mut document);
     order_child_object(&mut document, "device", DEVICE_FIELD_ORDER);
     order_ui_info(&mut document);
     order_language_info(&mut document);
@@ -153,6 +160,16 @@ fn order_legacy_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
     order_fault_code_info(&mut document);
     order_object_value(document, LEGACY_JCPRO_TOP_LEVEL_ORDER)
+}
+
+fn order_export_info(root: &mut Value) {
+    let Some(export_info) = root.get_mut("export_info") else {
+        return;
+    };
+    order_child_object(export_info, "battery_monitor", EXPORT_TARGET_FIELD_ORDER);
+    order_child_object(export_info, "fault_code_info", EXPORT_TARGET_FIELD_ORDER);
+    let value = std::mem::take(export_info);
+    *export_info = order_object_value(value, EXPORT_INFO_FIELD_ORDER);
 }
 
 fn order_ui_info(root: &mut Value) {
@@ -400,7 +417,13 @@ mod tests {
         let document = json!({
             "sdo_info": { "children": [], "name": "", "name_index": 0, "type": 0, "user_auth": 0 },
             "project": { "base_path": "", "from": "", "update_time": "", "create_time": "", "name": "demo" },
-            "export_info": { "binary_filename": "data.bin", "manifest_filename": "update.json", "folder_name": "release" },
+            "export_info": {
+                "fault_code_info": { "bin": false, "config": true },
+                "battery_monitor": { "bin": true, "config": false },
+                "binary_filename": "data.bin",
+                "manifest_filename": "update.json",
+                "folder_name": "release"
+            },
             "pdo_recv": [],
             "language_info": { "list_translate": {}, "list_inner": [], "list_code_language": [] },
             "fault_code_info": {
@@ -536,6 +559,31 @@ mod tests {
                 "sdo_info",
                 "history_ui",
             ]
+        );
+
+        let export_info = sanitized
+            .get("export_info")
+            .and_then(Value::as_object)
+            .unwrap();
+        assert_eq!(
+            export_info.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec![
+                "folder_name",
+                "manifest_filename",
+                "binary_filename",
+                "battery_monitor",
+                "fault_code_info"
+            ]
+        );
+        assert_eq!(
+            export_info
+                .get("battery_monitor")
+                .and_then(Value::as_object)
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec!["config", "bin"]
         );
 
         let fault = sanitized

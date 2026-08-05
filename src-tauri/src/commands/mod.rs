@@ -5,10 +5,9 @@
 //! 命令函数本身不做业务校验，仅负责桥接前后端。
 
 use crate::domain::export::{
-    build_export_plan, build_project_binary_with_options, compare_project_binary, copy_ui_images,
+    build_export_plan, build_project_binary, compare_project_binary, copy_ui_images,
     export_project_package, BinaryBuildReport, BinaryCompareReport, BinaryCompareRequest,
-    ExportBatteryOptions, ExportPlanReport, ExportPlanRequest, ProjectExportReport,
-    UiImageCopyReport,
+    ExportPlanReport, ExportPlanRequest, ProjectExportReport, UiImageCopyReport,
 };
 use crate::domain::language::{
     language_document_to_table, merge_single_language_rows, parse_language_table,
@@ -680,12 +679,8 @@ pub fn compare_project_binary_report(request: BinaryCompareRequest) -> BinaryCom
 }
 
 #[tauri::command]
-pub fn build_project_binary_report(
-    document: Value,
-    export_options: Option<ExportBatteryOptions>,
-) -> BinaryBuildReport {
-    let options = export_options.unwrap_or_default();
-    build_project_binary_with_options(&document, &options)
+pub fn build_project_binary_report(document: Value) -> BinaryBuildReport {
+    build_project_binary(&document)
 }
 
 // ── CAN 测试数据构建 ──────────────────────────────────────────────
