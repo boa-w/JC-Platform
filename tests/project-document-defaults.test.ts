@@ -16,9 +16,10 @@ test('adds the unified battery monitor section to a recovery document', () => {
     battery_monitor: { config: true, bin: true },
     fault_code_info: { config: true, bin: true },
   });
-  assert.equal(restored?.battery_monitor?.frames.length, 11);
-  assert.equal(restored?.battery_monitor?.signals.length, 33);
-  assert.equal(restored?.battery_monitor?.items.length, 33);
+  assert.equal(restored?.battery_monitor?.enabled, false);
+  assert.equal(restored?.battery_monitor?.frames.length, 0);
+  assert.equal(restored?.battery_monitor?.signals.length, 0);
+  assert.equal(restored?.battery_monitor?.items.length, 0);
 });
 
 test('fills missing project export target flags without replacing project names', () => {

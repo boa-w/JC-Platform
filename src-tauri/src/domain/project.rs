@@ -10,9 +10,7 @@
 //! `pdo_*`、`sdo_info`、`language_info` 等段落。
 
 use crate::domain::private_protocol::PrivateProtocolDocument;
-use crate::domain::protocol::battery_monitor::{
-    default_battery_monitor_protocol, BATTERY_MONITOR_LANGUAGE_ENTRIES,
-};
+use crate::domain::protocol::battery_monitor::default_battery_monitor_protocol;
 use crate::domain::protocol_manager::migrate_project_to_unified_protocol;
 use crate::domain::signal::SignalDictionary;
 use serde::{Deserialize, Serialize};
@@ -235,7 +233,6 @@ pub fn migrate_legacy_project_document(path: Option<String>, value: Value) -> Mi
         }
     }
 
-    normalize_language_info(&mut document);
     document.insert(
         "config_version".to_string(),
         Value::String("0.1.0-tauri-refactor".to_string()),
@@ -261,59 +258,6 @@ pub fn migrate_legacy_project_document(path: Option<String>, value: Value) -> Mi
         document,
         added_sections,
         migrated_version: "0.1.0-tauri-refactor".to_string(),
-    }
-}
-
-fn normalize_language_info(document: &mut Map<String, Value>) {
-    let Some(language_info) = document
-        .get_mut("language_info")
-        .and_then(Value::as_object_mut)
-    else {
-        return;
-    };
-    let list_code_language = language_info
-        .get("list_code_language")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    {
-        let list_inner = language_info
-            .entry("list_inner".to_string())
-            .or_insert_with(|| Value::Array(Vec::new()));
-        let Some(items) = list_inner.as_array_mut() else {
-            return;
-        };
-        for (key, _) in BATTERY_MONITOR_LANGUAGE_ENTRIES {
-            if !items.iter().any(|item| item.as_str() == Some(key)) {
-                items.push(Value::String((*key).to_string()));
-            }
-        }
-    }
-    let translations = language_info
-        .entry("list_translate".to_string())
-        .or_insert_with(|| Value::Object(Map::new()));
-    let Some(translations) = translations.as_object_mut() else {
-        return;
-    };
-    for (key, zh_text) in BATTERY_MONITOR_LANGUAGE_ENTRIES {
-        let entry = translations
-            .entry((*key).to_string())
-            .or_insert_with(|| Value::Object(Map::new()));
-        let Some(entry) = entry.as_object_mut() else {
-            continue;
-        };
-        for code in &list_code_language {
-            let Some(code) = code.as_str() else {
-                continue;
-            };
-            entry.entry(code.to_string()).or_insert_with(|| {
-                Value::String(if code == "zh" {
-                    (*zh_text).to_string()
-                } else {
-                    String::new()
-                })
-            });
-        }
     }
 }
 
@@ -823,15 +767,10 @@ fn default_sdo_info() -> Value {
 }
 
 fn default_language_info() -> Value {
-    let mut list_inner = vec![
+    let list_inner = vec![
         Value::String("中文".to_string()),
         Value::String("英文".to_string()),
     ];
-    let mut list_translate = Map::new();
-    for (key, zh_text) in BATTERY_MONITOR_LANGUAGE_ENTRIES {
-        list_inner.push(Value::String((*key).to_string()));
-        list_translate.insert((*key).to_string(), json!({ "zh": zh_text, "en": "" }));
-    }
     json!({
         "list_code_language": ["zh", "en"],
         "language_labels": {
@@ -839,7 +778,7 @@ fn default_language_info() -> Value {
             "en": "英文"
         },
         "list_inner": list_inner,
-        "list_translate": list_translate
+        "list_translate": {}
     })
 }
 
@@ -1137,5 +1076,71 @@ pub fn parse_legacy_project_document(path: Option<String>, value: Value) -> Proj
         document,
         added_sections: migrated.added_sections,
         errors,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_empty_battery_monitor(document: &Value) {
+        let battery_monitor = document
+            .get("battery_monitor")
+            .expect("battery_monitor section");
+
+        assert_eq!(battery_monitor.get("enabled"), Some(&Value::Bool(false)));
+        assert_eq!(
+            battery_monitor
+                .get("frames")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(0)
+        );
+        assert_eq!(
+            battery_monitor
+                .get("signals")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(0)
+        );
+        assert_eq!(
+            battery_monitor
+                .get("items")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(0)
+        );
+        assert!(!document
+            .get("language_info")
+            .and_then(|value| value.get("list_inner"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .any(|key| key.starts_with("battery_monitor.")));
+    }
+
+    #[test]
+    fn new_project_uses_only_the_battery_monitor_scaffold() {
+        let document = create_legacy_project_document("demo", 800, 480);
+
+        assert_empty_battery_monitor(&document);
+    }
+
+    #[test]
+    fn migration_fills_only_the_battery_monitor_scaffold() {
+        let migrated = migrate_legacy_project_document(
+            None,
+            json!({
+                "project": { "name": "demo" },
+                "language_info": {
+                    "list_code_language": ["zh", "en"],
+                    "list_inner": ["中文", "英文"],
+                    "list_translate": {}
+                }
+            }),
+        );
+
+        assert_empty_battery_monitor(&migrated.document);
     }
 }

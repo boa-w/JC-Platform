@@ -2441,7 +2441,67 @@ fn export_file_name(value: Option<&str>, default_name: &str, extension: &str) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::protocol::battery_monitor::default_battery_monitor_protocol;
+
+    fn battery_monitor_fixture() -> Value {
+        json!({
+            "schema_version": 1,
+            "enabled": true,
+            "version": 1,
+            "default_timeout_ticks": 200,
+            "page_size": 4,
+            "frames": [{
+                "frame_key": "test_frame",
+                "can_id": 0x123,
+                "frame_type": 0,
+                "dlc": 8,
+                "desc": "测试帧",
+                "timeout_ticks": 200
+            }],
+            "signals": [{
+                "signal_key": "test_signal",
+                "param_id": "TEST_SIGNAL",
+                "name": "测试信号",
+                "inner": -1,
+                "frame_key": "test_frame",
+                "pos": 0,
+                "len": 8,
+                "byte_order": "little_endian",
+                "raw_offset": 0,
+                "raw_type": "u8",
+                "value_type": "u8",
+                "parse_resolution": 1,
+                "parse_offset": 0,
+                "parse_mask": u32::MAX,
+                "parse_shift": 0,
+                "receiver": "vcu",
+                "comment": ""
+            }],
+            "items": [{
+                "item_key": "test_item",
+                "enabled": true,
+                "order": 0,
+                "signal_key": "test_signal",
+                "name_key": "battery_monitor.test_item",
+                "fallback_name": "测试显示项",
+                "unit": "",
+                "formatter": {
+                    "kind": "linear",
+                    "offset": 0,
+                    "scale_num": 1,
+                    "scale_den": 1,
+                    "decimals": 0,
+                    "display_base": 10,
+                    "true_text": "",
+                    "false_text": ""
+                },
+                "validity": {
+                    "mode": "frame_timeout",
+                    "frame_key": "test_frame",
+                    "empty_text": " "
+                }
+            }]
+        })
+    }
 
     fn language_info_without_selected_languages() -> Value {
         json!({
@@ -2466,7 +2526,7 @@ mod tests {
             "pdo_condition": [],
             "pdo_recv": [],
             "pdo_send": [],
-            "battery_monitor": default_battery_monitor_protocol()
+            "battery_monitor": battery_monitor_fixture()
         })
     }
 
@@ -3101,7 +3161,7 @@ mod tests {
 
     #[test]
     fn build_project_binary_packs_unified_battery_monitor_segment() {
-        let mut battery_monitor = default_battery_monitor_protocol();
+        let mut battery_monitor = battery_monitor_fixture();
         battery_monitor["version"] = json!(2);
         let document = json!({
             "language_info": language_info_without_selected_languages(),
@@ -3123,8 +3183,8 @@ mod tests {
         );
         assert_eq!(report.data_description.global_param_total, 0);
         assert_eq!(report.data_description.pdo_recv_total, 0);
-        assert_eq!(report.data_description.battery_monitor_item_total, 33);
-        assert_eq!(report.data_description.battery_monitor_frame_total, 11);
+        assert_eq!(report.data_description.battery_monitor_item_total, 1);
+        assert_eq!(report.data_description.battery_monitor_frame_total, 1);
         assert_eq!(report.data_description.battery_monitor_version, 2);
 
         let base = report.data_description.battery_monitor_base_addr as usize;
@@ -3141,21 +3201,21 @@ mod tests {
         assert_eq!(read_u16(base), 2);
         assert_eq!(read_u16(base + 2), 1);
         assert_eq!(read_u16(base + 4), 4);
-        assert_eq!(read_u16(base + 6), 33);
-        assert_eq!(read_u16(base + 8), 11);
-        assert_eq!(read_u16(base + 10), 33);
+        assert_eq!(read_u16(base + 6), 1);
+        assert_eq!(read_u16(base + 8), 1);
+        assert_eq!(read_u16(base + 10), 1);
         assert_eq!(read_u16(base + 12), 200);
         assert_eq!(read_u16(base + 14), 12);
         assert_eq!(read_u16(base + 16), 32);
         assert_eq!(read_u16(base + 18), 40);
         assert_eq!(frame_table_addr, base + 40);
-        assert_eq!(signal_table_addr, frame_table_addr + 11 * 12);
-        assert_eq!(item_table_addr, signal_table_addr + 33 * 32);
-        assert_eq!(read_u32(frame_table_addr), 0x2f0);
+        assert_eq!(signal_table_addr, frame_table_addr + 12);
+        assert_eq!(item_table_addr, signal_table_addr + 32);
+        assert_eq!(read_u32(frame_table_addr), 0x123);
         assert_eq!(read_u16(frame_table_addr + 6), 200);
         assert_eq!(read_u16(signal_table_addr), 0);
         assert_eq!(read_u16(item_table_addr), 0);
-        assert!(report.bytes.len() >= item_table_addr + 33 * 40);
+        assert!(report.bytes.len() >= item_table_addr + 40);
         assert!(
             report.data_description.sdo_base_addr
                 > report.data_description.battery_monitor_base_addr
@@ -3164,7 +3224,7 @@ mod tests {
 
     #[test]
     fn build_project_binary_can_skip_battery_monitor_bin() {
-        let battery_monitor = default_battery_monitor_protocol();
+        let battery_monitor = battery_monitor_fixture();
         let mut document = json!({
             "language_info": language_info_without_selected_languages(),
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },

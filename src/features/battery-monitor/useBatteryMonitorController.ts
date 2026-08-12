@@ -19,6 +19,7 @@ import type {
 } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
 import { runSystemDialog } from '../../utils/systemDialog';
+import { defaultBatteryMonitor } from '../project-document/projectDocumentDefaults';
 import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
 
 interface UseBatteryMonitorControllerOptions {
@@ -33,16 +34,7 @@ interface UseBatteryMonitorControllerOptions {
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function cloneDefaultBatteryMonitor(): BatteryMonitorProtocol {
-  return {
-    schema_version: 1,
-    enabled: true,
-    version: 1,
-    default_timeout_ticks: 200,
-    page_size: 4,
-    frames: [],
-    signals: [],
-    items: [],
-  };
+  return JSON.parse(JSON.stringify(defaultBatteryMonitor)) as BatteryMonitorProtocol;
 }
 
 function defaultLanguageDocument(): LanguageDocument {
@@ -53,14 +45,21 @@ function defaultLanguageDocument(): LanguageDocument {
   };
 }
 
-function ensureLanguageEntry(language: LanguageDocument, key: string, zhText = ''): LanguageDocument {
+function ensureLanguageEntry(
+  language: LanguageDocument,
+  key: string,
+  zhText = '',
+): LanguageDocument {
   if (!key.trim()) return language;
   const listInner = language.list_inner.includes(key)
     ? language.list_inner
     : [...language.list_inner, key];
   const existing = (language.list_translate[key] as Record<string, string> | undefined) ?? {};
   const values = Object.fromEntries(
-    language.list_code_language.map((code) => [code, existing[code] ?? (code === 'zh' ? zhText : '')]),
+    language.list_code_language.map((code) => [
+      code,
+      existing[code] ?? (code === 'zh' ? zhText : ''),
+    ]),
   );
   return {
     ...language,
@@ -85,7 +84,11 @@ function normalizeBatteryMonitor(value: unknown): BatteryMonitorProtocol {
 function normalizeImportedBatteryMonitor(value: unknown): BatteryMonitorProtocol | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const source = value as Record<string, unknown>;
-  if (!Array.isArray(source.frames) || !Array.isArray(source.signals) || !Array.isArray(source.items)) {
+  if (
+    !Array.isArray(source.frames) ||
+    !Array.isArray(source.signals) ||
+    !Array.isArray(source.items)
+  ) {
     return null;
   }
   return normalizeBatteryMonitor(value);
@@ -318,9 +321,7 @@ export function useBatteryMonitorController({
     updateBatteryMonitorDocument({
       ...document,
       items: document.items.map((item, currentIndex) =>
-        currentIndex === index
-          ? { ...item, validity: { ...item.validity, [field]: value } }
-          : item,
+        currentIndex === index ? { ...item, validity: { ...item.validity, [field]: value } } : item,
       ),
     });
   }
@@ -329,7 +330,8 @@ export function useBatteryMonitorController({
     const item = batteryMonitorDocument().items[index];
     if (!item?.name_key?.trim()) return;
     const language = languageDocument();
-    const existing = (language.list_translate[item.name_key] as Record<string, string> | undefined) ?? {};
+    const existing =
+      (language.list_translate[item.name_key] as Record<string, string> | undefined) ?? {};
     const nextLanguage = ensureLanguageEntry(
       {
         ...language,
@@ -401,7 +403,9 @@ export function useBatteryMonitorController({
     }
     const selected = await runSystemDialog(
       () =>
-        save({ filters: [{ name: t('batteryMonitor.filters.protocolJson'), extensions: ['json'] }] }),
+        save({
+          filters: [{ name: t('batteryMonitor.filters.protocolJson'), extensions: ['json'] }],
+        }),
       setBatteryMonitorExportStatus,
     );
     if (!selected) return;
@@ -466,9 +470,11 @@ export function useBatteryMonitorController({
   async function handleExportBatteryFramesCsv() {
     setBatteryCsvStatus(null);
     if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
-    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
+    if (!isTauriRuntime())
+      return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: t('batteryMonitor.filters.framesCsv'), extensions: ['csv'] }] }),
+      () =>
+        save({ filters: [{ name: t('batteryMonitor.filters.framesCsv'), extensions: ['csv'] }] }),
       setBatteryCsvStatus,
     );
     if (!selected) return;
@@ -476,7 +482,12 @@ export function useBatteryMonitorController({
     try {
       const { framesToCsv } = await import('../../utils/batteryCsv');
       await saveTextFile(selected, `\uFEFF${framesToCsv(batteryMonitorDocument().frames)}`);
-      setBatteryCsvStatus(t('batteryMonitor.status.csvExported', { kind: t('batteryMonitor.kinds.frames'), path: selected }));
+      setBatteryCsvStatus(
+        t('batteryMonitor.status.csvExported', {
+          kind: t('batteryMonitor.kinds.frames'),
+          path: selected,
+        }),
+      );
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -487,10 +498,15 @@ export function useBatteryMonitorController({
   async function handleImportBatteryFramesCsv() {
     setBatteryCsvStatus(null);
     if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
-    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
+    if (!isTauriRuntime())
+      return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
     const operation = documentGuard.begin();
     const selected = await runSystemDialog(
-      () => open({ multiple: false, filters: [{ name: t('batteryMonitor.filters.framesCsv'), extensions: ['csv'] }] }),
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: t('batteryMonitor.filters.framesCsv'), extensions: ['csv'] }],
+        }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
       },
@@ -502,10 +518,12 @@ export function useBatteryMonitorController({
       const { frames, errors } = csvToFrames(await loadTextFile(selected));
       if (!documentGuard.isCurrent(operation)) return;
       if (errors.length > 0)
-        return setBatteryCsvStatus(t('batteryMonitor.status.csvImportError', {
-          kind: t('batteryMonitor.kinds.frames'),
-          errors: errors.join(t('common.punctuation.semicolon')),
-        }));
+        return setBatteryCsvStatus(
+          t('batteryMonitor.status.csvImportError', {
+            kind: t('batteryMonitor.kinds.frames'),
+            errors: errors.join(t('common.punctuation.semicolon')),
+          }),
+        );
       const current = batteryMonitorDocument();
       const frameKeys = new Set(frames.map((frame) => frame.frame_key));
       updateBatteryMonitorDocument({
@@ -518,9 +536,15 @@ export function useBatteryMonitorController({
           ),
         ),
       });
-      setBatteryCsvStatus(t('batteryMonitor.status.csvImported', { kind: t('batteryMonitor.kinds.frames'), count: frames.length }));
+      setBatteryCsvStatus(
+        t('batteryMonitor.status.csvImported', {
+          kind: t('batteryMonitor.kinds.frames'),
+          count: frames.length,
+        }),
+      );
     } catch (error) {
-      if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation))
+        setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
       if (documentGuard.isCurrent(operation)) setIsImportingBatteryCsv(false);
     }
@@ -529,9 +553,11 @@ export function useBatteryMonitorController({
   async function handleExportBatterySignalsCsv() {
     setBatteryCsvStatus(null);
     if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
-    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
+    if (!isTauriRuntime())
+      return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: t('batteryMonitor.filters.signalsCsv'), extensions: ['csv'] }] }),
+      () =>
+        save({ filters: [{ name: t('batteryMonitor.filters.signalsCsv'), extensions: ['csv'] }] }),
       setBatteryCsvStatus,
     );
     if (!selected) return;
@@ -539,7 +565,12 @@ export function useBatteryMonitorController({
     try {
       const { signalsToCsv } = await import('../../utils/batteryCsv');
       await saveTextFile(selected, `\uFEFF${signalsToCsv(batteryMonitorDocument().signals)}`);
-      setBatteryCsvStatus(t('batteryMonitor.status.csvExported', { kind: t('batteryMonitor.kinds.signals'), path: selected }));
+      setBatteryCsvStatus(
+        t('batteryMonitor.status.csvExported', {
+          kind: t('batteryMonitor.kinds.signals'),
+          path: selected,
+        }),
+      );
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -550,10 +581,15 @@ export function useBatteryMonitorController({
   async function handleImportBatterySignalsCsv() {
     setBatteryCsvStatus(null);
     if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
-    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
+    if (!isTauriRuntime())
+      return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
     const operation = documentGuard.begin();
     const selected = await runSystemDialog(
-      () => open({ multiple: false, filters: [{ name: t('batteryMonitor.filters.signalsCsv'), extensions: ['csv'] }] }),
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: t('batteryMonitor.filters.signalsCsv'), extensions: ['csv'] }],
+        }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
       },
@@ -565,10 +601,12 @@ export function useBatteryMonitorController({
       const { signals, errors } = csvToSignals(await loadTextFile(selected));
       if (!documentGuard.isCurrent(operation)) return;
       if (errors.length > 0)
-        return setBatteryCsvStatus(t('batteryMonitor.status.csvImportError', {
-          kind: t('batteryMonitor.kinds.signals'),
-          errors: errors.join(t('common.punctuation.semicolon')),
-        }));
+        return setBatteryCsvStatus(
+          t('batteryMonitor.status.csvImportError', {
+            kind: t('batteryMonitor.kinds.signals'),
+            errors: errors.join(t('common.punctuation.semicolon')),
+          }),
+        );
       const current = batteryMonitorDocument();
       const signalKeys = new Set(signals.map((signal) => signal.signal_key));
       updateBatteryMonitorDocument({
@@ -576,9 +614,15 @@ export function useBatteryMonitorController({
         signals,
         items: current.items.filter((item) => signalKeys.has(item.signal_key)),
       });
-      setBatteryCsvStatus(t('batteryMonitor.status.csvImported', { kind: t('batteryMonitor.kinds.signals'), count: signals.length }));
+      setBatteryCsvStatus(
+        t('batteryMonitor.status.csvImported', {
+          kind: t('batteryMonitor.kinds.signals'),
+          count: signals.length,
+        }),
+      );
     } catch (error) {
-      if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation))
+        setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
       if (documentGuard.isCurrent(operation)) setIsImportingBatteryCsv(false);
     }
@@ -587,9 +631,11 @@ export function useBatteryMonitorController({
   async function handleExportBatteryItemsCsv() {
     setBatteryCsvStatus(null);
     if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
-    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
+    if (!isTauriRuntime())
+      return setBatteryCsvStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
     const selected = await runSystemDialog(
-      () => save({ filters: [{ name: t('batteryMonitor.filters.itemsCsv'), extensions: ['csv'] }] }),
+      () =>
+        save({ filters: [{ name: t('batteryMonitor.filters.itemsCsv'), extensions: ['csv'] }] }),
       setBatteryCsvStatus,
     );
     if (!selected) return;
@@ -597,7 +643,12 @@ export function useBatteryMonitorController({
     try {
       const { itemsToCsv } = await import('../../utils/batteryCsv');
       await saveTextFile(selected, `\uFEFF${itemsToCsv(batteryMonitorDocument().items)}`);
-      setBatteryCsvStatus(t('batteryMonitor.status.csvExported', { kind: t('batteryMonitor.kinds.items'), path: selected }));
+      setBatteryCsvStatus(
+        t('batteryMonitor.status.csvExported', {
+          kind: t('batteryMonitor.kinds.items'),
+          path: selected,
+        }),
+      );
     } catch (error) {
       setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -608,10 +659,15 @@ export function useBatteryMonitorController({
   async function handleImportBatteryItemsCsv() {
     setBatteryCsvStatus(null);
     if (!loadedProject) return setBatteryCsvStatus(t('batteryMonitor.status.openProjectFirst'));
-    if (!isTauriRuntime()) return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
+    if (!isTauriRuntime())
+      return setBatteryCsvStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
     const operation = documentGuard.begin();
     const selected = await runSystemDialog(
-      () => open({ multiple: false, filters: [{ name: t('batteryMonitor.filters.itemsCsv'), extensions: ['csv'] }] }),
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: t('batteryMonitor.filters.itemsCsv'), extensions: ['csv'] }],
+        }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(message);
       },
@@ -623,19 +679,27 @@ export function useBatteryMonitorController({
       const { items, errors } = csvToItems(await loadTextFile(selected));
       if (!documentGuard.isCurrent(operation)) return;
       if (errors.length > 0)
-        return setBatteryCsvStatus(t('batteryMonitor.status.csvImportError', {
-          kind: t('batteryMonitor.kinds.items'),
-          errors: errors.join(t('common.punctuation.semicolon')),
-        }));
+        return setBatteryCsvStatus(
+          t('batteryMonitor.status.csvImportError', {
+            kind: t('batteryMonitor.kinds.items'),
+            errors: errors.join(t('common.punctuation.semicolon')),
+          }),
+        );
       const current = batteryMonitorDocument();
       const signalKeys = new Set(current.signals.map((signal) => signal.signal_key));
       updateBatteryMonitorDocument({
         ...current,
         items: items.filter((item) => signalKeys.has(item.signal_key)),
       });
-      setBatteryCsvStatus(t('batteryMonitor.status.csvImported', { kind: t('batteryMonitor.kinds.items'), count: items.length }));
+      setBatteryCsvStatus(
+        t('batteryMonitor.status.csvImported', {
+          kind: t('batteryMonitor.kinds.items'),
+          count: items.length,
+        }),
+      );
     } catch (error) {
-      if (documentGuard.isCurrent(operation)) setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation))
+        setBatteryCsvStatus(error instanceof Error ? error.message : String(error));
     } finally {
       if (documentGuard.isCurrent(operation)) setIsImportingBatteryCsv(false);
     }
@@ -644,10 +708,15 @@ export function useBatteryMonitorController({
   async function handleImportBatteryDbc() {
     setBatteryDbcStatus(null);
     if (!loadedProject) return setBatteryDbcStatus(t('batteryMonitor.status.openProjectFirst'));
-    if (!isTauriRuntime()) return setBatteryDbcStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
+    if (!isTauriRuntime())
+      return setBatteryDbcStatus(t('batteryMonitor.status.desktopFilePickerOnly'));
     const operation = documentGuard.begin();
     const selected = await runSystemDialog(
-      () => open({ multiple: false, filters: [{ name: t('batteryMonitor.filters.dbc'), extensions: ['dbc'] }] }),
+      () =>
+        open({
+          multiple: false,
+          filters: [{ name: t('batteryMonitor.filters.dbc'), extensions: ['dbc'] }],
+        }),
       (message) => {
         if (documentGuard.isCurrent(operation)) setBatteryDbcStatus(message);
       },
@@ -658,20 +727,31 @@ export function useBatteryMonitorController({
       const report = await importDbc(selected);
       if (!documentGuard.isCurrent(operation)) return;
       if (report.errors.length > 0)
-        return setBatteryDbcStatus(t('batteryMonitor.status.dbcImportError', {
-          errors: report.errors.join(t('common.punctuation.semicolon')),
-        }));
-      if (report.frames.length === 0) return setBatteryDbcStatus(t('batteryMonitor.status.dbcNoMessages'));
+        return setBatteryDbcStatus(
+          t('batteryMonitor.status.dbcImportError', {
+            errors: report.errors.join(t('common.punctuation.semicolon')),
+          }),
+        );
+      if (report.frames.length === 0)
+        return setBatteryDbcStatus(t('batteryMonitor.status.dbcNoMessages'));
       const current = batteryMonitorDocument();
       const signalKeys = new Set(report.signals.map((signal) => signal.signal_key));
       const items = current.items.filter((item) => signalKeys.has(item.signal_key));
-      updateBatteryMonitorDocument({ ...current, frames: report.frames, signals: report.signals, items });
-      setBatteryDbcStatus(t('batteryMonitor.status.dbcImported', {
-        frames: report.frames.length,
-        signals: report.signals.length,
-      }));
+      updateBatteryMonitorDocument({
+        ...current,
+        frames: report.frames,
+        signals: report.signals,
+        items,
+      });
+      setBatteryDbcStatus(
+        t('batteryMonitor.status.dbcImported', {
+          frames: report.frames.length,
+          signals: report.signals.length,
+        }),
+      );
     } catch (error) {
-      if (documentGuard.isCurrent(operation)) setBatteryDbcStatus(error instanceof Error ? error.message : String(error));
+      if (documentGuard.isCurrent(operation))
+        setBatteryDbcStatus(error instanceof Error ? error.message : String(error));
     } finally {
       if (documentGuard.isCurrent(operation)) setIsImportingBatteryDbc(false);
     }
@@ -680,9 +760,11 @@ export function useBatteryMonitorController({
   async function handleExportBatteryDbc() {
     setBatteryDbcStatus(null);
     if (!loadedProject) return setBatteryDbcStatus(t('batteryMonitor.status.openProjectFirst'));
-    if (!isTauriRuntime()) return setBatteryDbcStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
+    if (!isTauriRuntime())
+      return setBatteryDbcStatus(t('batteryMonitor.status.desktopSaveDialogOnly'));
     const document = batteryMonitorDocument();
-    if (document.frames.length === 0) return setBatteryDbcStatus(t('batteryMonitor.status.noFramesToExport'));
+    if (document.frames.length === 0)
+      return setBatteryDbcStatus(t('batteryMonitor.status.noFramesToExport'));
     const selected = await runSystemDialog(
       () => save({ filters: [{ name: t('batteryMonitor.filters.dbc'), extensions: ['dbc'] }] }),
       setBatteryDbcStatus,
