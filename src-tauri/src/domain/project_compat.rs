@@ -90,6 +90,14 @@ const PDO_SIMPLE_FIELD_ORDER: &[&str] = &["pdo_send", "pdo_recv"];
 const SDO_FIELD_ORDER: &[&str] = &["type", "user_auth", "name_index", "name", "children"];
 const FAULT_CODE_INFO_FIELD_ORDER: &[&str] =
     &["schema_version", "enabled", "version", "sources", "codes"];
+const FAULT_CODE_V2_INFO_FIELD_ORDER: &[&str] = &[
+    "schema_version",
+    "enabled",
+    "version",
+    "sources",
+    "definitions",
+    "bindings",
+];
 const FAULT_CODE_SOURCE_FIELD_ORDER: &[&str] = &[
     "source_key",
     "source_id",
@@ -112,6 +120,9 @@ const FAULT_CODE_ITEM_FIELD_ORDER: &[&str] = &[
     "name",
     "enabled",
 ];
+const FAULT_CODE_DEFINITION_FIELD_ORDER: &[&str] =
+    &["fault_key", "message_key", "name", "severity", "enabled"];
+const FAULT_CODE_BINDING_FIELD_ORDER: &[&str] = &["source_key", "code", "fault_key", "enabled"];
 
 pub fn is_legacy_jcpro_path(path: &str) -> bool {
     path.to_lowercase().ends_with(".jcpro")
@@ -381,18 +392,44 @@ fn order_fault_code_info(root: &mut Value) {
         return;
     };
 
+    let is_v2 = fault_code_info
+        .get("schema_version")
+        .and_then(Value::as_i64)
+        == Some(2);
     if let Some(object) = fault_code_info.as_object_mut() {
         object.remove("groups");
-        object.remove("bindings");
+        if is_v2 {
+            object.remove("codes");
+        } else {
+            object.remove("definitions");
+            object.remove("bindings");
+        }
     }
 
     if let Some(sources) = fault_code_info
         .get_mut("sources")
         .and_then(Value::as_array_mut)
     {
-        for source in sources {
+        for source in sources.iter_mut() {
             let value = std::mem::take(source);
             *source = order_object_value(value, FAULT_CODE_SOURCE_FIELD_ORDER);
+        }
+        if is_v2 {
+            sources.sort_by(|left, right| {
+                let left_id = left.get("source_id").and_then(Value::as_i64).unwrap_or(0);
+                let right_id = right.get("source_id").and_then(Value::as_i64).unwrap_or(0);
+                left_id.cmp(&right_id).then_with(|| {
+                    left.get("source_key")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .cmp(
+                            right
+                                .get("source_key")
+                                .and_then(Value::as_str)
+                                .unwrap_or(""),
+                        )
+                })
+            });
         }
     }
 
@@ -410,8 +447,58 @@ fn order_fault_code_info(root: &mut Value) {
         }
     }
 
+    if let Some(definitions) = fault_code_info
+        .get_mut("definitions")
+        .and_then(Value::as_array_mut)
+    {
+        for definition in definitions.iter_mut() {
+            let value = std::mem::take(definition);
+            *definition = order_object_value(value, FAULT_CODE_DEFINITION_FIELD_ORDER);
+        }
+        definitions.sort_by(|left, right| {
+            left.get("fault_key")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .cmp(right.get("fault_key").and_then(Value::as_str).unwrap_or(""))
+        });
+    }
+
+    if let Some(bindings) = fault_code_info
+        .get_mut("bindings")
+        .and_then(Value::as_array_mut)
+    {
+        for binding in bindings.iter_mut() {
+            let value = std::mem::take(binding);
+            *binding = order_object_value(value, FAULT_CODE_BINDING_FIELD_ORDER);
+        }
+        bindings.sort_by(|left, right| {
+            left.get("source_key")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .cmp(
+                    right
+                        .get("source_key")
+                        .and_then(Value::as_str)
+                        .unwrap_or(""),
+                )
+                .then_with(|| {
+                    left.get("code")
+                        .and_then(Value::as_i64)
+                        .unwrap_or(0)
+                        .cmp(&right.get("code").and_then(Value::as_i64).unwrap_or(0))
+                })
+        });
+    }
+
     let value = std::mem::take(fault_code_info);
-    *fault_code_info = order_object_value(value, FAULT_CODE_INFO_FIELD_ORDER);
+    *fault_code_info = order_object_value(
+        value,
+        if is_v2 {
+            FAULT_CODE_V2_INFO_FIELD_ORDER
+        } else {
+            FAULT_CODE_INFO_FIELD_ORDER
+        },
+    );
 }
 
 fn order_object_value(value: Value, field_order: &[&str]) -> Value {
@@ -851,6 +938,23 @@ mod tests {
                 "locale_order": ["zh", "en"],
                 "default_locale": "zh"
             },
+            "fault_code_info": {
+                "schema_version": 2,
+                "enabled": true,
+                "version": 2,
+                "sources": [
+                    { "source_key": "pump", "source_id": 2, "type_char": "P", "can_id": 660 },
+                    { "source_key": "traction", "source_id": 1, "type_char": "T", "can_id": 648 }
+                ],
+                "definitions": [
+                    { "fault_key": "fault.pump.052", "message_key": "fault.message.low", "severity": "fault" },
+                    { "fault_key": "fault.traction.052", "message_key": "fault.message.low", "severity": "fault" }
+                ],
+                "bindings": [
+                    { "source_key": "traction", "code": 52, "fault_key": "fault.traction.052" },
+                    { "source_key": "pump", "code": 52, "fault_key": "fault.pump.052" }
+                ]
+            },
             "project": { "name": "v2" },
             "config_version": "jc002"
         });
@@ -860,6 +964,31 @@ mod tests {
         assert_eq!(sanitized["config_version"], "jc002");
         assert!(sanitized.get("localization").is_some());
         assert!(sanitized.get("language_info").is_none());
+        assert!(sanitized["fault_code_info"].get("codes").is_none());
+        assert_eq!(
+            sanitized["fault_code_info"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec![
+                "schema_version",
+                "enabled",
+                "version",
+                "sources",
+                "definitions",
+                "bindings"
+            ]
+        );
+        assert_eq!(
+            sanitized["fault_code_info"]["sources"][0]["source_key"],
+            "traction"
+        );
+        assert_eq!(
+            sanitized["fault_code_info"]["bindings"][0]["source_key"],
+            "pump"
+        );
         assert_eq!(
             sanitized["localization"]["locales"]
                 .as_object()

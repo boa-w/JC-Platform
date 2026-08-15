@@ -10,6 +10,7 @@
 | 语言引用 | `u16` 编辑顺序索引 | `u32 message_index` |
 | 发布清单 | `language_addr`、`language_code` | `i18n_*`、`sdo_version` |
 | 语言二进制 | 每语言索引表和字符串块 | 单一 `LVI2` 动态包 |
+| 故障项目模型 | `schema_version=1`、`codes[]` | `schema_version=2`、`definitions[]`、`bindings[]` |
 | 固件入口 | `bin_generate()` | `bin_generate_jc002()` |
 | 缺失文本 | v1 兼容规则 | 严格返回缺失，不做运行时回退 |
 
@@ -23,6 +24,7 @@
 6. v2 构建器不得调用 v1 的语言条目收集、文本索引或语言块编码函数。
 7. v2 固件初始化失败时直接返回错误，不启动 v1 语言表。
 8. 不允许通过中文原文、数组位置或旧宏名称自动生成稳定消息 key。
+9. `jc001` 故障段只接受 `codes[]`；`jc002` 故障段只接受 `definitions[]` 和 `bindings[]`，禁止混用。
 
 ## 文件与部署隔离
 

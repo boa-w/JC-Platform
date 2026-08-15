@@ -132,6 +132,10 @@ impl ProjectValidationReport {
                     warnings.push(error);
                     schema_valid = false;
                 }
+                if let Err(error) = validate_fault_code_version_contract(value) {
+                    warnings.push(error);
+                    schema_valid = false;
+                }
             }
             Some(version) if version != "jc001" => {
                 warnings.push(format!("不支持的 config_version：{version}"));
@@ -185,7 +189,7 @@ pub struct SaveProjectRequest {
 }
 
 pub fn validate_project_version_contract(document: &Value) -> Result<(), String> {
-    match document.get("config_version").and_then(Value::as_str) {
+    let result = match document.get("config_version").and_then(Value::as_str) {
         Some("jc001") if document.get("localization").is_some() => {
             Err("jc001 项目禁止包含 jc002 localization".to_string())
         }
@@ -196,7 +200,108 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
         Some("jc002") => crate::domain::localization::validate_localization(document),
         Some(version) => Err(format!("不支持的 config_version：{version}")),
         None => Ok(()),
+    };
+    result?;
+    validate_fault_code_version_contract(document)
+}
+
+fn validate_fault_code_version_contract(document: &Value) -> Result<(), String> {
+    let Some(root) = document.get("fault_code_info") else {
+        return Ok(());
+    };
+    let config_version = document.get("config_version").and_then(Value::as_str);
+    let schema_version = root
+        .get("schema_version")
+        .and_then(Value::as_i64)
+        .unwrap_or(1);
+    if config_version == Some("jc001") {
+        if schema_version != 1
+            || root.get("codes").and_then(Value::as_array).is_none()
+            || root.get("definitions").is_some()
+            || root.get("bindings").is_some()
+        {
+            return Err("jc001 fault_code_info 必须使用 schema_version=1 的 codes[]".to_string());
+        }
+        return Ok(());
     }
+    if config_version != Some("jc002") {
+        return Ok(());
+    }
+    if schema_version != 2
+        || root.get("definitions").and_then(Value::as_array).is_none()
+        || root.get("bindings").and_then(Value::as_array).is_none()
+        || root.get("codes").is_some()
+    {
+        return Err(
+            "jc002 fault_code_info 必须使用 schema_version=2 的 definitions[]/bindings[]"
+                .to_string(),
+        );
+    }
+
+    let sources = root
+        .get("sources")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "jc002 fault_code_info.sources 必须为数组".to_string())?;
+    let definitions = root
+        .get("definitions")
+        .and_then(Value::as_array)
+        .expect("validated definitions array");
+    let bindings = root
+        .get("bindings")
+        .and_then(Value::as_array)
+        .expect("validated bindings array");
+    let mut source_keys = HashSet::new();
+    for source in sources {
+        let key = source
+            .get("source_key")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if key.is_empty() || !source_keys.insert(key.to_string()) {
+            return Err("jc002 故障来源 source_key 必须唯一且不能为空".to_string());
+        }
+    }
+    let mut definition_keys = HashSet::new();
+    for definition in definitions {
+        let fault_key = definition
+            .get("fault_key")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let message_key = definition
+            .get("message_key")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if fault_key.is_empty()
+            || message_key.is_empty()
+            || !definition_keys.insert(fault_key.to_string())
+        {
+            return Err("jc002 故障定义 fault_key 必须唯一，且 message_key 不能为空".to_string());
+        }
+    }
+    let mut binding_keys = HashSet::new();
+    for binding in bindings {
+        let source_key = binding
+            .get("source_key")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let fault_key = binding
+            .get("fault_key")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let code = binding.get("code").and_then(Value::as_i64).unwrap_or(-1);
+        if !source_keys.contains(source_key)
+            || !definition_keys.contains(fault_key)
+            || !(0..=u8::MAX as i64).contains(&code)
+            || !binding_keys.insert(format!("{source_key}:{code}"))
+        {
+            return Err(format!("jc002 故障绑定无效或重复：{source_key}:{code}"));
+        }
+    }
+    Ok(())
 }
 
 /// 项目另存为请求参数。

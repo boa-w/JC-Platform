@@ -52,6 +52,7 @@ import {
   sourcePresets,
   typeChars,
 } from './faultCodeModel';
+import { FaultCodeV2Page } from './FaultCodeV2Page';
 import './fault-code.css';
 
 interface FaultCodePageProps {
@@ -84,7 +85,15 @@ function fallbackFaultCodeRowKey(item: FaultCodeItem) {
   }-${item.severity ?? 'severity'}`;
 }
 
-export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePageProps) {
+export function FaultCodePage(props: FaultCodePageProps) {
+  const document = props.loadedProject?.document as Record<string, unknown> | undefined;
+  if (props.loadedProject && document?.config_version === 'jc002') {
+    return <FaultCodeV2Page {...props} loadedProject={props.loadedProject} />;
+  }
+  return <LegacyFaultCodePage {...props} />;
+}
+
+function LegacyFaultCodePage({ loadedProject, onUpdateSections }: FaultCodePageProps) {
   const { t } = useTranslation();
   const [csvStatus, setCsvStatus] = useState<string | null>(null);
   const [isCsvBusy, setIsCsvBusy] = useState(false);

@@ -31,5 +31,22 @@ test('migrates the full Inmotion6 project without positional UI-key drift', asyn
   assert.equal(zh['ui.overspeed.alarm.set'], '超速报警值设置');
   assert.equal(zh['ui.after.sales.service'], '售后服务');
   assert.equal(zh['ui.sim.card.info'], 'SIM卡信息');
-  assert.equal(project.fault_code_info.codes.length, 288);
+  assert.equal(project.fault_code_info.schema_version, 2);
+  assert.equal(project.fault_code_info.codes, undefined);
+  assert.equal(project.fault_code_info.definitions.length, 288);
+  assert.equal(project.fault_code_info.bindings.length, 288);
+  assert.equal(
+    new Set(
+      project.fault_code_info.definitions.map((item: { message_key: string }) => item.message_key),
+    ).size,
+    127,
+  );
+  const pump52 = project.fault_code_info.bindings.find(
+    (item: { source_key: string; code: number }) => item.source_key === 'pump' && item.code === 52,
+  );
+  const pump52Definition = project.fault_code_info.definitions.find(
+    (item: { fault_key: string }) => item.fault_key === pump52.fault_key,
+  );
+  assert.equal(pump52Definition.fault_key, 'fault.pump.052');
+  assert.equal(pump52Definition.message_key, 'fault.traction.052');
 });

@@ -7,7 +7,7 @@
 - 清单：`jc_export_v2/ConfigUpdate.json`
 - 二进制：`jc_export_v2/bin/data.bin`
 
-当前构建包含 10 个 locale、572 个稳定消息 key、288 条 fault code 和完整 Inmotion6 SDO。原项目没有 `battery_monitor`，因此该测试包不包含 battery 段。
+当前构建包含 10 个 locale、555 个稳定消息 key、288 个故障定义、288 条来源绑定和完整 Inmotion6 SDO。127 个故障文案 key 被多个独立故障定义复用。原项目没有 `battery_monitor`，因此该测试包不包含 battery 段。
 
 ## 可重复生成
 
@@ -29,11 +29,11 @@ cargo run --manifest-path src-tauri/Cargo.toml --bin jc-cli -- `
 
 | 项目 | 值 |
 | --- | ---: |
-| data.bin size | 358679 bytes |
-| CRC16-CCITT-FALSE | 33816 |
+| data.bin size | 354004 bytes |
+| CRC16-CCITT-FALSE | 1665 |
 | LVI2 schema | 2 |
 | locale count | 10 |
-| message count | 572 |
+| message count | 555 |
 | fault text ABI | 2 |
 | fault code count | 288 |
 | SDO text ABI | 2 |

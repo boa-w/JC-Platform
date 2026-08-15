@@ -354,6 +354,25 @@ export interface FaultCodeInfo {
   version?: number;
   sources?: FaultCodeSource[];
   codes?: FaultCodeItem[];
+  definitions?: FaultCodeDefinition[];
+  bindings?: FaultCodeBinding[];
+  [key: string]: unknown;
+}
+
+export interface FaultCodeDefinition {
+  fault_key: string;
+  message_key: string;
+  name?: string;
+  severity?: string;
+  enabled?: boolean;
+  [key: string]: unknown;
+}
+
+export interface FaultCodeBinding {
+  source_key: string;
+  code: number;
+  fault_key: string;
+  enabled?: boolean;
   [key: string]: unknown;
 }
 

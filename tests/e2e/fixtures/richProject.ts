@@ -175,6 +175,85 @@ export const richProjectDocument = {
   },
 };
 
+const { language_info: _legacyLanguageInfo, ...richProjectWithoutLegacyLanguage } =
+  richProjectDocument;
+
+export const v2FaultProjectPath = 'D:\\projects\\fault-catalog-v2.jcpro';
+export const v2FaultProjectDocument = {
+  ...richProjectWithoutLegacyLanguage,
+  config_version: 'jc002',
+  project: { ...richProjectDocument.project, name: 'Fault Catalog V2' },
+  localization: {
+    default_locale: 'zh',
+    locale_order: ['zh', 'en'],
+    locales: {
+      zh: {
+        enabled: true,
+        direction: 'ltr',
+        translations: {
+          'fault.message.dc_bus_low': '直流母线电压低',
+        },
+      },
+      en: {
+        enabled: true,
+        direction: 'ltr',
+        translations: {
+          'fault.message.dc_bus_low': 'DC bus voltage low',
+        },
+      },
+    },
+  },
+  fault_code_info: {
+    schema_version: 2,
+    enabled: true,
+    version: 2,
+    sources: [
+      {
+        source_key: 'traction',
+        source_id: 1,
+        type_char: 'T',
+        name: '牵引',
+        can_id: 0x288,
+        frame_type: 0,
+        code_byte: 2,
+        clear_code: 0,
+        invalid_codes: [],
+        enabled: true,
+      },
+      {
+        source_key: 'pump',
+        source_id: 2,
+        type_char: 'P',
+        name: '油泵',
+        can_id: 0x294,
+        frame_type: 0,
+        code_byte: 2,
+        clear_code: 0,
+        invalid_codes: [],
+        enabled: true,
+      },
+    ],
+    definitions: [
+      {
+        fault_key: 'fault.traction.052',
+        message_key: 'fault.message.dc_bus_low',
+        severity: 'fault',
+        enabled: true,
+      },
+      {
+        fault_key: 'fault.pump.052',
+        message_key: 'fault.message.dc_bus_low',
+        severity: 'fault',
+        enabled: true,
+      },
+    ],
+    bindings: [
+      { source_key: 'traction', code: 52, fault_key: 'fault.traction.052', enabled: true },
+      { source_key: 'pump', code: 52, fault_key: 'fault.pump.052', enabled: true },
+    ],
+  },
+};
+
 export async function installRichProjectDesktopMock(page: Page) {
   await page.evaluate(
     ({ document, projectPath }) => {
@@ -275,18 +354,16 @@ export async function installRichProjectDesktopMock(page: Page) {
           if (command === 'release_project_window') return null;
           if (command === 'load_project') return loadedProject(JSON.parse(worktreeContent));
           if (command === 'load_text_file') {
-            const delay = (
-              window as unknown as { __FORMAT_FILE_DELAY_MS__: number }
-            ).__FORMAT_FILE_DELAY_MS__;
+            const delay = (window as unknown as { __FORMAT_FILE_DELAY_MS__: number })
+              .__FORMAT_FILE_DELAY_MS__;
             if (delay > 0) await new Promise((resolve) => window.setTimeout(resolve, delay));
             return jcproContent;
           }
           if (command === 'save_text_file') {
             jcproContent = String(args?.content ?? '');
             worktreeContent = jcproContent;
-            (
-              window as unknown as { __FORMATTED_JCPRO_FILE__: unknown }
-            ).__FORMATTED_JCPRO_FILE__ = { path: args?.path, content: jcproContent };
+            (window as unknown as { __FORMATTED_JCPRO_FILE__: unknown }).__FORMATTED_JCPRO_FILE__ =
+              { path: args?.path, content: jcproContent };
             return null;
           }
           if (command === 'load_json_file') throw new Error('optional sidecar not found');
@@ -297,9 +374,8 @@ export async function installRichProjectDesktopMock(page: Page) {
             return { valid: true, logo: null, main_items: [], errors: [] };
           }
           if (command === 'load_project_git_context') {
-            const delay = (
-              window as unknown as { __GIT_CONTEXT_DELAY_MS__: number }
-            ).__GIT_CONTEXT_DELAY_MS__;
+            const delay = (window as unknown as { __GIT_CONTEXT_DELAY_MS__: number })
+              .__GIT_CONTEXT_DELAY_MS__;
             if (delay > 0) await new Promise((resolve) => window.setTimeout(resolve, delay));
             return gitContext;
           }
@@ -397,5 +473,43 @@ export async function installRichProjectDesktopMock(page: Page) {
         internals;
     },
     { document: richProjectDocument, projectPath: richProjectPath },
+  );
+}
+
+export async function installV2FaultProjectDesktopMock(page: Page) {
+  await installRichProjectDesktopMock(page);
+  await page.evaluate(
+    ({ document, projectPath }) => {
+      const host = window as unknown as {
+        __TAURI_INTERNALS__: {
+          invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown>;
+        };
+        __SAVED_PROJECT_DOCUMENT__: unknown;
+      };
+      const originalInvoke = host.__TAURI_INTERNALS__.invoke;
+      const loadedProject = (nextDocument: unknown) => ({
+        summary: {
+          name: 'Fault Catalog V2',
+          version: 'jc002',
+          path: projectPath,
+          deviceResolution: '800×480',
+        },
+        validation: { valid: true, missing_sections: [], warnings: [] },
+        document: nextDocument,
+      });
+      host.__TAURI_INTERNALS__.invoke = async (command, args) => {
+        if (command === 'open_project_window') {
+          return { action: 'current', windowLabel: 'main', path: projectPath };
+        }
+        if (command === 'load_project') return loadedProject(structuredClone(document));
+        if (command === 'save_project') {
+          const request = args?.request as { document?: unknown } | undefined;
+          host.__SAVED_PROJECT_DOCUMENT__ = request?.document ?? document;
+          return loadedProject(host.__SAVED_PROJECT_DOCUMENT__);
+        }
+        return originalInvoke(command, args);
+      };
+    },
+    { document: v2FaultProjectDocument, projectPath: v2FaultProjectPath },
   );
 }

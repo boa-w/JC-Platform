@@ -173,10 +173,52 @@ v2 SDO 菜单和参数必须提供：
 
 ```json
 {
-  "code": 10,
-  "message_key": "fault.traction.010"
+  "fault_code_info": {
+    "schema_version": 2,
+    "enabled": true,
+    "version": 2,
+    "sources": [
+      {
+        "source_key": "traction",
+        "source_id": 1,
+        "type_char": "T",
+        "can_id": 648,
+        "frame_type": 0,
+        "code_byte": 2,
+        "clear_code": 0,
+        "invalid_codes": [31],
+        "enabled": true
+      }
+    ],
+    "definitions": [
+      {
+        "fault_key": "fault.traction.052",
+        "message_key": "fault.message.dc_bus_voltage_low",
+        "severity": "fault",
+        "enabled": true
+      }
+    ],
+    "bindings": [
+      {
+        "source_key": "traction",
+        "code": 52,
+        "fault_key": "fault.traction.052",
+        "enabled": true
+      }
+    ]
+  }
 }
 ```
+
+- `sources[]` 只描述报码来源和取码规则。
+- `definitions[]` 保存稳定故障身份、等级和多语言 `message_key`。
+- `bindings[]` 把一个来源下的原始报码映射到故障定义。
+- `source_key`、`fault_key` 和 `(source_key, code)` 必须分别唯一。
+- 每个绑定必须引用已存在的来源和定义。
+- 多个独立 `fault_key` 可以共享同一个 `message_key`；这表示文案复用，不是重复错误。
+- 删除绑定不会删除定义或翻译。删除来源/定义时，编辑器必须先确认并级联删除引用绑定。
+- 保存时来源按 ID、定义按 `fault_key`、绑定按来源和 code 稳定排序。
+- v2 不接受 v1 的 `codes[]`，也不会从 `codes[]` 隐式迁移或回退。
 
 v2 项目应使用 `message_key`。`name_key`、`name` 的读取仍存在于共享解析函数中，但不应作为新 v2 文件规范使用。
 

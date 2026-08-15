@@ -1309,16 +1309,31 @@ fn collect_fault_code_language_entries(document: &Value, entries: &mut Vec<Strin
     if !root.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
         return;
     }
-    let Some(codes) = root.get("codes").and_then(Value::as_array) else {
-        return;
-    };
-    for code in codes {
-        if !code.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
-            continue;
+    if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        if let Some(definitions) = root.get("definitions").and_then(Value::as_array) {
+            for definition in definitions {
+                if !definition
+                    .get("enabled")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true)
+                {
+                    continue;
+                }
+                let key = object_string(definition, "message_key");
+                if !key.is_empty() {
+                    push_unique(entries, &key);
+                }
+            }
         }
-        let key = fault_code_language_key(code);
-        if !key.is_empty() {
-            push_unique(entries, &key);
+    } else if let Some(codes) = root.get("codes").and_then(Value::as_array) {
+        for code in codes {
+            if !code.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
+                continue;
+            }
+            let key = fault_code_language_key(code);
+            if !key.is_empty() {
+                push_unique(entries, &key);
+            }
         }
     }
 }
@@ -1603,6 +1618,105 @@ fn signed_index(value: i64) -> u16 {
     }
 }
 
+fn fault_code_export_records(
+    root: &Value,
+    dynamic: bool,
+    errors: &mut Vec<String>,
+) -> Option<Vec<Value>> {
+    let schema_version = object_i64(root, "schema_version", 1);
+    if !dynamic {
+        if schema_version != 1 {
+            errors.push(format!(
+                "jc001 fault_code_info 仅支持 schema_version=1，当前为 {schema_version}"
+            ));
+            return None;
+        }
+        return Some(
+            root.get("codes")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default(),
+        );
+    }
+    if schema_version != 2 {
+        errors.push(format!(
+            "jc002 fault_code_info 必须使用 schema_version=2 的 definitions/bindings，当前为 {schema_version}"
+        ));
+        return None;
+    }
+
+    let definitions = root
+        .get("definitions")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut definition_by_key = HashMap::<String, Value>::new();
+    for definition in definitions {
+        let fault_key = object_string(&definition, "fault_key");
+        let message_key = object_string(&definition, "message_key");
+        if fault_key.is_empty() || message_key.is_empty() {
+            errors.push("jc002 故障定义的 fault_key 和 message_key 不能为空".to_string());
+            continue;
+        }
+        if definition_by_key
+            .insert(fault_key.clone(), definition)
+            .is_some()
+        {
+            errors.push(format!("jc002 故障定义 fault_key 重复：{fault_key}"));
+        }
+    }
+
+    let bindings = root
+        .get("bindings")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut records = Vec::new();
+    let mut identities = HashSet::<String>::new();
+    for binding in bindings {
+        if !binding
+            .get("enabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(true)
+        {
+            continue;
+        }
+        let source_key = object_string(&binding, "source_key");
+        let fault_key = object_string(&binding, "fault_key");
+        let code = object_i64(&binding, "code", -1);
+        let identity = format!("{source_key}:{code}");
+        if source_key.is_empty() || !(0..=u8::MAX as i64).contains(&code) {
+            errors.push(format!("jc002 故障绑定无效：{identity}"));
+            continue;
+        }
+        if !identities.insert(identity.clone()) {
+            errors.push(format!("jc002 故障绑定重复：{identity}"));
+            continue;
+        }
+        let Some(definition) = definition_by_key.get(&fault_key) else {
+            errors.push(format!(
+                "jc002 故障绑定 {identity} 引用了不存在的定义 {fault_key}"
+            ));
+            continue;
+        };
+        if !definition
+            .get("enabled")
+            .and_then(Value::as_bool)
+            .unwrap_or(true)
+        {
+            continue;
+        }
+        records.push(json!({
+            "source_key": source_key,
+            "code": code,
+            "message_key": object_string(definition, "message_key"),
+            "severity": object_string(definition, "severity"),
+            "enabled": true
+        }));
+    }
+    Some(records)
+}
+
 fn build_fault_code_bytes(
     document: &Value,
     base_addr: usize,
@@ -1643,11 +1757,7 @@ fn build_fault_code_bytes(
             }
         })
         .collect::<HashMap<_, _>>();
-    let mut codes = root
-        .get("codes")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
+    let mut codes = fault_code_export_records(root, text_catalog.is_dynamic(), errors)?;
     codes.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
     codes.retain(|code| {
         let source_key = object_string(code, "source_key");
@@ -3102,6 +3212,60 @@ mod tests {
         assert_eq!(bin_off_report.data_description.fault_code_base_addr, -1);
         assert_eq!(bin_off_report.data_description.fault_source_total, 0);
         assert_eq!(bin_off_report.data_description.fault_code_total, 0);
+    }
+
+    #[test]
+    fn jc002_fault_catalog_flattens_shared_messages_without_merging_identities() {
+        let document = jc002(
+            json!({
+                "project": { "name": "fault-v2" },
+                "export_info": {},
+                "device": { "resolution_w": 800, "resolution_h": 480 },
+                "ui_info": { "main": { "item": {} } },
+                "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+                "pdo_global_param": [],
+                "pdo_condition": [],
+                "pdo_recv": [],
+                "pdo_send": [],
+                "sdo_info": { "type": 0, "user_auth": 0, "message_key": "menu.root", "children": [] },
+                "battery_monitor": { "enabled": false },
+                "fault_code_info": {
+                    "schema_version": 2,
+                    "enabled": true,
+                    "version": 2,
+                    "sources": [
+                        { "source_key": "traction", "source_id": 1, "type_char": "T", "can_id": 648 },
+                        { "source_key": "pump", "source_id": 2, "type_char": "P", "can_id": 660 }
+                    ],
+                    "definitions": [
+                        { "fault_key": "fault.traction.052", "message_key": "fault.message.low", "severity": "fault" },
+                        { "fault_key": "fault.pump.052", "message_key": "fault.message.low", "severity": "fault" }
+                    ],
+                    "bindings": [
+                        { "source_key": "traction", "code": 52, "fault_key": "fault.traction.052" },
+                        { "source_key": "pump", "code": 52, "fault_key": "fault.pump.052" }
+                    ]
+                }
+            }),
+            &["menu.root", "fault.message.low"],
+        );
+
+        let report = build_project_binary(&document);
+        assert!(report.valid, "{:?}", report.errors);
+        assert_eq!(report.data_description.fault_code_version, 2);
+        assert_eq!(report.data_description.fault_source_total, 2);
+        assert_eq!(report.data_description.fault_code_total, 2);
+
+        let base = report.data_description.fault_code_base_addr as usize;
+        let first = base + 20 + 2 * 16;
+        let second = first + 12;
+        assert_ne!(report.bytes[first], report.bytes[second]);
+        assert_eq!(report.bytes[first + 1], 52);
+        assert_eq!(report.bytes[second + 1], 52);
+        assert_eq!(
+            &report.bytes[first + 2..first + 6],
+            &report.bytes[second + 2..second + 6]
+        );
     }
 
     #[test]

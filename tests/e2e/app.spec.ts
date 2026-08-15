@@ -1,6 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { installRichProjectDesktopMock, richProjectPath } from './fixtures/richProject';
+import {
+  installRichProjectDesktopMock,
+  installV2FaultProjectDesktopMock,
+  richProjectPath,
+  v2FaultProjectPath,
+} from './fixtures/richProject';
 
 function captureRuntimeErrors(page: Page) {
   const errors: string[] = [];
@@ -31,6 +36,15 @@ async function openRichProject(page: Page) {
   const openSection = page.locator('.project-section').filter({ hasText: '打开现有项目' });
   await openSection.getByRole('button', { name: '打开', exact: true }).click();
   await expect(page.locator('.action-bar-project')).toContainText('Rich Fixture');
+}
+
+async function openV2FaultProject(page: Page) {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await installV2FaultProjectDesktopMock(page);
+  await page.getByLabel('项目文件路径').fill(v2FaultProjectPath);
+  const openSection = page.locator('.project-section').filter({ hasText: '打开现有项目' });
+  await openSection.getByRole('button', { name: '打开', exact: true }).click();
+  await expect(page.locator('.action-bar-project')).toContainText('Fault Catalog V2');
 }
 
 test.beforeEach(async ({ page }) => {
@@ -175,6 +189,70 @@ test('keeps protocol field explanations and long language keys readable', async 
   expect(comparisonLayout.translationWidth).toBeGreaterThan(0);
   expect(comparisonLayout.keyRight).toBeLessThanOrEqual(comparisonLayout.translationLeft);
   expect(comparisonLayout.keyHeight).toBeGreaterThan(24);
+});
+
+test('edits the jc002 normalized fault catalog without flattening shared messages', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await openV2FaultProject(page);
+  await page.getByRole('button', { name: '配置', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '配置 功能' })
+    .getByRole('button', { name: '故障代码', exact: true })
+    .click();
+
+  const workspace = page.locator('.fault-catalog-page');
+  await expect(workspace).toContainText('多个故障可安全复用同一文案');
+  await expect(workspace.locator('.fault-catalog-summary')).toContainText('来源2');
+  await expect(workspace.locator('.fault-catalog-summary')).toContainText('故障定义2');
+  await expect(workspace.locator('.fault-catalog-summary')).toContainText('报码绑定2');
+  await expect(workspace.locator('.fault-catalog-summary')).toContainText('复用文案1');
+  await expect(workspace.locator('.fault-catalog-table tbody tr')).toHaveCount(2);
+
+  await workspace.getByRole('tab', { name: '故障定义', exact: true }).click();
+  await expect(workspace.getByText('共享文案', { exact: false })).toHaveCount(2);
+  await workspace.getByLabel('编辑语言').selectOption('en');
+  const firstDefinition = workspace.locator('.fault-catalog-table tbody tr').first();
+  const englishText = firstDefinition.locator('td').nth(4).getByRole('textbox');
+  await expect(englishText).toHaveValue('DC bus voltage low');
+  await englishText.fill('DC bus voltage is low');
+
+  const layout = await workspace.locator('.fault-catalog-toolbar').evaluate((element) => {
+    const tabs = element.querySelector<HTMLElement>('.fault-catalog-tabs');
+    const controls = element.querySelector<HTMLElement>('.fault-catalog-controls');
+    const tabsRect = tabs?.getBoundingClientRect();
+    const controlsRect = controls?.getBoundingClientRect();
+    return {
+      toolbarHeight: element.getBoundingClientRect().height,
+      tabsRight: tabsRect?.right ?? 0,
+      controlsLeft: controlsRect?.left ?? 0,
+    };
+  });
+  expect(layout.toolbarHeight).toBeLessThan(80);
+  expect(layout.tabsRight).toBeLessThanOrEqual(layout.controlsLeft);
+  await expectNoSeriousAccessibilityViolations(page, 'jc002 规范化故障目录');
+
+  const saveButton = page.locator('.action-bar').getByRole('button', { name: '保存', exact: true });
+  await expect(saveButton).toBeEnabled();
+  await saveButton.click();
+  await page
+    .getByRole('dialog', { name: '确认保存' })
+    .getByRole('button', { name: '确认保存', exact: true })
+    .click();
+  await expect(saveButton).toBeDisabled();
+  const saved = await page.evaluate(
+    () =>
+      (window as unknown as { __SAVED_PROJECT_DOCUMENT__: Record<string, unknown> | null })
+        .__SAVED_PROJECT_DOCUMENT__,
+  );
+  expect(saved).not.toBeNull();
+  expect(saved).toHaveProperty('fault_code_info');
+  const fault = saved?.fault_code_info as Record<string, unknown>;
+  expect(fault.schema_version).toBe(2);
+  expect(fault.codes).toBeUndefined();
+  expect((fault.definitions as unknown[]).length).toBe(2);
+  expect((fault.bindings as unknown[]).length).toBe(2);
 });
 
 test('meets the serious accessibility baseline across primary surfaces', async ({ page }) => {
@@ -335,9 +413,7 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   await expect(main).toBeVisible();
   await expect(main.getByRole('heading', { level: 1, name: '软件设置' })).toBeAttached();
 
-  await expect(
-    main.getByRole('checkbox', { name: '写入锂电监控配置' }),
-  ).toHaveCount(0);
+  await expect(main.getByRole('checkbox', { name: '写入锂电监控配置' })).toHaveCount(0);
   const themeSwitch = main.getByRole('switch', { name: '深色模式' });
   await expect(themeSwitch).toHaveAttribute(
     'aria-checked',
@@ -366,12 +442,8 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   await exportNavigation.getByRole('button', { name: '项目导出', exact: true }).click();
   const exportMain = page.getByRole('main', { name: '项目导出' });
   await expect(exportMain).toBeVisible();
-  await expect(
-    exportMain.getByRole('checkbox', { name: '写入锂电监控配置' }),
-  ).toBeVisible();
-  await expect(
-    exportMain.getByRole('checkbox', { name: '写入故障码配置' }),
-  ).toBeVisible();
+  await expect(exportMain.getByRole('checkbox', { name: '写入锂电监控配置' })).toBeVisible();
+  await expect(exportMain.getByRole('checkbox', { name: '写入故障码配置' })).toBeVisible();
   expect(await page.evaluate(() => Object.keys(localStorage))).not.toContain(
     'jc-platform.export.battery-options',
   );
