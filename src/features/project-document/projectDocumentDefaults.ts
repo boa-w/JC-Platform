@@ -72,6 +72,7 @@ function hasExportTargetFlags(value: unknown) {
 
 export function withRequiredEditorSections(document: unknown) {
   const source = (document as Record<string, unknown>) ?? {};
+  if (source.config_version === 'jc002') return null;
   const defaults: Record<string, unknown> = {};
   if (!isRecord(source.export_info)) {
     defaults.export_info = cloneDefault(defaultExportInfo);

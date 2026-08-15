@@ -76,7 +76,8 @@ Infrastructure 基础设施适配层
 | UI 资源 | 维护资源位置、选项和目标路径 | `ui_info`、`img/` |
 | 锂电监控 | 维护帧、信号解析、显示项和超时策略 | `battery_monitor`、二进制扩展段 |
 | 故障代码 | 维护故障来源和故障码 | `fault_code_info`、二进制扩展段 |
-| 多国语言 | 维护语言列表、键和翻译值 | `language_info`、二进制语言块 |
+| 多国语言 v1 | 维护旧语言列表、文本和编辑顺序索引 | `language_info`、索引语言块 |
+| 多国语言 v2 | 维护 locale、稳定消息 key 和复数形式 | `localization`、`LVI2` 动态包 |
 | 项目导出 | 构建发布目录和设备兼容格式 | `ConfigUpdate.json`、`bin/` |
 | CAN 测试数据 | 生成测试场景和纯帧文件 | TXT、CSV、说明 JSON |
 | Git 版本 | 只提交受管项目配置 | `.jcpro`、sidecar |
@@ -98,7 +99,7 @@ Command 层不重新实现领域规则，主要把前端请求转换为领域请
 
 ## Domain 领域核心
 
-领域核心只表达业务概念，不依赖 UI。它包含两条兼容路径：
+领域核心只表达业务概念，不依赖 UI。协议编辑模型包含两条兼容路径：
 
 1. **旧格式路径**：保证现有 `.jcpro`、PDO/SDO 导出和设备二进制布局稳定；
 2. **统一协议路径**：以 Signal、传输模型和显式映射表达协议，并在需要时拍平回旧字段。
@@ -114,6 +115,16 @@ Command 层不重新实现领域规则，主要把前端请求转换为领域请
 - 语言与导出：`LanguageConfig`、`ExportPlanReport`、`BinaryBuildReport`、`DataDescriptionPlan`。
 
 导出领域服务的核心原则是：先计算所有路径、地址、数量和校验结果，再执行文件操作；二进制中的各段使用小端序，所有可选段通过 `-1` 地址和 `0` 数量表示缺失。
+
+配置发布另有明确的版本路由：
+
+```text
+config_version == jc001 -> language_info -> v1 索引语言块 -> bin_generate()
+config_version == jc002 -> localization  -> LVI2 动态语言包 -> bin_generate_jc002()
+其他或混合字段          -> 构建/加载失败
+```
+
+两条发布路径只共享无版本差异的基础 PDO 和资源构建能力。语言 catalog、业务文本引用、清单专属字段和固件语言 loader 不共享。完整规则见 [配置版本边界](configuration-versions.md)。
 
 ## Infrastructure 基础设施层
 
@@ -145,6 +156,8 @@ Command 层不重新实现领域规则，主要把前端请求转换为领域请
 - 保存为非 `.jcpro` JSON 时保留完整编辑文档；
 - 另存为项目时会复制 UI 图片，并把绝对资源路径转换为目标项目下的相对路径。
 
+上述兼容保存流程是当前 v1 `.jcpro` 生命周期。v2 文件必须保留 `config_version: "jc002"` 和 `localization`，不得经过会强制生成 `jc001` 或剥离 v2 字段的兼容保存函数。当前实现应在正式开放 v2 编辑保存前补充独立保存入口和端到端测试。
+
 ### 导出项目
 
-导出由 `domain::export` 统一完成。它先生成计划和二进制报告，只有没有前置错误时才清理导出目录、复制图片、写二进制和写清单。详细布局见 [导出文件构建机制](export-build.md)。
+导出由 `domain::export` 统一完成。入口先严格检查 `config_version` 和语言段互斥，再分派 v1 或 v2 编码。只有没有前置错误时才清理导出目录、复制图片、写二进制和写清单。v1 布局见 [jc001 导出机制](export-build.md)，v2 布局见 [jc002 发布包与二进制 ABI](export-build-v2.md)。

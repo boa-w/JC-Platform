@@ -1,4 +1,6 @@
-# 导出文件构建机制
+# jc001 导出文件构建机制
+
+> 本文只定义 `config_version: "jc001"` 的发布清单、旧索引语言块和二进制 ABI。`jc002` 使用独立的 `LVI2` 包和 `u32 message_index`，详见 [jc002 发布包与二进制 ABI](export-build-v2.md)。禁止用本文规则解释 v2 文件。
 
 ## 导出目标
 

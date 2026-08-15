@@ -16,6 +16,7 @@ export type DocumentSectionKey =
   | 'pdo_recv'
   | 'pdo_send'
   | 'language_info'
+  | 'localization'
   | 'battery_monitor'
   | 'fault_code_info'
   | 'signal_dictionary'
@@ -34,6 +35,7 @@ export const modifiedSectionLabelKeys: Record<DocumentSectionKey, string> = {
   pdo_recv: 'documentSections.pdoReceive',
   pdo_send: 'documentSections.pdoSend',
   language_info: 'documentSections.languages',
+  localization: 'documentSections.languages',
   battery_monitor: 'documentSections.batteryMonitor',
   fault_code_info: 'documentSections.faultCodes',
   signal_dictionary: 'documentSections.signalDictionary',
@@ -92,6 +94,12 @@ export function documentSectionForModule(key: NavigationKey): DocumentSectionKey
   return sectionByModule[key] ?? null;
 }
 
+export function languageSectionForDocument(
+  document: Record<string, unknown>,
+): 'language_info' | 'localization' {
+  return document.config_version === 'jc002' ? 'localization' : 'language_info';
+}
+
 export function configSectionForEditor(
   document: Record<string, unknown>,
   key: NavigationKey,
@@ -105,16 +113,24 @@ export function configSectionForEditor(
       advancedConfigSections.map((section) => [section, document[section]]),
     );
   }
+  if (key === 'language') return document[languageSectionForDocument(document)];
   const section = documentSectionForModule(key);
   return section ? document[section] : null;
 }
 
-export function restorePathsForEditor(key: NavigationKey, context: JsonEditorContext) {
+export function restorePathsForEditor(
+  key: NavigationKey,
+  context: JsonEditorContext,
+  document?: Record<string, unknown>,
+) {
   const jsonEditorKey = jsonEditorKeyForModule(key, context);
   if (jsonEditorKey === 'sdo') return [['sdo_info']];
   if (jsonEditorKey === 'pdo-simple') return [['pdo_simple_send_recv']];
   if (jsonEditorKey === 'pdo-advanced') return advancedConfigSections.map((section) => [section]);
-  const section = documentSectionForModule(key);
+  const section =
+    key === 'language' && document
+      ? languageSectionForDocument(document)
+      : documentSectionForModule(key);
   return section ? [[section]] : [];
 }
 

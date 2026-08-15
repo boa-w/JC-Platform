@@ -1,4 +1,6 @@
-# 数据格式与 `.jcpro` 架构
+# jc001 数据格式与 `.jcpro` 架构
+
+> 本文只定义 `config_version: "jc001"`。`jc002` 不继承本文的 `language_info`、保存裁剪或语言索引规则。v2 请阅读 [jc002 项目数据格式](data-format-v2.md)，版本互斥规则见 [配置版本边界](configuration-versions.md)。
 
 ## 格式定位
 

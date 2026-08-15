@@ -14,12 +14,18 @@ import {
   pdoSimpleDocumentTable,
   sdoDocumentTable,
 } from '../../api/commands';
+import {
+  localizationToLanguageDocument,
+  updateLocalizationFromLanguageDocument,
+} from '../../components/language/localizationAdapter';
 import { useOperationGuard } from '../../hooks/useOperationGuard';
 import { legacyTableKindForModule } from '../../modules/documentSections';
 import type {
+  LanguageDocument,
   LanguageImportReport,
   LegacyTableKind,
   LoadedProject,
+  LocalizationDocument,
   NavigationKey,
   PdoSimpleImportReport,
   SdoImportReport,
@@ -97,7 +103,11 @@ export function useTableConfigController({
       () =>
         save({
           filters: [
-            { name: format === 'csv' ? t('tableConfig.filters.csv') : t('tableConfig.filters.excelXml'), extensions: [format] },
+            {
+              name:
+                format === 'csv' ? t('tableConfig.filters.csv') : t('tableConfig.filters.excelXml'),
+              extensions: [format],
+            },
           ],
         }),
       setExportStatus,
@@ -107,13 +117,16 @@ export function useTableConfigController({
 
     setIsExporting(true);
     try {
-      const document = (targetProject.document as Record<string, unknown>)[
-        tableConfigSections[kind]
-      ];
+      const root = targetProject.document as Record<string, unknown>;
+      const document =
+        kind === 'language' && root.config_version === 'jc002'
+          ? localizationToLanguageDocument(root.localization as LocalizationDocument)
+          : root[tableConfigSections[kind]];
       const table = await exportableDocument(kind, document);
       if (format === 'csv') await exportTableCsv({ path, document: table });
       else await exportTableWorkbook({ path, document: table });
-      if (operationGuard.isCurrent(operation)) setExportStatus(t('tableConfig.status.exported', { path }));
+      if (operationGuard.isCurrent(operation))
+        setExportStatus(t('tableConfig.status.exported', { path }));
     } catch (error) {
       if (operationGuard.isCurrent(operation)) {
         setExportStatus(error instanceof Error ? error.message : String(error));
@@ -149,7 +162,9 @@ export function useTableConfigController({
       () =>
         open({
           multiple: false,
-          filters: [{ name: t('tableConfig.filters.table'), extensions: ['csv', 'xls', 'xlsx', 'xml'] }],
+          filters: [
+            { name: t('tableConfig.filters.table'), extensions: ['csv', 'xls', 'xlsx', 'xml'] },
+          ],
         }),
       setImportError,
     );
@@ -164,16 +179,29 @@ export function useTableConfigController({
       setImportReport(report);
       if (!report.valid || !report.document) {
         setImportError(
-          report.errors.join(t('common.punctuation.semicolon')) || t('tableConfig.status.importFailed'),
+          report.errors.join(t('common.punctuation.semicolon')) ||
+            t('tableConfig.status.importFailed'),
         );
         return;
       }
 
+      const root = targetProject.document as Record<string, unknown>;
+      let section = tableConfigSections[kind];
+      let nextDocument: unknown = report.document;
+      if (kind === 'language' && root.config_version === 'jc002') {
+        section = 'localization';
+        const localization = root.localization as LocalizationDocument;
+        nextDocument = updateLocalizationFromLanguageDocument(
+          localization,
+          localizationToLanguageDocument(localization),
+          report.document as LanguageDocument,
+        );
+      }
       applyLoadedProject({
         ...targetProject,
         document: {
-          ...(targetProject.document as Record<string, unknown>),
-          [tableConfigSections[kind]]: report.document,
+          ...root,
+          [section]: nextDocument,
         },
       });
     } catch (error) {

@@ -93,13 +93,18 @@ pub struct ProjectValidationReport {
 
 impl ProjectValidationReport {
     pub fn from_legacy_value(value: &Value) -> Self {
-        let required_sections = required_project_sections();
+        let config_version = value.get("config_version").and_then(Value::as_str);
+        let required_sections = match config_version {
+            Some("jc002") => required_v2_project_sections(),
+            _ => required_project_sections(),
+        };
         let missing_sections = required_sections
             .iter()
             .filter(|section| value.get(**section).is_none())
             .map(|section| (*section).to_string())
             .collect::<Vec<_>>();
         let mut warnings = Vec::new();
+        let mut schema_valid = true;
 
         if value.get("config_version").is_none() {
             warnings.push("缺少 config_version，后续保存时需要决定版本迁移策略".to_string());
@@ -113,8 +118,30 @@ impl ProjectValidationReport {
             warnings.push("缺少 project.name，项目列表将显示默认名称".to_string());
         }
 
+        match config_version {
+            Some("jc001") if value.get("localization").is_some() => {
+                warnings.push("jc001 项目禁止包含 jc002 localization".to_string());
+                schema_valid = false;
+            }
+            Some("jc002") if value.get("language_info").is_some() => {
+                warnings.push("jc002 项目禁止包含 jc001 language_info".to_string());
+                schema_valid = false;
+            }
+            Some("jc002") => {
+                if let Err(error) = crate::domain::localization::validate_localization(value) {
+                    warnings.push(error);
+                    schema_valid = false;
+                }
+            }
+            Some(version) if version != "jc001" => {
+                warnings.push(format!("不支持的 config_version：{version}"));
+                schema_valid = false;
+            }
+            _ => {}
+        }
+
         Self {
-            valid: missing_sections.is_empty(),
+            valid: missing_sections.is_empty() && schema_valid,
             missing_sections,
             warnings,
         }
@@ -155,6 +182,21 @@ pub struct NewProjectRequest {
 pub struct SaveProjectRequest {
     pub path: String,
     pub document: Value,
+}
+
+pub fn validate_project_version_contract(document: &Value) -> Result<(), String> {
+    match document.get("config_version").and_then(Value::as_str) {
+        Some("jc001") if document.get("localization").is_some() => {
+            Err("jc001 项目禁止包含 jc002 localization".to_string())
+        }
+        Some("jc001") => Ok(()),
+        Some("jc002") if document.get("language_info").is_some() => {
+            Err("jc002 项目禁止包含 jc001 language_info".to_string())
+        }
+        Some("jc002") => crate::domain::localization::validate_localization(document),
+        Some(version) => Err(format!("不支持的 config_version：{version}")),
+        None => Ok(()),
+    }
 }
 
 /// 项目另存为请求参数。
@@ -281,6 +323,7 @@ pub fn save_project_as(request: SaveProjectAsRequest) -> Result<SaveProjectAsRep
     fs::create_dir_all(&target_dir)
         .map_err(|error| format!("创建目标目录失败 {}：{}", target_dir.display(), error))?;
 
+    validate_project_version_contract(&request.document)?;
     let mut document = sanitize_document_for_target(&target_path, request.document);
     let mut context = SaveAsResourceContext::new(source_dir, target_dir.clone());
     copy_project_resources(&mut document, &mut context);
@@ -716,6 +759,22 @@ fn required_project_sections() -> &'static [&'static str] {
     ]
 }
 
+fn required_v2_project_sections() -> &'static [&'static str] {
+    &[
+        "project",
+        "export_info",
+        "device",
+        "ui_info",
+        "pdo_simple_send_recv",
+        "pdo_global_param",
+        "pdo_condition",
+        "pdo_recv",
+        "pdo_send",
+        "sdo_info",
+        "localization",
+    ]
+}
+
 fn is_unified_protocol_section(section: &str) -> bool {
     matches!(
         section,
@@ -858,12 +917,10 @@ pub struct ProjectDocument {
     pub private_protocol: PrivateProtocolDocument,
     #[serde(default)]
     pub protocol_mapping: Vec<Value>,
-    #[serde(default)]
-    pub language_info: LanguageDocument,
-    #[serde(default = "default_battery_monitor_protocol")]
-    pub battery_monitor: Value,
-    #[serde(default = "default_fault_code_info")]
-    pub fault_code_info: Value,
+    pub language_info: Option<LanguageDocument>,
+    pub localization: Option<Value>,
+    pub battery_monitor: Option<Value>,
+    pub fault_code_info: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1059,6 +1116,26 @@ pub struct LanguageDocument {
 
 /// 解析项目文档：先迁移补齐，再尝试反序列化为强类型 `ProjectDocument`。
 pub fn parse_legacy_project_document(path: Option<String>, value: Value) -> ProjectParseReport {
+    if value.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        let summary = ProjectSummary::from_legacy_value(path, &value);
+        let validation = ProjectValidationReport::from_legacy_value(&value);
+        let mut errors = Vec::new();
+        let document = match serde_json::from_value::<ProjectDocument>(value) {
+            Ok(document) => Some(document),
+            Err(error) => {
+                errors.push(format!("jc002 强类型解析失败：{}", error));
+                None
+            }
+        };
+        return ProjectParseReport {
+            valid: validation.valid && errors.is_empty(),
+            summary,
+            validation,
+            document,
+            added_sections: Vec::new(),
+            errors,
+        };
+    }
     let migrated = migrate_legacy_project_document(path, value);
     let mut errors = Vec::new();
     let document = match serde_json::from_value::<ProjectDocument>(migrated.document.clone()) {
@@ -1142,5 +1219,61 @@ mod tests {
         );
 
         assert_empty_battery_monitor(&migrated.document);
+    }
+
+    fn valid_v2_document() -> Value {
+        json!({
+            "config_version": "jc002",
+            "project": { "name": "v2" },
+            "export_info": {},
+            "device": { "resolution_w": 800, "resolution_h": 480 },
+            "ui_info": {},
+            "pdo_simple_send_recv": { "pdo_send": [], "pdo_recv": [] },
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": { "type": 0, "user_auth": 0, "name_index": 0, "name": "", "children": [] },
+            "localization": {
+                "default_locale": "zh",
+                "locale_order": ["zh", "en"],
+                "locales": {
+                    "zh": { "translations": { "menu.root": "菜单" } },
+                    "en": { "translations": { "menu.root": "Menu" } }
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn validation_accepts_v2_without_v1_or_optional_sections() {
+        let report = ProjectValidationReport::from_legacy_value(&valid_v2_document());
+
+        assert!(report.valid, "{:?}", report.warnings);
+        assert!(report.missing_sections.is_empty());
+    }
+
+    #[test]
+    fn parsing_v2_does_not_run_legacy_migration() {
+        let report = parse_legacy_project_document(None, valid_v2_document());
+
+        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.added_sections.is_empty());
+        let document = report.document.unwrap();
+        assert_eq!(document.config_version.as_deref(), Some("jc002"));
+        assert!(document.localization.is_some());
+        assert!(document.language_info.is_none());
+        assert!(document.battery_monitor.is_none());
+    }
+
+    #[test]
+    fn version_contract_rejects_mixed_v2_document() {
+        let mut document = valid_v2_document();
+        document["language_info"] = default_language_info();
+
+        assert_eq!(
+            validate_project_version_contract(&document),
+            Err("jc002 项目禁止包含 jc001 language_info".to_string())
+        );
     }
 }

@@ -13,6 +13,7 @@
 //! [电池监控段] [故障码段] [SDO 菜单树] [语言包 × N] [CRC16]
 //! ```
 
+use crate::domain::localization::{build_dynamic_language_pack, DynamicLanguagePackBuild};
 use crate::domain::pdo::{
     parse_pdo_advanced_document, PdoAdvancedDocument, PdoAdvancedFrame, PdoAdvancedSignal,
     PdoGlobalParam,
@@ -192,8 +193,14 @@ pub struct DataDescriptionPlan {
     pub fault_source_total: usize,
     pub fault_code_total: usize,
     pub sdo_base_addr: isize,
+    pub sdo_version: usize,
     pub language_addr: Vec<isize>,
     pub language_code: Vec<String>,
+    pub i18n_base_addr: isize,
+    pub i18n_size: usize,
+    pub i18n_version: usize,
+    pub i18n_locale_total: usize,
+    pub i18n_message_total: usize,
 }
 
 impl DataDescriptionPlan {
@@ -224,8 +231,14 @@ impl DataDescriptionPlan {
             fault_source_total: 0,
             fault_code_total: 0,
             sdo_base_addr: -1,
+            sdo_version: 0,
             language_addr: Vec::new(),
             language_code,
+            i18n_base_addr: -1,
+            i18n_size: 0,
+            i18n_version: 0,
+            i18n_locale_total: 0,
+            i18n_message_total: 0,
         }
     }
 
@@ -548,18 +561,65 @@ fn build_project_binary_from_settings(
     document: &Value,
     export_settings: &ProjectExportSettings,
 ) -> BinaryBuildReport {
-    let language_code = document
-        .get("language_info")
-        .and_then(|value| value.get("list_code_language"))
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .map(str::to_string)
-                .collect()
-        })
+    let config_version = document
+        .get("config_version")
+        .and_then(Value::as_str)
         .unwrap_or_default();
+    if !matches!(config_version, "jc001" | "jc002") {
+        return BinaryBuildReport {
+            valid: false,
+            file_size: 0,
+            crc: 0,
+            data_description: DataDescriptionPlan::empty(Vec::new()),
+            bytes: Vec::new(),
+            warnings: Vec::new(),
+            errors: vec![format!(
+                "导出器只接受明确的 jc001 或 jc002，当前 config_version={config_version:?}"
+            )],
+        };
+    }
+    let schema_error = match config_version {
+        "jc001" if document.get("language_info").is_none() => {
+            Some("jc001 项目必须包含 language_info")
+        }
+        "jc001" if document.get("localization").is_some() => {
+            Some("jc001 项目禁止包含 jc002 localization")
+        }
+        "jc002" if document.get("localization").is_none() => {
+            Some("jc002 项目必须包含 localization")
+        }
+        "jc002" if document.get("language_info").is_some() => {
+            Some("jc002 项目禁止包含 jc001 language_info")
+        }
+        _ => None,
+    };
+    if let Some(error) = schema_error {
+        return BinaryBuildReport {
+            valid: false,
+            file_size: 0,
+            crc: 0,
+            data_description: DataDescriptionPlan::empty(Vec::new()),
+            bytes: Vec::new(),
+            warnings: Vec::new(),
+            errors: vec![error.to_string()],
+        };
+    }
+    let language_code = if config_version == "jc001" {
+        document
+            .get("language_info")
+            .and_then(|value| value.get("list_code_language"))
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
 
     let mut errors = Vec::new();
     let battery_enabled = export_settings.battery_monitor.bin && battery_monitor_enabled(document);
@@ -571,8 +631,13 @@ fn build_project_binary_from_settings(
     if let Some(pdo_document) = pdo_report.document.as_ref() {
         if battery_enabled || pdo_document_has_content(pdo_document) {
             let pdo_document = pdo_document.clone();
-            let mut report =
-                build_binary_from_pdo(document, &pdo_document, language_code, export_settings);
+            let mut report = build_binary_from_pdo(
+                document,
+                &pdo_document,
+                language_code,
+                export_settings,
+                config_version,
+            );
             report.errors.extend(errors);
             report.valid = report.errors.is_empty();
             return report;
@@ -580,8 +645,13 @@ fn build_project_binary_from_settings(
     }
 
     if let Some(pdo_document) = build_pdo_document_from_simple(document) {
-        let mut report =
-            build_binary_from_pdo(document, &pdo_document, language_code, export_settings);
+        let mut report = build_binary_from_pdo(
+            document,
+            &pdo_document,
+            language_code,
+            export_settings,
+            config_version,
+        );
         report.errors.extend(errors);
         report.valid = report.errors.is_empty();
         return report;
@@ -622,7 +692,11 @@ fn build_config_update_manifest(
     let mut manifest = Map::new();
     manifest.insert(
         "config_version".to_string(),
-        Value::String("jc001".to_string()),
+        request
+            .document
+            .get("config_version")
+            .cloned()
+            .unwrap_or(Value::Null),
     );
     if let Some(device) = request.document.get("device") {
         manifest.insert("device".to_string(), device.clone());
@@ -635,6 +709,31 @@ fn build_config_update_manifest(
     );
     let mut manifest_data_description = json!(data_description);
     omit_disabled_export_descriptions(&mut manifest_data_description, export_settings);
+    if let Some(description) = manifest_data_description.as_object_mut() {
+        match request
+            .document
+            .get("config_version")
+            .and_then(Value::as_str)
+        {
+            Some("jc001") => {
+                for key in [
+                    "i18n_base_addr",
+                    "i18n_size",
+                    "i18n_version",
+                    "i18n_locale_total",
+                    "i18n_message_total",
+                    "sdo_version",
+                ] {
+                    description.remove(key);
+                }
+            }
+            Some("jc002") => {
+                description.remove("language_addr");
+                description.remove("language_code");
+            }
+            _ => errors.push("清单导出要求 config_version 为 jc001 或 jc002".to_string()),
+        }
+    }
     manifest.insert("data_description".to_string(), manifest_data_description);
     if export_settings.battery_monitor.config {
         if let Some(battery_monitor) = request.document.get("battery_monitor") {
@@ -890,9 +989,11 @@ fn build_binary_from_pdo(
     document: &PdoAdvancedDocument,
     language_code: Vec<String>,
     export_settings: &ProjectExportSettings,
+    config_version: &str,
 ) -> BinaryBuildReport {
     let mut bytes = Vec::new();
     let mut warnings = Vec::new();
+    let mut errors = Vec::new();
     let language_count = language_code.len();
     let mut description = DataDescriptionPlan::empty(language_code.clone());
     description.language_code = language_code;
@@ -940,7 +1041,33 @@ fn build_binary_from_pdo(
         .iter()
         .flat_map(|condition| condition.data.iter().map(|input| input.param_id.clone()))
         .collect::<HashSet<_>>();
-    let language_entries = collect_language_entries(source_document, export_settings);
+    let dynamic_pack = if config_version == "jc002" {
+        match build_dynamic_language_pack(source_document) {
+            Ok(pack) => Some(pack),
+            Err(error) => {
+                return BinaryBuildReport {
+                    valid: false,
+                    file_size: 0,
+                    crc: 0,
+                    data_description: description,
+                    bytes: Vec::new(),
+                    warnings,
+                    errors: vec![error],
+                };
+            }
+        }
+    } else {
+        None
+    };
+    let language_entries = if config_version == "jc001" {
+        collect_language_entries(source_document, export_settings)
+    } else {
+        Vec::new()
+    };
+    let text_catalog = match dynamic_pack.as_ref() {
+        Some(pack) => TextCatalog::Dynamic(pack),
+        None => TextCatalog::Legacy(&language_entries),
+    };
 
     if !document.pdo_condition.is_empty() {
         description.global_condition_base_addr = bytes.len() as isize;
@@ -989,8 +1116,9 @@ fn build_binary_from_pdo(
         build_battery_monitor_bytes(
             source_document,
             bytes.len(),
-            &language_entries,
+            text_catalog,
             &mut warnings,
+            &mut errors,
         )
     } else {
         None
@@ -1007,8 +1135,9 @@ fn build_binary_from_pdo(
         build_fault_code_bytes(
             source_document,
             bytes.len(),
-            &language_entries,
+            text_catalog,
             &mut warnings,
+            &mut errors,
         )
     } else {
         None
@@ -1025,32 +1154,50 @@ fn build_binary_from_pdo(
     let sdo_bytes = build_sdo_bytes(
         source_document.get("sdo_info"),
         bytes.len(),
-        &language_entries,
+        text_catalog,
         &mut warnings,
+        &mut errors,
     );
     if sdo_bytes.is_empty() {
         description.sdo_base_addr = -1;
     } else {
+        description.sdo_version = if config_version == "jc002" { 2 } else { 1 };
         bytes.extend(sdo_bytes);
     }
 
-    description.language_addr = write_language_bytes(
-        source_document,
-        &language_entries,
-        language_count,
-        &mut bytes,
-    );
+    match config_version {
+        "jc001" => {
+            description.language_addr = write_language_bytes(
+                source_document,
+                &language_entries,
+                language_count,
+                &mut bytes,
+            );
+        }
+        "jc002" => match dynamic_pack {
+            Some(pack) => {
+                description.i18n_base_addr = bytes.len() as isize;
+                description.i18n_size = pack.bytes.len();
+                description.i18n_version = pack.summary.schema_version as usize;
+                description.i18n_locale_total = pack.summary.locales.len();
+                description.i18n_message_total = pack.summary.message_count;
+                bytes.extend(pack.bytes);
+            }
+            None => errors.push("jc002 动态语言包未构建".to_string()),
+        },
+        _ => errors.push(format!("未知配置版本：{config_version}")),
+    }
     description.file_size = bytes.len();
     description.crc = crc16_ccitt_false(&bytes);
 
     BinaryBuildReport {
-        valid: true,
+        valid: errors.is_empty(),
         file_size: description.file_size,
         crc: description.crc,
         data_description: description,
         bytes,
         warnings,
-        errors: Vec::new(),
+        errors,
     }
 }
 
@@ -1059,6 +1206,40 @@ struct SdoBinaryNode {
     value: Value,
     parent: Option<usize>,
     bytes: Vec<u8>,
+}
+
+#[derive(Clone, Copy)]
+enum TextCatalog<'a> {
+    Legacy(&'a [String]),
+    Dynamic(&'a DynamicLanguagePackBuild),
+}
+
+impl TextCatalog<'_> {
+    fn is_dynamic(self) -> bool {
+        matches!(self, Self::Dynamic(_))
+    }
+
+    fn index(self, key: &str, context: &str, errors: &mut Vec<String>) -> u32 {
+        if key.trim().is_empty() {
+            return if self.is_dynamic() {
+                u32::MAX
+            } else {
+                u16::MAX.into()
+            };
+        }
+        match self {
+            Self::Legacy(entries) => {
+                entries.iter().position(|item| item == key).unwrap_or(0) as u32
+            }
+            Self::Dynamic(pack) => match pack.require_message_index(key) {
+                Ok(index) => index,
+                Err(error) => {
+                    errors.push(format!("{context}：{error}"));
+                    u32::MAX
+                }
+            },
+        }
+    }
 }
 
 fn collect_language_entries(
@@ -1151,8 +1332,9 @@ fn push_unique(entries: &mut Vec<String>, value: &str) {
 fn build_battery_monitor_bytes(
     document: &Value,
     base_addr: usize,
-    language_entries: &[String],
+    text_catalog: TextCatalog<'_>,
     warnings: &mut Vec<String>,
+    errors: &mut Vec<String>,
 ) -> Option<(Vec<u8>, usize, usize, usize)> {
     let root = document.get("battery_monitor")?;
     let protocol: BatteryMonitorProtocol = serde_json::from_value(root.clone()).ok()?;
@@ -1188,14 +1370,18 @@ fn build_battery_monitor_bytes(
     let header_len = 40usize;
     let frame_record_len = 12usize;
     let signal_record_len = 32usize;
-    let item_record_len = 40usize;
+    let item_record_len = if text_catalog.is_dynamic() {
+        52usize
+    } else {
+        40usize
+    };
     let frame_table_addr = base_addr + header_len;
     let signal_table_addr = frame_table_addr + frames.len() * frame_record_len;
     let item_table_addr = signal_table_addr + signals.len() * signal_record_len;
     let mut bytes = Vec::new();
 
     write_u16(&mut bytes, protocol.version);
-    write_u16(&mut bytes, 1);
+    write_u16(&mut bytes, if text_catalog.is_dynamic() { 2 } else { 1 });
     write_u16(&mut bytes, protocol.page_size.max(1));
     write_u16(&mut bytes, items.len() as u16);
     write_u16(&mut bytes, frames.len() as u16);
@@ -1251,11 +1437,18 @@ fn build_battery_monitor_bytes(
         write_u8(&mut bytes, 0);
         write_u16(&mut bytes, u16::MAX);
         write_u16(&mut bytes, signed_index(signal.inner));
-        write_u16(
-            &mut bytes,
-            optional_language_text_index(&signal.name, language_entries),
-        );
-        write_u16(&mut bytes, 0);
+        if text_catalog.is_dynamic() {
+            write_u32(
+                &mut bytes,
+                text_catalog.index(&signal.name, "锂电信号名称", errors),
+            );
+        } else {
+            write_u16(
+                &mut bytes,
+                text_catalog.index(&signal.name, "锂电信号名称", errors) as u16,
+            );
+            write_u16(&mut bytes, 0);
+        }
     }
 
     for item in &items {
@@ -1278,13 +1471,19 @@ fn build_battery_monitor_bytes(
         let frame_index = frame_map.get(frame_key).copied().unwrap_or(u16::MAX);
 
         write_u16(&mut bytes, signal_index.min(u16::MAX as usize) as u16);
-        write_u16(
+        write_text_reference(
             &mut bytes,
-            optional_language_text_index(&item.name_key, language_entries),
+            text_catalog,
+            &item.name_key,
+            "锂电显示项 name_key",
+            errors,
         );
-        write_u16(
+        write_text_reference(
             &mut bytes,
-            optional_language_text_index(&item.fallback_name, language_entries),
+            text_catalog,
+            &item.fallback_name,
+            "锂电显示项 fallback_name",
+            errors,
         );
         write_u16(&mut bytes, frame_index);
         write_u8(&mut bytes, 1);
@@ -1308,21 +1507,33 @@ fn build_battery_monitor_bytes(
         );
         write_u8(&mut bytes, item.formatter.decimals);
         write_u8(&mut bytes, item.formatter.display_base);
-        write_u16(
+        write_text_reference(
             &mut bytes,
-            optional_language_text_index(&item.unit, language_entries),
+            text_catalog,
+            &item.unit,
+            "锂电显示项 unit",
+            errors,
         );
-        write_u16(
+        write_text_reference(
             &mut bytes,
-            optional_language_text_index(&item.formatter.true_text, language_entries),
+            text_catalog,
+            &item.formatter.true_text,
+            "锂电显示项 true_text",
+            errors,
         );
-        write_u16(
+        write_text_reference(
             &mut bytes,
-            optional_language_text_index(&item.formatter.false_text, language_entries),
+            text_catalog,
+            &item.formatter.false_text,
+            "锂电显示项 false_text",
+            errors,
         );
-        write_u16(
+        write_text_reference(
             &mut bytes,
-            optional_language_text_index(&item.validity.empty_text, language_entries),
+            text_catalog,
+            &item.validity.empty_text,
+            "锂电显示项 empty_text",
+            errors,
         );
         write_u16(
             &mut bytes,
@@ -1341,6 +1552,21 @@ fn build_battery_monitor_bytes(
     }
 
     Some((bytes, items.len(), frames.len(), version))
+}
+
+fn write_text_reference(
+    bytes: &mut Vec<u8>,
+    catalog: TextCatalog<'_>,
+    key: &str,
+    context: &str,
+    errors: &mut Vec<String>,
+) {
+    let index = catalog.index(key, context, errors);
+    if catalog.is_dynamic() {
+        write_u32(bytes, index);
+    } else {
+        write_u16(bytes, index as u16);
+    }
 }
 
 fn battery_raw_type_code(raw_type: &BatteryRawType) -> u8 {
@@ -1377,19 +1603,12 @@ fn signed_index(value: i64) -> u16 {
     }
 }
 
-fn optional_language_text_index(value: &str, entries: &[String]) -> u16 {
-    if value.trim().is_empty() {
-        u16::MAX
-    } else {
-        language_text_index(value, entries)
-    }
-}
-
 fn build_fault_code_bytes(
     document: &Value,
     base_addr: usize,
-    language_entries: &[String],
+    text_catalog: TextCatalog<'_>,
     warnings: &mut Vec<String>,
+    errors: &mut Vec<String>,
 ) -> Option<(Vec<u8>, usize, usize, usize)> {
     let root = document.get("fault_code_info")?;
     if !root.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
@@ -1463,7 +1682,11 @@ fn build_fault_code_bytes(
     let version = object_i64(root, "version", 1).max(0) as usize;
     let header_len = 20usize;
     let source_record_len = 16usize;
-    let code_record_len = 8usize;
+    let code_record_len = if text_catalog.is_dynamic() {
+        12usize
+    } else {
+        8usize
+    };
     let source_table_addr = base_addr + header_len;
     let code_table_addr = source_table_addr + sources.len() * source_record_len;
     let invalid_table_addr = code_table_addr + codes.len() * code_record_len;
@@ -1473,7 +1696,7 @@ fn build_fault_code_bytes(
     let mut invalid_bytes = Vec::new();
 
     write_u16(&mut bytes, version as u16);
-    write_u16(&mut bytes, 0);
+    write_u16(&mut bytes, if text_catalog.is_dynamic() { 2 } else { 1 });
     write_u16(&mut bytes, sources.len() as u16);
     write_u16(&mut bytes, codes.len() as u16);
     write_u32(&mut bytes, source_table_addr as u32);
@@ -1539,9 +1762,12 @@ fn build_fault_code_bytes(
             &mut code_bytes,
             object_i64(code, "code", 0).clamp(0, u8::MAX as i64) as u8,
         );
-        write_u16(
+        write_text_reference(
             &mut code_bytes,
-            language_text_index(&language_key, language_entries),
+            text_catalog,
+            &language_key,
+            "故障码 message_key",
+            errors,
         );
         write_u8(
             &mut code_bytes,
@@ -1549,12 +1775,24 @@ fn build_fault_code_bytes(
         );
         write_u8(&mut code_bytes, 0);
         write_u16(&mut code_bytes, 0);
+        if text_catalog.is_dynamic() {
+            write_u16(&mut code_bytes, 0);
+        }
     }
 
     bytes.extend(source_bytes);
     bytes.extend(code_bytes);
     bytes.extend(invalid_bytes);
-    Some((bytes, sources.len(), codes.len(), version))
+    Some((
+        bytes,
+        sources.len(),
+        codes.len(),
+        if text_catalog.is_dynamic() {
+            2
+        } else {
+            version
+        },
+    ))
 }
 
 fn fault_source_key(value: &Value) -> String {
@@ -1643,31 +1881,28 @@ fn battery_formatter_kind(kind: &str) -> u8 {
     }
 }
 
-fn language_text_index(value: &str, entries: &[String]) -> u16 {
-    entries.iter().position(|item| item == value).unwrap_or(0) as u16
-}
-
 fn build_sdo_bytes(
     value: Option<&Value>,
     base_addr: usize,
-    language_entries: &[String],
+    text_catalog: TextCatalog<'_>,
     warnings: &mut Vec<String>,
+    errors: &mut Vec<String>,
 ) -> Vec<u8> {
     let Some(root) = value else {
         warnings.push("缺少 sdo_info，跳过 SDO 菜单段打包".to_string());
         return Vec::new();
     };
     let mut nodes = Vec::new();
-    flatten_sdo_children(root, None, &mut nodes, language_entries, warnings);
+    flatten_sdo_children(root, None, &mut nodes, text_catalog, warnings, errors);
     let mut result_nodes = Vec::new();
-    let mut root_bytes = menu_item_bytes(root, language_entries, 1, 0);
+    let mut root_bytes = menu_item_bytes(root, text_catalog, 1, 0, errors);
     result_nodes.push(SdoBinaryNode {
         value: root.clone(),
         parent: None,
         bytes: root_bytes.clone(),
     });
     let mut level = vec![None];
-    let mut sdo_offset = 40usize;
+    let mut sdo_offset = root_bytes.len();
     let mut current_item_index = 0usize;
 
     for _ in 0..1000 {
@@ -1716,8 +1951,9 @@ fn flatten_sdo_children(
     value: &Value,
     parent: Option<usize>,
     nodes: &mut Vec<SdoBinaryNode>,
-    language_entries: &[String],
+    text_catalog: TextCatalog<'_>,
     warnings: &mut Vec<String>,
+    errors: &mut Vec<String>,
 ) {
     let Some(children) = value.get("children").and_then(Value::as_array) else {
         return;
@@ -1725,13 +1961,14 @@ fn flatten_sdo_children(
     for child in children {
         let index = nodes.len();
         let bytes = if object_i64(child, "type", 0) == 1 {
-            menu_sdo_bytes(child, language_entries, warnings)
+            menu_sdo_bytes(child, text_catalog, warnings, errors)
         } else {
             menu_item_bytes(
                 child,
-                language_entries,
+                text_catalog,
                 object_i64(child, "user_auth", 0) as u16,
                 object_i64(child, "type", 0) as u16,
+                errors,
             )
         };
         nodes.push(SdoBinaryNode {
@@ -1739,37 +1976,66 @@ fn flatten_sdo_children(
             parent,
             bytes,
         });
-        flatten_sdo_children(child, Some(index), nodes, language_entries, warnings);
+        flatten_sdo_children(child, Some(index), nodes, text_catalog, warnings, errors);
     }
 }
 
 fn menu_item_bytes(
     value: &Value,
-    language_entries: &[String],
+    text_catalog: TextCatalog<'_>,
     user_auth: u16,
     ui_type: u16,
+    errors: &mut Vec<String>,
 ) -> Vec<u8> {
     let mut bytes = Vec::new();
     write_u16(&mut bytes, menu_control(0, user_auth, ui_type));
-    write_u16(&mut bytes, language_index(value, language_entries));
+    let message_index = text_catalog.index(
+        &sdo_message_key(value, text_catalog),
+        "SDO 菜单名称",
+        errors,
+    );
+    write_u16(&mut bytes, message_index as u16);
     write_u32(&mut bytes, 0);
     write_u32(&mut bytes, 0);
-    bytes.extend([0xff; 28]);
+    if text_catalog.is_dynamic() {
+        write_u16(&mut bytes, (message_index >> 16) as u16);
+        bytes.extend([0xff; 26]);
+    } else {
+        bytes.extend([0xff; 28]);
+    }
     bytes
 }
 
 fn menu_sdo_bytes(
     value: &Value,
-    language_entries: &[String],
+    text_catalog: TextCatalog<'_>,
     warnings: &mut Vec<String>,
+    errors: &mut Vec<String>,
 ) -> Vec<u8> {
     let mut bytes = Vec::new();
     write_u16(
         &mut bytes,
         menu_control(1, object_i64(value, "user_auth", 0) as u16, 1),
     );
-    write_u16(&mut bytes, language_index(value, language_entries));
-    write_u16(&mut bytes, 0xffff);
+    if text_catalog.is_dynamic() {
+        let message_index = text_catalog.index(
+            &sdo_message_key(value, text_catalog),
+            "SDO 参数名称",
+            errors,
+        );
+        write_u16(&mut bytes, message_index as u16);
+        write_u16(&mut bytes, (message_index >> 16) as u16);
+    } else {
+        write_u16(
+            &mut bytes,
+            text_catalog.index(
+                &sdo_message_key(value, text_catalog),
+                "SDO 参数名称",
+                errors,
+            ) as u16,
+        );
+        write_u16(&mut bytes, 0xffff);
+    }
     write_u8(&mut bytes, sdo_control(value));
     write_u8(&mut bytes, object_i64(value, "handle", 0) as u8);
     write_u32(&mut bytes, sdo_handle_param(value));
@@ -1802,20 +2068,28 @@ fn menu_sdo_bytes(
 }
 
 fn write_menu_children(bytes: &mut [u8], children_addr: u32, total: u32) {
-    bytes[4..8].copy_from_slice(&children_addr.to_le_bytes());
-    bytes[8..12].copy_from_slice(&total.to_le_bytes());
+    let offset = 4;
+    bytes[offset..offset + 4].copy_from_slice(&children_addr.to_le_bytes());
+    bytes[offset + 4..offset + 8].copy_from_slice(&total.to_le_bytes());
 }
 
 fn menu_control(data_type: u16, user_auth: u16, ui_type: u16) -> u16 {
     (data_type & 0x0f) | ((user_auth & 0x07) << 4) | ((ui_type & 0x01ff) << 7)
 }
 
-fn language_index(value: &Value, entries: &[String]) -> u16 {
-    let name = value
-        .get("name")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    entries.iter().position(|item| item == name).unwrap_or(0) as u16
+fn sdo_message_key(value: &Value, catalog: TextCatalog<'_>) -> String {
+    let keys: &[&str] = if catalog.is_dynamic() {
+        &["message_key", "name_key"]
+    } else {
+        &["name"]
+    };
+    for key in keys {
+        let value = object_string(value, key);
+        if !value.is_empty() {
+            return value;
+        }
+    }
+    String::new()
 }
 
 fn sdo_control(value: &Value) -> u8 {
@@ -2442,6 +2716,64 @@ fn export_file_name(value: Option<&str>, default_name: &str, extension: &str) ->
 mod tests {
     use super::*;
 
+    fn i18n_fixture(name: &str) -> Value {
+        let source = match name {
+            "jc001-valid" => include_str!("../../tests/fixtures/i18n/jc001-valid.json"),
+            "jc002-valid" => include_str!("../../tests/fixtures/i18n/jc002-valid.json"),
+            "jc002-mixed-schema" => {
+                include_str!("../../tests/fixtures/i18n/jc002-mixed-schema.json")
+            }
+            "jc002-missing-key" => {
+                include_str!("../../tests/fixtures/i18n/jc002-missing-key.json")
+            }
+            _ => panic!("unknown i18n fixture: {name}"),
+        };
+        serde_json::from_str(source).unwrap()
+    }
+
+    fn fixture_manifest(document: Value, binary: &BinaryBuildReport) -> Value {
+        let settings = project_export_settings(&document);
+        let mut warnings = Vec::new();
+        let mut errors = Vec::new();
+        let manifest = build_config_update_manifest(
+            &ExportPlanRequest {
+                project_path: None,
+                output_dir: "out".to_string(),
+                document,
+                folder_name: None,
+                manifest_filename: None,
+                binary_filename: None,
+            },
+            &binary.data_description,
+            &settings,
+            &mut warnings,
+            &mut errors,
+        );
+        assert!(errors.is_empty(), "unexpected manifest errors: {errors:?}");
+        manifest
+    }
+
+    fn jc001(mut document: Value) -> Value {
+        document["config_version"] = json!("jc001");
+        document
+    }
+
+    fn jc002(mut document: Value, keys: &[&str]) -> Value {
+        document["config_version"] = json!("jc002");
+        let translations = keys
+            .iter()
+            .map(|key| ((*key).to_string(), json!(format!("text:{key}"))))
+            .collect::<Map<_, _>>();
+        document["localization"] = json!({
+            "default_locale": "en-US",
+            "locale_order": ["en-US"],
+            "locales": {
+                "en-US": { "enabled": true, "translations": translations }
+            }
+        });
+        document
+    }
+
     fn battery_monitor_fixture() -> Value {
         json!({
             "schema_version": 1,
@@ -2516,18 +2848,37 @@ mod tests {
     }
 
     fn enabled_battery_monitor_document() -> Value {
-        json!({
+        jc001(json!({
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": { "main": { "item": {} } },
             "language_info": language_info_without_selected_languages(),
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
-            "pdo_global_param": [],
+            "pdo_global_param": [{
+                "param_id": "TEST",
+                "name": "test",
+                "def": "0",
+                "reserved": 0,
+                "type": 0,
+                "inner": -1
+            }],
             "pdo_condition": [],
-            "pdo_recv": [],
+            "pdo_recv": [{
+                "id": 0x111,
+                "type": 0,
+                "desc": "test",
+                "data": [{
+                    "pos": 0,
+                    "len": 8,
+                    "show_type": 0,
+                    "handle": 0,
+                    "handle_param": "",
+                    "param_id": "TEST"
+                }]
+            }],
             "pdo_send": [],
             "battery_monitor": battery_monitor_fixture()
-        })
+        }))
     }
 
     fn build_battery_monitor_manifest(config: bool, bin: bool) -> (BinaryBuildReport, Value) {
@@ -2570,12 +2921,12 @@ mod tests {
     }
 
     fn empty_pdo_advanced_sections() -> Value {
-        json!({
+        jc001(json!({
             "pdo_global_param": [],
             "pdo_condition": [],
             "pdo_recv": [],
             "pdo_send": []
-        })
+        }))
     }
 
     #[test]
@@ -2589,8 +2940,49 @@ mod tests {
     }
 
     #[test]
+    fn versioned_fixtures_emit_mutually_exclusive_manifest_fields() {
+        let v1_document = i18n_fixture("jc001-valid");
+        let v1_binary = build_project_binary(&v1_document);
+        assert!(v1_binary.valid, "{:?}", v1_binary.errors);
+        let v1_manifest = fixture_manifest(v1_document, &v1_binary);
+        let v1_description = v1_manifest["data_description"].as_object().unwrap();
+        assert!(v1_description.contains_key("language_addr"));
+        assert!(v1_description.contains_key("language_code"));
+        assert!(!v1_description.keys().any(|key| key.starts_with("i18n_")));
+        assert!(!v1_description.contains_key("sdo_version"));
+
+        let v2_document = i18n_fixture("jc002-valid");
+        let v2_binary = build_project_binary(&v2_document);
+        assert!(v2_binary.valid, "{:?}", v2_binary.errors);
+        let v2_manifest = fixture_manifest(v2_document, &v2_binary);
+        let v2_description = v2_manifest["data_description"].as_object().unwrap();
+        assert!(!v2_description.contains_key("language_addr"));
+        assert!(!v2_description.contains_key("language_code"));
+        assert_eq!(v2_description["i18n_version"], 2);
+        assert_eq!(v2_description["i18n_locale_total"], 2);
+        assert_eq!(v2_description["sdo_version"], 2);
+    }
+
+    #[test]
+    fn versioned_fixtures_reject_mixed_schema_and_missing_message_keys() {
+        let mixed = build_project_binary(&i18n_fixture("jc002-mixed-schema"));
+        assert!(!mixed.valid);
+        assert!(mixed
+            .errors
+            .iter()
+            .any(|error| error.contains("language_info")));
+
+        let missing = build_project_binary(&i18n_fixture("jc002-missing-key"));
+        assert!(!missing.valid);
+        assert!(missing
+            .errors
+            .iter()
+            .any(|error| error.contains("menu.root")));
+    }
+
+    #[test]
     fn build_project_binary_packs_fault_code_section() {
-        let document = json!({
+        let document = jc001(json!({
             "language_info": {
                 "list_code_language": ["zh"],
                 "list_inner": [],
@@ -2625,7 +3017,7 @@ mod tests {
                     "severity": "warning"
                 }]
             }
-        });
+        }));
 
         let report = build_project_binary(&document);
 
@@ -2714,7 +3106,7 @@ mod tests {
 
     #[test]
     fn build_project_binary_keeps_same_fault_code_for_different_sources() {
-        let document = json!({
+        let document = jc001(json!({
             "language_info": {
                 "list_code_language": ["zh"],
                 "list_inner": [],
@@ -2773,7 +3165,7 @@ mod tests {
                     }
                 ]
             }
-        });
+        }));
 
         let report = build_project_binary(&document);
 
@@ -2796,7 +3188,7 @@ mod tests {
 
     #[test]
     fn export_plan_uses_stable_legacy_paths_and_data_description_target() {
-        let document = json!({
+        let document = jc001(json!({
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": [],
             "language_info": language_info_without_selected_languages(),
@@ -2807,7 +3199,7 @@ mod tests {
             "pdo_recv": [],
             "pdo_send": [],
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] }
-        });
+        }));
 
         let report = build_export_plan(ExportPlanRequest {
             project_path: None,
@@ -2844,7 +3236,7 @@ mod tests {
 
     #[test]
     fn export_plan_uses_custom_manifest_and_binary_file_names() {
-        let document = json!({
+        let document = jc001(json!({
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": [],
             "language_info": language_info_without_selected_languages(),
@@ -2855,7 +3247,7 @@ mod tests {
             "pdo_recv": [],
             "pdo_send": [],
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] }
-        });
+        }));
 
         let report = build_export_plan(ExportPlanRequest {
             project_path: None,
@@ -2882,7 +3274,7 @@ mod tests {
     #[test]
     fn export_plan_uses_project_directory_and_document_export_settings() {
         let project_path = join_fs_path(&join_fs_path("workspace", "project"), "demo.jcpro");
-        let document = json!({
+        let document = jc001(json!({
             "export_info": {
                 "folder_name": "release_bundle",
                 "manifest_filename": "device_update",
@@ -2898,7 +3290,7 @@ mod tests {
             "pdo_recv": [],
             "pdo_send": [],
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] }
-        });
+        }));
 
         let report = build_export_plan(ExportPlanRequest {
             project_path: Some(project_path),
@@ -2925,7 +3317,7 @@ mod tests {
 
     #[test]
     fn export_plan_request_names_override_document_export_settings() {
-        let document = json!({
+        let document = jc001(json!({
             "export_info": {
                 "folder_name": "document_folder",
                 "manifest_filename": "document_manifest.json",
@@ -2941,7 +3333,7 @@ mod tests {
             "pdo_recv": [],
             "pdo_send": [],
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] }
-        });
+        }));
 
         let report = build_export_plan(ExportPlanRequest {
             project_path: None,
@@ -2974,7 +3366,7 @@ mod tests {
 
     #[test]
     fn collect_language_entries_includes_language_name_prefix() {
-        let document = json!({
+        let document = jc001(json!({
             "language_info": {
                 "list_code_language": ["zh", "en"],
                 "list_inner": ["中文", "English", "参数A"]
@@ -2985,7 +3377,7 @@ mod tests {
                     { "name": "参数B", "children": [] }
                 ]
             }
-        });
+        }));
 
         assert_eq!(
             collect_language_entries(&document, &ProjectExportSettings::default()),
@@ -2995,7 +3387,7 @@ mod tests {
 
     #[test]
     fn collect_language_entries_deduplicates_sdo_names_against_list_inner() {
-        let document = json!({
+        let document = jc001(json!({
             "language_info": {
                 "list_code_language": ["zh", "en"],
                 "list_inner": ["中文", "English", "参数A"]
@@ -3007,7 +3399,7 @@ mod tests {
                     { "name": "参数B", "children": [] }
                 ]
             }
-        });
+        }));
 
         assert_eq!(
             collect_language_entries(&document, &ProjectExportSettings::default()),
@@ -3017,7 +3409,7 @@ mod tests {
 
     #[test]
     fn collect_language_entries_appends_empty_string_unconditionally() {
-        let document = json!({
+        let document = jc001(json!({
             "language_info": {
                 "list_code_language": ["zh"],
                 "list_inner": ["", "中文"]
@@ -3026,7 +3418,7 @@ mod tests {
                 "name": "菜单根",
                 "children": []
             }
-        });
+        }));
 
         assert_eq!(
             collect_language_entries(&document, &ProjectExportSettings::default()),
@@ -3036,7 +3428,7 @@ mod tests {
 
     #[test]
     fn sdo_name_index_accounts_for_language_prefix() {
-        let document = json!({
+        let document = jc001(json!({
             "language_info": {
                 "list_code_language": ["zh", "en"],
                 "list_inner": ["中文", "English", "参数A"]
@@ -3045,16 +3437,110 @@ mod tests {
                 "name": "菜单根",
                 "children": []
             }
-        });
+        }));
         let entries = collect_language_entries(&document, &ProjectExportSettings::default());
-        let bytes = menu_item_bytes(document.get("sdo_info").unwrap(), &entries, 1, 0);
+        let bytes = menu_item_bytes(
+            document.get("sdo_info").unwrap(),
+            TextCatalog::Legacy(&entries),
+            1,
+            0,
+            &mut Vec::new(),
+        );
 
         assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 3);
     }
 
     #[test]
+    fn jc002_sdo_uses_dynamic_message_index_and_rejects_missing_key() {
+        let base = json!({
+            "battery_monitor": disabled_battery_monitor(),
+            "pdo_global_param": [],
+            "pdo_condition": [],
+            "pdo_recv": [],
+            "pdo_send": [],
+            "sdo_info": {
+                "type": 0,
+                "user_auth": 0,
+                "name": "不应参与 v2",
+                "message_key": "menu.root",
+                "children": []
+            }
+        });
+        let document = jc002(base.clone(), &["menu.root"]);
+        let pdo = parse_pdo_advanced_document(&document).document.unwrap();
+        let report = build_binary_from_pdo(
+            &document,
+            &pdo,
+            Vec::new(),
+            &ProjectExportSettings::default(),
+            "jc002",
+        );
+        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.data_description.language_addr.is_empty());
+        assert_eq!(report.data_description.sdo_version, 2);
+        assert_eq!(report.data_description.i18n_version, 2);
+        let sdo = report.data_description.sdo_base_addr as usize;
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[sdo + 2..sdo + 6].try_into().unwrap()),
+            0
+        );
+
+        let missing = jc002(base, &["different.key"]);
+        let pdo = parse_pdo_advanced_document(&missing).document.unwrap();
+        let report = build_binary_from_pdo(
+            &missing,
+            &pdo,
+            Vec::new(),
+            &ProjectExportSettings::default(),
+            "jc002",
+        );
+        assert!(!report.valid);
+        assert!(report
+            .errors
+            .iter()
+            .any(|error| error.contains("menu.root")));
+    }
+
+    #[test]
+    fn jc002_sdo_parameter_preserves_v1_business_field_offsets() {
+        let value = json!({
+            "type": 1,
+            "user_auth": 2,
+            "message_key": "sdo.parameter.test",
+            "control_protocol": 0,
+            "control_rw": 1,
+            "control_use_default": 1,
+            "control_use_min_max": 1,
+            "handle": 3,
+            "handle_param": "1->2->3",
+            "fid": 8,
+            "mid": 0x2030,
+            "sid": 5,
+            "data_default": "7",
+            "data_min": "1",
+            "data_max": "9"
+        });
+        let document = jc002(json!({}), &["sdo.parameter.test"]);
+        let pack = build_dynamic_language_pack(&document).unwrap();
+        let bytes = menu_sdo_bytes(
+            &value,
+            TextCatalog::Dynamic(&pack),
+            &mut Vec::new(),
+            &mut Vec::new(),
+        );
+
+        assert_eq!(bytes.len(), 40);
+        assert_eq!(bytes[6] & 0x0f, 0);
+        assert_eq!(bytes[7], 3);
+        assert_eq!(bytes[12], 8);
+        assert_eq!(u16::from_le_bytes([bytes[13], bytes[14]]), 0x2030);
+        assert_eq!(bytes[15], 5);
+        assert_eq!(u32::from_le_bytes(bytes[16..20].try_into().unwrap()), 7);
+    }
+
+    #[test]
     fn build_project_binary_prefers_advanced_pdo_over_simple_pdo() {
-        let document = json!({
+        let document = jc001(json!({
             "language_info": language_info_without_selected_languages(),
             "battery_monitor": disabled_battery_monitor(),
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
@@ -3090,7 +3576,7 @@ mod tests {
                 }]
             }],
             "pdo_send": []
-        });
+        }));
 
         let report = build_project_binary(&document);
 
@@ -3163,7 +3649,7 @@ mod tests {
     fn build_project_binary_packs_unified_battery_monitor_segment() {
         let mut battery_monitor = battery_monitor_fixture();
         battery_monitor["version"] = json!(2);
-        let document = json!({
+        let document = jc001(json!({
             "language_info": language_info_without_selected_languages(),
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
@@ -3172,7 +3658,7 @@ mod tests {
             "pdo_recv": [],
             "pdo_send": [],
             "battery_monitor": battery_monitor
-        });
+        }));
 
         let report = build_project_binary(&document);
 
@@ -3225,7 +3711,7 @@ mod tests {
     #[test]
     fn build_project_binary_can_skip_battery_monitor_bin() {
         let battery_monitor = battery_monitor_fixture();
-        let mut document = json!({
+        let mut document = jc001(json!({
             "language_info": language_info_without_selected_languages(),
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
@@ -3234,7 +3720,7 @@ mod tests {
             "pdo_recv": [],
             "pdo_send": [],
             "battery_monitor": battery_monitor
-        });
+        }));
         document["export_info"] = json!({
             "battery_monitor": { "config": true, "bin": false },
             "fault_code_info": { "config": true, "bin": true }
@@ -3319,7 +3805,7 @@ mod tests {
 
     #[test]
     fn build_project_binary_packs_sdo_parameter_and_reports_stable_crc() {
-        let document = json!({
+        let document = jc001(json!({
             "language_info": language_info_without_selected_languages(),
             "battery_monitor": disabled_battery_monitor(),
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
@@ -3361,7 +3847,7 @@ mod tests {
                     "pre_handle_decimal": 0
                 }]
             }
-        });
+        }));
 
         let report = build_project_binary(&document);
 

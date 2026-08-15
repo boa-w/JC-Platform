@@ -1,0 +1,9 @@
+{
+  "config_version": "jc002",
+  "language_info": { "list_code_language": ["zh"], "list_inner": [], "list_translate": {} },
+  "localization": {
+    "default_locale": "en-US",
+    "locale_order": ["en-US"],
+    "locales": { "en-US": { "enabled": true, "translations": { "menu.root": "Menu" } } }
+  }
+}

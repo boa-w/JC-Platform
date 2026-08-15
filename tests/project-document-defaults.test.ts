@@ -40,3 +40,12 @@ test('fills missing project export target flags without replacing project names'
     fault_code_info: { config: true, bin: true },
   });
 });
+
+test('does not synthesize optional or v1 sections for jc002', () => {
+  const restored = withRequiredEditorSections({
+    config_version: 'jc002',
+    localization: { default_locale: 'zh', locale_order: ['zh'], locales: {} },
+  });
+
+  assert.equal(restored, null);
+});

@@ -19,9 +19,9 @@ use crate::domain::pdo::{
 };
 use crate::domain::project::{
     create_legacy_project_document, migrate_legacy_project_document, parse_legacy_project_document,
-    save_project_as as save_project_as_document, LoadedProject, MigratedProject, NewProjectRequest,
-    ProjectParseReport, ProjectSummary, ProjectValidationReport, SaveProjectAsReport,
-    SaveProjectAsRequest, SaveProjectRequest,
+    save_project_as as save_project_as_document, validate_project_version_contract, LoadedProject,
+    MigratedProject, NewProjectRequest, ProjectParseReport, ProjectSummary,
+    ProjectValidationReport, SaveProjectAsReport, SaveProjectAsRequest, SaveProjectRequest,
 };
 use crate::domain::project_compat::sanitize_document_for_target;
 use crate::domain::protocol_manager::{
@@ -666,6 +666,7 @@ pub fn create_project(request: NewProjectRequest) -> Result<LoadedProject, Strin
 /// 将项目 JSON 写回磁盘并返回更新后的加载结果。
 #[tauri::command]
 pub fn save_project(request: SaveProjectRequest) -> Result<LoadedProject, String> {
+    validate_project_version_contract(&request.document)?;
     let document = sanitize_document_for_target(&request.path, request.document);
     json_store::write_json(&request.path, &document).map_err(|error| error.to_string())?;
     load_project_from_document(request.path, document)

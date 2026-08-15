@@ -3,6 +3,10 @@ import { lazy, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
+import {
+  localizationToLanguageDocument,
+  updateLocalizationFromLanguageDocument,
+} from '../components/language/localizationAdapter';
 import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
 import { featureModules } from '../data/modules';
@@ -26,10 +30,7 @@ import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor
 import { PdoAdvancedReportPanel } from '../features/realtime-data/PdoAdvancedReportPanel';
 import { usePdoAdvancedReport } from '../features/realtime-data/usePdoAdvancedReport';
 import { usePdoEditor } from '../features/realtime-data/usePdoEditor';
-import {
-  TableConfigStatusPanel,
-  useTableConfigController,
-} from '../features/table-config';
+import { TableConfigStatusPanel, useTableConfigController } from '../features/table-config';
 import {
   uiResourcePreviewDocument,
   useUiResourceController,
@@ -42,6 +43,7 @@ import type {
   FeatureModule,
   LanguageDocument,
   LoadedProject,
+  LocalizationDocument,
   NavigationKey,
   ProjectSummary,
 } from '../types/platform';
@@ -372,16 +374,22 @@ export function Dashboard({
 
   function baselineLanguageDocument(): LanguageDocument | null {
     if (!baselineDocument) return null;
-    return (
-      ((baselineDocument as Record<string, unknown>).language_info as
-        | LanguageDocument
-        | undefined) ?? null
-    );
+    const document = baselineDocument as Record<string, unknown>;
+    if (document.config_version === 'jc002') {
+      const localization = document.localization as LocalizationDocument | undefined;
+      return localization ? localizationToLanguageDocument(localization) : null;
+    }
+    return (document.language_info as LanguageDocument | undefined) ?? null;
   }
 
   function languageDocument(): LanguageDocument | null {
     if (!loadedProject) return null;
-    return (loadedProject.document as Record<string, unknown>).language_info as LanguageDocument;
+    const document = loadedProject.document as Record<string, unknown>;
+    if (document.config_version === 'jc002') {
+      const localization = document.localization as LocalizationDocument | undefined;
+      return localization ? localizationToLanguageDocument(localization) : null;
+    }
+    return (document.language_info as LanguageDocument | undefined) ?? null;
   }
 
   async function confirmGenerateTestData() {
@@ -402,6 +410,18 @@ export function Dashboard({
   }
 
   function updateLanguageDocument(next: LanguageDocument) {
+    const document = loadedProject?.document as Record<string, unknown> | undefined;
+    if (document?.config_version === 'jc002') {
+      const localization = document.localization as LocalizationDocument | undefined;
+      const previous = languageDocument();
+      if (localization && previous) {
+        updateProjectDocument(
+          'localization',
+          updateLocalizationFromLanguageDocument(localization, previous, next),
+        );
+      }
+      return;
+    }
     updateProjectDocument('language_info', next);
   }
 
@@ -650,6 +670,7 @@ export function Dashboard({
               isImportingFullLanguage={tableConfig.isImporting}
               onUpdate={updateLanguageDocument}
               onImportFullLanguage={() => tableConfig.importTable('language')}
+              supportsLegacyImport={true}
             />
           ) : null}
 

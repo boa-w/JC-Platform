@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
+import { localizationToLanguageDocument } from '../../components/language/localizationAdapter';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
-import type { LanguageDocument, LoadedProject } from '../../types/platform';
+import type { LanguageDocument, LoadedProject, LocalizationDocument } from '../../types/platform';
 import { languageText } from '../fault-code/faultCodeModel';
 import type { BatteryMonitorController } from './useBatteryMonitorController';
 
@@ -52,11 +53,16 @@ const formatterOptions = [
 function parseMask(value: string) {
   const text = value.trim();
   const parsed = /^0x/i.test(text) ? Number.parseInt(text.slice(2), 16) : Number(text);
-  return Number.isFinite(parsed) ? Math.max(0, Math.min(0xffffffff, Math.trunc(parsed))) : 0xffffffff;
+  return Number.isFinite(parsed)
+    ? Math.max(0, Math.min(0xffffffff, Math.trunc(parsed)))
+    : 0xffffffff;
 }
 
 function languageDocumentFor(project: LoadedProject | null): LanguageDocument {
   const document = project?.document as Record<string, unknown> | undefined;
+  if (document?.config_version === 'jc002' && document.localization) {
+    return localizationToLanguageDocument(document.localization as LocalizationDocument);
+  }
   return (
     (document?.language_info as LanguageDocument | undefined) ?? {
       list_code_language: ['zh', 'en'],
@@ -240,7 +246,8 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
             <article>
               <span>{t('batteryMonitor.summary.framesSignals')}</span>
               <strong>
-                {currentBatteryMonitorDocument.frames.length} / {currentBatteryMonitorDocument.signals.length}
+                {currentBatteryMonitorDocument.frames.length} /{' '}
+                {currentBatteryMonitorDocument.signals.length}
               </strong>
             </article>
             <article>
@@ -286,7 +293,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                 min={1}
                 type="number"
                 value={currentBatteryMonitorDocument.version}
-                onChange={(event) => updateBatteryMonitorField('version', Number(event.target.value))}
+                onChange={(event) =>
+                  updateBatteryMonitorField('version', Number(event.target.value))
+                }
               />
             </label>
             <label>
@@ -306,7 +315,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                 min={1}
                 type="number"
                 value={currentBatteryMonitorDocument.page_size}
-                onChange={(event) => updateBatteryMonitorField('page_size', Number(event.target.value))}
+                onChange={(event) =>
+                  updateBatteryMonitorField('page_size', Number(event.target.value))
+                }
               />
             </label>
           </div>
@@ -348,7 +359,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                       <td>
                         <input
                           value={frame.frame_key}
-                          onChange={(event) => updateBatteryFrame(index, 'frame_key', event.target.value)}
+                          onChange={(event) =>
+                            updateBatteryFrame(index, 'frame_key', event.target.value)
+                          }
                         />
                       </td>
                       <td>
@@ -360,7 +373,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                       <td>
                         <select
                           value={frame.frame_type}
-                          onChange={(event) => updateBatteryFrame(index, 'frame_type', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatteryFrame(index, 'frame_type', Number(event.target.value))
+                          }
                         >
                           <option value={0}>{t('batteryMonitor.frameTypes.standard')}</option>
                           <option value={1}>{t('batteryMonitor.frameTypes.extended')}</option>
@@ -372,13 +387,17 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           min={1}
                           type="number"
                           value={frame.dlc}
-                          onChange={(event) => updateBatteryFrame(index, 'dlc', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatteryFrame(index, 'dlc', Number(event.target.value))
+                          }
                         />
                       </td>
                       <td>
                         <input
                           value={frame.desc}
-                          onChange={(event) => updateBatteryFrame(index, 'desc', event.target.value)}
+                          onChange={(event) =>
+                            updateBatteryFrame(index, 'desc', event.target.value)
+                          }
                         />
                       </td>
                       <td>
@@ -386,20 +405,28 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           min={0}
                           type="number"
                           value={frame.timeout_ticks}
-                          onChange={(event) => updateBatteryFrame(index, 'timeout_ticks', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatteryFrame(index, 'timeout_ticks', Number(event.target.value))
+                          }
                         />
                       </td>
                       <td>
                         {isModifiedPath(['battery_monitor', 'frames', index]) ? (
                           <button
                             className="config-restore-button"
-                            onClick={() => restoreModifiedPath(['battery_monitor', 'frames', index])}
+                            onClick={() =>
+                              restoreModifiedPath(['battery_monitor', 'frames', index])
+                            }
                             type="button"
                           >
                             {t('common.actions.restore')}
                           </button>
                         ) : null}
-                        <button className="danger" onClick={() => removeBatteryFrame(index)} type="button">
+                        <button
+                          className="danger"
+                          onClick={() => removeBatteryFrame(index)}
+                          type="button"
+                        >
                           {t('common.actions.delete')}
                         </button>
                       </td>
@@ -447,25 +474,33 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                       <td>
                         <input
                           value={signal.signal_key}
-                          onChange={(event) => updateBatterySignal(index, 'signal_key', event.target.value)}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'signal_key', event.target.value)
+                          }
                         />
                       </td>
                       <td>
                         <input
                           value={signal.param_id}
-                          onChange={(event) => updateBatterySignal(index, 'param_id', event.target.value)}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'param_id', event.target.value)
+                          }
                         />
                       </td>
                       <td>
                         <input
                           value={signal.name}
-                          onChange={(event) => updateBatterySignal(index, 'name', event.target.value)}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'name', event.target.value)
+                          }
                         />
                       </td>
                       <td>
                         <select
                           value={signal.frame_key}
-                          onChange={(event) => updateBatterySignal(index, 'frame_key', event.target.value)}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'frame_key', event.target.value)
+                          }
                         >
                           {frameOptions.map((frame) => (
                             <option key={frame.frame_key} value={frame.frame_key}>
@@ -479,13 +514,17 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           min={0}
                           type="number"
                           value={signal.pos}
-                          onChange={(event) => updateBatterySignal(index, 'pos', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'pos', Number(event.target.value))
+                          }
                         />
                         <input
                           min={1}
                           type="number"
                           value={signal.len}
-                          onChange={(event) => updateBatterySignal(index, 'len', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'len', Number(event.target.value))
+                          }
                         />
                       </td>
                       <td>
@@ -493,13 +532,17 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           min={0}
                           type="number"
                           value={signal.raw_offset}
-                          onChange={(event) => updateBatterySignal(index, 'raw_offset', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'raw_offset', Number(event.target.value))
+                          }
                         />
                       </td>
                       <td>
                         <select
                           value={signal.raw_type}
-                          onChange={(event) => updateBatterySignal(index, 'raw_type', event.target.value)}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'raw_type', event.target.value)
+                          }
                         >
                           {rawTypeOptions.map(([value, labelKey]) => (
                             <option key={value} value={value}>
@@ -511,7 +554,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                       <td>
                         <select
                           value={signal.value_type}
-                          onChange={(event) => updateBatterySignal(index, 'value_type', event.target.value)}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'value_type', event.target.value)
+                          }
                         >
                           {valueTypeOptions.map(([value, labelKey]) => (
                             <option key={value} value={value}>
@@ -523,9 +568,13 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                       <td>
                         <select
                           value={signal.byte_order}
-                          onChange={(event) => updateBatterySignal(index, 'byte_order', event.target.value)}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'byte_order', event.target.value)
+                          }
                         >
-                          <option value="little_endian">{t('batteryMonitor.byteOrder.little')}</option>
+                          <option value="little_endian">
+                            {t('batteryMonitor.byteOrder.little')}
+                          </option>
                           <option value="big_endian">{t('batteryMonitor.byteOrder.big')}</option>
                         </select>
                       </td>
@@ -534,7 +583,13 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           step="any"
                           type="number"
                           value={signal.parse_resolution}
-                          onChange={(event) => updateBatterySignal(index, 'parse_resolution', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatterySignal(
+                              index,
+                              'parse_resolution',
+                              Number(event.target.value),
+                            )
+                          }
                         />
                       </td>
                       <td>
@@ -542,13 +597,17 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           step="any"
                           type="number"
                           value={signal.parse_offset}
-                          onChange={(event) => updateBatterySignal(index, 'parse_offset', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'parse_offset', Number(event.target.value))
+                          }
                         />
                       </td>
                       <td>
                         <input
                           value={`0x${signal.parse_mask.toString(16).toUpperCase()}`}
-                          onChange={(event) => updateBatterySignal(index, 'parse_mask', parseMask(event.target.value))}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'parse_mask', parseMask(event.target.value))
+                          }
                         />
                       </td>
                       <td>
@@ -556,20 +615,28 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           min={0}
                           type="number"
                           value={signal.parse_shift}
-                          onChange={(event) => updateBatterySignal(index, 'parse_shift', Number(event.target.value))}
+                          onChange={(event) =>
+                            updateBatterySignal(index, 'parse_shift', Number(event.target.value))
+                          }
                         />
                       </td>
                       <td>
                         {isModifiedPath(['battery_monitor', 'signals', index]) ? (
                           <button
                             className="config-restore-button"
-                            onClick={() => restoreModifiedPath(['battery_monitor', 'signals', index])}
+                            onClick={() =>
+                              restoreModifiedPath(['battery_monitor', 'signals', index])
+                            }
                             type="button"
                           >
                             {t('common.actions.restore')}
                           </button>
                         ) : null}
-                        <button className="danger" onClick={() => removeBatterySignal(index)} type="button">
+                        <button
+                          className="danger"
+                          onClick={() => removeBatterySignal(index)}
+                          type="button"
+                        >
                           {t('common.actions.delete')}
                         </button>
                       </td>
@@ -627,7 +694,9 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           <input
                             checked={item.enabled}
                             type="checkbox"
-                            onChange={(event) => updateBatteryItem(index, 'enabled', event.target.checked)}
+                            onChange={(event) =>
+                              updateBatteryItem(index, 'enabled', event.target.checked)
+                            }
                           />
                         </td>
                         <td>
@@ -635,19 +704,25 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                             min={0}
                             type="number"
                             value={item.order}
-                            onChange={(event) => updateBatteryItem(index, 'order', Number(event.target.value))}
+                            onChange={(event) =>
+                              updateBatteryItem(index, 'order', Number(event.target.value))
+                            }
                           />
                         </td>
                         <td>
                           <input
                             value={item.item_key}
-                            onChange={(event) => updateBatteryItem(index, 'item_key', event.target.value)}
+                            onChange={(event) =>
+                              updateBatteryItem(index, 'item_key', event.target.value)
+                            }
                           />
                         </td>
                         <td>
                           <select
                             value={item.signal_key}
-                            onChange={(event) => updateBatteryItem(index, 'signal_key', event.target.value)}
+                            onChange={(event) =>
+                              updateBatteryItem(index, 'signal_key', event.target.value)
+                            }
                           >
                             {signalOptions.map((signal) => (
                               <option key={signal.signal_key} value={signal.signal_key}>
@@ -659,32 +734,42 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                         <td>
                           <input
                             value={item.name_key}
-                            onChange={(event) => updateBatteryItem(index, 'name_key', event.target.value)}
+                            onChange={(event) =>
+                              updateBatteryItem(index, 'name_key', event.target.value)
+                            }
                           />
                         </td>
                         <td>
                           <input
                             value={zhText || ''}
                             placeholder={item.fallback_name}
-                            onChange={(event) => updateBatteryItemLanguage(index, event.target.value)}
+                            onChange={(event) =>
+                              updateBatteryItemLanguage(index, event.target.value)
+                            }
                           />
                         </td>
                         <td>
                           <input
                             value={item.fallback_name}
-                            onChange={(event) => updateBatteryItem(index, 'fallback_name', event.target.value)}
+                            onChange={(event) =>
+                              updateBatteryItem(index, 'fallback_name', event.target.value)
+                            }
                           />
                         </td>
                         <td>
                           <input
                             value={item.unit}
-                            onChange={(event) => updateBatteryItem(index, 'unit', event.target.value)}
+                            onChange={(event) =>
+                              updateBatteryItem(index, 'unit', event.target.value)
+                            }
                           />
                         </td>
                         <td>
                           <select
                             value={item.formatter.kind}
-                            onChange={(event) => updateBatteryItemFormatter(index, 'kind', event.target.value)}
+                            onChange={(event) =>
+                              updateBatteryItemFormatter(index, 'kind', event.target.value)
+                            }
                           >
                             {formatterOptions.map(([value, labelKey]) => (
                               <option key={value} value={value}>
@@ -698,20 +783,38 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                             step="any"
                             type="number"
                             value={item.formatter.offset}
-                            onChange={(event) => updateBatteryItemFormatter(index, 'offset', Number(event.target.value))}
+                            onChange={(event) =>
+                              updateBatteryItemFormatter(
+                                index,
+                                'offset',
+                                Number(event.target.value),
+                              )
+                            }
                           />
                         </td>
                         <td>
                           <input
                             type="number"
                             value={item.formatter.scale_num}
-                            onChange={(event) => updateBatteryItemFormatter(index, 'scale_num', Number(event.target.value))}
+                            onChange={(event) =>
+                              updateBatteryItemFormatter(
+                                index,
+                                'scale_num',
+                                Number(event.target.value),
+                              )
+                            }
                           />
                           /
                           <input
                             type="number"
                             value={item.formatter.scale_den}
-                            onChange={(event) => updateBatteryItemFormatter(index, 'scale_den', Number(event.target.value))}
+                            onChange={(event) =>
+                              updateBatteryItemFormatter(
+                                index,
+                                'scale_den',
+                                Number(event.target.value),
+                              )
+                            }
                           />
                         </td>
                         <td>
@@ -719,13 +822,21 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                             min={0}
                             type="number"
                             value={item.formatter.decimals}
-                            onChange={(event) => updateBatteryItemFormatter(index, 'decimals', Number(event.target.value))}
+                            onChange={(event) =>
+                              updateBatteryItemFormatter(
+                                index,
+                                'decimals',
+                                Number(event.target.value),
+                              )
+                            }
                           />
                         </td>
                         <td>
                           <select
                             value={item.validity.frame_key ?? ''}
-                            onChange={(event) => updateBatteryItemValidity(index, 'frame_key', event.target.value)}
+                            onChange={(event) =>
+                              updateBatteryItemValidity(index, 'frame_key', event.target.value)
+                            }
                           >
                             {frameOptions.map((frame) => (
                               <option key={frame.frame_key} value={frame.frame_key}>
@@ -739,7 +850,11 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                             type="number"
                             value={item.validity.timeout_ticks ?? ''}
                             onChange={(event) =>
-                              updateBatteryItemValidity(index, 'timeout_ticks', Number(event.target.value))
+                              updateBatteryItemValidity(
+                                index,
+                                'timeout_ticks',
+                                Number(event.target.value),
+                              )
                             }
                           />
                         </td>
@@ -747,13 +862,19 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
                           {isModifiedPath(['battery_monitor', 'items', index]) ? (
                             <button
                               className="config-restore-button"
-                              onClick={() => restoreModifiedPath(['battery_monitor', 'items', index])}
+                              onClick={() =>
+                                restoreModifiedPath(['battery_monitor', 'items', index])
+                              }
                               type="button"
                             >
                               {t('common.actions.restore')}
                             </button>
                           ) : null}
-                          <button className="danger" onClick={() => removeBatteryItem(index)} type="button">
+                          <button
+                            className="danger"
+                            onClick={() => removeBatteryItem(index)}
+                            type="button"
+                          >
                             {t('common.actions.delete')}
                           </button>
                         </td>

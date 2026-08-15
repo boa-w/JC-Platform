@@ -40,6 +40,7 @@ interface LanguagePageProps {
   isImportingFullLanguage: boolean;
   onUpdate: (document: LanguageDocument) => void;
   onImportFullLanguage: () => void | Promise<void>;
+  supportsLegacyImport?: boolean;
 }
 
 type ViewMode = 'editor' | 'comparison';
@@ -197,6 +198,7 @@ export function LanguagePage({
   isImportingFullLanguage,
   onUpdate,
   onImportFullLanguage,
+  supportsLegacyImport = true,
 }: LanguagePageProps) {
   const { t } = useTranslation();
   const langMainRef = useRef<HTMLDivElement | null>(null);
@@ -311,9 +313,14 @@ export function LanguagePage({
   const visibleLanguageKeys = languageIndex.visibleLanguageKeys;
 
   const selectedDeletableKeys = useMemo(() => {
-    const minIndex = document.list_code_language.length;
+    const minIndex = document.editor_locked_key_count ?? document.list_code_language.length;
     return document.list_inner.slice(minIndex).filter((key) => selectedTranslationKeys.has(key));
-  }, [document.list_code_language.length, document.list_inner, selectedTranslationKeys]);
+  }, [
+    document.editor_locked_key_count,
+    document.list_code_language.length,
+    document.list_inner,
+    selectedTranslationKeys,
+  ]);
 
   const modifiedKeys = useMemo(() => {
     const keys = new Set<string>();
@@ -334,7 +341,7 @@ export function LanguagePage({
     let filtered = visibleLanguageKeys.map((key, i) => ({
       key,
       index: i,
-      isConfigKey: i < document.list_code_language.length,
+      isConfigKey: i < (document.editor_locked_key_count ?? document.list_code_language.length),
       isExternalKey: i >= document.list_inner.length,
       translations: (document.list_translate[key] as Record<string, string>) ?? {},
     }));
@@ -367,6 +374,7 @@ export function LanguagePage({
     visibleLanguageKeys,
     languageIndex.searchTextByKey,
     document.list_code_language.length,
+    document.editor_locked_key_count,
     document.list_inner.length,
     document.list_translate,
     modifiedKeys,
@@ -555,7 +563,7 @@ export function LanguagePage({
   }
 
   function handleReorderKeys(keys: string[], targetIndex: number, position: 'before' | 'after') {
-    const minIndex = document.list_code_language.length;
+    const minIndex = document.editor_locked_key_count ?? document.list_code_language.length;
     if (keys.length === 0 || targetIndex < minIndex || targetIndex >= document.list_inner.length) {
       return;
     }
@@ -718,7 +726,9 @@ export function LanguagePage({
 
     setIsTranslating(true);
     resetTranslateRun(candidates.length);
-    setTranslateStatus(t('language.page.translatingProgress', { current: 0, total: candidates.length }));
+    setTranslateStatus(
+      t('language.page.translatingProgress', { current: 0, total: candidates.length }),
+    );
     addTranslateLog(
       'info',
       t('language.page.translationStarted', {
@@ -996,12 +1006,16 @@ export function LanguagePage({
               fullImportStatus={fullLanguageImportStatus}
               isImportingSingleLanguage={isImportingSingleLanguage}
               isImportingFullLanguage={isImportingFullLanguage}
-              canImportFullLanguage={loaded}
+              canImportFullLanguage={loaded && supportsLegacyImport}
               onSearch={setSearchQuery}
               onFilter={setFilterMode}
               onSyncKeys={() => {}}
-              onImportSingleLanguage={() => void handleImportSingleLanguage()}
-              onImportFullLanguage={handleImportFullLanguage}
+              onImportSingleLanguage={
+                supportsLegacyImport ? () => void handleImportSingleLanguage() : () => undefined
+              }
+              onImportFullLanguage={
+                supportsLegacyImport ? handleImportFullLanguage : () => undefined
+              }
             />
             <TranslationServicePanel
               languages={languageOptions}

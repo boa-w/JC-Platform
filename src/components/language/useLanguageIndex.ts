@@ -13,14 +13,12 @@ function translationValues(document: LanguageDocument, key: string): Record<stri
   return (document.list_translate[key] as Record<string, string> | undefined) ?? {};
 }
 
-function buildLanguageIndex(document: LanguageDocument): LanguageIndex {
+export function buildLanguageIndex(document: LanguageDocument): LanguageIndex {
   const indexedKeys = new Set(document.list_inner);
   const externalKeys = Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
   const visibleLanguageKeys = [...document.list_inner, ...externalKeys];
-  const translationKeys = [
-    ...document.list_inner.slice(document.list_code_language.length),
-    ...externalKeys,
-  ];
+  const lockedKeyCount = document.editor_locked_key_count ?? document.list_code_language.length;
+  const translationKeys = [...document.list_inner.slice(lockedKeyCount), ...externalKeys];
   const searchTextByKey = new Map<string, string>();
   const progressByCode = new Map<string, { translated: number; total: number }>();
 

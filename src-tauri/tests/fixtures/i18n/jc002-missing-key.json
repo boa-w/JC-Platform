@@ -1,0 +1,26 @@
+{
+  "config_version": "jc002",
+  "device": { "version": "jxc_7size_meter" },
+  "localization": {
+    "default_locale": "en-US",
+    "locale_order": ["en-US"],
+    "locales": { "en-US": { "enabled": true, "translations": { "different.key": "Different" } } }
+  },
+  "battery_monitor": { "enabled": false },
+  "pdo_global_param": [
+    { "param_id": "TEST", "name": "test", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
+  ],
+  "pdo_condition": [],
+  "pdo_recv": [
+    {
+      "id": 273,
+      "type": 0,
+      "desc": "test",
+      "data": [
+        { "pos": 0, "len": 8, "show_type": 0, "handle": 0, "handle_param": "", "param_id": "TEST" }
+      ]
+    }
+  ],
+  "pdo_send": [],
+  "sdo_info": { "type": 0, "user_auth": 0, "message_key": "menu.root", "children": [] }
+}

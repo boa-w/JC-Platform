@@ -1,0 +1,11 @@
+{
+  "config_version": "jc002",
+  "localization": {
+    "default_locale": "en-US",
+    "locale_order": ["en-US", "en-US"],
+    "locales": {
+      "en-US": { "enabled": true, "translations": { "menu.root": "Menu" } },
+      "ru-RU": { "enabled": true, "translations": { "menu.root": "Меню" } }
+    }
+  }
+}

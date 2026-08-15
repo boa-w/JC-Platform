@@ -25,7 +25,7 @@
 
 ### 数据交换与验证
 
-- **多国语言**：收集 SDO、锂电监控和故障码等模块的翻译项，维护 `language_info`，支持 CSV/XLS/XLSX 导入导出以及单语言 CSV 合并。
+- **多国语言**：v1 维护 `language_info` 和索引语言块；v2 使用独立 `localization` schema、稳定消息 key 和 LVGL `lv_i18n` 风格动态语言包。两套格式不混用、不隐式回退。
 - **CAN 测试数据**：从 PDO、SDO 和锂电监控配置提取帧，生成冒烟、边界、故障和回归等测试场景，并导出 TXT、CSV 和说明 JSON。
 - **二进制检查**：预览二进制大小、CRC、段地址和语言数量，也可与旧版 `.bin` 逐字节比较并报告首个差异。
 - **Git 项目版本**：复用项目所在仓库，仅管理当前 `.jcpro` 和关联重构 sidecar，不会自动提交源码、图片或导出目录。详见 [项目版本管理](docs/project-version-management.md)。
@@ -38,7 +38,7 @@
 - `bin/pdo_sdo_data.bin`（名称可配置）：按设备兼容布局打包的 PDO、锂电监控、故障码、SDO 和语言数据；
 - `img/`、`img/anim/`：按 UI 资源的默认选项复制的静态图片和动画帧。
 
-导出顺序、段地址和开关规则见 [导出文件构建机制](docs/export-build.md)。
+版本边界见 [配置版本边界](docs/configuration-versions.md)。v1 导出见 [jc001 导出机制](docs/export-build.md)，v2 导出和 ABI 见 [jc002 发布包与二进制 ABI](docs/export-build-v2.md)。
 
 ## 目录结构
 
@@ -65,8 +65,13 @@ docs/                        项目文档
 ## 文档索引
 
 - [架构设计](docs/architecture.md)：前端、Tauri Commands、领域层和基础设施层的职责，以及配置生命周期。
-- [数据格式与 `.jcpro` 架构](docs/data-format.md)：主文件、sidecar、统一协议编辑态和兼容保存规则。
-- [导出文件构建机制](docs/export-build.md)：导出目录、`ConfigUpdate.json`、`pdo_sdo_data.bin` 段布局和构建顺序。
+- [配置版本边界](docs/configuration-versions.md)：`jc001`/`jc002` 的互斥字段、loader 和部署隔离规则。
+- [jc001 数据格式](docs/data-format.md)：旧版项目、sidecar、统一协议编辑态和兼容保存规则。
+- [jc001 导出机制](docs/export-build.md)：旧索引语言块和 v1 二进制布局。
+- [jc002 数据格式](docs/data-format-v2.md)：`localization`、稳定消息 key 和业务引用规则。
+- [jc002 发布包与 ABI](docs/export-build-v2.md)：`LVI2`、v2 SDO、battery 和 fault 记录布局。
+- [jc002 固件运行时](docs/firmware-i18n-v2.md)：加载、严格查询、测试和设备验收边界。
+- [Inmotion6 jc002 测试构建](docs/jc002-inmotion6-test-build.md)：完整业务测试配置、发布包和可重复生成命令。
 - [开发指南](docs/development.md)：环境、命令、代码组织和测试边界。
 
 ## 开发命令

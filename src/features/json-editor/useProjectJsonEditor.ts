@@ -3,6 +3,7 @@ import {
   advancedConfigSections,
   configSectionForEditor,
   jsonEditorKeyForModule,
+  languageSectionForDocument,
   restorePathsForEditor,
 } from '../../modules/documentSections';
 import type { LoadedProject, NavigationKey } from '../../types/platform';
@@ -52,7 +53,10 @@ export function useProjectJsonEditor({
   }
 
   function restore() {
-    const document = restoreProjectPaths(restorePathsForEditor(activeModuleKey, { realtimeMode }));
+    const currentDocument = loadedProject?.document as Record<string, unknown> | undefined;
+    const document = restoreProjectPaths(
+      restorePathsForEditor(activeModuleKey, { realtimeMode }, currentDocument),
+    );
     if (!document) return;
     const section = configSectionForEditor(document as Record<string, unknown>, activeModuleKey, {
       realtimeMode,
@@ -70,7 +74,7 @@ export function useProjectJsonEditor({
       const editorKey = jsonEditorKeyForModule(activeModuleKey, { realtimeMode });
       if (editorKey === 'sdo') document.sdo_info = parsed;
       if (editorKey === 'pdo-simple') document.pdo_simple_send_recv = parsed;
-      if (activeModuleKey === 'language') document.language_info = parsed;
+      if (activeModuleKey === 'language') document[languageSectionForDocument(document)] = parsed;
       if (activeModuleKey === 'battery-monitor') document.battery_monitor = parsed;
       if (activeModuleKey === 'signal-dictionary') document.signal_dictionary = parsed;
       if (activeModuleKey === 'private-protocol') document.private_protocol = parsed;

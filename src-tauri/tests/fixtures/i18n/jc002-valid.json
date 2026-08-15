@@ -1,0 +1,42 @@
+{
+  "config_version": "jc002",
+  "device": { "version": "jxc_7size_meter", "resolution_w": 800, "resolution_h": 480 },
+  "ui_info": { "main": { "item": {} } },
+  "localization": {
+    "default_locale": "en-US",
+    "locale_order": ["en-US", "ru-RU"],
+    "locales": {
+      "en-US": {
+        "enabled": true,
+        "translations": {
+          "menu.root": "Menu",
+          "fault.count": { "one": "%d fault", "other": "%d faults" }
+        }
+      },
+      "ru-RU": {
+        "enabled": true,
+        "translations": {
+          "menu.root": "Меню",
+          "fault.count": { "one": "%d ошибка", "few": "%d ошибки", "many": "%d ошибок", "other": "%d ошибки" }
+        }
+      }
+    }
+  },
+  "battery_monitor": { "enabled": false },
+  "pdo_global_param": [
+    { "param_id": "TEST", "name": "test", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
+  ],
+  "pdo_condition": [],
+  "pdo_recv": [
+    {
+      "id": 273,
+      "type": 0,
+      "desc": "test",
+      "data": [
+        { "pos": 0, "len": 8, "show_type": 0, "handle": 0, "handle_param": "", "param_id": "TEST" }
+      ]
+    }
+  ],
+  "pdo_send": [],
+  "sdo_info": { "type": 0, "user_auth": 0, "name": "ignored", "message_key": "menu.root", "children": [] }
+}

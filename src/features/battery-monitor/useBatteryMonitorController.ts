@@ -9,6 +9,10 @@ import {
   saveJsonFile,
   saveTextFile,
 } from '../../api/commands';
+import {
+  localizationToLanguageDocument,
+  updateLocalizationFromLanguageDocument,
+} from '../../components/language/localizationAdapter';
 import { useOperationGuard } from '../../hooks/useOperationGuard';
 import type {
   BatteryMonitorFrame,
@@ -16,6 +20,7 @@ import type {
   BatteryMonitorProtocol,
   BatteryMonitorSignal,
   LanguageDocument,
+  LocalizationDocument,
 } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
 import { runSystemDialog } from '../../utils/systemDialog';
@@ -152,6 +157,9 @@ export function useBatteryMonitorController({
   function languageDocument(): LanguageDocument {
     if (!loadedProject) return defaultLanguageDocument();
     const source = loadedProject.document as Record<string, unknown>;
+    if (source.config_version === 'jc002' && source.localization) {
+      return localizationToLanguageDocument(source.localization as LocalizationDocument);
+    }
     const language = source.language_info as LanguageDocument | undefined;
     return language ?? defaultLanguageDocument();
   }
@@ -168,10 +176,22 @@ export function useBatteryMonitorController({
 
   function updateBatteryMonitorDocument(next: BatteryMonitorProtocol) {
     const normalized = normalizeBatteryMonitor(next);
-    updateProjectSections({
+    const source = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
+    const previousLanguage = languageDocument();
+    const nextLanguage = batteryLanguageFor(normalized);
+    const sections: Record<string, unknown> = {
       battery_monitor: normalized,
-      language_info: batteryLanguageFor(normalized),
-    });
+    };
+    if (source.config_version === 'jc002' && source.localization) {
+      sections.localization = updateLocalizationFromLanguageDocument(
+        source.localization as LocalizationDocument,
+        previousLanguage,
+        nextLanguage,
+      );
+    } else {
+      sections.language_info = nextLanguage;
+    }
+    updateProjectSections(sections);
   }
 
   function updateBatteryMonitorField(field: keyof BatteryMonitorProtocol, value: unknown) {
@@ -343,7 +363,19 @@ export function useBatteryMonitorController({
       item.name_key,
       text || item.fallback_name || item.item_key,
     );
-    updateProjectDocument('language_info', nextLanguage);
+    const source = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
+    if (source.config_version === 'jc002' && source.localization) {
+      updateProjectDocument(
+        'localization',
+        updateLocalizationFromLanguageDocument(
+          source.localization as LocalizationDocument,
+          language,
+          nextLanguage,
+        ),
+      );
+    } else {
+      updateProjectDocument('language_info', nextLanguage);
+    }
   }
 
   function addBatteryItem() {

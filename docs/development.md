@@ -95,3 +95,26 @@ macOS CI 产物当前未签名，首次打开可能受 Gatekeeper 限制；正�
 - Rust 单元测试：模型转换、校验、二进制打包。
 - 前端组件测试：表格编辑、树操作、表单校验。
 - 集成测试：打开样例 `.jcpro` 并导出。
+
+### 配置版本回归
+
+v1/v2 fixture 位于 `src-tauri/tests/fixtures/i18n/`。新增版本字段或二进制文本引用时，至少验证：
+
+- v1/v2 schema 字段互斥；
+- v1 清单无 `i18n_*`，v2 清单无 `language_*`；
+- `locale_order` 完整且无重复；
+- 非空业务消息 key 缺失时构建失败；
+- `LVI2` 编解码和 CRC 损坏拒绝。
+
+```powershell
+cd src-tauri
+cargo test --lib
+```
+
+固件动态语言宿主测试在下位机 `meter_6_test/tests/` 中，要求 PATH 中存在 GCC 或 Clang：
+
+```powershell
+.\tests\run-host-tests.ps1
+```
+
+退出码 2 表示未发现宿主 C 编译器，不能记为测试通过。目标固件 SCons 构建和设备验收也必须单独记录。

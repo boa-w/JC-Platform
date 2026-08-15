@@ -15,6 +15,7 @@ pub mod can_test;
 pub mod canopen_convert;
 pub mod export;
 pub mod language;
+pub mod localization;
 pub mod pdo;
 pub mod private_protocol;
 pub mod project;

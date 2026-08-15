@@ -3,6 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { loadTextFile, saveTextFile } from '../../api/commands';
 import { ConfirmDialogHost } from '../../components/ConfirmDialog';
+import {
+  localizationToLanguageDocument,
+  updateLocalizationFromLanguageDocument,
+} from '../../components/language/localizationAdapter';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import type {
   FaultCodeInfo,
@@ -10,6 +14,7 @@ import type {
   FaultCodeSource,
   LanguageDocument,
   LoadedProject,
+  LocalizationDocument,
 } from '../../types/platform';
 import {
   csvToFaultCodes,
@@ -88,9 +93,14 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
     () => normalizeFaultDocument(document.fault_code_info),
     [document.fault_code_info],
   );
+  const isV2 = document.config_version === 'jc002';
+  const localization = document.localization as LocalizationDocument | undefined;
   const language = useMemo(
-    () => (document.language_info as LanguageDocument | undefined) ?? defaultLanguageDocument(),
-    [document.language_info],
+    () =>
+      isV2 && localization
+        ? localizationToLanguageDocument(localization)
+        : ((document.language_info as LanguageDocument | undefined) ?? defaultLanguageDocument()),
+    [document.language_info, isV2, localization],
   );
   const sources = faultCode.sources ?? [];
   const codes = faultCode.codes ?? [];
@@ -181,10 +191,19 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
   }, [sources]);
 
   function updateFaultCode(next: FaultCodeInfo, nextLanguage = language) {
-    onUpdateSections({
+    const sections: Record<string, unknown> = {
       fault_code_info: { ...next, schema_version: next.schema_version ?? 1 },
-      language_info: nextLanguage,
-    });
+    };
+    if (isV2 && localization) {
+      sections.localization = updateLocalizationFromLanguageDocument(
+        localization,
+        language,
+        nextLanguage,
+      );
+    } else {
+      sections.language_info = nextLanguage;
+    }
+    onUpdateSections(sections);
   }
 
   function updateRoot(field: keyof FaultCodeInfo, value: unknown) {
@@ -308,7 +327,7 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
       key,
       text,
     );
-    onUpdateSections({
+    const sections: Record<string, unknown> = {
       fault_code_info: {
         ...faultCode,
         schema_version: faultCode.schema_version ?? 1,
@@ -316,8 +335,17 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
           currentIndex === index ? { ...code, message_key: key, name: text } : code,
         ),
       },
-      language_info: nextLanguage,
-    });
+    };
+    if (isV2 && localization) {
+      sections.localization = updateLocalizationFromLanguageDocument(
+        localization,
+        language,
+        nextLanguage,
+      );
+    } else {
+      sections.language_info = nextLanguage;
+    }
+    onUpdateSections(sections);
   }
 
   function bindCodeMessageKey(index: number, key: string) {
@@ -1061,7 +1089,9 @@ export function FaultCodePage({ loadedProject, onUpdateSections }: FaultCodePage
                 value={effectiveSourceFilter}
                 onChange={(event) => setSourceFilter(event.target.value)}
               >
-                <option value="all">{t('faultCode.codes.allSources', { count: codes.length })}</option>
+                <option value="all">
+                  {t('faultCode.codes.allSources', { count: codes.length })}
+                </option>
                 {sources.map((source) => {
                   const key = sourceKeyFor(source);
                   return (

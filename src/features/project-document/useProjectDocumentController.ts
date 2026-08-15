@@ -178,7 +178,8 @@ export function useProjectDocumentController({
     (refactorOnlySections as readonly string[]).includes(section),
   );
   const isLegacyJcproProject =
-    loadedProject?.summary.path?.toLowerCase().endsWith('.jcpro') ?? false;
+    (loadedProject?.summary.path?.toLowerCase().endsWith('.jcpro') ?? false) &&
+    (loadedProject?.document as Record<string, unknown> | undefined)?.config_version !== 'jc002';
   const projectMissingSections = loadedProject?.validation.missing_sections ?? [];
   const compatibleMissingSections = projectMissingSections.filter(
     (section) => !(refactorOnlySections as readonly string[]).includes(section),

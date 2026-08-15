@@ -10,6 +10,7 @@ const REFACTOR_ONLY_SECTIONS: &[&str] =
     &["signal_dictionary", "private_protocol", "protocol_mapping"];
 
 const LEGACY_CONFIG_VERSION: &str = "jc001";
+const V2_CONFIG_VERSION: &str = "jc002";
 
 const LEGACY_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "config_version",
@@ -27,6 +28,26 @@ const LEGACY_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "sdo_info",
     "history_ui",
 ];
+
+const V2_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
+    "config_version",
+    "device",
+    "project",
+    "export_info",
+    "ui_info",
+    "fault_code_info",
+    "pdo_simple_send_recv",
+    "pdo_global_param",
+    "pdo_condition",
+    "pdo_recv",
+    "pdo_send",
+    "sdo_info",
+    "history_ui",
+    "battery_monitor",
+    "localization",
+];
+const LOCALIZATION_FIELD_ORDER: &[&str] = &["default_locale", "locale_order", "locales"];
+const LOCALE_FIELD_ORDER: &[&str] = &["enabled", "direction", "translations"];
 
 const PROJECT_FIELD_ORDER: &[&str] = &["name", "create_time", "update_time", "from", "base_path"];
 const EXPORT_INFO_FIELD_ORDER: &[&str] = &[
@@ -104,14 +125,22 @@ pub fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
     if !is_legacy_jcpro_path(path) {
         return document;
     }
-    if let Some(object) = document.as_object_mut() {
-        for section in refactor_only_sections() {
-            object.remove(*section);
+    match document.get("config_version").and_then(Value::as_str) {
+        Some(V2_CONFIG_VERSION) => {
+            update_project_update_time(&mut document, &current_legacy_timestamp());
+            order_v2_jcpro_document(document)
+        }
+        _ => {
+            if let Some(object) = document.as_object_mut() {
+                for section in refactor_only_sections() {
+                    object.remove(*section);
+                }
+            }
+            set_legacy_config_version(&mut document);
+            update_project_update_time(&mut document, &current_legacy_timestamp());
+            order_legacy_jcpro_document(document)
         }
     }
-    set_legacy_config_version(&mut document);
-    update_project_update_time(&mut document, &current_legacy_timestamp());
-    order_legacy_jcpro_document(document)
 }
 
 fn set_legacy_config_version(document: &mut Value) {
@@ -160,6 +189,63 @@ fn order_legacy_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
     order_fault_code_info(&mut document);
     order_object_value(document, LEGACY_JCPRO_TOP_LEVEL_ORDER)
+}
+
+fn order_v2_jcpro_document(mut document: Value) -> Value {
+    order_child_object(&mut document, "project", PROJECT_FIELD_ORDER);
+    order_export_info(&mut document);
+    order_child_object(&mut document, "device", DEVICE_FIELD_ORDER);
+    order_ui_info(&mut document);
+    order_child_object(
+        &mut document,
+        "pdo_simple_send_recv",
+        PDO_SIMPLE_FIELD_ORDER,
+    );
+    order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
+    order_fault_code_info(&mut document);
+    order_localization(&mut document);
+    order_object_value(document, V2_JCPRO_TOP_LEVEL_ORDER)
+}
+
+fn order_localization(root: &mut Value) {
+    let Some(localization) = root.get_mut("localization") else {
+        return;
+    };
+    let locale_order = localization
+        .get("locale_order")
+        .and_then(Value::as_array)
+        .map(|items| string_array_values(items))
+        .unwrap_or_default();
+    if let Some(locales) = localization.get_mut("locales") {
+        let Value::Object(mut locale_map) = std::mem::take(locales) else {
+            return;
+        };
+        let mut ordered_locales = Map::new();
+        for locale in &locale_order {
+            if let Some(mut value) = locale_map.remove(locale) {
+                order_locale(&mut value);
+                ordered_locales.insert(locale.clone(), value);
+            }
+        }
+        let mut remaining = locale_map.into_iter().collect::<Vec<_>>();
+        remaining.sort_by(|(left, _), (right, _)| left.cmp(right));
+        for (locale, mut value) in remaining {
+            order_locale(&mut value);
+            ordered_locales.insert(locale, value);
+        }
+        *locales = Value::Object(ordered_locales);
+    }
+    let value = std::mem::take(localization);
+    *localization = order_object_value(value, LOCALIZATION_FIELD_ORDER);
+}
+
+fn order_locale(locale: &mut Value) {
+    if let Some(translations) = locale.get_mut("translations") {
+        let value = std::mem::take(translations);
+        *translations = order_object_by_primary_keys(value, &[]);
+    }
+    let value = std::mem::take(locale);
+    *locale = order_object_value(value, LOCALE_FIELD_ORDER);
 }
 
 fn order_export_info(root: &mut Value) {
@@ -751,6 +837,46 @@ mod tests {
         assert_eq!(
             key_b.keys().map(String::as_str).collect::<Vec<_>>(),
             vec!["zh", "en", "ja", "extra"]
+        );
+    }
+
+    #[test]
+    fn sanitize_jc002_preserves_version_and_localization_schema() {
+        let document = json!({
+            "localization": {
+                "locales": {
+                    "en": { "translations": { "z.key": "Z", "a.key": "A" }, "enabled": true },
+                    "zh": { "translations": { "z.key": "中Z", "a.key": "中A" }, "enabled": true }
+                },
+                "locale_order": ["zh", "en"],
+                "default_locale": "zh"
+            },
+            "project": { "name": "v2" },
+            "config_version": "jc002"
+        });
+
+        let sanitized = sanitize_document_for_target("demo.jcpro", document);
+
+        assert_eq!(sanitized["config_version"], "jc002");
+        assert!(sanitized.get("localization").is_some());
+        assert!(sanitized.get("language_info").is_none());
+        assert_eq!(
+            sanitized["localization"]["locales"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec!["zh", "en"]
+        );
+        assert_eq!(
+            sanitized["localization"]["locales"]["zh"]["translations"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec!["a.key", "z.key"]
         );
     }
 }

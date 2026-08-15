@@ -111,7 +111,9 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
       <section className="export-write-controls">
         <div className="export-write-controls__header">
           <div>
-            <strong className="section-label--muted">{t('projectExport.writeControls.title')}</strong>
+            <strong className="section-label--muted">
+              {t('projectExport.writeControls.title')}
+            </strong>
             <p>{t('projectExport.writeControls.description')}</p>
           </div>
           <button
@@ -125,8 +127,12 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
         </div>
         <div className="export-option-grid">
           <div className="export-option-grid__head">{t('projectExport.writeControls.item')}</div>
-          <div className="export-option-grid__head">{t('projectExport.writeControls.writeConfig')}</div>
-          <div className="export-option-grid__head">{t('projectExport.writeControls.writeBin')}</div>
+          <div className="export-option-grid__head">
+            {t('projectExport.writeControls.writeConfig')}
+          </div>
+          <div className="export-option-grid__head">
+            {t('projectExport.writeControls.writeBin')}
+          </div>
           <div className="export-option-info">
             <span>{t('navigation.modules.batteryMonitor.title')}</span>
             <small>{t('projectExport.writeControls.batteryDescription')}</small>
@@ -205,7 +211,9 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
             </article>
             <article>
               <span>{t('projectExport.imageCopy')}</span>
-              <strong>{t('dashboard.gitSummary.fileCount', { count: exportReport.copied_images.length })}</strong>
+              <strong>
+                {t('dashboard.gitSummary.fileCount', { count: exportReport.copied_images.length })}
+              </strong>
             </article>
             <article className="export-report__wide">
               <span>{t('projectExport.exportRoot')}</span>
@@ -291,7 +299,9 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
             <section className="export-result-panel">
               <div className="export-result-header">
                 <strong>{t('projectExport.tools.binaryReport')}</strong>
-                <span>{t(binaryReport.valid ? 'projectExport.valid' : 'projectExport.hasIssues')}</span>
+                <span>
+                  {t(binaryReport.valid ? 'projectExport.valid' : 'projectExport.hasIssues')}
+                </span>
               </div>
               <div className="export-report">
                 <article>
@@ -304,7 +314,11 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
                 </article>
                 <article>
                   <span>{t('projectExport.languageCount')}</span>
-                  <strong>{binaryReport.data_description.language_code.length}</strong>
+                  <strong>
+                    {binaryReport.data_description.i18n_locale_total ??
+                      binaryReport.data_description.language_code?.length ??
+                      0}
+                  </strong>
                 </article>
               </div>
               {binaryReport.warnings.length > 0 ? (

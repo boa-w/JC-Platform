@@ -173,9 +173,10 @@ export interface ProjectDocument {
   signal_dictionary: SignalDictionary;
   private_protocol: PrivateProtocolDocument;
   protocol_mapping: ProtocolMapping[];
-  language_info: LanguageDocument;
-  battery_monitor: BatteryMonitorProtocol;
-  fault_code_info: FaultCodeInfo;
+  language_info?: LanguageDocument;
+  localization?: LocalizationDocument;
+  battery_monitor?: BatteryMonitorProtocol;
+  fault_code_info?: FaultCodeInfo;
 }
 
 export interface ProjectExportSettings {
@@ -545,6 +546,23 @@ export interface LanguageDocument {
   list_inner: string[];
   list_translate: Record<string, unknown>;
   language_labels?: Record<string, string>;
+  editor_locked_key_count?: number;
+}
+
+export type LocalizationMessage = string | Record<string, string>;
+
+export interface LocalizationLocale {
+  enabled?: boolean;
+  direction?: 'ltr' | 'rtl';
+  translations: Record<string, LocalizationMessage>;
+  [key: string]: unknown;
+}
+
+export interface LocalizationDocument {
+  default_locale: string;
+  locale_order: string[];
+  locales: Record<string, LocalizationLocale>;
+  [key: string]: unknown;
 }
 
 export interface BaiduTranslateRequest {
@@ -760,8 +778,14 @@ export interface DataDescriptionPlan {
   fault_source_total: number;
   fault_code_total: number;
   sdo_base_addr: number;
-  language_addr: number[];
-  language_code: string[];
+  sdo_version: number;
+  language_addr?: number[];
+  language_code?: string[];
+  i18n_base_addr?: number;
+  i18n_size?: number;
+  i18n_version?: number;
+  i18n_locale_total?: number;
+  i18n_message_total?: number;
 }
 
 export interface SdoImportReport {

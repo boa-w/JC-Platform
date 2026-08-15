@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createProjectWindow,
-  loadTextFile,
   loadJsonFile,
   loadProject,
+  loadTextFile,
   migrateProjectDocument,
   openProjectWindow,
   parseProjectDocument,
@@ -19,8 +19,8 @@ import {
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { type DocumentSectionKey, refactorOnlySections } from '../../modules/documentSections';
 import type { LoadedProject, ProjectParseReport } from '../../types/platform';
-import { cloneJson } from '../../utils/projectDirty';
 import { formatJsonText } from '../../utils/jsonFormat';
+import { cloneJson } from '../../utils/projectDirty';
 import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import { runSystemDialog } from '../../utils/systemDialog';
 
@@ -198,7 +198,8 @@ export function useProjectLifecycleController({
   }
 
   async function findRefactorConfig(project: LoadedProject, projectFilePath: string) {
-    if (!projectFilePath.toLowerCase().endsWith('.jcpro')) {
+    const document = project.document as Record<string, unknown>;
+    if (!projectFilePath.toLowerCase().endsWith('.jcpro') || document.config_version === 'jc002') {
       return { project, path: null, status: null };
     }
     for (const candidatePath of candidateRefactorConfigPaths(projectFilePath)) {
@@ -298,11 +299,18 @@ export function useProjectLifecycleController({
         return;
       }
     }
-    if (!skipDiscardConfirmation && !(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))) return;
+    if (
+      !skipDiscardConfirmation &&
+      !(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))
+    )
+      return;
     const generation = beginOpenOperation();
     try {
       const nextProject = await loadProject(requestedPath);
-      const mounted = await findRefactorConfig(nextProject, nextProject.summary.path ?? requestedPath);
+      const mounted = await findRefactorConfig(
+        nextProject,
+        nextProject.summary.path ?? requestedPath,
+      );
       if (generation !== operationGenerationRef.current) return;
       setRefactorConfigPath(mounted.path);
       setRefactorConfigStatus(mounted.status);
@@ -327,7 +335,11 @@ export function useProjectLifecycleController({
 
   async function selectProjectFile() {
     setOpenError(null);
-    if (!loadedProject && !(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))) return;
+    if (
+      !loadedProject &&
+      !(await confirmDiscardUnsavedChanges(t('projectLifecycle.actions.openOther')))
+    )
+      return;
     if (!isTauriRuntime()) {
       setOpenError(t('projectLifecycle.status.desktopFilePickerOnly'));
       return;
@@ -354,7 +366,10 @@ export function useProjectLifecycleController({
       if (generation !== operationGenerationRef.current) return;
       setProjectParseReport(report);
       if (!report.valid)
-        setOpenError(report.errors.join(t('common.punctuation.semicolon')) || t('projectLifecycle.status.parseFailed'));
+        setOpenError(
+          report.errors.join(t('common.punctuation.semicolon')) ||
+            t('projectLifecycle.status.parseFailed'),
+        );
     } catch (cause) {
       if (generation === operationGenerationRef.current) {
         setOpenError(cause instanceof Error ? cause.message : String(cause));
@@ -397,14 +412,16 @@ export function useProjectLifecycleController({
     if (!loadedProject) return false;
     if (refactorConfigPath) {
       await saveJsonFile(refactorConfigPath, refactorConfigDocument(loadedProject.document));
-      setRefactorConfigStatus(t('projectLifecycle.status.refactorWritten', { path: refactorConfigPath }));
-      setSaveStatus(t('projectLifecycle.status.refactorWrittenProject', { path: refactorConfigPath }));
+      setRefactorConfigStatus(
+        t('projectLifecycle.status.refactorWritten', { path: refactorConfigPath }),
+      );
+      setSaveStatus(
+        t('projectLifecycle.status.refactorWrittenProject', { path: refactorConfigPath }),
+      );
       return true;
     }
     if (!isTauriRuntime()) {
-      setSaveStatus(
-        t('projectLifecycle.status.legacyRefactorSaveAs'),
-      );
+      setSaveStatus(t('projectLifecycle.status.legacyRefactorSaveAs'));
       return false;
     }
     const sourcePath = loadedProject.summary.path ?? loadedProject.summary.name ?? 'project';
