@@ -1,0 +1,93 @@
+{
+  "config_version": "jc001",
+  "project": {
+    "name": "Portable migration fixture"
+  },
+  "sdo_info": {
+    "type": 0,
+    "name": "Menu",
+    "children": [
+      {
+        "type": 1,
+        "name": "Menu speed",
+        "fid": 1536,
+        "mid": 8194,
+        "sid": 1,
+        "children": []
+      }
+    ]
+  },
+  "language_info": {
+    "list_code_language": ["zh", "en"],
+    "list_inner": ["Brake state", "Vehicle speed", "Menu speed", "Shared fault"],
+    "list_translate": {
+      "Vehicle speed": {
+        "zh": "车速",
+        "en": "Vehicle speed"
+      },
+      "Brake state": {
+        "zh": "制动状态",
+        "en": "Brake state"
+      },
+      "Menu speed": {
+        "zh": "菜单车速",
+        "en": "Menu speed"
+      },
+      "Shared fault": {
+        "zh": "共享故障",
+        "en": "Shared fault"
+      }
+    }
+  },
+  "fault_code_info": {
+    "schema_version": 1,
+    "version": 1,
+    "enabled": true,
+    "sources": [
+      {
+        "source_key": "traction",
+        "source_id": 1,
+        "type_char": "T",
+        "name": "Traction",
+        "can_id": 648,
+        "frame_type": 0,
+        "code_byte": 2,
+        "clear_code": 0,
+        "invalid_codes": [],
+        "enabled": true
+      },
+      {
+        "source_key": "pump",
+        "source_id": 2,
+        "type_char": "P",
+        "name": "Pump",
+        "can_id": 660,
+        "frame_type": 0,
+        "code_byte": 2,
+        "clear_code": 0,
+        "invalid_codes": [],
+        "enabled": true
+      }
+    ],
+    "codes": [
+      {
+        "source_key": "traction",
+        "source_id": 1,
+        "type_char": "T",
+        "code": 52,
+        "severity": "fault",
+        "message_key": "Shared fault",
+        "enabled": true
+      },
+      {
+        "source_key": "pump",
+        "source_id": 2,
+        "type_char": "P",
+        "code": 52,
+        "severity": "fault",
+        "message_key": "Shared fault",
+        "enabled": true
+      }
+    ]
+  }
+}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Check, X } from 'lucide-react';
 import type { LanguageDocument } from '../../types/platform';
 import { ConfirmDialog } from '../ConfirmDialog';
 import type { LanguageProgress } from './types';
@@ -103,18 +104,22 @@ export function LanguageSidebar({
     setEditLabel(getLabel(document, code));
   }
 
+  function cancelEditLang() {
+    setEditingLang(null);
+    setEditCode('');
+    setEditLabel('');
+  }
+
   function commitEditLang() {
     if (!editingLang) return;
     const newCode = editCode.trim().toLowerCase();
     const newLabel = editLabel.trim();
-    if (!newCode || !newLabel) {
-      setEditingLang(null);
-      return;
-    }
+    if (!newCode || !newLabel) return;
+    if (newCode !== editingLang && document.list_code_language.includes(newCode)) return;
     if (newCode !== editingLang || newLabel !== getLabel(document, editingLang)) {
       onUpdateLanguage(editingLang, newCode, newLabel);
     }
-    setEditingLang(null);
+    cancelEditLang();
   }
 
   const deleteTarget = confirmDelete ? getLabel(document, confirmDelete) : '';
@@ -190,6 +195,12 @@ export function LanguageSidebar({
           const isSelected = selectedLanguage === lang.code;
           const isZh = lang.code === 'zh';
           const isEditing = editingLang === lang.code;
+          const normalizedEditCode = editCode.trim().toLowerCase();
+          const editCodeExists =
+            isEditing &&
+            normalizedEditCode !== lang.code &&
+            document.list_code_language.includes(normalizedEditCode);
+          const canCommitEdit = Boolean(editCode.trim() && editLabel.trim()) && !editCodeExists;
           return (
             <div
               className={`lang-sidebar-item ${isSelected ? 'active' : ''} ${isZh ? 'lang-sidebar-item--zh' : ''}`}
@@ -206,7 +217,7 @@ export function LanguageSidebar({
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') commitEditLang();
-                        if (e.key === 'Escape') setEditingLang(null);
+                        if (e.key === 'Escape') cancelEditLang();
                       }}
                       disabled={isZh}
                     />
@@ -218,9 +229,8 @@ export function LanguageSidebar({
                       onClick={(e) => e.stopPropagation()}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') commitEditLang();
-                        if (e.key === 'Escape') setEditingLang(null);
+                        if (e.key === 'Escape') cancelEditLang();
                       }}
-                      onBlur={commitEditLang}
                     />
                   </div>
                   <div className="lang-sidebar-progress">
@@ -230,6 +240,29 @@ export function LanguageSidebar({
                     <span className="lang-sidebar-progress-text">
                       {lang.translated}/{lang.total}
                     </span>
+                  </div>
+                  <div className="lang-sidebar-edit-actions">
+                    <button
+                      aria-label={t('language.sidebar.saveEdit')}
+                      className="lang-sidebar-edit-action lang-sidebar-edit-action--save"
+                      disabled={!canCommitEdit}
+                      onClick={commitEditLang}
+                      title={t('language.sidebar.saveEdit')}
+                      type="button"
+                    >
+                      <Check aria-hidden="true" size={13} />
+                      <span>{t('common.actions.save')}</span>
+                    </button>
+                    <button
+                      aria-label={t('language.sidebar.cancelEdit')}
+                      className="lang-sidebar-edit-action lang-sidebar-edit-action--cancel"
+                      onClick={cancelEditLang}
+                      title={t('language.sidebar.cancelEdit')}
+                      type="button"
+                    >
+                      <X aria-hidden="true" size={13} />
+                      <span>{t('common.actions.cancel')}</span>
+                    </button>
                   </div>
                 </div>
               ) : (

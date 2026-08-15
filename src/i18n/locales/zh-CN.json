@@ -462,6 +462,8 @@
       "editName": "编辑语言名称 {{code}}",
       "editLanguage": "编辑语言 {{language}}",
       "editLanguageTitle": "编辑语言",
+      "saveEdit": "保存语言修改",
+      "cancelEdit": "取消语言编辑",
       "deleteLanguage": "删除语言 {{language}}",
       "deleteLanguageTitle": "删除语言",
       "languageCount": "{{count}} 种语言",

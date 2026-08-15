@@ -3853,7 +3853,7 @@ mod tests {
         let item_table_addr = read_u32(base + 28) as usize;
 
         assert_eq!(read_u16(base), 2);
-        assert_eq!(read_u16(base + 2), 1);
+        assert_eq!(read_u16(base + 2), 2);
         assert_eq!(read_u16(base + 4), 4);
         assert_eq!(read_u16(base + 6), 1);
         assert_eq!(read_u16(base + 8), 1);
@@ -3861,7 +3861,7 @@ mod tests {
         assert_eq!(read_u16(base + 12), 200);
         assert_eq!(read_u16(base + 14), 12);
         assert_eq!(read_u16(base + 16), 32);
-        assert_eq!(read_u16(base + 18), 40);
+        assert_eq!(read_u16(base + 18), 52);
         assert_eq!(frame_table_addr, base + 40);
         assert_eq!(signal_table_addr, frame_table_addr + 12);
         assert_eq!(item_table_addr, signal_table_addr + 32);
@@ -3869,7 +3869,7 @@ mod tests {
         assert_eq!(read_u16(frame_table_addr + 6), 200);
         assert_eq!(read_u16(signal_table_addr), 0);
         assert_eq!(read_u16(item_table_addr), 0);
-        assert!(report.bytes.len() >= item_table_addr + 40);
+        assert!(report.bytes.len() >= item_table_addr + 52);
         assert!(
             report.data_description.sdo_base_addr
                 > report.data_description.battery_monitor_base_addr
@@ -3891,8 +3891,8 @@ mod tests {
             "unexpected export errors: {:?}",
             report.errors
         );
-        assert_eq!(report.data_description.global_param_total, 0);
-        assert_eq!(report.data_description.pdo_recv_total, 0);
+        assert_eq!(report.data_description.global_param_total, 1);
+        assert_eq!(report.data_description.pdo_recv_total, 1);
         assert_eq!(report.data_description.battery_monitor_base_addr, -1);
         assert_eq!(report.data_description.battery_monitor_item_total, 0);
     }

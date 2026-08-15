@@ -202,6 +202,27 @@ test('keeps protocol field explanations and long language keys readable', async 
   expect(comparisonLayout.keyHeight).toBeGreaterThan(24);
 });
 
+test('can cancel language column editing without committing on blur', async ({ page }) => {
+  await openRichProject(page);
+  await page.getByRole('button', { name: '多国语言', exact: true }).click();
+
+  const englishLanguage = page.locator('.lang-sidebar-item').filter({ hasText: '英文' });
+  await englishLanguage.hover();
+  await englishLanguage.getByRole('button', { name: '编辑语言 英文', exact: true }).click();
+
+  const labelInput = page.getByRole('textbox', { name: '编辑语言名称 en', exact: true });
+  await expect(labelInput).toHaveValue('英文');
+  await expect(page.getByRole('button', { name: '保存语言修改', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '取消语言编辑', exact: true })).toBeVisible();
+
+  await labelInput.fill('临时语言名称');
+  await page.getByRole('button', { name: '取消语言编辑', exact: true }).click();
+
+  await expect(labelInput).toBeHidden();
+  await expect(englishLanguage).toContainText('英文');
+  await expect(englishLanguage).not.toContainText('临时语言名称');
+});
+
 test('opens the battery workspace with an explicit jc002 contract', async ({ page }) => {
   await openV2FaultProject(page);
 
