@@ -26,6 +26,7 @@ import type { JsonPath } from '../../utils/projectDirty';
 import { runSystemDialog } from '../../utils/systemDialog';
 import { defaultBatteryMonitor } from '../project-document/projectDocumentDefaults';
 import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
+import { validateBatteryMonitor, type BatteryValidationReport } from './batteryMonitorValidation';
 
 interface UseBatteryMonitorControllerOptions {
   document: unknown | null;
@@ -39,7 +40,8 @@ interface UseBatteryMonitorControllerOptions {
 const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
 function cloneDefaultBatteryMonitor(): BatteryMonitorProtocol {
-  return JSON.parse(JSON.stringify(defaultBatteryMonitor)) as BatteryMonitorProtocol;
+  const fallback = JSON.parse(JSON.stringify(defaultBatteryMonitor)) as BatteryMonitorProtocol;
+  return fallback;
 }
 
 function defaultLanguageDocument(): LanguageDocument {
@@ -54,6 +56,7 @@ function ensureLanguageEntry(
   language: LanguageDocument,
   key: string,
   zhText = '',
+  locale = 'zh',
 ): LanguageDocument {
   if (!key.trim()) return language;
   const listInner = language.list_inner.includes(key)
@@ -63,7 +66,7 @@ function ensureLanguageEntry(
   const values = Object.fromEntries(
     language.list_code_language.map((code) => [
       code,
-      existing[code] ?? (code === 'zh' ? zhText : ''),
+      existing[code] ?? (code === locale ? zhText : ''),
     ]),
   );
   return {
@@ -120,7 +123,17 @@ export function useBatteryMonitorController({
   const [isExportingBatteryDbc, setIsExportingBatteryDbc] = useState(false);
   const [isImportingBatteryDbc, setIsImportingBatteryDbc] = useState(false);
   const documentGuard = useOperationGuard(document);
+  const source = (document as Record<string, unknown> | null) ?? {};
+  const isBatteryMonitorSupported = source.config_version === 'jc002';
+  const hasBatteryMonitor =
+    typeof source.battery_monitor === 'object' && source.battery_monitor !== null;
   const currentBatteryMonitorDocument = batteryMonitorDocument();
+  const batteryValidation: BatteryValidationReport = validateBatteryMonitor(
+    currentBatteryMonitorDocument,
+    {
+      localization: source.localization as LocalizationDocument | undefined,
+    },
+  );
 
   // Project-path changes define a new editing session for transient import/export state.
   // biome-ignore lint/correctness/useExhaustiveDependencies: projectPath intentionally triggers this reset boundary.
@@ -154,43 +167,60 @@ export function useBatteryMonitorController({
     return normalizeBatteryMonitor(source.battery_monitor);
   }
 
+  function initializeBatteryMonitor() {
+    if (isBatteryMonitorSupported) updateBatteryMonitorDocument(cloneDefaultBatteryMonitor());
+  }
+
   function languageDocument(): LanguageDocument {
     if (!loadedProject) return defaultLanguageDocument();
     const source = loadedProject.document as Record<string, unknown>;
-    if (source.config_version === 'jc002' && source.localization) {
+    if (source.localization) {
       return localizationToLanguageDocument(source.localization as LocalizationDocument);
     }
-    const language = source.language_info as LanguageDocument | undefined;
-    return language ?? defaultLanguageDocument();
+    return defaultLanguageDocument();
   }
 
   function batteryLanguageFor(next: BatteryMonitorProtocol) {
     let language = languageDocument();
+    const source = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
+    const localization = source.localization as LocalizationDocument | undefined;
+    const defaultLocale = localization?.default_locale ?? language.list_code_language[0] ?? 'zh';
+    for (const signal of next.signals) {
+      const key = signal.name?.trim();
+      if (!key) continue;
+      language = ensureLanguageEntry(language, key, key, defaultLocale);
+    }
     for (const item of next.items) {
       const key = item.name_key?.trim();
-      if (!key) continue;
-      language = ensureLanguageEntry(language, key, item.fallback_name || item.item_key);
+      if (key) language = ensureLanguageEntry(language, key, key, defaultLocale);
+      for (const textKey of [
+        item.fallback_name,
+        item.unit,
+        item.formatter?.true_text,
+        item.formatter?.false_text,
+        item.validity?.empty_text,
+      ]) {
+        const normalizedKey = textKey?.trim();
+        if (normalizedKey) language = ensureLanguageEntry(language, normalizedKey, normalizedKey, defaultLocale);
+      }
     }
     return language;
   }
 
   function updateBatteryMonitorDocument(next: BatteryMonitorProtocol) {
-    const normalized = normalizeBatteryMonitor(next);
     const source = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
+    if (!isBatteryMonitorSupported || !source.localization) return;
+    const normalized = normalizeBatteryMonitor(next);
     const previousLanguage = languageDocument();
     const nextLanguage = batteryLanguageFor(normalized);
     const sections: Record<string, unknown> = {
       battery_monitor: normalized,
-    };
-    if (source.config_version === 'jc002' && source.localization) {
-      sections.localization = updateLocalizationFromLanguageDocument(
+      localization: updateLocalizationFromLanguageDocument(
         source.localization as LocalizationDocument,
         previousLanguage,
         nextLanguage,
-      );
-    } else {
-      sections.language_info = nextLanguage;
-    }
+      ),
+    };
     updateProjectSections(sections);
   }
 
@@ -204,11 +234,31 @@ export function useBatteryMonitorController({
     value: string | number,
   ) {
     const document = batteryMonitorDocument();
+    const previousFrame = document.frames[index];
+    const previousFrameKey = previousFrame?.frame_key;
+    const frameKeyChanged =
+      field === 'frame_key' && Boolean(previousFrameKey) && previousFrameKey !== String(value);
+    const nextFrameKey = String(value);
     updateBatteryMonitorDocument({
       ...document,
       frames: document.frames.map((frame, currentIndex) =>
         currentIndex === index ? { ...frame, [field]: value } : frame,
       ),
+      signals: frameKeyChanged
+        ? document.signals.map((signal) =>
+            signal.frame_key === previousFrameKey ? { ...signal, frame_key: nextFrameKey } : signal,
+          )
+        : document.signals,
+      items: frameKeyChanged
+        ? document.items.map((item) =>
+            item.validity.frame_key === previousFrameKey
+              ? {
+                  ...item,
+                  validity: { ...item.validity, frame_key: nextFrameKey },
+                }
+              : item,
+          )
+        : document.items,
     });
   }
 
@@ -260,11 +310,20 @@ export function useBatteryMonitorController({
     value: string | number,
   ) {
     const document = batteryMonitorDocument();
+    const previousSignal = document.signals[index];
+    const previousSignalKey = previousSignal?.signal_key;
+    const signalKeyChanged =
+      field === 'signal_key' && Boolean(previousSignalKey) && previousSignalKey !== String(value);
     updateBatteryMonitorDocument({
       ...document,
       signals: document.signals.map((signal, currentIndex) =>
         currentIndex === index ? { ...signal, [field]: value } : signal,
       ),
+      items: signalKeyChanged
+        ? document.items.map((item) =>
+            item.signal_key === previousSignalKey ? { ...item, signal_key: String(value) } : item,
+          )
+        : document.items,
     });
   }
 
@@ -278,8 +337,7 @@ export function useBatteryMonitorController({
         ...document.signals,
         {
           signal_key: `battery_signal_${index + 1}`,
-          param_id: `BATTERY_MONITOR_CUSTOM_${index + 1}`,
-          name: '新锂电监控信号',
+          name: `battery_monitor.signal_${index + 1}.name`,
           inner: -1,
           frame_key: frameKey,
           pos: 0,
@@ -346,7 +404,7 @@ export function useBatteryMonitorController({
     });
   }
 
-  function updateBatteryItemLanguage(index: number, text: string) {
+  function updateBatteryItemLanguage(index: number, text: string, locale = 'zh') {
     const item = batteryMonitorDocument().items[index];
     if (!item?.name_key?.trim()) return;
     const language = languageDocument();
@@ -357,25 +415,23 @@ export function useBatteryMonitorController({
         ...language,
         list_translate: {
           ...language.list_translate,
-          [item.name_key]: { ...existing, zh: text },
+          [item.name_key]: { ...existing, [locale]: text },
         },
       },
       item.name_key,
       text || item.fallback_name || item.item_key,
+      locale,
     );
     const source = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
-    if (source.config_version === 'jc002' && source.localization) {
-      updateProjectDocument(
-        'localization',
-        updateLocalizationFromLanguageDocument(
-          source.localization as LocalizationDocument,
-          language,
-          nextLanguage,
-        ),
-      );
-    } else {
-      updateProjectDocument('language_info', nextLanguage);
-    }
+    if (!isBatteryMonitorSupported || !source.localization) return;
+    updateProjectDocument(
+      'localization',
+      updateLocalizationFromLanguageDocument(
+        source.localization as LocalizationDocument,
+        language,
+        nextLanguage,
+      ),
+    );
   }
 
   function addBatteryItem() {
@@ -393,7 +449,7 @@ export function useBatteryMonitorController({
           order: index,
           signal_key: signal?.signal_key ?? '',
           name_key: nameKey,
-          fallback_name: '新锂电监控显示项',
+          fallback_name: `${nameKey}.fallback`,
           unit: '',
           formatter: {
             kind: 'linear',
@@ -408,7 +464,7 @@ export function useBatteryMonitorController({
           validity: {
             mode: 'frame_timeout',
             frame_key: signal?.frame_key ?? '',
-            empty_text: ' ',
+            empty_text: '',
           },
         },
       ],
@@ -417,10 +473,37 @@ export function useBatteryMonitorController({
 
   function removeBatteryItem(index: number) {
     const document = batteryMonitorDocument();
+    const ordered = document.items
+      .map((item, currentIndex) => ({ item, currentIndex }))
+      .sort(
+        (left, right) =>
+          left.item.order - right.item.order || left.currentIndex - right.currentIndex,
+      )
+      .filter(({ currentIndex }) => currentIndex !== index)
+      .map(({ item }, order) => ({ ...item, order }));
     updateBatteryMonitorDocument({
       ...document,
-      items: document.items.filter((_, currentIndex) => currentIndex !== index),
+      items: ordered,
     });
+  }
+
+  function moveBatteryItem(fromIndex: number, toIndex: number): number | null {
+    const document = batteryMonitorDocument();
+    const ordered = document.items
+      .map((item, index) => ({ item, index }))
+      .sort((left, right) => left.item.order - right.item.order || left.index - right.index);
+    const fromPosition = ordered.findIndex((entry) => entry.index === fromIndex);
+    const toPosition = ordered.findIndex((entry) => entry.index === toIndex);
+    if (fromPosition < 0 || toPosition < 0 || fromPosition === toPosition) {
+      return null;
+    }
+    const [moved] = ordered.splice(fromPosition, 1);
+    ordered.splice(toPosition, 0, moved);
+    updateBatteryMonitorDocument({
+      ...document,
+      items: ordered.map(({ item }, index) => ({ ...item, order: index })),
+    });
+    return toPosition;
   }
 
   async function handleExportBatteryMonitor() {
@@ -476,8 +559,18 @@ export function useBatteryMonitorController({
     if (typeof selected !== 'string' || !documentGuard.isCurrent(operation)) return;
     setIsImportingBatteryMonitor(true);
     try {
-      const imported = normalizeImportedBatteryMonitor(await loadJsonFile(selected));
+      const raw = await loadJsonFile(selected);
       if (!documentGuard.isCurrent(operation)) return;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        setBatteryMonitorImportStatus(t('batteryMonitor.status.invalidProtocol'));
+        return;
+      }
+      const rawProtocol = raw as Record<string, unknown>;
+      if (rawProtocol.schema_version !== 2 || rawProtocol.version !== 2) {
+        setBatteryMonitorImportStatus(t('batteryMonitor.status.versionMismatch'));
+        return;
+      }
+      const imported = normalizeImportedBatteryMonitor(raw);
       if (!imported) {
         setBatteryMonitorImportStatus(t('batteryMonitor.status.invalidProtocol'));
         return;
@@ -815,6 +908,9 @@ export function useBatteryMonitorController({
 
   return {
     currentBatteryMonitorDocument,
+    batteryValidation,
+    isBatteryMonitorSupported,
+    hasBatteryMonitor,
     batteryMonitorExportStatus,
     batteryMonitorImportStatus,
     batteryCsvStatus,
@@ -837,6 +933,7 @@ export function useBatteryMonitorController({
     handleImportBatteryDbc,
     updateBatteryMonitorDocument,
     updateBatteryMonitorField,
+    initializeBatteryMonitor,
     updateBatteryFrame,
     updateBatteryFrameId,
     addBatteryFrame,
@@ -850,6 +947,7 @@ export function useBatteryMonitorController({
     updateBatteryItemLanguage,
     addBatteryItem,
     removeBatteryItem,
+    moveBatteryItem,
     formatFrameId,
     isModifiedPath,
     restoreModifiedPath,

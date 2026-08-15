@@ -21,6 +21,7 @@ use crate::domain::pdo::{
 use crate::domain::project::ProjectExportSettings;
 use crate::domain::protocol::battery_monitor::{
     BatteryByteOrder, BatteryMonitorProtocol, BatteryRawType, BatteryValueType,
+    BATTERY_MONITOR_BINARY_VERSION, BATTERY_MONITOR_SCHEMA_VERSION,
 };
 use crate::domain::ui_resource::{parse_ui_info, ResourceOption, UiResource, UiResourceHandle};
 use crate::infrastructure::file_system::{copy_file, ensure_dir};
@@ -735,7 +736,17 @@ fn build_config_update_manifest(
         }
     }
     manifest.insert("data_description".to_string(), manifest_data_description);
-    if export_settings.battery_monitor.config {
+    // jc002 keeps the editable battery protocol in the .jcpro project, but
+    // ships its runtime representation exclusively in the binary section.
+    // The manifest only exposes the address/count/version index above so the
+    // device cannot accidentally parse a second, stale copy from JSON.
+    if request
+        .document
+        .get("config_version")
+        .and_then(Value::as_str)
+        != Some("jc002")
+        && export_settings.battery_monitor.config
+    {
         if let Some(battery_monitor) = request.document.get("battery_monitor") {
             manifest.insert("battery_monitor".to_string(), battery_monitor.clone());
         }
@@ -1257,9 +1268,6 @@ fn collect_language_entries(
     if let Some(sdo_info) = document.get("sdo_info") {
         collect_sdo_names(sdo_info, &mut entries);
     }
-    if export_settings.battery_monitor.bin {
-        collect_battery_monitor_language_entries(document, &mut entries);
-    }
     if export_settings.fault_code_info.bin {
         collect_fault_code_language_entries(document, &mut entries);
     }
@@ -1274,30 +1282,6 @@ fn collect_sdo_names(value: &Value, entries: &mut Vec<String>) {
     if let Some(children) = value.get("children").and_then(Value::as_array) {
         for child in children {
             collect_sdo_names(child, entries);
-        }
-    }
-}
-
-fn collect_battery_monitor_language_entries(document: &Value, entries: &mut Vec<String>) {
-    let Some(root) = document.get("battery_monitor") else {
-        return;
-    };
-    let Some(items) = root.get("items").and_then(Value::as_array) else {
-        return;
-    };
-    for item in items
-        .iter()
-        .filter(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true))
-    {
-        push_unique(entries, &object_string(item, "name_key"));
-        push_unique(entries, &object_string(item, "fallback_name"));
-        push_unique(entries, &object_string(item, "unit"));
-        if let Some(formatter) = item.get("formatter") {
-            push_unique(entries, &object_string(formatter, "true_text"));
-            push_unique(entries, &object_string(formatter, "false_text"));
-        }
-        if let Some(validity) = item.get("validity") {
-            push_unique(entries, &object_string(validity, "empty_text"));
         }
     }
 }
@@ -1352,7 +1336,28 @@ fn build_battery_monitor_bytes(
     errors: &mut Vec<String>,
 ) -> Option<(Vec<u8>, usize, usize, usize)> {
     let root = document.get("battery_monitor")?;
-    let protocol: BatteryMonitorProtocol = serde_json::from_value(root.clone()).ok()?;
+    if !text_catalog.is_dynamic() {
+        errors.push("锂电监控仅支持 jc002 Battery V2".to_string());
+        return None;
+    }
+    let protocol: BatteryMonitorProtocol = match serde_json::from_value(root.clone()) {
+        Ok(protocol) => protocol,
+        Err(error) => {
+            errors.push(format!("battery_monitor 配置无法解析：{error}"));
+            return None;
+        }
+    };
+    if protocol.schema_version != BATTERY_MONITOR_SCHEMA_VERSION
+        || protocol.version != BATTERY_MONITOR_BINARY_VERSION
+    {
+        errors.push(format!(
+            "battery_monitor 必须使用 schema_version={} 且 version={}，当前为 schema_version={}、version={}",
+            BATTERY_MONITOR_SCHEMA_VERSION,
+            BATTERY_MONITOR_BINARY_VERSION,
+            protocol.schema_version, protocol.version
+        ));
+        return None;
+    }
     if !protocol.enabled {
         return None;
     }
@@ -2886,9 +2891,9 @@ mod tests {
 
     fn battery_monitor_fixture() -> Value {
         json!({
-            "schema_version": 1,
+            "schema_version": 2,
             "enabled": true,
-            "version": 1,
+            "version": 2,
             "default_timeout_ticks": 200,
             "page_size": 4,
             "frames": [{
@@ -2901,8 +2906,7 @@ mod tests {
             }],
             "signals": [{
                 "signal_key": "test_signal",
-                "param_id": "TEST_SIGNAL",
-                "name": "测试信号",
+                "name": "battery_monitor.test_signal",
                 "inner": -1,
                 "frame_key": "test_frame",
                 "pos": 0,
@@ -2924,7 +2928,7 @@ mod tests {
                 "order": 0,
                 "signal_key": "test_signal",
                 "name_key": "battery_monitor.test_item",
-                "fallback_name": "测试显示项",
+                "fallback_name": "battery_monitor.test_item.fallback",
                 "unit": "",
                 "formatter": {
                     "kind": "linear",
@@ -2939,7 +2943,7 @@ mod tests {
                 "validity": {
                     "mode": "frame_timeout",
                     "frame_key": "test_frame",
-                    "empty_text": " "
+                    "empty_text": "battery_monitor.empty"
                 }
             }]
         })
@@ -2953,42 +2957,46 @@ mod tests {
         })
     }
 
-    fn disabled_battery_monitor() -> Value {
-        json!({ "enabled": false })
-    }
-
     fn enabled_battery_monitor_document() -> Value {
-        jc001(json!({
-            "device": { "resolution_w": 800, "resolution_h": 480 },
-            "ui_info": { "main": { "item": {} } },
-            "language_info": language_info_without_selected_languages(),
-            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
-            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
-            "pdo_global_param": [{
-                "param_id": "TEST",
-                "name": "test",
-                "def": "0",
-                "reserved": 0,
-                "type": 0,
-                "inner": -1
-            }],
-            "pdo_condition": [],
-            "pdo_recv": [{
-                "id": 0x111,
-                "type": 0,
-                "desc": "test",
-                "data": [{
-                    "pos": 0,
-                    "len": 8,
-                    "show_type": 0,
-                    "handle": 0,
-                    "handle_param": "",
-                    "param_id": "TEST"
-                }]
-            }],
-            "pdo_send": [],
-            "battery_monitor": battery_monitor_fixture()
-        }))
+        jc002(
+            json!({
+                "device": { "resolution_w": 800, "resolution_h": 480 },
+                "ui_info": { "main": { "item": {} } },
+                "sdo_info": { "type": 0, "user_auth": 0, "message_key": "menu.root", "children": [] },
+                "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+                "pdo_global_param": [{
+                    "param_id": "TEST",
+                    "name": "test",
+                    "def": "0",
+                    "reserved": 0,
+                    "type": 0,
+                    "inner": -1
+                }],
+                "pdo_condition": [],
+                "pdo_recv": [{
+                    "id": 0x111,
+                    "type": 0,
+                    "desc": "test",
+                    "data": [{
+                        "pos": 0,
+                        "len": 8,
+                        "show_type": 0,
+                        "handle": 0,
+                        "handle_param": "",
+                        "param_id": "TEST"
+                    }]
+                }],
+                "pdo_send": [],
+                "battery_monitor": battery_monitor_fixture()
+            }),
+            &[
+                "menu.root",
+                "battery_monitor.test_signal",
+                "battery_monitor.test_item",
+                "battery_monitor.test_item.fallback",
+                "battery_monitor.empty",
+            ],
+        )
     }
 
     fn build_battery_monitor_manifest(config: bool, bin: bool) -> (BinaryBuildReport, Value) {
@@ -3107,7 +3115,6 @@ mod tests {
             "pdo_recv": [],
             "pdo_send": [],
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
-            "battery_monitor": disabled_battery_monitor(),
             "fault_code_info": {
                 "enabled": true,
                 "version": 3,
@@ -3228,7 +3235,6 @@ mod tests {
                 "pdo_recv": [],
                 "pdo_send": [],
                 "sdo_info": { "type": 0, "user_auth": 0, "message_key": "menu.root", "children": [] },
-                "battery_monitor": { "enabled": false },
                 "fault_code_info": {
                     "schema_version": 2,
                     "enabled": true,
@@ -3286,7 +3292,6 @@ mod tests {
             "pdo_recv": [],
             "pdo_send": [],
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
-            "battery_monitor": disabled_battery_monitor(),
             "fault_code_info": {
                 "enabled": true,
                 "version": 1,
@@ -3356,7 +3361,6 @@ mod tests {
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": [],
             "language_info": language_info_without_selected_languages(),
-            "battery_monitor": disabled_battery_monitor(),
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
             "pdo_global_param": [],
             "pdo_condition": [],
@@ -3404,7 +3408,6 @@ mod tests {
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": [],
             "language_info": language_info_without_selected_languages(),
-            "battery_monitor": disabled_battery_monitor(),
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
             "pdo_global_param": [],
             "pdo_condition": [],
@@ -3447,7 +3450,6 @@ mod tests {
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": [],
             "language_info": language_info_without_selected_languages(),
-            "battery_monitor": disabled_battery_monitor(),
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
             "pdo_global_param": [],
             "pdo_condition": [],
@@ -3490,7 +3492,6 @@ mod tests {
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": [],
             "language_info": language_info_without_selected_languages(),
-            "battery_monitor": disabled_battery_monitor(),
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
             "pdo_global_param": [],
             "pdo_condition": [],
@@ -3617,7 +3618,6 @@ mod tests {
     #[test]
     fn jc002_sdo_uses_dynamic_message_index_and_rejects_missing_key() {
         let base = json!({
-            "battery_monitor": disabled_battery_monitor(),
             "pdo_global_param": [],
             "pdo_condition": [],
             "pdo_recv": [],
@@ -3706,7 +3706,6 @@ mod tests {
     fn build_project_binary_prefers_advanced_pdo_over_simple_pdo() {
         let document = jc001(json!({
             "language_info": language_info_without_selected_languages(),
-            "battery_monitor": disabled_battery_monitor(),
             "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
             "pdo_simple_send_recv": {
                 "pdo_recv": [{
@@ -3767,7 +3766,6 @@ mod tests {
             "language_info".to_string(),
             language_info_without_selected_languages(),
         );
-        object.insert("battery_monitor".to_string(), disabled_battery_monitor());
         object.insert(
             "sdo_info".to_string(),
             json!({ "type": 0, "user_auth": 0, "name": "菜单", "children": [] }),
@@ -3811,18 +3809,24 @@ mod tests {
 
     #[test]
     fn build_project_binary_packs_unified_battery_monitor_segment() {
-        let mut battery_monitor = battery_monitor_fixture();
-        battery_monitor["version"] = json!(2);
-        let document = jc001(json!({
-            "language_info": language_info_without_selected_languages(),
-            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
-            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
-            "pdo_global_param": [],
-            "pdo_condition": [],
-            "pdo_recv": [],
-            "pdo_send": [],
-            "battery_monitor": battery_monitor
-        }));
+        let document = jc002(
+            json!({
+                "sdo_info": { "type": 0, "user_auth": 0, "message_key": "menu.root", "children": [] },
+                "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
+                "pdo_global_param": [],
+                "pdo_condition": [],
+                "pdo_recv": [],
+                "pdo_send": [],
+                "battery_monitor": battery_monitor_fixture()
+            }),
+            &[
+                "menu.root",
+                "battery_monitor.test_signal",
+                "battery_monitor.test_item",
+                "battery_monitor.test_item.fallback",
+                "battery_monitor.empty",
+            ],
+        );
 
         let report = build_project_binary(&document);
 
@@ -3874,17 +3878,7 @@ mod tests {
 
     #[test]
     fn build_project_binary_can_skip_battery_monitor_bin() {
-        let battery_monitor = battery_monitor_fixture();
-        let mut document = jc001(json!({
-            "language_info": language_info_without_selected_languages(),
-            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
-            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
-            "pdo_global_param": [],
-            "pdo_condition": [],
-            "pdo_recv": [],
-            "pdo_send": [],
-            "battery_monitor": battery_monitor
-        }));
+        let mut document = enabled_battery_monitor_document();
         document["export_info"] = json!({
             "battery_monitor": { "config": true, "bin": false },
             "fault_code_info": { "config": true, "bin": true }
@@ -3912,7 +3906,7 @@ mod tests {
                 .and_then(Value::as_object)
                 .expect("manifest data_description");
 
-            assert_eq!(manifest.get("battery_monitor").is_some(), config);
+            assert!(manifest.get("battery_monitor").is_none());
             if config {
                 assert_eq!(
                     data_description
@@ -3968,10 +3962,63 @@ mod tests {
     }
 
     #[test]
+    fn jc002_manifest_keeps_battery_monitor_definition_in_binary_only() {
+        let mut document = enabled_battery_monitor_document();
+        document["export_info"] = json!({
+            "battery_monitor": { "config": true, "bin": true },
+            "fault_code_info": { "config": true, "bin": true }
+        });
+
+        let binary = build_project_binary(&document);
+        assert!(
+            binary.valid,
+            "unexpected export errors: {:?}",
+            binary.errors
+        );
+        let export_settings = project_export_settings(&document);
+        let data_description =
+            manifest_data_description(&binary.data_description, &export_settings);
+        let mut warnings = Vec::new();
+        let mut errors = Vec::new();
+        let manifest = build_config_update_manifest(
+            &ExportPlanRequest {
+                project_path: None,
+                output_dir: "out".to_string(),
+                document,
+                folder_name: None,
+                manifest_filename: None,
+                binary_filename: None,
+            },
+            &data_description,
+            &export_settings,
+            &mut warnings,
+            &mut errors,
+        );
+
+        assert!(errors.is_empty(), "unexpected manifest errors: {errors:?}");
+        assert!(manifest.get("battery_monitor").is_none());
+        assert_eq!(
+            manifest["data_description"]["battery_monitor_base_addr"],
+            json!(binary.data_description.battery_monitor_base_addr)
+        );
+        assert_eq!(
+            manifest["data_description"]["battery_monitor_item_total"],
+            json!(binary.data_description.battery_monitor_item_total)
+        );
+        assert_eq!(
+            manifest["data_description"]["battery_monitor_frame_total"],
+            json!(binary.data_description.battery_monitor_frame_total)
+        );
+        assert_eq!(
+            manifest["data_description"]["battery_monitor_version"],
+            json!(binary.data_description.battery_monitor_version)
+        );
+    }
+
+    #[test]
     fn build_project_binary_packs_sdo_parameter_and_reports_stable_crc() {
         let document = jc001(json!({
             "language_info": language_info_without_selected_languages(),
-            "battery_monitor": disabled_battery_monitor(),
             "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
             "pdo_global_param": [{
                 "param_id": "PARAM_A",

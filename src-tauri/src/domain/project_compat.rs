@@ -1,7 +1,7 @@
 //! Legacy 项目文件兼容策略。
 //!
 //! 该模块集中定义写回 `.jcpro` 时需要剥离的重构专属段，避免命令层和项目层各自维护
-//! 一份规则。锂电监控是正式项目协议段，不属于 refactor-only 数据。
+//! 一份规则。锂电监控只属于 jc002，不进入 jc001 保存结果。
 
 use chrono::Local;
 use serde_json::{Map, Value};
@@ -146,6 +146,7 @@ pub fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
                 for section in refactor_only_sections() {
                     object.remove(*section);
                 }
+                object.remove("battery_monitor");
             }
             set_legacy_config_version(&mut document);
             update_project_update_time(&mut document, &current_legacy_timestamp());
@@ -524,7 +525,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn sanitize_jcpro_removes_only_unified_sidecar_sections() {
+    fn sanitize_jcpro_removes_unified_sections_and_unsupported_battery_section() {
         let document = json!({
             "signal_dictionary": {},
             "private_protocol": {},
@@ -544,7 +545,7 @@ mod tests {
         assert!(sanitized.get("signal_dictionary").is_none());
         assert!(sanitized.get("private_protocol").is_none());
         assert!(sanitized.get("protocol_mapping").is_none());
-        assert!(sanitized.get("battery_monitor").is_some());
+        assert!(sanitized.get("battery_monitor").is_none());
         assert_eq!(
             sanitized
                 .get("export_info")

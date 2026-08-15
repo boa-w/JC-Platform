@@ -115,11 +115,10 @@ export function csvToFrames(text: string): { frames: BatteryMonitorFrame[]; erro
 
 export function signalsToCsv(signals: BatteryMonitorSignal[]): string {
   const header =
-    'signal_key,param_id,name,inner,frame_key,pos,len,byte_order,raw_offset,raw_type,value_type,parse_resolution,parse_offset,parse_mask,parse_shift,receiver,comment';
+    'signal_key,name,inner,frame_key,pos,len,byte_order,raw_offset,raw_type,value_type,parse_resolution,parse_offset,parse_mask,parse_shift,receiver,comment';
   const rows = signals.map((signal) =>
     [
       signal.signal_key,
-      signal.param_id,
       escapeCsvField(signal.name),
       String(signal.inner),
       signal.frame_key,
@@ -148,30 +147,32 @@ export function csvToSignals(text: string): { signals: BatteryMonitorSignal[]; e
   if (header?.[0] !== 'signal_key') {
     return { signals, errors: ['CSV 首列必须为 signal_key'] };
   }
+  if (header[1] === 'param_id') {
+    return { signals, errors: ['Battery V2 信号 CSV 不支持 param_id，请使用 signal_key,name 列'] };
+  }
   for (let index = 1; index < rows.length; index += 1) {
     const row = rows[index];
-    if (row.length < 17) {
+    if (row.length < 16) {
       errors.push(`第 ${index + 1} 行列数不足`);
       continue;
     }
     signals.push({
       signal_key: row[0],
-      param_id: row[1],
-      name: row[2] ?? '',
-      inner: integerValue(row[3], -1),
-      frame_key: row[4] ?? '',
-      pos: Math.max(0, integerValue(row[5], 0)),
-      len: Math.max(1, integerValue(row[6], 8)),
-      byte_order: (row[7] === 'big_endian' ? 'big_endian' : 'little_endian'),
-      raw_offset: Math.max(0, integerValue(row[8], 0)),
-      raw_type: (row[9] || 'u8') as BatteryMonitorSignal['raw_type'],
-      value_type: (row[10] || 'u8') as BatteryMonitorSignal['value_type'],
-      parse_resolution: numberValue(row[11], 1),
-      parse_offset: numberValue(row[12], 0),
-      parse_mask: parseUnsigned(row[13], 0xffffffff),
-      parse_shift: Math.max(0, integerValue(row[14], 0)),
-      receiver: row[15] ?? '',
-      comment: row[16] ?? '',
+      name: row[1] ?? '',
+      inner: integerValue(row[2], -1),
+      frame_key: row[3] ?? '',
+      pos: Math.max(0, integerValue(row[4], 0)),
+      len: Math.max(1, integerValue(row[5], 8)),
+      byte_order: (row[6] === 'big_endian' ? 'big_endian' : 'little_endian'),
+      raw_offset: Math.max(0, integerValue(row[7], 0)),
+      raw_type: (row[8] || 'u8') as BatteryMonitorSignal['raw_type'],
+      value_type: (row[9] || 'u8') as BatteryMonitorSignal['value_type'],
+      parse_resolution: numberValue(row[10], 1),
+      parse_offset: numberValue(row[11], 0),
+      parse_mask: parseUnsigned(row[12], 0xffffffff),
+      parse_shift: Math.max(0, integerValue(row[13], 0)),
+      receiver: row[14] ?? '',
+      comment: row[15] ?? '',
     });
   }
   return { signals, errors };
@@ -197,7 +198,7 @@ export function itemsToCsv(items: BatteryMonitorItem[]): string {
       String(item.formatter?.display_base ?? 10),
       item.validity?.mode ?? 'frame_timeout',
       item.validity?.frame_key ?? '',
-      escapeCsvField(item.validity?.empty_text ?? ' '),
+      escapeCsvField(item.validity?.empty_text ?? ''),
       item.validity?.timeout_ticks === undefined ? '' : String(item.validity.timeout_ticks),
     ].join(','),
   );
@@ -240,7 +241,7 @@ export function csvToItems(text: string): { items: BatteryMonitorItem[]; errors:
       validity: {
         mode: row[13] || 'frame_timeout',
         frame_key: row[14] ?? '',
-        empty_text: row[15] ?? ' ',
+        empty_text: row[15] ?? '',
         ...(timeout ? { timeout_ticks: Math.max(0, integerValue(timeout, 200)) } : {}),
       },
     });

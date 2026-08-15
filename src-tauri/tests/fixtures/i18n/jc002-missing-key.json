@@ -6,7 +6,6 @@
     "locale_order": ["en-US"],
     "locales": { "en-US": { "enabled": true, "translations": { "different.key": "Different" } } }
   },
-  "battery_monitor": { "enabled": false },
   "pdo_global_param": [
     { "param_id": "TEST", "name": "test", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
   ],

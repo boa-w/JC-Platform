@@ -19,7 +19,8 @@
       "save": "保存",
       "restore": "恢复",
       "refresh": "刷新",
-      "delete": "删除"
+      "delete": "删除",
+      "clear": "清空"
     },
     "lifecycle": {
       "experimental": "实验性",
@@ -645,7 +646,7 @@
     },
     "signalDictionary": {
       "title": "业务信号字典",
-      "description": "从旧版 SDO、PDO 和锂电配置派生业务 Signal，集中查看数据类型、单位、缩放和旧系统变量索引。",
+      "description": "从项目 SDO、PDO 和 Battery V2 配置派生业务 Signal，集中查看数据类型、单位、缩放和协议变量关联。",
       "refresh": "刷新字典",
       "addSignal": "新增 Signal",
       "signalCount": "Signal 总数",
@@ -1240,7 +1241,10 @@
       "status": "状态",
       "framesSignals": "帧 / 信号",
       "enabledItems": "启用显示项",
-      "configSection": "配置段"
+      "configSection": "配置段",
+      "translations": "语言来源",
+      "locales": "种语言",
+      "validation": "校验"
     },
     "fields": {
       "defaultTimeout": "默认超时 tick",
@@ -1259,6 +1263,8 @@
       "importItemsCsv": "导入显示项 CSV",
       "exportDbc": "导出 DBC",
       "importDbc": "导入 DBC",
+      "dataExchange": "数据交换",
+      "validate": "校验配置",
       "addFrame": "新增帧",
       "addSignal": "新增信号",
       "addItem": "新增显示项",
@@ -1268,10 +1274,30 @@
       "title": "CAN 帧（{{count}}）",
       "type": "类型",
       "description": "描述",
-      "timeout": "超时 tick"
+      "timeout": "超时 tick",
+      "detailKicker": "帧定义",
+      "collectionHint": "配置 CAN 接收帧和超时策略",
+      "search": "搜索帧 Key、CAN ID 或描述",
+      "canIdHint": "支持十进制或 0x 十六进制",
+      "signalCount": "{{count}} 个信号",
+      "viewSignals": "查看此帧信号",
+      "select": "请选择一个 CAN 帧",
+      "unnamed": "未命名帧",
+      "noMatch": "没有匹配的 CAN 帧"
     },
     "signals": {
-      "title": "信号解析规则（{{count}}）"
+      "title": "信号解析规则（{{count}}）",
+      "detailKicker": "信号解析",
+      "collectionHint": "按帧筛选并编辑原始解析规则",
+      "search": "搜索信号 Key 或名称",
+      "allFrames": "全部 CAN 帧",
+      "select": "请选择一个信号",
+      "unnamed": "未命名信号",
+      "noName": "未填写名称",
+      "noMatch": "没有匹配的信号",
+      "capacityHint": "当前帧容量 {{bits}} bit",
+      "receiver": "接收方",
+      "comment": "备注"
     },
     "items": {
       "title": "页面显示项（{{count}}）",
@@ -1285,7 +1311,98 @@
       "scale": "缩放分子 / 分母",
       "decimals": "小数",
       "validity": "有效帧 / 超时",
-      "frameTimeout": "帧超时"
+      "frameTimeout": "帧超时",
+      "detailKicker": "页面显示项",
+      "collectionHint": "拖动调整设备页面显示顺序",
+      "search": "搜索 Key、文案或信号",
+      "select": "请选择一个显示项",
+      "orderHint": "拖动列表项会自动重新编号",
+      "locale": "编辑语言",
+      "currentTranslation": "当前语言文案",
+      "translationPresent": "该语言已有翻译",
+      "translationMissing": "该语言缺少翻译",
+      "fallback": "fallback 文案",
+      "formatting": "格式化规则",
+      "displayBase": "显示进制",
+      "trueText": "真值文本",
+      "falseText": "假值文本",
+      "validityFrame": "有效帧",
+      "emptyText": "无效时显示",
+      "noUnit": "无单位",
+      "noMatch": "没有匹配的显示项",
+      "dragHint": "按住拖动以调整顺序"
+    },
+    "workspaces": {
+      "label": "锂电监控协议工作区",
+      "overview": "概览",
+      "frames": "CAN 帧",
+      "signals": "信号解析",
+      "items": "显示项",
+      "validation": "校验"
+    },
+    "workflow": {
+      "frames": "先定义设备发送的 CAN 帧",
+      "signals": "再定义帧内的位和数据解析",
+      "items": "最后配置页面展示和多语言",
+      "validation": "导出前检查所有引用关系"
+    },
+    "overview": {
+      "contractKicker": "版本契约",
+      "contractTitle": "运行时配置边界",
+      "schema": "协议 Schema",
+      "binary": "二进制版本",
+      "languageSource": "语言来源",
+      "configState": "配置状态",
+      "configured": "已配置",
+      "notConfigured": "尚未配置",
+      "runtimeKicker": "运行参数",
+      "runtimeTitle": "接收和页面参数",
+      "runtimeNote": "V2 项目固定使用 Battery Binary V2；版本字段由运行时契约校验。",
+      "workflowKicker": "配置流程",
+      "workflowTitle": "按依赖关系完成配置"
+    },
+    "setup": {
+      "title": "当前项目尚未配置 battery_monitor",
+      "message": "初始化后会创建严格的 Battery V2 空配置段，并继续使用 localization。",
+      "initialize": "初始化配置"
+    },
+    "validation": {
+      "kicker": "导出前检查",
+      "title": "配置校验",
+      "description": "校验结果直接对应运行时所需的帧、信号、显示项和 localization 引用。",
+      "valid": "配置通过",
+      "invalid": "配置存在问题",
+      "viewAll": "查看全部",
+      "noIssues": "当前没有发现问题",
+      "noErrors": "没有错误",
+      "noWarnings": "没有警告",
+      "errors": "错误",
+      "warnings": "警告",
+      "errorCount": "{{count}} 个错误",
+      "messages": {
+        "v2SchemaVersion": "V2 项目的 schema_version 必须为 2，当前为 {{actual}}。",
+        "v2BinaryVersion": "V2 项目的 battery 二进制 version 必须为 2，当前为 {{actual}}。",
+        "enabledWithoutData": "协议已启用，但帧、信号和显示项必须全部存在。",
+        "duplicateKey": "{{kind}} Key {{key}} 重复（{{count}} 条）。",
+        "duplicateCanId": "CAN ID {{key}} 重复（{{count}} 个帧）。",
+        "invalidCanId": "帧 {{key}} 的 CAN ID {{actual}} 超出当前帧类型范围。",
+        "invalidDlc": "帧 {{key}} 的 DLC {{actual}} 必须在 1 到 8 之间。",
+        "missingFrame": "{{key}} 引用了不存在的帧 {{frame}}。",
+        "invalidSignalRange": "信号 {{key}} 的结束位 {{end}} 超出帧 {{frame}} 的容量 {{capacity}} bit。",
+        "missingSignal": "显示项 {{key}} 引用了不存在的信号 {{signal}}。",
+        "missingSignalMessageKey": "信号 {{key}} 缺少多语言 message key。",
+        "missingMessageKey": "显示项 {{key}} 缺少 message_key。",
+        "missingLocalization": "显示项 {{key}} 的 message_key {{nameKey}} 不存在于 localization。",
+        "duplicateOrder": "启用显示项的顺序 {{order}} 重复（{{count}} 条）。",
+        "invalidScaleDen": "显示项 {{key}} 的缩放分母不能为 0。",
+        "missingFallback": "显示项 {{key}} 没有 fallback 文案。",
+        "invalidPageSize": "每页数量 {{actual}} 必须在 1 到 64 之间。"
+      }
+    },
+    "confirmDelete": {
+      "frame": "确定删除帧 {{key}}？关联信号和失效显示项也会被移除。",
+      "signal": "确定删除信号 {{key}}？关联显示项也会被移除。",
+      "item": "确定删除显示项 {{key}}？此操作保存后无法撤销。"
     },
     "frameTypes": {
       "standard": "标准帧",
@@ -1310,8 +1427,9 @@
     },
     "signalHeaders": {
       "signalKey": "信号标识",
-      "paramId": "参数标识",
+      "signalKeyHint": "稳定的信号定义键；显示项通过 items[].signal_key 引用它。修改后，上位机会同步更新关联显示项。",
       "name": "信号名称",
+      "nameHint": "信号的多语言文案 key；jc002 中应填写 localization 中存在的 key，而不是直接填写中文显示文本。",
       "frame": "所属 CAN 帧",
       "posLen": "起始位 / 位长度",
       "rawOffset": "原始字节偏移",
@@ -1325,8 +1443,11 @@
     },
     "formatters": {
       "linear": "线性",
+      "linearU8Wrap": "U8 线性",
       "boolText": "布尔文本",
       "hex": "十六进制",
+      "packedTime": "打包时间（0.1 小时）",
+      "packedTimeLegacyDischarge": "旧式放电时间（0.1 小时）",
       "datetime": "日期时间"
     },
     "kinds": {
@@ -1347,6 +1468,7 @@
       "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
       "exported": "已导出：{{path}}",
       "invalidProtocol": "无效的锂电监控协议配置文件，必须同时包含 frames、signals、items。",
+      "versionMismatch": "锂电监控配置必须使用 schema_version=2 且 version=2。",
       "importedProtocol": "已导入 {{frames}} 帧 / {{signals}} 信号 / {{items}} 显示项",
       "csvExported": "{{kind}} CSV 已导出：{{path}}",
       "csvImportError": "导入{{kind}} CSV 出错：{{errors}}",
@@ -1357,7 +1479,8 @@
       "noFramesToExport": "没有帧可导出。",
       "dbcExported": "DBC 已导出：{{path}}"
     },
-    "openProjectFirst": "请先在项目管理中打开 .jcpro 项目文件"
+    "openProjectFirst": "请先在项目管理中打开 .jcpro 项目文件",
+    "unsupportedProject": "锂电监控协议仅适用于 JCPro V2 项目。"
   },
   "uiCanvas": {
     "title": "UI 资源编辑",
@@ -1496,8 +1619,8 @@
       "item": "项目段",
       "writeConfig": "写入配置",
       "writeBin": "写入二进制",
-      "batteryDescription": "锂电监控协议",
-      "batteryConfigAria": "写入锂电监控配置",
+      "batteryDescription": "协议定义写入 data.bin，JSON 只保留索引元数据",
+      "batteryConfigAria": "写入锂电监控索引元数据",
       "configFile": "配置文件",
       "batteryBinAria": "写入锂电监控二进制",
       "binFile": "二进制文件",

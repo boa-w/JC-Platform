@@ -174,6 +174,21 @@ source.fault_code_info = {
 };
 delete source.fault_code_info.codes;
 
+if (source.battery_monitor !== undefined) {
+  if (
+    !source.battery_monitor ||
+    typeof source.battery_monitor !== 'object' ||
+    Array.isArray(source.battery_monitor)
+  ) {
+    throw new Error('battery_monitor must be an object when migrating to jc002');
+  }
+  if (source.battery_monitor.schema_version !== 2 || source.battery_monitor.version !== 2) {
+    throw new Error(
+      'battery_monitor must already use schema_version=2 and version=2',
+    );
+  }
+}
+
 source.config_version = 'jc002';
 source.project = { ...source.project, name: `${source.project?.name ?? 'project'}_jc002` };
 source.export_info = {

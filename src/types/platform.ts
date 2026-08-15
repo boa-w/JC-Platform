@@ -335,9 +335,9 @@ export interface ProtocolCompatibilityReport {
 }
 
 export interface BatteryMonitorProtocol {
-  schema_version: number;
+  schema_version: 2;
   enabled: boolean;
-  version: number;
+  version: 2;
   default_timeout_ticks: number;
   page_size: number;
   frames: BatteryMonitorFrame[];
@@ -417,7 +417,6 @@ export interface BatteryMonitorFrame {
 
 export interface BatteryMonitorSignal {
   signal_key: string;
-  param_id: string;
   name: string;
   inner: number;
   frame_key: string;

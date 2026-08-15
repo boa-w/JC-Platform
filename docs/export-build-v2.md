@@ -48,6 +48,24 @@ language_addr
 language_code
 ```
 
+### battery v2 的清单边界
+
+`.jcpro` 中的 `battery_monitor` 是上位机编辑模型，包含完整的帧、信号、显示项和
+格式化定义。导出时这些内容只写入 `data.bin` 的 battery v2 段。
+
+因此，jc002 的 `ConfigUpdate.json` 不包含顶层 `battery_monitor` 大对象，只在
+`data_description` 中提供以下运行时索引：
+
+| 字段 | 含义 |
+| --- | --- |
+| `battery_monitor_base_addr` | battery v2 header 在 data.bin 中的偏移 |
+| `battery_monitor_item_total` | 二进制显示项数量 |
+| `battery_monitor_frame_total` | 二进制帧数量 |
+| `battery_monitor_version` | battery 二进制 ABI 版本，当前为 `2` |
+
+设备运行时从该地址读取 header、帧表、信号表和显示项表；清单与二进制必须来自同一
+次构建，不能单独替换其中一个文件。
+
 ### v2 专属字段
 
 | 字段 | 含义 |

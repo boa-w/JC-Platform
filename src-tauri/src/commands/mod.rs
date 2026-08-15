@@ -1267,16 +1267,11 @@ pub fn import_dbc(path: String) -> Result<Value, String> {
                 .signal_comment(msg.id.clone(), &sig.name)
                 .unwrap_or("")
                 .to_string();
-            let name = if comment.is_empty() {
-                sig.name.clone()
-            } else {
-                comment.clone()
-            };
+            let message_key = format!("battery_monitor.signal.{frame_key}.{sig_name}");
 
             signals.push(json!({
                 "signal_key": sig_name,
-                "param_id": format!("BATTERY_DBC_{}", sig.name.to_uppercase()),
-                "name": name,
+                "name": message_key,
                 "inner": -1i64,
                 "frame_key": frame_key.clone(),
                 "pos": sig.start_bit as i64,

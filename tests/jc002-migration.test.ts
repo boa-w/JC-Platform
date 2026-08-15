@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -49,4 +49,39 @@ test('migrates the full Inmotion6 project without positional UI-key drift', asyn
   );
   assert.equal(pump52Definition.fault_key, 'fault.pump.052');
   assert.equal(pump52Definition.message_key, 'fault.traction.052');
+});
+
+test('rejects an embedded battery protocol with a non-v2 contract', async () => {
+  const outputRoot = await mkdtemp(path.join(os.tmpdir(), 'jc002-battery-migration-'));
+  const sourcePath = path.join(outputRoot, 'source.jcpro');
+  const projectOutput = path.join(outputRoot, 'project.jcpro');
+  const keysOutput = path.join(outputRoot, 'CommonLocalizationKeys.c');
+  const source = JSON.parse(
+    await readFile(
+      path.join(businessRoot, 'liugong_70T_Inmotion6.generated.jcpro'),
+      'utf8',
+    ),
+  );
+  source.battery_monitor = {
+    schema_version: 1,
+    enabled: false,
+    version: 1,
+    default_timeout_ticks: 200,
+    page_size: 4,
+    frames: [],
+    signals: [],
+    items: [],
+  };
+  await writeFile(sourcePath, `${JSON.stringify(source, null, 2)}\n`, 'utf8');
+
+  await assert.rejects(
+    exec(process.execPath, [
+      'scripts/migrate-jc001-i18n-v2.mjs',
+      sourcePath,
+      projectOutput,
+      path.join(firmwareRoot, 'jclib_ui.h'),
+      keysOutput,
+    ]),
+    /must already use schema_version=2 and version=2/,
+  );
 });

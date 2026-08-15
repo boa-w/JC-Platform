@@ -6,8 +6,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const BATTERY_MONITOR_SCHEMA_VERSION: u16 = 1;
-pub const BATTERY_MONITOR_BINARY_VERSION: u16 = 1;
+pub const BATTERY_MONITOR_SCHEMA_VERSION: u16 = 2;
+pub const BATTERY_MONITOR_BINARY_VERSION: u16 = 2;
 pub const BATTERY_MONITOR_DEFAULT_TIMEOUT_TICKS: u16 = 200;
 pub const BATTERY_MONITOR_PAGE_SIZE: u16 = 4;
 pub const BATTERY_PARSE_NO_MASK: u32 = u32::MAX;
@@ -64,7 +64,6 @@ pub struct BatteryMonitorFrame {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct BatteryMonitorSignal {
     pub signal_key: String,
-    pub param_id: String,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -196,10 +195,15 @@ pub struct BatteryMonitorValidity {
 }
 
 pub fn parse_battery_monitor_protocol(document: &Value) -> BatteryMonitorProtocol {
-    document
-        .get("battery_monitor")
-        .and_then(|value| serde_json::from_value(value.clone()).ok())
-        .unwrap_or_default()
+    let Some(value) = document.get("battery_monitor") else {
+        return BatteryMonitorProtocol::default();
+    };
+    let is_v2 = value.get("schema_version").and_then(Value::as_u64) == Some(2)
+        && value.get("version").and_then(Value::as_u64) == Some(2);
+    if !is_v2 {
+        return BatteryMonitorProtocol::default();
+    }
+    serde_json::from_value(value.clone()).unwrap_or_default()
 }
 
 /// Returns the empty protocol scaffold used for new and incomplete projects.
@@ -264,12 +268,13 @@ fn default_validity_mode() -> String {
 }
 
 fn default_empty_text() -> String {
-    " ".to_string()
+    String::new()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn default_protocol_is_disabled_and_empty() {
@@ -296,5 +301,22 @@ mod tests {
                 .unwrap();
 
         assert_eq!(protocol, expected);
+    }
+
+    #[test]
+    fn parsing_a_non_v2_protocol_returns_the_empty_v2_scaffold() {
+        let protocol = parse_battery_monitor_protocol(&json!({
+            "battery_monitor": {
+                "schema_version": 1,
+                "enabled": true,
+                "version": 1,
+                "signals": [{ "signal_key": "legacy_signal", "name": "旧信号" }]
+            }
+        }));
+
+        assert!(!protocol.enabled);
+        assert_eq!(protocol.schema_version, BATTERY_MONITOR_SCHEMA_VERSION);
+        assert_eq!(protocol.version, BATTERY_MONITOR_BINARY_VERSION);
+        assert!(protocol.signals.is_empty());
     }
 }

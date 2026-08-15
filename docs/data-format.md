@@ -35,7 +35,6 @@
 | `pdo_send` | array | 高级 PDO 发送帧 | 二进制 PDO 发送段 |
 | `sdo_info` | object | SDO 菜单树和参数 | 二进制 SDO 段 |
 | `language_info` | object | 语言代码、内部键和翻译值 | 二进制语言块、表格交换 |
-| `battery_monitor` | object | 锂电监控正式协议段 | 可选二进制扩展段和清单描述 |
 | `fault_code_info` | object | 故障来源和故障码 | 可选二进制扩展段和清单描述 |
 | `signal_dictionary` | object | 统一业务信号字典 | 编辑态；`.jcpro` 保存到 sidecar |
 | `private_protocol` | object | 私有协议帧模型 | 编辑态；`.jcpro` 保存到 sidecar |
@@ -74,7 +73,6 @@ config_version → device → project → export_info → ui_info → language_i
   "folder_name": "jc_export",
   "manifest_filename": "ConfigUpdate.json",
   "binary_filename": "pdo_sdo_data.bin",
-  "battery_monitor": { "config": true, "bin": true },
   "fault_code_info": { "config": true, "bin": true }
 }
 ```
@@ -209,18 +207,7 @@ SDO 菜单树。
 
 ## battery_monitor
 
-锂电监控是独立的正式协议段，不再拆成普通 PDO 和显示配置两个来源。顶层字段为：
-
-```text
-schema_version, enabled, version, default_timeout_ticks, page_size
-frames[], signals[], items[]
-```
-
-- `frames[]`：`frame_key`、CAN ID、帧类型、DLC、描述和超时 tick；
-- `signals[]`：信号 ID、所属帧、位位置/长度、原始类型、值类型、字节序、解析分辨率、偏移、掩码和移位；
-- `items[]`：显示项顺序、关联信号、语言 key、回退名称、单位、格式化规则和有效性/超时规则。
-
-只有 `enabled` 且存在有效帧、信号和显示项时才会生成二进制段。它不应再复制到普通 PDO 表中。
+jc001 不再定义锂电监控解析段。锂电监控已统一使用 jc002 的 Battery V2 契约，字段、消息 key 和二进制布局见 [v2 数据格式](data-format-v2.md#锂电监控)。
 
 ## fault_code_info
 
@@ -254,7 +241,7 @@ frames[], signals[], items[]
 - `list_code_language` 的顺序就是设备语言块的顺序；
 - `list_inner` 保存语言名称和普通翻译项的有序键列表；
 - `list_translate[key][code]` 保存每个键在各语言中的文本；
-- 导出器还会收集 SDO 名称、锂电监控显示项和故障码文案 key，统一建立设备端文本索引。
+- jc001 导出器只收集 SDO 和故障码的旧语言条目；锂电监控不属于 jc001 发布包。
 
 ## 统一协议编辑段和 sidecar
 

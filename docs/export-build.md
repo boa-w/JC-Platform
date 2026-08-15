@@ -122,9 +122,6 @@
 | `global_condition_base_addr` / `global_condition_total` | 条件表地址和条数 |
 | `pdo_recv_base_addr` / `pdo_recv_total` | PDO 接收段地址和帧数 |
 | `pdo_send_base_addr` / `pdo_send_total` | PDO 发送段地址和帧数 |
-| `battery_monitor_base_addr` | 锂电监控扩展段地址 |
-| `battery_monitor_item_total` / `battery_monitor_frame_total` | 锂电显示项数和帧数 |
-| `battery_monitor_version` | 锂电监控二进制版本 |
 | `fault_code_base_addr` | 故障码扩展段地址 |
 | `fault_source_total` / `fault_code_total` | 故障来源数和故障码数 |
 | `fault_code_version` | 故障码二进制版本 |
@@ -139,7 +136,7 @@
 导出器按以下规则取得 PDO 输入：
 
 1. 解析高级段 `pdo_global_param`、`pdo_condition`、`pdo_recv`、`pdo_send`；
-2. 高级段有内容，或启用的锂电监控要求继续构建时，使用高级 PDO 文档；
+2. 高级段有内容时使用高级 PDO 文档；
 3. 高级段没有有效内容时，从 `pdo_simple_send_recv` 收集 `pdo_param_index`，生成临时全局参数和高级帧结构，再使用同一套打包器。
 
 统一协议段不会在二进制构建时自动替代旧 PDO 段。统一协议编辑完成后，需要先执行“拍平统一协议”，把合法映射写回高级 PDO 段；否则设备导出可能仍使用旧的 PDO 配置。
@@ -155,7 +152,6 @@
 [条件表达式表]
 [PDO 接收帧描述 + 数据项]
 [PDO 发送帧描述 + 数据项]
-[锂电监控段，可选]
 [故障码段，可选]
 [SDO 菜单树]
 [语言块 × 语言数量]
@@ -171,18 +167,9 @@
 - 每个 PDO 帧描述为 12 字节，包含 CAN ID、数据区地址、数据项数量、帧类型和条件触发标记；
 - 每个 PDO 数据项为 8 字节，包含位置、长度、全局参数索引、句柄和句柄参数。
 
-### 锂电监控段
+### 锂电监控
 
-段头 40 字节，随后依次为帧表、信号表和启用显示项表：
-
-```text
-header: 40 bytes
-frame record: 12 bytes × frame_total
-signal record: 32 bytes × signal_total
-item record: 40 bytes × enabled_item_total
-```
-
-帧表保存 CAN ID、帧类型、DLC、超时和关联信号范围；信号表保存位域、原始/值类型、解析分辨率、偏移、掩码和文本索引；显示项表保存显示顺序、格式化比例、单位、有效性文本和超时。段只使用 `battery_monitor.enabled` 且有效的项目。
+jc001 不包含锂电监控二进制段。Battery V2 的段布局和发布边界见 [jc002 发布包与二进制 ABI](export-build-v2.md#battery-v2-的清单边界)。
 
 ### 故障码段
 
@@ -203,7 +190,7 @@ SDO 根节点和普通菜单节点按 40 字节记录写入，参数节点按当
 
 ### 语言块
 
-每种选中语言各写一个独立块，`language_addr[i]` 与 `language_code[i]` 一一对应。一个块由文本数量、文本偏移索引表和以 NUL 结尾的文本组成。文本索引来源于统一收集的内部键、SDO 名称、锂电监控文本和故障码文案 key；如果某个语言的翻译键缺失，设备块写入对应 key/默认文本。项目中明确保存的空字符串会按空字符串写入，不会被导出器自动改写。
+每种选中语言各写一个独立块，`language_addr[i]` 与 `language_code[i]` 一一对应。一个块由文本数量、文本偏移索引表和以 NUL 结尾的文本组成。文本索引来源于统一收集的内部键、SDO 名称和故障码文案 key；如果某个语言的翻译键缺失，设备块写入对应 key/默认文本。项目中明确保存的空字符串会按空字符串写入，不会被导出器自动改写。
 
 ## 校验和与旧文件比较
 

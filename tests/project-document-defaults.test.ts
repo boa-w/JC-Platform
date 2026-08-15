@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { withRequiredEditorSections } from '../src/features/project-document/projectDocumentDefaults.ts';
 
-test('adds the unified battery monitor section to a recovery document', () => {
+test('does not synthesize a deprecated battery monitor section for a legacy recovery document', () => {
   const restored = withRequiredEditorSections({
     project: { name: 'Recovery Fixture', revision: 2 },
     fault_code_info: {},
@@ -16,10 +16,7 @@ test('adds the unified battery monitor section to a recovery document', () => {
     battery_monitor: { config: true, bin: true },
     fault_code_info: { config: true, bin: true },
   });
-  assert.equal(restored?.battery_monitor?.enabled, false);
-  assert.equal(restored?.battery_monitor?.frames.length, 0);
-  assert.equal(restored?.battery_monitor?.signals.length, 0);
-  assert.equal(restored?.battery_monitor?.items.length, 0);
+  assert.equal(restored?.battery_monitor, undefined);
 });
 
 test('fills missing project export target flags without replacing project names', () => {

@@ -2,6 +2,10 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
+use crate::domain::protocol::battery_monitor::{
+    BATTERY_MONITOR_BINARY_VERSION, BATTERY_MONITOR_SCHEMA_VERSION,
+};
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CanTestSignalValue {
@@ -605,6 +609,14 @@ fn collect_battery_monitor_frames(document: &Value, warnings: &mut Vec<String>) 
     let Some(monitor) = document.get("battery_monitor") else {
         return Vec::new();
     };
+    if monitor.get("schema_version").and_then(Value::as_u64)
+        != Some(u64::from(BATTERY_MONITOR_SCHEMA_VERSION))
+        || monitor.get("version").and_then(Value::as_u64)
+            != Some(u64::from(BATTERY_MONITOR_BINARY_VERSION))
+    {
+        warnings.push("锂电监控仅解析 Battery V2 配置".to_string());
+        return Vec::new();
+    }
     if !monitor
         .get("enabled")
         .and_then(Value::as_bool)
@@ -645,9 +657,7 @@ fn collect_battery_frames_from_section(
                 .iter()
                 .filter(|sig| object_string(sig, "frame_key").unwrap_or_default() == frame_key)
             {
-                let key = object_string(sig, "signal_key")
-                    .or_else(|| object_string(sig, "param_id"))
-                    .unwrap_or_default();
+                let key = object_string(sig, "signal_key").unwrap_or_default();
                 let pos = object_u32(sig, "pos").unwrap_or(0);
                 let len = object_u32(sig, "len").unwrap_or(0);
                 if len == 0 || pos + len > 64 {
@@ -670,9 +680,7 @@ fn collect_battery_frames_from_section(
                 let unit = object_string(sig, "unit").unwrap_or(mapped_unit);
                 frame_signals.push(SignalSpec {
                     key: format!("{label}:{frame_key}:{key}:{pos}:{len}"),
-                    name: object_string(sig, "name")
-                        .or_else(|| object_string(sig, "param_id"))
-                        .unwrap_or_else(|| key.clone()),
+                    name: object_string(sig, "name").unwrap_or_else(|| key.clone()),
                     unit,
                     pos,
                     len,

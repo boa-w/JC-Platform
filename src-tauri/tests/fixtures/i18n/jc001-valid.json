@@ -7,7 +7,6 @@
     "list_inner": ["菜单"],
     "list_translate": { "菜单": { "zh": "菜单", "en": "Menu" } }
   },
-  "battery_monitor": { "enabled": false },
   "pdo_global_param": [
     { "param_id": "TEST", "name": "test", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
   ],

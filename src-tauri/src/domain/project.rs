@@ -10,7 +10,6 @@
 //! `pdo_*`、`sdo_info`、`language_info` 等段落。
 
 use crate::domain::private_protocol::PrivateProtocolDocument;
-use crate::domain::protocol::battery_monitor::default_battery_monitor_protocol;
 use crate::domain::protocol_manager::migrate_project_to_unified_protocol;
 use crate::domain::signal::SignalDictionary;
 use serde::{Deserialize, Serialize};
@@ -144,6 +143,11 @@ impl ProjectValidationReport {
             _ => {}
         }
 
+        if let Err(error) = validate_battery_monitor_version_contract(value) {
+            warnings.push(error);
+            schema_valid = false;
+        }
+
         Self {
             valid: missing_sections.is_empty() && schema_valid,
             missing_sections,
@@ -202,7 +206,31 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
         None => Ok(()),
     };
     result?;
-    validate_fault_code_version_contract(document)
+    validate_fault_code_version_contract(document)?;
+    validate_battery_monitor_version_contract(document)
+}
+
+fn validate_battery_monitor_version_contract(document: &Value) -> Result<(), String> {
+    let Some(root) = document.get("battery_monitor") else {
+        return Ok(());
+    };
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
+        return Err("battery_monitor 仅支持 jc002 Battery V2".to_string());
+    }
+    let schema_version = root
+        .get("schema_version")
+        .and_then(Value::as_i64)
+        .unwrap_or_default();
+    let binary_version = root
+        .get("version")
+        .and_then(Value::as_i64)
+        .unwrap_or_default();
+    if schema_version != 2 || binary_version != 2 {
+        return Err(format!(
+            "jc002 battery_monitor 必须使用 schema_version=2 且 version=2，当前为 schema_version={schema_version}、version={binary_version}"
+        ));
+    }
+    Ok(())
 }
 
 fn validate_fault_code_version_contract(document: &Value) -> Result<(), String> {
@@ -355,7 +383,6 @@ pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_
         "signal_dictionary": SignalDictionary::default(),
         "private_protocol": PrivateProtocolDocument::default(),
         "protocol_mapping": [],
-        "battery_monitor": default_battery_monitor_protocol(),
     })
 }
 
@@ -859,7 +886,6 @@ fn required_project_sections() -> &'static [&'static str] {
         "private_protocol",
         "protocol_mapping",
         "language_info",
-        "battery_monitor",
         "fault_code_info",
     ]
 }
@@ -907,7 +933,6 @@ fn default_section_value(section: &str) -> Value {
         "private_protocol" => json!(PrivateProtocolDocument::default()),
         "protocol_mapping" => Value::Array(Vec::new()),
         "language_info" => default_language_info(),
-        "battery_monitor" => default_battery_monitor_protocol(),
         "fault_code_info" => default_fault_code_info(),
         _ => Value::Array(Vec::new()),
     }
@@ -1265,33 +1290,8 @@ pub fn parse_legacy_project_document(path: Option<String>, value: Value) -> Proj
 mod tests {
     use super::*;
 
-    fn assert_empty_battery_monitor(document: &Value) {
-        let battery_monitor = document
-            .get("battery_monitor")
-            .expect("battery_monitor section");
-
-        assert_eq!(battery_monitor.get("enabled"), Some(&Value::Bool(false)));
-        assert_eq!(
-            battery_monitor
-                .get("frames")
-                .and_then(Value::as_array)
-                .map(Vec::len),
-            Some(0)
-        );
-        assert_eq!(
-            battery_monitor
-                .get("signals")
-                .and_then(Value::as_array)
-                .map(Vec::len),
-            Some(0)
-        );
-        assert_eq!(
-            battery_monitor
-                .get("items")
-                .and_then(Value::as_array)
-                .map(Vec::len),
-            Some(0)
-        );
+    fn assert_legacy_project_has_no_battery_monitor(document: &Value) {
+        assert!(document.get("battery_monitor").is_none());
         assert!(!document
             .get("language_info")
             .and_then(|value| value.get("list_inner"))
@@ -1303,14 +1303,14 @@ mod tests {
     }
 
     #[test]
-    fn new_project_uses_only_the_battery_monitor_scaffold() {
+    fn new_legacy_project_does_not_create_a_battery_monitor_section() {
         let document = create_legacy_project_document("demo", 800, 480);
 
-        assert_empty_battery_monitor(&document);
+        assert_legacy_project_has_no_battery_monitor(&document);
     }
 
     #[test]
-    fn migration_fills_only_the_battery_monitor_scaffold() {
+    fn legacy_migration_does_not_create_a_battery_monitor_section() {
         let migrated = migrate_legacy_project_document(
             None,
             json!({
@@ -1323,7 +1323,7 @@ mod tests {
             }),
         );
 
-        assert_empty_battery_monitor(&migrated.document);
+        assert_legacy_project_has_no_battery_monitor(&migrated.document);
     }
 
     fn valid_v2_document() -> Value {

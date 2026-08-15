@@ -18,7 +18,7 @@ export const navGroups: NavGroup[] = [
     id: 'data',
     labelKey: 'navigation.groups.data',
     accentToken: '--navigation-accent-data',
-    keys: ['setting-data', 'realtime-data'],
+    keys: ['setting-data', 'realtime-data', 'battery-monitor'],
   },
   {
     id: 'protocol',
@@ -29,7 +29,6 @@ export const navGroups: NavGroup[] = [
       'private-protocol',
       'protocol-mapping',
       'canopen-export',
-      'battery-monitor',
     ],
   },
   {

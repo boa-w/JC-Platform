@@ -1,7 +1,8 @@
 //! 多协议模型校验。
 
 use super::battery_monitor::{
-    BatteryMonitorProtocol, BatteryRawType, BatteryValueType, BATTERY_PARSE_NO_MASK,
+    BatteryMonitorProtocol, BatteryRawType, BatteryValueType, BATTERY_MONITOR_BINARY_VERSION,
+    BATTERY_MONITOR_SCHEMA_VERSION, BATTERY_PARSE_NO_MASK,
 };
 use super::model::{CanOpenTransport, MappingTarget, ProtocolMapping, ProtocolValidationReport};
 use crate::domain::private_protocol::PrivateProtocolDocument;
@@ -75,6 +76,18 @@ fn validate_battery_monitor(
     errors: &mut Vec<String>,
     warnings: &mut Vec<String>,
 ) {
+    if protocol.schema_version != BATTERY_MONITOR_SCHEMA_VERSION {
+        errors.push(format!(
+            "锂电监控必须使用 schema_version={}，当前为 {}",
+            BATTERY_MONITOR_SCHEMA_VERSION, protocol.schema_version
+        ));
+    }
+    if protocol.version != BATTERY_MONITOR_BINARY_VERSION {
+        errors.push(format!(
+            "锂电监控必须使用 version={}，当前为 {}",
+            BATTERY_MONITOR_BINARY_VERSION, protocol.version
+        ));
+    }
     if !protocol.enabled {
         return;
     }
@@ -106,15 +119,11 @@ fn validate_battery_monitor(
         .map(|signal| signal.signal_key.as_str())
         .collect::<HashSet<_>>();
     let mut seen_signal_keys = HashSet::new();
-    let mut seen_param_ids = HashSet::new();
     for signal in &protocol.signals {
         if signal.signal_key.trim().is_empty() {
             errors.push("锂电监控存在空 signal_key".to_string());
         } else if !seen_signal_keys.insert(signal.signal_key.as_str()) {
             errors.push(format!("锂电监控 signal_key 重复：{}", signal.signal_key));
-        }
-        if !signal.param_id.trim().is_empty() && !seen_param_ids.insert(signal.param_id.as_str()) {
-            errors.push(format!("锂电监控 param_id 重复：{}", signal.param_id));
         }
         let Some(frame) = protocol
             .frames

@@ -134,16 +134,6 @@ export const richProjectDocument = {
       诊断模式: { zh: '诊断模式', en: '' },
     },
   },
-  battery_monitor: {
-    schema_version: 1,
-    enabled: true,
-    version: 1,
-    default_timeout_ticks: 200,
-    page_size: 4,
-    frames: [],
-    signals: [],
-    items: [],
-  },
   fault_code_info: {
     schema_version: 1,
     enabled: true,
@@ -175,8 +165,10 @@ export const richProjectDocument = {
   },
 };
 
-const { language_info: _legacyLanguageInfo, ...richProjectWithoutLegacyLanguage } =
-  richProjectDocument;
+const {
+  language_info: _legacyLanguageInfo,
+  ...richProjectWithoutLegacyLanguage
+} = richProjectDocument;
 
 export const v2FaultProjectPath = 'D:\\projects\\fault-catalog-v2.jcpro';
 export const v2FaultProjectDocument = {

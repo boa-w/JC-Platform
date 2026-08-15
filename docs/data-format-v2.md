@@ -36,7 +36,7 @@
 | `localization` | 必填 | v2 唯一语言来源 |
 | `pdo_*` | 按项目需要 | 基础 PDO 数据 |
 | `sdo_info` | 当前固件部署必填 | v2 loader 当前要求 `sdo_version=2` |
-| `battery_monitor` | 可选 | 启用时文本字段必须引用消息 key |
+| `battery_monitor` | 可选 | `.jcpro` 编辑态锂电协议模型；导出为二进制协议段 |
 | `fault_code_info` | 可选 | 启用时故障文案必须引用消息 key |
 
 禁止字段：
@@ -46,6 +46,16 @@ language_info
 ```
 
 检测到禁止字段时构建立即失败，不忽略、不迁移、不回落。
+
+## 编辑文件与运行时清单
+
+`battery_monitor` 的完整帧、信号、显示项和格式化规则只属于 jc002
+`.jcpro` 编辑文件。导出器会将这些定义编码到 `data.bin` 的 battery v2
+段；设备侧 `ConfigUpdate.json` 不复制该对象，只保留
+`data_description.battery_monitor_base_addr`、条目数、帧数和版本等索引元数据。
+
+因此，`ConfigUpdate.json` 和 `data.bin` 必须来自同一次导出，设备不得从 JSON
+读取第二份 battery 协议定义。
 
 ## localization
 
@@ -234,6 +244,45 @@ v2 项目应使用 `message_key`。`name_key`、`name` 的读取仍存在于共�
 - validity `empty_text`
 
 非空值必须存在于 `localization` 消息目录。空值编码为 `0xFFFFFFFF`，表示无文本引用。
+
+#### `signals[]` 的关系字段
+
+信号表中的 `signal_key` 和 `name` 作用不同：
+
+| 字段 | 作用 | 示例 | 修改影响 |
+| --- | --- | --- | --- |
+| `signal_key` | 上位机编辑态的稳定关系键。`items[].signal_key` 通过它引用信号；导出时上位机再将它解析为信号表索引。 | `battery_voltage` | 修改后必须同步所有 `items[].signal_key` 引用；上位机编辑器会同步已有显示项。 |
+| `name` | 信号的多语言文案 key。jc002 中必须指向 `localization` 中的消息 key，不是直接填写的中文或其他语言文本。 | `ui.battery.voltage` | 修改后必须同时在 `localization` 中维护同名 key，否则导出校验失败或设备侧无法取得该信号文案。 |
+
+示例：
+
+```json
+{
+  "signal_key": "battery_voltage",
+  "name": "ui.battery.voltage",
+  "frame_key": "battery_2f0",
+  "pos": 0,
+  "len": 16
+}
+```
+
+这里 `battery_voltage` 是项目内部关系键，`ui.battery.voltage` 是用于查找多语言显示文本的 key。真正的中文、英文等文本应写在：
+
+```json
+{
+  "localization": {
+    "locales": {
+      "zh": {
+        "translations": {
+          "ui.battery.voltage": "电池电压"
+        }
+      }
+    }
+  }
+}
+```
+
+`signal_key` 应使用 ASCII、稳定且不包含当前显示顺序的名称；`name` 应遵循项目的消息 key 命名规则。两者都不应使用数组下标作为唯一依据。
 
 ## 校验失败条件
 

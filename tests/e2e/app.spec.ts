@@ -131,17 +131,19 @@ test('formats the loaded jcpro file from project management', async ({ page }) =
 });
 
 test('keeps protocol field explanations and long language keys readable', async ({ page }) => {
-  await openRichProject(page);
+  await openV2FaultProject(page);
 
-  await page.getByRole('button', { name: '协议', exact: true }).click();
-  const protocolNavigation = page.getByRole('navigation', { name: '协议 功能' });
-  await protocolNavigation.getByRole('button', { name: '锂电监控协议', exact: true }).click();
+  await page.getByRole('button', { name: '数据', exact: true }).click();
+  const dataNavigation = page.getByRole('navigation', { name: '数据 功能' });
+  await dataNavigation.getByRole('button', { name: '锂电监控协议', exact: true }).click();
   const batteryMain = page.getByRole('main', { name: '锂电监控协议' });
+  await batteryMain.getByRole('button', { name: '初始化配置', exact: true }).click();
+  await batteryMain.getByRole('tab', { name: /信号解析/ }).click();
+  await expect(batteryMain.getByText(/信号解析规则（/)).toBeVisible();
+  await expect(batteryMain.locator('.battery-signal-table-frame')).toBeVisible();
   const signalHeader = batteryMain
     .locator('.battery-monitor-signal-table th')
     .filter({ hasText: 'signal_key' });
-  await expect(signalHeader).toContainText('信号标识');
-  await expect(signalHeader.locator('.battery-signal-header-code')).toHaveText('signal_key');
   await expect(signalHeader.locator('.battery-signal-header-label')).toHaveText('信号标识');
 
   await page.getByRole('button', { name: '多国语言', exact: true }).click();
@@ -198,6 +200,28 @@ test('keeps protocol field explanations and long language keys readable', async 
   expect(comparisonLayout.translationWidth).toBeGreaterThan(0);
   expect(comparisonLayout.keyRight).toBeLessThanOrEqual(comparisonLayout.translationLeft);
   expect(comparisonLayout.keyHeight).toBeGreaterThan(24);
+});
+
+test('opens the battery workspace with an explicit jc002 contract', async ({ page }) => {
+  await openV2FaultProject(page);
+
+  await page.getByRole('button', { name: '数据', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '数据 功能' })
+    .getByRole('button', { name: '锂电监控协议', exact: true })
+    .click();
+
+  const batteryMain = page.getByRole('main', { name: '锂电监控协议' });
+  await expect(
+    batteryMain.getByText('JCPro V2 / Battery V2', { exact: true }).first(),
+  ).toBeVisible();
+  await expect(batteryMain.getByText('localization', { exact: true })).toBeVisible();
+  await expect(batteryMain.getByText('当前项目尚未配置 battery_monitor')).toBeVisible();
+
+  await batteryMain.getByRole('button', { name: '初始化配置', exact: true }).click();
+  await expect(batteryMain.getByText('已配置', { exact: true })).toBeVisible();
+  await expect(batteryMain.getByText('schema_version = 2', { exact: true })).toBeVisible();
+  await expect(batteryMain.getByText('version = 2', { exact: true })).toBeVisible();
 });
 
 test('edits the jc002 normalized fault catalog without flattening shared messages', async ({
@@ -295,7 +319,7 @@ test('meets the serious accessibility baseline across every workspace', async ({
     },
     {
       group: '数据',
-      modules: ['设置数据', '实时数据'],
+      modules: ['设置数据', '实时数据', '锂电监控协议'],
     },
     {
       group: '协议',
@@ -304,7 +328,6 @@ test('meets the serious accessibility baseline across every workspace', async ({
         '私有协议 实验/废弃',
         '协议映射 实验',
         'CANopen 导出 实验',
-        '锂电监控协议',
       ],
     },
     {
@@ -422,7 +445,7 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   await expect(main).toBeVisible();
   await expect(main.getByRole('heading', { level: 1, name: '软件设置' })).toBeAttached();
 
-  await expect(main.getByRole('checkbox', { name: '写入锂电监控配置' })).toHaveCount(0);
+  await expect(main.getByRole('checkbox', { name: '写入锂电监控索引元数据' })).toHaveCount(0);
   const themeSwitch = main.getByRole('switch', { name: '深色模式' });
   await expect(themeSwitch).toHaveAttribute(
     'aria-checked',
@@ -451,7 +474,7 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   await exportNavigation.getByRole('button', { name: '项目导出', exact: true }).click();
   const exportMain = page.getByRole('main', { name: '项目导出' });
   await expect(exportMain).toBeVisible();
-  await expect(exportMain.getByRole('checkbox', { name: '写入锂电监控配置' })).toBeVisible();
+  await expect(exportMain.getByRole('checkbox', { name: '写入锂电监控索引元数据' })).toBeVisible();
   await expect(exportMain.getByRole('checkbox', { name: '写入故障码配置' })).toBeVisible();
   expect(await page.evaluate(() => Object.keys(localStorage))).not.toContain(
     'jc-platform.export.battery-options',
@@ -673,7 +696,7 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
     .click();
   const exportMain = page.getByRole('main', { name: '项目导出' });
   const batteryConfigSwitch = exportMain.getByRole('checkbox', {
-    name: '写入锂电监控配置',
+    name: '写入锂电监控索引元数据',
   });
   await batteryConfigSwitch.uncheck();
   await expect(
@@ -780,16 +803,6 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
   await page.evaluate((path) => {
     const baseDocument = {
       project: { name: 'Recovery Fixture', revision: 1 },
-      battery_monitor: {
-        schema_version: 1,
-        enabled: true,
-        version: 1,
-        default_timeout_ticks: 200,
-        page_size: 4,
-        frames: [],
-        signals: [],
-        items: [],
-      },
       fault_code_info: {},
     };
     localStorage.setItem(

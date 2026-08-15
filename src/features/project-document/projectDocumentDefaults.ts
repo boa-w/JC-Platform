@@ -1,9 +1,9 @@
 import type { BatteryMonitorProtocol, ProjectExportSettings } from '../../types/platform';
 
 export const defaultBatteryMonitor: BatteryMonitorProtocol = {
-  schema_version: 1,
+  schema_version: 2,
   enabled: false,
-  version: 1,
+  version: 2,
   default_timeout_ticks: 200,
   page_size: 4,
   frames: [],
@@ -92,7 +92,6 @@ export function withRequiredEditorSections(document: unknown) {
       },
     };
   }
-  if (!source.battery_monitor) defaults.battery_monitor = cloneDefault(defaultBatteryMonitor);
   if (!source.fault_code_info) defaults.fault_code_info = cloneDefault(defaultFaultCodeInfo);
   return Object.keys(defaults).length > 0 ? { ...source, ...defaults } : null;
 }

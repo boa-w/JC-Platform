@@ -1,0 +1,1134 @@
+/* ── Battery Monitor V2 Workspace ── */
+
+.battery-signal-workspace {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.battery-signal-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.battery-signal-table-toolbar > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.battery-signal-table-toolbar strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.battery-signal-table-toolbar small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.battery-signal-table-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+:where(.battery-signal-table-controls) .battery-search-field {
+  min-width: 230px;
+}
+
+.battery-table-add-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid var(--action-primary-solid);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  background: var(--action-primary-solid);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.battery-table-add-button:hover {
+  background: var(--action-primary-solid-hover);
+  border-color: var(--action-primary-solid-hover);
+}
+
+.battery-signal-table-frame {
+  max-height: min(68vh, 760px);
+  overflow: auto;
+}
+
+.battery-monitor-signal-table {
+  min-width: 1840px;
+  table-layout: auto;
+}
+
+.battery-monitor-signal-table th {
+  min-width: 92px;
+  white-space: normal;
+  line-height: 1.25;
+  text-transform: none;
+}
+
+.battery-signal-header {
+  display: grid;
+  gap: 2px;
+  cursor: help;
+}
+
+.battery-monitor-signal-table th:first-child,
+.battery-monitor-signal-table td:first-child {
+  width: 38px;
+  min-width: 38px;
+  text-align: center;
+}
+
+.battery-monitor-signal-table th:nth-child(2),
+.battery-monitor-signal-table td:nth-child(2) {
+  min-width: 190px;
+}
+
+.battery-monitor-signal-table th:nth-child(3),
+.battery-monitor-signal-table td:nth-child(3),
+.battery-monitor-signal-table th:nth-child(4),
+.battery-monitor-signal-table td:nth-child(4) {
+  min-width: 150px;
+}
+
+.battery-monitor-signal-table th:last-child,
+.battery-monitor-signal-table td:last-child {
+  min-width: 130px;
+}
+
+.battery-monitor-signal-table td {
+  vertical-align: middle;
+}
+
+.battery-monitor-signal-table tbody tr {
+  cursor: pointer;
+}
+
+.battery-monitor-signal-table tbody tr.battery-signal-row-selected td {
+  background: var(--action-primary-subtle);
+  box-shadow:
+    inset 0 1px 0 var(--action-primary-border),
+    inset 0 -1px 0 var(--action-primary-border);
+}
+
+.battery-signal-index {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.battery-table-input {
+  width: 100%;
+  min-width: 82px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 5px 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.battery-table-input:hover {
+  border-color: var(--border-default);
+  background: var(--surface-panel);
+}
+
+.battery-table-input:focus {
+  outline: none;
+  border-color: var(--action-primary);
+  background: var(--surface-panel);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.battery-table-input--key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.battery-table-dual-inputs,
+.battery-table-stack,
+.battery-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.battery-table-dual-inputs .battery-table-input:first-child {
+  min-width: 58px;
+}
+
+.battery-table-dual-inputs .battery-table-input:last-child {
+  min-width: 48px;
+}
+
+.battery-table-stack {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.battery-table-dual-inputs > span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.battery-table-actions {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.battery-table-actions button {
+  min-width: 74px;
+  white-space: nowrap;
+}
+
+.config-table .battery-table-empty {
+  height: 120px;
+  color: var(--text-muted);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.battery-monitor-page {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.battery-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.battery-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.battery-title-line h2 {
+  margin: 0;
+}
+
+.battery-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 720px;
+}
+
+.battery-tool-button,
+.battery-action-menu summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.battery-tool-button:hover:not(:disabled),
+.battery-action-menu summary:hover {
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
+}
+
+.battery-tool-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.battery-tool-button--danger {
+  border-color: var(--status-danger-border);
+  color: var(--status-danger-text);
+}
+
+.battery-tool-button--danger:hover:not(:disabled) {
+  border-color: var(--status-danger);
+  background: var(--status-danger-surface);
+  color: var(--status-danger);
+}
+
+.battery-action-menu {
+  position: relative;
+}
+
+.battery-action-menu summary {
+  list-style: none;
+}
+
+.battery-action-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.battery-action-menu-content {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 5px);
+  right: 0;
+  display: grid;
+  min-width: 190px;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-md);
+}
+
+.battery-action-menu-content .battery-tool-button {
+  justify-content: flex-start;
+  width: 100%;
+  border: 0;
+}
+
+.battery-version-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 2px 7px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.battery-version-badge--v2 {
+  border-color: var(--status-success);
+  background: var(--status-success-surface);
+  color: var(--status-success);
+}
+
+.battery-status-stack {
+  margin: 0;
+}
+
+.battery-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 6px;
+}
+
+.battery-summary-strip article {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.battery-summary-strip article.is-valid {
+  border-color: var(--status-success);
+}
+
+.battery-summary-strip article.is-invalid {
+  border-color: var(--status-danger);
+}
+
+.battery-summary-strip span,
+.battery-contract-grid span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.battery-summary-strip strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.battery-summary-strip .is-valid strong {
+  color: var(--status-success);
+}
+
+.battery-summary-strip .is-invalid strong {
+  color: var(--status-danger);
+}
+
+.battery-workspace-tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.battery-workspace-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 7px 12px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.battery-workspace-tabs button:hover,
+.battery-workspace-tabs button.is-active {
+  border-bottom-color: var(--action-primary);
+  color: var(--action-primary);
+}
+
+.battery-tab-count {
+  display: inline-grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--surface-emphasis);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.battery-workspace-tabs button.is-active .battery-tab-count {
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
+}
+
+.battery-workspace-content {
+  min-width: 0;
+}
+
+.battery-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 10px;
+}
+
+.battery-overview-panel {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  background: var(--surface-panel);
+}
+
+.battery-overview-panel--wide {
+  grid-column: 1 / -1;
+}
+
+.battery-panel-heading,
+.battery-detail-heading,
+.battery-validation-page-header,
+.battery-validation-summary-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.battery-panel-heading h3,
+.battery-detail-heading h3,
+.battery-validation-page-header h3 {
+  margin: 2px 0 0;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.battery-kicker {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.battery-contract-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.battery-contract-grid > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+  border-left: 2px solid var(--action-primary-border);
+  background: var(--surface-subtle);
+}
+
+.battery-contract-grid strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.battery-setup-callout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--action-primary-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
+}
+
+.battery-setup-callout div {
+  flex: 1;
+  min-width: 0;
+}
+
+.battery-setup-callout strong {
+  display: block;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.battery-setup-callout p,
+.battery-panel-note,
+.battery-validation-page-header p {
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.battery-runtime-form,
+.battery-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.battery-field {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.battery-field > span {
+  overflow-wrap: anywhere;
+}
+
+.battery-field small {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.battery-field input,
+.battery-field select,
+.battery-collection-filter {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.battery-field input:focus,
+.battery-field select:focus,
+.battery-collection-filter:focus,
+.battery-search-field:focus-within {
+  outline: none;
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.battery-form-grid__wide {
+  grid-column: span 2;
+}
+
+.battery-inline-fields {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.battery-inline-fields input {
+  min-width: 0;
+}
+
+.battery-inline-fields span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.battery-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.battery-workflow-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.battery-workflow-card:hover {
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-subtle);
+}
+
+.battery-workflow-card > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--action-primary);
+  color: var(--text-on-accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.battery-workflow-card div {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.battery-workflow-card strong,
+.battery-workflow-card small {
+  overflow-wrap: anywhere;
+}
+
+.battery-workflow-card strong {
+  font-size: 12px;
+}
+
+.battery-workflow-card small {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.battery-editor-split {
+  display: grid;
+  grid-template-columns: minmax(220px, 290px) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.battery-collection-panel,
+.battery-detail-panel {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+}
+
+.battery-collection-panel {
+  display: grid;
+  align-content: start;
+  grid-template-rows: auto auto auto 1fr auto;
+  gap: 8px;
+  min-height: 440px;
+  padding: 10px;
+}
+
+.battery-collection-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.battery-collection-header div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.battery-collection-header strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.battery-collection-header small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.battery-collection-header button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--action-primary-border);
+  border-radius: var(--radius-sm);
+  background: var(--action-primary-subtle);
+  color: var(--action-primary);
+  cursor: pointer;
+}
+
+.battery-search-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 31px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  color: var(--text-muted);
+}
+
+.battery-search-field input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.battery-search-field button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.battery-collection-filter {
+  min-height: 31px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-size: 12px;
+}
+
+.battery-collection-list {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  max-height: 590px;
+  overflow: auto;
+}
+
+.battery-collection-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 8px 7px;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.battery-collection-row:hover,
+.battery-collection-row.is-selected {
+  border-color: var(--action-primary-border);
+  background: var(--action-primary-subtle);
+}
+
+.battery-collection-status {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--status-warning-accent);
+}
+
+.battery-collection-status.is-enabled {
+  background: var(--status-success);
+}
+
+.battery-collection-copy {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 3px;
+}
+
+.battery-collection-copy strong,
+.battery-collection-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.battery-collection-copy strong {
+  font-size: 12px;
+}
+
+.battery-collection-copy small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.battery-collection-row > svg:last-child {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.battery-collection-empty,
+.battery-detail-empty {
+  display: grid;
+  min-height: 100px;
+  place-items: center;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.battery-detail-panel {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 16px;
+}
+
+.battery-detail-heading h3 {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+}
+
+.battery-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.battery-detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.battery-detail-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--action-primary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.battery-advanced-details {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+}
+
+.battery-advanced-details summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.battery-advanced-details[open] summary {
+  margin-bottom: 12px;
+  color: var(--action-primary);
+}
+
+.battery-drag-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.battery-drag-handle {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  cursor: grab;
+}
+
+.battery-item-row:active .battery-drag-handle {
+  cursor: grabbing;
+}
+
+.battery-validation-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.battery-validation-summary-header strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.battery-validation-summary-header > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--action-primary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.battery-validation-list,
+.battery-validation-columns section {
+  display: grid;
+  gap: 4px;
+}
+
+.battery-validation-issue {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+}
+
+.battery-validation-issue span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.battery-validation-issue--error {
+  border-color: var(--status-danger-border);
+  color: var(--status-danger-text);
+}
+
+.battery-validation-issue--warning {
+  border-color: var(--status-warning-border);
+  color: var(--status-warning);
+}
+
+.battery-validation-empty {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  color: var(--status-success);
+  font-size: 11px;
+}
+
+.battery-validation-page {
+  display: grid;
+  gap: 14px;
+}
+
+.battery-validation-count {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 8px;
+  min-width: 105px;
+  padding: 9px;
+  border: 1px solid var(--status-danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--status-danger-surface);
+}
+
+.battery-validation-count.is-valid {
+  border-color: var(--status-success);
+  background: var(--status-success-surface);
+}
+
+.battery-validation-count strong {
+  color: var(--status-danger);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  text-align: right;
+}
+
+.battery-validation-count.is-valid strong {
+  color: var(--status-success);
+}
+
+.battery-validation-count span {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.battery-validation-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.battery-validation-columns section {
+  align-content: start;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: var(--surface-panel);
+}
+
+.battery-validation-columns h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.battery-validation-all-clear {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--status-success);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  background: var(--status-success-surface);
+  color: var(--status-success);
+}
+
+@media (max-width: 980px) {
+  .battery-page-header {
+    display: grid;
+  }
+
+  .battery-page-actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .battery-overview-grid,
+  .battery-editor-split {
+    grid-template-columns: 1fr;
+  }
+
+  .battery-overview-panel--wide {
+    grid-column: auto;
+  }
+
+  .battery-collection-panel {
+    min-height: 260px;
+  }
+
+  .battery-collection-list {
+    max-height: 280px;
+  }
+}
+
+@media (max-width: 720px) {
+  .battery-summary-strip,
+  .battery-contract-grid,
+  .battery-runtime-form,
+  .battery-form-grid,
+  .battery-workflow-grid,
+  .battery-validation-columns {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .battery-form-grid__wide {
+    grid-column: span 2;
+  }
+
+  .battery-summary-strip article:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .battery-summary-strip,
+  .battery-contract-grid,
+  .battery-runtime-form,
+  .battery-form-grid,
+  .battery-workflow-grid,
+  .battery-validation-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .battery-form-grid__wide {
+    grid-column: auto;
+  }
+
+  .battery-setup-callout,
+  .battery-validation-page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+[data-theme="dark"] .battery-field input,
+[data-theme="dark"] .battery-field select,
+[data-theme="dark"] .battery-collection-filter {
+  background: var(--control-surface);
+  border-color: var(--control-border);
+  color: var(--control-text);
+}
