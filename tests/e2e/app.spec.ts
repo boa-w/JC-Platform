@@ -36,6 +36,7 @@ async function openRichProject(page: Page) {
   const openSection = page.locator('.project-section').filter({ hasText: '打开现有项目' });
   await openSection.getByRole('button', { name: '打开', exact: true }).click();
   await expect(page.locator('.action-bar-project')).toContainText('Rich Fixture');
+  await expect(page.locator('.action-bar-schema')).toHaveText('JCPro V1 (jc001)');
 }
 
 async function openV2FaultProject(page: Page) {
@@ -45,6 +46,7 @@ async function openV2FaultProject(page: Page) {
   const openSection = page.locator('.project-section').filter({ hasText: '打开现有项目' });
   await openSection.getByRole('button', { name: '打开', exact: true }).click();
   await expect(page.locator('.action-bar-project')).toContainText('Fault Catalog V2');
+  await expect(page.locator('.action-bar-schema')).toHaveText('JCPro V2 (jc002)');
 }
 
 test.beforeEach(async ({ page }) => {
@@ -55,6 +57,13 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(async ({ page }) => {
   expect(runtimeErrorsByPage.get(page)).toEqual([]);
+});
+
+test('shows the explicit jcpro schema in project management', async ({ page }) => {
+  await openV2FaultProject(page);
+  await page.getByRole('button', { name: '项目', exact: true }).click();
+  await expect(page.getByTestId('current-project-version')).toHaveText('JCPro V2 (jc002)');
+  await expect(page.getByText('JCPro V1 (jc001)', { exact: true })).toBeVisible();
 });
 
 test('navigates core workspaces without runtime errors', async ({ page }) => {

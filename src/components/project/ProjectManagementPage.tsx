@@ -7,11 +7,13 @@ import type {
   LoadedProject,
   ProjectParseReport,
 } from '../../types/platform';
+import { getJcproVersion, getJcproVersionValue } from '../../utils/jcproVersion';
 
 export interface RecentProject {
   path: string;
   name?: string;
   openedAt: string;
+  configVersion?: string;
 }
 
 interface ProjectManagementPageProps {
@@ -105,6 +107,16 @@ export function ProjectManagementPage({
 }: ProjectManagementPageProps) {
   const { t } = useTranslation();
   const projectBusy = isOpening || isFormattingJcpro;
+  const loadedVersion = getJcproVersion(loadedProject?.document);
+  const loadedVersionValue = getJcproVersionValue(loadedProject?.document);
+  const versionLabel = (version: string | null | undefined) => {
+    if (version === 'jc001' || version === 'jc002') {
+      return t(`projectManagement.versionTypes.${version}`);
+    }
+    return t('projectManagement.versionTypes.unknown', {
+      version: version || t('projectManagement.versionTypes.notDetected'),
+    });
+  };
 
   return (
     <section className="project-page">
@@ -180,7 +192,7 @@ export function ProjectManagementPage({
               </option>
               {recentProjects.map((item) => (
                 <option key={item.path} value={item.path}>
-                  {`${item.name || t('projectManagement.unnamed')} - ${item.path}`}
+                  {`${item.name || t('projectManagement.unnamed')} · ${versionLabel(item.configVersion)} - ${item.path}`}
                 </option>
               ))}
             </select>
@@ -210,6 +222,9 @@ export function ProjectManagementPage({
       <div className="project-section">
         <div className="project-section-header">
           <strong>{t('projectManagement.createNew')}</strong>
+          <span className="jcpro-version-badge jcpro-version-badge--v1">
+            {t('projectManagement.versionTypes.jc001')}
+          </span>
         </div>
         <div className="project-create-form">
           <input
@@ -319,6 +334,15 @@ export function ProjectManagementPage({
             </div>
           </div>
           <div className="project-info-grid">
+            <div className="project-info-item">
+              <span>{t('projectManagement.versionType')}</span>
+              <strong
+                className={`jcpro-version-text jcpro-version-text--${loadedVersion}`}
+                data-testid="current-project-version"
+              >
+                {versionLabel(loadedVersionValue)}
+              </strong>
+            </div>
             <div className="project-info-item">
               <span>{t('projectManagement.name')}</span>
               <strong>{loadedProject.summary.name}</strong>

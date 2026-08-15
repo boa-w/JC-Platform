@@ -32,6 +32,7 @@ import type {
   GitRevision,
   LoadedProject,
 } from '../../types/platform';
+import { getJcproVersion, getJcproVersionValue } from '../../utils/jcproVersion';
 
 type TableConfigKind = 'sdo' | 'pdoSimple' | 'language';
 
@@ -121,6 +122,14 @@ export function DashboardActionBar({
   onCommitGitVersion: handleCommitProjectVersion,
 }: DashboardActionBarProps) {
   const { t } = useTranslation();
+  const projectVersion = getJcproVersion(loadedProject?.document);
+  const projectVersionValue = getJcproVersionValue(loadedProject?.document);
+  const projectVersionLabel =
+    projectVersion === 'unknown'
+      ? t('projectManagement.versionTypes.unknown', {
+          version: projectVersionValue || t('projectManagement.versionTypes.notDetected'),
+        })
+      : t(`projectManagement.versionTypes.${projectVersion}`);
   const gitSummaryId = useId();
   const [showGitSummary, setShowGitSummary] = useState(false);
   const gitSummaryRef = useRef<HTMLDivElement | null>(null);
@@ -200,6 +209,14 @@ export function DashboardActionBar({
             <span className="action-bar-project">
               {loadedProject?.summary.name || t('dashboard.actionBar.noProject')}
             </span>
+            {loadedProject ? (
+              <span
+                className={`action-bar-schema action-bar-schema--${projectVersion}`}
+                title={t('projectManagement.versionType')}
+              >
+                {projectVersionLabel}
+              </span>
+            ) : null}
             <span className="action-bar-module">{t(activeModule.titleKey)}</span>
           </div>
           {modifiedSections.length > 0 ? (

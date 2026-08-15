@@ -569,6 +569,13 @@
     "resolutionHeight": "项目分辨率高度",
     "createProject": "创建项目",
     "currentProject": "当前项目",
+    "versionType": "JCPro 版本类型",
+    "versionTypes": {
+      "jc001": "JCPro V1 (jc001)",
+      "jc002": "JCPro V2 (jc002)",
+      "unknown": "未知 JCPro 版本 ({{version}})",
+      "notDetected": "未识别"
+    },
     "parse": "解析",
     "completeStructure": "补齐结构",
     "mountRefactorConfig": "挂载重构配置",

@@ -20,6 +20,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { type DocumentSectionKey, refactorOnlySections } from '../../modules/documentSections';
 import type { LoadedProject, ProjectParseReport } from '../../types/platform';
 import { formatJsonText } from '../../utils/jsonFormat';
+import { getJcproVersionValue } from '../../utils/jcproVersion';
 import { cloneJson } from '../../utils/projectDirty';
 import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import { runSystemDialog } from '../../utils/systemDialog';
@@ -28,6 +29,7 @@ export interface RecentProject {
   path: string;
   name?: string;
   openedAt: string;
+  configVersion?: string;
 }
 
 type SavingProjectAction = 'save' | 'saveAs' | null;
@@ -138,7 +140,12 @@ export function useProjectLifecycleController({
     if (!path) return;
     setRecentProjects((current) => {
       const next = [
-        { path, name: nextProject.summary.name, openedAt: new Date().toISOString() },
+        {
+          path,
+          name: nextProject.summary.name,
+          openedAt: new Date().toISOString(),
+          configVersion: getJcproVersionValue(nextProject.document) ?? undefined,
+        },
         ...current.filter((item) => item.path !== path),
       ].slice(0, maxRecentProjects);
       persistRecentProjects(next);

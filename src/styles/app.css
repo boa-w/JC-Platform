@@ -220,8 +220,8 @@ select:not([multiple]):disabled {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-width: 220px;
-  max-width: min(42vw, 480px);
+  min-width: 300px;
+  max-width: min(52vw, 620px);
   height: 26px;
   padding: 0 10px;
   border: 1px solid var(--toolbar-separator);
@@ -240,6 +240,23 @@ select:not([multiple]):disabled {
   min-width: 0;
 }
 
+.action-bar-schema {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border: 1px solid var(--toolbar-separator);
+  border-radius: 3px;
+  color: var(--toolbar-text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.action-bar-schema--jc002 {
+  border-color: var(--status-success);
+  color: var(--status-success);
+}
+
 .action-bar-module {
   overflow: hidden;
   color: var(--toolbar-text-muted);
@@ -248,7 +265,8 @@ select:not([multiple]):disabled {
   white-space: nowrap;
 }
 
-.action-bar-project + .action-bar-module::before {
+.action-bar-project + .action-bar-module::before,
+.action-bar-schema + .action-bar-module::before {
   content: "/";
   margin-right: 7px;
   color: var(--toolbar-text-muted);
@@ -2096,6 +2114,29 @@ button.git-summary-row:disabled,
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.jcpro-version-badge {
+  padding: 2px 7px;
+  border: 1px solid var(--border-default);
+  border-radius: 3px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.jcpro-version-text {
+  font-family: var(--font-mono);
+}
+
+.jcpro-version-text--jc002 {
+  color: var(--status-success);
+}
+
+.jcpro-version-text--unknown {
+  color: var(--status-warning);
 }
 
 .project-info-actions {
