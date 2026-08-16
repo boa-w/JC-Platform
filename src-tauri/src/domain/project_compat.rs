@@ -36,6 +36,7 @@ const V2_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "export_info",
     "ui_info",
     "canopen",
+    "protocol_profiles",
     "fault_code_info",
     "pdo_simple_send_recv",
     "pdo_global_param",
@@ -71,6 +72,36 @@ const CANOPEN_PDO_FIELD_ORDER: &[&str] = &[
     "source_section",
     "source_index",
 ];
+const PROTOCOL_PROFILES_FIELD_ORDER: &[&str] = &[
+    "schema_version",
+    "active_controller_profile_id",
+    "active_battery_profile_id",
+    "controller_profiles",
+    "battery_profiles",
+];
+const CONTROLLER_PROFILE_FIELD_ORDER: &[&str] = &[
+    "profile_id",
+    "controller_family",
+    "controller_revision",
+    "description",
+    "protocol",
+];
+const CONTROLLER_PROTOCOL_FIELD_ORDER: &[&str] = &[
+    "pdo_global_param",
+    "pdo_condition",
+    "pdo_recv",
+    "pdo_send",
+    "sdo_info",
+    "canopen",
+];
+const BATTERY_PROFILE_FIELD_ORDER: &[&str] = &[
+    "profile_id",
+    "battery_family",
+    "battery_revision",
+    "description",
+    "protocol",
+];
+const BATTERY_PROTOCOL_FIELD_ORDER: &[&str] = &["battery_monitor"];
 
 const PROJECT_FIELD_ORDER: &[&str] = &["name", "create_time", "update_time", "from", "base_path"];
 const EXPORT_INFO_FIELD_ORDER: &[&str] = &[
@@ -239,6 +270,7 @@ fn order_v2_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
     order_fault_code_info(&mut document);
     order_canopen(&mut document);
+    order_protocol_profiles(&mut document);
     order_localization(&mut document);
     order_object_value(document, V2_JCPRO_TOP_LEVEL_ORDER)
 }
@@ -279,6 +311,64 @@ fn order_canopen(root: &mut Value) {
     }
     let value = std::mem::take(canopen);
     *canopen = order_object_value(value, CANOPEN_FIELD_ORDER);
+}
+
+fn order_protocol_profiles(root: &mut Value) {
+    let Some(protocol_profiles) = root.get_mut("protocol_profiles") else {
+        return;
+    };
+    if let Some(profiles) = protocol_profiles
+        .get_mut("controller_profiles")
+        .and_then(Value::as_array_mut)
+    {
+        for profile in profiles.iter_mut() {
+            if let Some(protocol) = profile.get_mut("protocol") {
+                order_child_object(protocol, "sdo_info", SDO_FIELD_ORDER);
+                order_canopen(protocol);
+                let value = std::mem::take(protocol);
+                *protocol = order_object_value(value, CONTROLLER_PROTOCOL_FIELD_ORDER);
+            }
+            let value = std::mem::take(profile);
+            *profile = order_object_value(value, CONTROLLER_PROFILE_FIELD_ORDER);
+        }
+        profiles.sort_by(|left, right| {
+            left.get("profile_id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .cmp(
+                    right
+                        .get("profile_id")
+                        .and_then(Value::as_str)
+                        .unwrap_or(""),
+                )
+        });
+    }
+    if let Some(profiles) = protocol_profiles
+        .get_mut("battery_profiles")
+        .and_then(Value::as_array_mut)
+    {
+        for profile in profiles.iter_mut() {
+            if let Some(protocol) = profile.get_mut("protocol") {
+                let value = std::mem::take(protocol);
+                *protocol = order_object_value(value, BATTERY_PROTOCOL_FIELD_ORDER);
+            }
+            let value = std::mem::take(profile);
+            *profile = order_object_value(value, BATTERY_PROFILE_FIELD_ORDER);
+        }
+        profiles.sort_by(|left, right| {
+            left.get("profile_id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .cmp(
+                    right
+                        .get("profile_id")
+                        .and_then(Value::as_str)
+                        .unwrap_or(""),
+                )
+        });
+    }
+    let value = std::mem::take(protocol_profiles);
+    *protocol_profiles = order_object_value(value, PROTOCOL_PROFILES_FIELD_ORDER);
 }
 
 fn order_localization(root: &mut Value) {
@@ -1019,6 +1109,47 @@ mod tests {
                 ]
             },
             "project": { "name": "v2" },
+            "protocol_profiles": {
+                "battery_profiles": [
+                    {
+                        "protocol": {
+                            "battery_monitor": {}
+                        },
+                        "battery_revision": "1",
+                        "battery_family": "BMS",
+                        "profile_id": "battery_a"
+                    }
+                ],
+                "controller_profiles": [
+                    {
+                        "protocol": {
+                            "sdo_info": { "children": [], "type": 0 },
+                            "pdo_send": [],
+                            "pdo_recv": [],
+                            "pdo_condition": [],
+                            "pdo_global_param": []
+                        },
+                        "controller_revision": "2",
+                        "controller_family": "Inmotion",
+                        "profile_id": "inmotion"
+                    },
+                    {
+                        "protocol": {
+                            "pdo_global_param": [],
+                            "pdo_condition": [],
+                            "pdo_recv": [],
+                            "pdo_send": [],
+                            "sdo_info": { "type": 0, "children": [] }
+                        },
+                        "controller_revision": "1",
+                        "controller_family": "ACM",
+                        "profile_id": "acm"
+                    }
+                ],
+                "active_battery_profile_id": "battery_a",
+                "active_controller_profile_id": "inmotion",
+                "schema_version": 2
+            },
             "config_version": "jc002"
         });
 
@@ -1026,6 +1157,33 @@ mod tests {
 
         assert_eq!(sanitized["config_version"], "jc002");
         assert!(sanitized.get("localization").is_some());
+        assert_eq!(
+            sanitized["protocol_profiles"]["active_controller_profile_id"],
+            "inmotion"
+        );
+        assert_eq!(
+            sanitized["protocol_profiles"]["controller_profiles"][0]["profile_id"],
+            "acm"
+        );
+        assert_eq!(
+            sanitized["protocol_profiles"]["controller_profiles"][0]["protocol"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            vec![
+                "pdo_global_param",
+                "pdo_condition",
+                "pdo_recv",
+                "pdo_send",
+                "sdo_info"
+            ]
+        );
+        assert_eq!(
+            sanitized["protocol_profiles"]["battery_profiles"][0]["profile_id"],
+            "battery_a"
+        );
         assert!(sanitized.get("language_info").is_none());
         assert!(sanitized["fault_code_info"].get("codes").is_none());
         assert_eq!(

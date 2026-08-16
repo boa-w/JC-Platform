@@ -908,6 +908,7 @@ export function useBatteryMonitorController({
 
   return {
     currentBatteryMonitorDocument,
+    onUpdateSections: updateProjectSections,
     batteryValidation,
     isBatteryMonitorSupported,
     hasBatteryMonitor,

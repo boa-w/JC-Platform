@@ -7,6 +7,27 @@
   background: var(--surface-subtle);
 }
 
+.export-profile-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  border-left: 3px solid var(--action-primary);
+  padding: 9px 12px;
+  background: var(--action-primary-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.export-profile-summary strong {
+  color: var(--text-primary);
+}
+
+.export-profile-summary small {
+  flex-basis: 100%;
+  color: var(--text-muted);
+}
+
 .export-write-controls__header {
   display: flex;
   align-items: flex-start;

@@ -20,6 +20,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
     setBinaryFilename: setExportBinaryFilename,
     batteryMonitorExport,
     faultCodeExport,
+    protocolProfiles,
     updateExportTarget,
     exportReport,
     imageCopyReport,
@@ -73,6 +74,32 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
           {t(isExporting ? 'common.status.exporting' : 'projectExport.execute')}
         </button>
       </div>
+      {protocolProfiles ? (
+        <div className="export-profile-summary" role="status">
+          <strong>{t('projectExport.protocolProfile.title')}</strong>
+          <span>
+            {t('projectExport.protocolProfile.controllerActive', {
+              id: protocolProfiles.active_controller_profile_id,
+            })}
+          </span>
+          <span>
+            {t('projectExport.protocolProfile.controllerCount', {
+              count: protocolProfiles.controller_profiles.length,
+            })}
+          </span>
+          <span>
+            {t('projectExport.protocolProfile.batteryActive', {
+              id: protocolProfiles.active_battery_profile_id ?? t('protocolProfiles.notConfigured'),
+            })}
+          </span>
+          <span>
+            {t('projectExport.protocolProfile.batteryCount', {
+              count: protocolProfiles.battery_profiles.length,
+            })}
+          </span>
+          <small>{t('projectExport.protocolProfile.buildHint')}</small>
+        </div>
+      ) : null}
       <div className="export-filename-grid">
         <label>
           {t('projectExport.folderName')}

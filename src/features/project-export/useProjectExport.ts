@@ -15,6 +15,7 @@ import type {
   ProjectExportTargetSettings,
   UiImageCopyReport,
 } from '../../types/platform';
+import { readProtocolProfiles } from '../protocol-profiles/protocolProfiles';
 import { runSystemDialog } from '../../utils/systemDialog';
 import {
   defaultProjectExportSettings,
@@ -41,6 +42,7 @@ export function useProjectExport({
   const { t } = useTranslation();
   const [outputDir, setOutputDir] = useState(() => projectDirectory(projectPath));
   const exportSettings = useMemo(() => readProjectExportSettings(document), [document]);
+  const protocolProfiles = useMemo(() => readProtocolProfiles(document), [document]);
   const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
   const [imageCopyReport, setImageCopyReport] = useState<UiImageCopyReport | null>(null);
   const [binaryReport, setBinaryReport] = useState<BinaryBuildReport | null>(null);
@@ -205,6 +207,7 @@ export function useProjectExport({
     setBinaryFilename: (value: string) => updateExportSetting('binary_filename', value),
     batteryMonitorExport: exportSettings.battery_monitor,
     faultCodeExport: exportSettings.fault_code_info,
+    protocolProfiles,
     updateExportTarget,
     exportReport,
     imageCopyReport,

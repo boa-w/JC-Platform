@@ -16,6 +16,7 @@ export type DocumentSectionKey =
   | 'pdo_recv'
   | 'pdo_send'
   | 'canopen'
+  | 'protocol_profiles'
   | 'language_info'
   | 'localization'
   | 'battery_monitor'
@@ -36,6 +37,7 @@ export const modifiedSectionLabelKeys: Record<DocumentSectionKey, string> = {
   pdo_recv: 'documentSections.pdoReceive',
   pdo_send: 'documentSections.pdoSend',
   canopen: 'documentSections.canopen',
+  protocol_profiles: 'documentSections.protocolProfiles',
   language_info: 'documentSections.languages',
   localization: 'documentSections.languages',
   battery_monitor: 'documentSections.batteryMonitor',

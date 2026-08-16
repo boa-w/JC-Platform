@@ -21,6 +21,18 @@ v2 发布包必须由 `config_version: "jc002"` 项目单独构建。不要把 v
 ```json
 {
   "config_version": "jc002",
+  "protocol_profiles": {
+    "schema_version": 2,
+    "active_controller_profile_id": "inmotion",
+    "active_battery_profile_id": "bms-a",
+    "controller_profiles": [
+      { "profile_id": "acm", "controller_family": "ACM", "controller_revision": "1.x" },
+      { "profile_id": "inmotion", "controller_family": "Inmotion", "controller_revision": "2.x" }
+    ],
+    "battery_profiles": [
+      { "profile_id": "bms-a", "battery_family": "Lithium-A", "battery_revision": "1.x" }
+    ]
+  },
   "device": { "version": "jxc_7size_meter" },
   "screen_src": {},
   "data_description": {
@@ -36,10 +48,54 @@ v2 发布包必须由 `config_version: "jc002"` 项目单独构建。不要把 v
     "i18n_size": 0,
     "i18n_version": 2,
     "i18n_locale_total": 0,
-    "i18n_message_total": 0
+    "i18n_message_total": 0,
+    "protocol_profile_version": 2,
+    "controller_profile_total": 2,
+    "active_controller_profile_id": "inmotion",
+    "battery_profile_total": 1,
+    "active_battery_profile_id": "bms-a"
   }
 }
 ```
+
+`protocol_profiles` 只是一段升级身份元数据，不是协议定义。上位机从当前激活的控制器
+Profile 和锂电 Profile 组合构建 PDO、SDO 和可选 battery v2 段，写入 `data.bin`；清单
+分别记录两类 Profile 的版本、数量和激活 ID，避免把锂电帧、信号和显示项复制到 JSON。
+下位机在升级前和启动加载时都会校验两处身份一致。
+
+当前 ABI 每个发布包只有一套运行时表：
+
+```text
+项目 controller_profiles[N] + battery_profiles[M]
+          ↓ 分别选择两个 active ID
+当前控制器协议 + 当前锂电协议组合
+          ↓
+ConfigUpdate.json 身份元数据 + data.bin 单套运行时表
+          ↓ 更新后重启
+下位机现有 jc002 动态 PDO/SDO/battery loader
+```
+
+因此切换 ACM/Inmotion 或不同锂电协议时，只需在对应页面选择目标 Profile，再重新导出
+并更新整包。当前下位机不在运行中切换协议，也不读取设备 JSON 中的完整 Profile 定义。
+
+上位机的 Profile 选择来自同一个 `.jcpro`：CANopen 页面只改变
+`active_controller_profile_id`，锂电页面只改变 `active_battery_profile_id`。复制或重命名
+Profile 会修改 `.jcpro` 中相应的 Profile 数组；协议编辑器的 PDO/SDO/battery 改动会写回
+当前激活项。导出器不会根据顶层镜像猜测另一侧配置，也不会将未激活 Profile 混入运行时
+二进制。
+
+例如同一文件可以长期保存以下组合素材：
+
+```text
+controller_profiles: [acm, inmotion6]
+battery_profiles: [default, bms-a]
+当前导出: active_controller_profile_id=inmotion6
+          active_battery_profile_id=default
+```
+
+需要切换到 ACM 时，在上位机选择 `acm` 后重新导出即可；锂电仍为 `default`。需要切换
+锂电时只在锂电页面选择目标项，控制器选择不会被覆盖。每次选择变化都必须重新生成
+`ConfigUpdate.json` 与 `data.bin`，设备更新后重启生效。
 
 v2 禁止字段：
 

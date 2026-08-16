@@ -77,6 +77,11 @@
         "description": "编辑 jc002 的节点、SDO 和 PDO 拓扑，并从当前二进制映射源导出 CANopen 包。",
         "lifecycleReason": "jc002 CANopen 拓扑编辑与导出仍在持续验证中。"
       },
+      "protocolProfiles": {
+        "title": "协议 Profile 管理",
+        "description": "在同一 jc002 项目中维护不同控制器和锂电协议。",
+        "lifecycleReason": "Profile 选择在导出和设备重启后生效。"
+      },
       "uiResources": {
         "title": "UI 资源编辑",
         "description": "负责设备分辨率画布、图标/动画资源、属性编辑、选项增删和资源导出路径维护。"
@@ -204,6 +209,7 @@
     "pdoReceive": "PDO 接收帧",
     "pdoSend": "PDO 发送帧",
     "canopen": "CANopen V2 拓扑",
+    "protocolProfiles": "协议 Profile",
     "languages": "多国语言",
     "batteryMonitor": "锂电监控协议",
     "faultCodes": "故障代码",
@@ -720,6 +726,31 @@
       "flattenFailed": "生成旧版 PDO 段失败",
       "flattened": "已更新：{{sections}}"
     }
+  },
+  "protocolProfiles": {
+    "title": "协议 Profile",
+    "controllerTitle": "控制器协议 Profile",
+    "controllerDescription": "独立管理控制器的 PDO、SDO 和 CANopen 拓扑。",
+    "batteryTitle": "锂电监控 Profile",
+    "batteryDescription": "独立管理锂电帧、信号、显示项和超时策略。",
+    "notInitialized": "尚未启用{{scope}}。",
+    "notConfigured": "未配置",
+    "initialize": "启用 Profile 管理",
+    "activeController": "当前控制器协议",
+    "activeBattery": "当前锂电协议",
+    "controllerFamily": "控制器/协议族",
+    "controllerRevision": "控制器协议版本",
+    "batteryFamily": "电池协议族",
+    "batteryRevision": "电池协议版本",
+    "profileId": "Profile ID",
+    "description": "备注",
+    "profileIdEmpty": "Profile ID 不能为空。",
+    "profileIdTooLong": "Profile ID 不能超过 63 个 UTF-8 字节。",
+    "profileIdDuplicate": "Profile ID 已存在，请使用其他 ID。",
+    "clone": "复制 Profile",
+    "remove": "删除 Profile",
+    "removeConfirm": "确定删除 Profile「{{id}}」吗？",
+    "count": "共 {{count}} 个 Profile"
   },
   "canopenExport": {
     "title": "CANopen V2 构建",
@@ -1663,6 +1694,14 @@
     "binFilename": "二进制文件名",
     "restoreDefaultNames": "恢复默认名称",
     "restoreAllDefaults": "恢复全部默认值",
+    "protocolProfile": {
+      "title": "协议组合",
+      "controllerActive": "控制器协议：{{id}}",
+      "controllerCount": "控制器协议数：{{count}}",
+      "batteryActive": "锂电协议：{{id}}",
+      "batteryCount": "锂电协议数：{{count}}",
+      "buildHint": "构建将组合当前激活的控制器协议和锂电协议，生成单套 jc002 运行时 bin。"
+    },
     "writeControls": {
       "title": "写入控制",
       "description": "分别控制配置段和二进制文件是否写入导出包。",

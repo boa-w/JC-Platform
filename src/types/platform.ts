@@ -171,6 +171,7 @@ export interface ProjectDocument {
   pdo_send: unknown[];
   sdo_info: SdoNodeDocument;
   canopen?: CanOpenProjectDocument;
+  protocol_profiles?: ProtocolProfilesDocument;
   signal_dictionary: SignalDictionary;
   private_protocol: PrivateProtocolDocument;
   protocol_mapping: ProtocolMapping[];
@@ -254,6 +255,47 @@ export interface CanOpenProjectDocument {
   schema_version: number;
   nodes: CanOpenNodeDocument[];
   pdos: CanOpenPdoDocument[];
+}
+
+/** Protocol sections owned by a controller implementation. */
+export interface ControllerProtocolSections {
+  pdo_global_param: unknown[];
+  pdo_condition: unknown[];
+  pdo_recv: unknown[];
+  pdo_send: unknown[];
+  sdo_info: SdoNodeDocument;
+  canopen?: CanOpenProjectDocument;
+}
+
+/** Protocol sections owned by a battery-monitor implementation. */
+export interface BatteryProtocolSections {
+  battery_monitor?: BatteryMonitorProtocol;
+}
+
+export interface ControllerProtocolProfile {
+  profile_id: string;
+  controller_family: string;
+  controller_revision: string;
+  description?: string;
+  protocol: ControllerProtocolSections;
+}
+
+export interface BatteryProtocolProfile {
+  profile_id: string;
+  battery_family: string;
+  battery_revision: string;
+  description?: string;
+  protocol: {
+    battery_monitor: BatteryMonitorProtocol;
+  };
+}
+
+export interface ProtocolProfilesDocument {
+  schema_version: 2;
+  active_controller_profile_id: string;
+  active_battery_profile_id?: string;
+  controller_profiles: ControllerProtocolProfile[];
+  battery_profiles: BatteryProtocolProfile[];
 }
 
 export interface CanOpenNodeDocument {
@@ -852,6 +894,11 @@ export interface DataDescriptionPlan {
   i18n_version?: number;
   i18n_locale_total?: number;
   i18n_message_total?: number;
+  protocol_profile_version?: number;
+  controller_profile_total?: number;
+  active_controller_profile_id?: string;
+  battery_profile_total?: number;
+  active_battery_profile_id?: string;
 }
 
 export interface SdoImportReport {

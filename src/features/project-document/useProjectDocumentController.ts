@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDocumentDirtySections } from '../../hooks/useDocumentDirtySections';
+import { syncProtocolProfileSections } from '../protocol-profiles/syncProtocolProfileSections';
 import {
   type DocumentSectionKey,
   refactorOnlySections,
@@ -148,7 +149,7 @@ export function useProjectDocumentController({
     (section: string, value: unknown) => {
       const project = loadedProjectRef.current;
       if (!project) return;
-      const document = { ...(project.document as Record<string, unknown>), [section]: value };
+      const document = syncProtocolProfileSections(project.document, { [section]: value });
       const changedSection = (trackedDocumentSections as readonly string[]).includes(section)
         ? [section as DocumentSectionKey]
         : undefined;
@@ -161,7 +162,7 @@ export function useProjectDocumentController({
     (sections: Record<string, unknown>) => {
       const project = loadedProjectRef.current;
       if (!project) return;
-      const document = { ...(project.document as Record<string, unknown>), ...sections };
+      const document = syncProtocolProfileSections(project.document, sections);
       const changedSections = Object.keys(sections).filter(
         (section): section is DocumentSectionKey =>
           (trackedDocumentSections as readonly string[]).includes(section),

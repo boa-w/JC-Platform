@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
+import { ProtocolProfileBar } from '../../components/protocol/ProtocolProfileBar';
 import type {
   CanOpenNodeDocument,
   CanOpenPdoDocument,
@@ -23,6 +24,7 @@ import { useCanopenExport } from './useCanopenExport';
 interface CanopenExportPageProps {
   loadedProject: LoadedProject | null;
   onUpdateDocument: (section: string, value: unknown) => void;
+  onUpdateSections: (sections: Record<string, unknown>) => void;
 }
 
 const EMPTY_CANOPEN: CanOpenProjectDocument = {
@@ -294,7 +296,7 @@ function formatHex(value: number) {
   return `0x${value.toString(16).toUpperCase()}`;
 }
 
-export function CanopenExportPage({ loadedProject, onUpdateDocument }: CanopenExportPageProps) {
+export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSections }: CanopenExportPageProps) {
   const { t } = useTranslation();
   const canopenExport = useCanopenExport(loadedProject);
   const report = canopenExport.report;
@@ -462,6 +464,14 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument }: CanopenEx
           ) : null}
         </div>
       </div>
+
+      {loadedProject && isJc002 ? (
+        <ProtocolProfileBar
+          document={document}
+          onUpdateSections={onUpdateSections}
+          scope="controller"
+        />
+      ) : null}
 
       {!loadedProject ? (
         <EmptyState icon={FileCode2}>{t('canopenExport.openProjectPageFirst')}</EmptyState>

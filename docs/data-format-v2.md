@@ -38,6 +38,7 @@
 | `sdo_info` | 当前固件部署必填 | v2 loader 当前要求 `sdo_version=2` |
 | `battery_monitor` | 可选 | `.jcpro` 编辑态锂电协议模型；导出为二进制协议段 |
 | `fault_code_info` | 可选 | 启用时故障文案必须引用消息 key |
+| `protocol_profiles` | 可选 | 独立的控制器协议 Profile 集合和锂电协议 Profile 集合 |
 
 禁止字段：
 
@@ -46,6 +47,96 @@ language_info
 ```
 
 检测到禁止字段时构建立即失败，不忽略、不迁移、不回落。
+
+## 独立协议 Profile
+
+`protocol_profiles` 的 `schema_version=2` 明确分开两类协议：
+
+```json
+{
+  "protocol_profiles": {
+    "schema_version": 2,
+    "active_controller_profile_id": "inmotion",
+    "active_battery_profile_id": "bms-a",
+    "controller_profiles": [
+      {
+        "profile_id": "inmotion",
+        "controller_family": "Inmotion",
+        "controller_revision": "2.x",
+        "protocol": {
+          "pdo_global_param": [],
+          "pdo_condition": [],
+          "pdo_recv": [],
+          "pdo_send": [],
+          "sdo_info": {},
+          "canopen": {}
+        }
+      }
+    ],
+    "battery_profiles": [
+      {
+        "profile_id": "bms-a",
+        "battery_family": "Lithium-A",
+        "battery_revision": "1.x",
+        "protocol": {
+          "battery_monitor": {
+            "schema_version": 2,
+            "enabled": true,
+            "version": 2,
+            "frames": [],
+            "signals": [],
+            "items": []
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+规则：
+
+- `controller_profiles` 必须非空，`active_controller_profile_id` 必须存在。
+- `battery_profiles` 可以为空；非空时必须设置 `active_battery_profile_id` 并引用现有项。
+- 两个集合分别保证 `profile_id` 唯一；控制器和锂电允许使用相同的 ID，因为它们是
+  两个独立命名空间。
+- 控制器 Profile 只包含 PDO、SDO 和可选 CANopen；锂电 Profile 只包含
+  `battery_monitor`，禁止交叉嵌套。
+- 顶层协议段是当前两个激活项的编辑镜像，`protocol_profiles` 是持久化的唯一来源。
+- 导出器将两个激活项组合成当前 jc002 二进制 ABI 的一套 PDO/SDO/锂电表；完整集合
+  不写入 `data.bin`，也不复制到设备端 JSON。
+- 切换任意一侧都需要重新导出成对的清单和 bin，更新后重启生效；当前不支持在线切换。
+
+### 同一 jcpro 的 Profile 编辑流程
+
+上位机把 Profile 管理分成两个独立入口：CANopen 页操作
+`controller_profiles`，锂电监控页操作 `battery_profiles`。即使可选的 `canopen` 拓扑段
+尚未初始化，CANopen 页仍显示控制器 Profile 管理栏；每个入口都提供当前 Profile
+选择、复制、删除、ID 重命名、备注以及族/版本编辑。协议编辑器修改的顶层字段不是第二
+份数据，而是激活 Profile 的临时编辑镜像；统一同步函数会在每次修改时写回对应数组。
+
+Profile ID 是数组内的稳定引用键，遵守以下规则：
+
+- 同一 Profile 数组内唯一；控制器和锂电可以使用相同 ID；
+- 非空，最多 63 个 UTF-8 字节；
+- 重命名激活 Profile 时同步更新对应 `active_*_profile_id`；
+- 复制会生成唯一 ID 并切换到复制项，原 Profile 不被修改；
+- 删除会弹窗确认，控制器数组不能删除最后一项。
+
+因此，一个项目可以保存例如 `ACM + default`、`Inmotion6 + default` 和
+`Inmotion6 + BMS-A` 三种构建组合，但每次导出仍只选择一组激活 ID：
+
+```text
+controller_profiles: ACM, Inmotion6
+battery_profiles: default, BMS-A
+active_controller_profile_id: Inmotion6
+active_battery_profile_id: default
+                 ↓
+              当前 data.bin
+```
+
+保存 `.jcpro` 会保留全部数组；构建器只物化当前两个激活项。切换任意一侧后必须重新
+生成同批次的 `ConfigUpdate.json` 与 `data.bin`，设备更新并重启后才会使用新的组合。
 
 ## 编辑文件与运行时清单
 

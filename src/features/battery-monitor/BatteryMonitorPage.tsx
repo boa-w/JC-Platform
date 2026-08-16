@@ -21,6 +21,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
+import { ProtocolProfileBar } from '../../components/protocol/ProtocolProfileBar';
 import { localizationToLanguageDocument } from '../../components/language/localizationAdapter';
 import type {
   LanguageDocument,
@@ -201,6 +202,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
   const { t } = useTranslation();
   const {
     currentBatteryMonitorDocument,
+    onUpdateSections,
     batteryValidation,
     isBatteryMonitorSupported,
     hasBatteryMonitor,
@@ -1577,6 +1579,11 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
           </ActionButton>
         </div>
       </header>
+      <ProtocolProfileBar
+        document={loadedProject.document}
+        onUpdateSections={onUpdateSections}
+        scope="battery"
+      />
       {batteryMonitorExportStatus ||
       batteryMonitorImportStatus ||
       batteryCsvStatus ||

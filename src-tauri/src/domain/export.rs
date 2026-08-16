@@ -18,8 +18,10 @@ use crate::domain::pdo::{
     parse_pdo_advanced_document, PdoAdvancedDocument, PdoAdvancedFrame, PdoAdvancedSignal,
     PdoGlobalParam,
 };
-use crate::domain::project::validate_canopen_contract;
-use crate::domain::project::ProjectExportSettings;
+use crate::domain::project::{
+    materialize_active_protocol_profiles, protocol_profiles_manifest, validate_canopen_contract,
+    validate_protocol_profiles_contract, ProjectExportSettings,
+};
 use crate::domain::protocol::battery_monitor::{
     BatteryByteOrder, BatteryMonitorProtocol, BatteryRawType, BatteryValueType,
     BATTERY_MONITOR_BINARY_VERSION, BATTERY_MONITOR_SCHEMA_VERSION,
@@ -30,6 +32,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 use std::{fs, path::PathBuf};
+
+fn is_zero_usize(value: &usize) -> bool {
+    *value == 0
+}
 
 /// 导出包摘要。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -205,6 +211,16 @@ pub struct DataDescriptionPlan {
     pub i18n_version: usize,
     pub i18n_locale_total: usize,
     pub i18n_message_total: usize,
+    #[serde(skip_serializing_if = "is_zero_usize")]
+    pub protocol_profile_version: usize,
+    #[serde(skip_serializing_if = "is_zero_usize")]
+    pub controller_profile_total: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_controller_profile_id: Option<String>,
+    #[serde(skip_serializing_if = "is_zero_usize")]
+    pub battery_profile_total: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_battery_profile_id: Option<String>,
 }
 
 impl DataDescriptionPlan {
@@ -245,6 +261,11 @@ impl DataDescriptionPlan {
             i18n_version: 0,
             i18n_locale_total: 0,
             i18n_message_total: 0,
+            protocol_profile_version: 0,
+            controller_profile_total: 0,
+            active_controller_profile_id: None,
+            battery_profile_total: 0,
+            active_battery_profile_id: None,
         }
     }
 
@@ -560,7 +581,67 @@ pub fn compare_project_binary(request: BinaryCompareRequest) -> BinaryCompareRep
 /// PDO 与锂电监控分别构建，锂电帧不再投影到普通 PDO 表。
 pub fn build_project_binary(document: &Value) -> BinaryBuildReport {
     let export_settings = project_export_settings(document);
+    if document.get("protocol_profiles").is_some() {
+        return build_project_binary_from_active_profile(document, &export_settings);
+    }
     build_project_binary_from_settings(document, &export_settings)
+}
+
+fn build_project_binary_from_active_profile(
+    document: &Value,
+    export_settings: &ProjectExportSettings,
+) -> BinaryBuildReport {
+    if let Err(error) = validate_protocol_profiles_contract(document) {
+        return BinaryBuildReport {
+            valid: false,
+            file_size: 0,
+            crc: 0,
+            data_description: DataDescriptionPlan::empty(Vec::new()),
+            bytes: Vec::new(),
+            warnings: Vec::new(),
+            errors: vec![error],
+        };
+    }
+    let materialized = match materialize_active_protocol_profiles(document) {
+        Ok(document) => document,
+        Err(error) => {
+            return BinaryBuildReport {
+                valid: false,
+                file_size: 0,
+                crc: 0,
+                data_description: DataDescriptionPlan::empty(Vec::new()),
+                bytes: Vec::new(),
+                warnings: Vec::new(),
+                errors: vec![error],
+            };
+        }
+    };
+    let mut report = build_project_binary_from_settings(&materialized, export_settings);
+    let profile_root = document.get("protocol_profiles");
+    let controller_total = profile_root
+        .and_then(|root| root.get("controller_profiles"))
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    let active_controller_id = profile_root
+        .and_then(|root| root.get("active_controller_profile_id"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let battery_total = profile_root
+        .and_then(|root| root.get("battery_profiles"))
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    let active_battery_id = profile_root
+        .and_then(|root| root.get("active_battery_profile_id"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    report.data_description.protocol_profile_version = 2;
+    report.data_description.controller_profile_total = controller_total;
+    report.data_description.active_controller_profile_id = active_controller_id;
+    report.data_description.battery_profile_total = battery_total;
+    report.data_description.active_battery_profile_id = active_battery_id;
+    report
 }
 
 fn build_project_binary_from_settings(
@@ -722,6 +803,9 @@ fn build_config_update_manifest(
     } else {
         errors.push("导出项目失败：缺少 device".to_string());
     }
+    if let Some(protocol_profiles) = protocol_profiles_manifest(&request.document) {
+        manifest.insert("protocol_profiles".to_string(), protocol_profiles);
+    }
     manifest.insert(
         "screen_src".to_string(),
         build_legacy_screen_src(request, warnings, errors),
@@ -744,6 +828,11 @@ fn build_config_update_manifest(
                     "canopen_sdo_base_addr",
                     "canopen_sdo_total",
                     "sdo_version",
+                    "protocol_profile_version",
+                    "controller_profile_total",
+                    "active_controller_profile_id",
+                    "battery_profile_total",
+                    "active_battery_profile_id",
                 ] {
                     description.remove(key);
                 }
@@ -751,7 +840,13 @@ fn build_config_update_manifest(
             Some("jc002") => {
                 description.remove("language_addr");
                 description.remove("language_code");
-                if request.document.get("canopen").is_some() {
+                let materialized = materialize_active_protocol_profiles(&request.document).ok();
+                let has_canopen = request.document.get("canopen").is_some()
+                    || materialized
+                        .as_ref()
+                        .and_then(|value| value.get("canopen"))
+                        .is_some();
+                if has_canopen {
                     description.insert("canopen_version".to_string(), json!(1));
                 } else {
                     description.remove("canopen_sdo_base_addr");
@@ -3169,6 +3264,135 @@ mod tests {
             .errors
             .iter()
             .any(|error| error.contains("menu.root")));
+    }
+
+    #[test]
+    fn jc002_profile_build_materializes_active_protocol_and_manifest_identity() {
+        let mut document = i18n_fixture("jc002-valid");
+        let mut acm_protocol = json!({
+            "pdo_global_param": document["pdo_global_param"].clone(),
+            "pdo_condition": document["pdo_condition"].clone(),
+            "pdo_recv": document["pdo_recv"].clone(),
+            "pdo_send": document["pdo_send"].clone(),
+            "sdo_info": document["sdo_info"].clone()
+        });
+        let mut inmotion_protocol = acm_protocol.clone();
+        inmotion_protocol["pdo_global_param"][0]["name"] = json!("inmotion.speed");
+        inmotion_protocol["canopen"] = json!({
+            "schema_version": 1,
+            "nodes": [],
+            "pdos": []
+        });
+        acm_protocol["pdo_global_param"][0]["name"] = json!("acm.speed");
+        document["protocol_profiles"] = json!({
+            "schema_version": 2,
+            "active_controller_profile_id": "inmotion",
+            "active_battery_profile_id": "battery_b",
+            "controller_profiles": [
+                {
+                    "profile_id": "acm",
+                    "controller_family": "ACM",
+                    "controller_revision": "1.x",
+                        "protocol": acm_protocol
+                },
+                {
+                    "profile_id": "inmotion",
+                    "controller_family": "Inmotion",
+                    "controller_revision": "2.x",
+                        "protocol": inmotion_protocol
+                }
+            ],
+            "battery_profiles": [
+                {
+                    "profile_id": "battery_a",
+                    "battery_family": "BMS-A",
+                    "battery_revision": "1.x",
+                    "protocol": {
+                        "battery_monitor": {
+                            "schema_version": 2,
+                            "enabled": false,
+                            "version": 2,
+                            "default_timeout_ticks": 200,
+                            "page_size": 4,
+                            "frames": [],
+                            "signals": [],
+                            "items": []
+                        }
+                    }
+                },
+                {
+                    "profile_id": "battery_b",
+                    "battery_family": "BMS-B",
+                    "battery_revision": "2.x",
+                    "protocol": {
+                        "battery_monitor": {
+                            "schema_version": 2,
+                            "enabled": false,
+                            "version": 2,
+                            "default_timeout_ticks": 250,
+                            "page_size": 4,
+                            "frames": [],
+                            "signals": [],
+                            "items": []
+                        }
+                    }
+                }
+            ]
+        });
+
+        let binary = build_project_binary(&document);
+        assert!(
+            binary.valid,
+            "unexpected export errors: {:?}",
+            binary.errors
+        );
+        assert_eq!(binary.data_description.protocol_profile_version, 2);
+        assert_eq!(binary.data_description.controller_profile_total, 2);
+        assert_eq!(
+            binary
+                .data_description
+                .active_controller_profile_id
+                .as_deref(),
+            Some("inmotion")
+        );
+        assert_eq!(binary.data_description.battery_profile_total, 2);
+        assert_eq!(
+            binary.data_description.active_battery_profile_id.as_deref(),
+            Some("battery_b")
+        );
+
+        let manifest = fixture_manifest(document, &binary);
+        assert_eq!(
+            manifest["protocol_profiles"]["active_controller_profile_id"],
+            "inmotion"
+        );
+        assert_eq!(
+            manifest["protocol_profiles"]["active_battery_profile_id"],
+            "battery_b"
+        );
+        assert_eq!(
+            manifest["protocol_profiles"]["controller_profiles"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            manifest["protocol_profiles"]["battery_profiles"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            manifest["data_description"]["active_controller_profile_id"],
+            "inmotion"
+        );
+        assert_eq!(
+            manifest["data_description"]["active_battery_profile_id"],
+            "battery_b"
+        );
+        assert_eq!(manifest["data_description"]["canopen_version"], 1);
     }
 
     #[test]

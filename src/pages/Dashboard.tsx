@@ -694,6 +694,7 @@ export function Dashboard({
             <CanopenExportPage
               loadedProject={loadedProject}
               onUpdateDocument={updateProjectDocument}
+              onUpdateSections={updateProjectSections}
             />
           ) : null}
 

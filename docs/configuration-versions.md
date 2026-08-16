@@ -25,6 +25,11 @@
 7. v2 固件初始化失败时直接返回错误，不启动 v1 语言表。
 8. 不允许通过中文原文、数组位置或旧宏名称自动生成稳定消息 key。
 9. `jc001` 故障段只接受 `codes[]`；`jc002` 故障段只接受 `definitions[]` 和 `bindings[]`，禁止混用。
+10. `jc002.protocol_profiles` 若存在，必须使用 `schema_version=2`；控制器和锂电 Profile
+    分别在 `controller_profiles`、`battery_profiles` 中管理，各自 ID 不得重复，激活 ID
+    必须存在，且禁止跨集合嵌套协议段。
+11. 两类 Profile 只在上位机编辑和构建阶段保存多套协议；发布包当前只物化两个激活项，
+    下位机通过清单和 bin 描述的两组元数据一致性校验后，重启加载组合后的运行时表。
 
 ## 文件与部署隔离
 
@@ -39,6 +44,7 @@
 - v1 导出格式：[export-build.md](export-build.md)
 - v2 项目格式：[data-format-v2.md](data-format-v2.md)
 - v2 导出和 ABI：[export-build-v2.md](export-build-v2.md)
+- v2 多协议 Profile：[jc002-protocol-profiles.md](jc002-protocol-profiles.md)
 - v2 固件运行时：[firmware-i18n-v2.md](firmware-i18n-v2.md)
 
 ## 当前实现状态
@@ -53,3 +59,5 @@
 | 固件 v2 battery 记录消费 | 尚未完整接入；当前 Inmotion6 测试项目不含 battery 段 |
 | 固定页面 UI | 通过生成的枚举到稳定 key 表接入；缺失当前语言文本返回 `NULL` |
 | Inmotion6 业务测试迁移 | `scripts/migrate-jc001-i18n-v2.mjs` 可重复生成；其他项目仍需显式设计稳定 key |
+| jc002 多协议 Profile 编辑、active Profile 构建 | 上位机已实现；每包物化一套运行时表 |
+| 下位机 Profile 清单/bin 元数据校验 | 已接入 `meter_6_test`，待目标 SCons 构建和设备验证 |

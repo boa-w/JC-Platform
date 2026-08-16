@@ -43,6 +43,11 @@ Infrastructure 基础设施适配层
                                └─ img/
 ```
 
+对于 jc002，编辑文档中的 `protocol_profiles` 分别保存控制器协议集合和锂电协议集合，
+`active_controller_profile_id` 与 `active_battery_profile_id` 独立决定各自页面编辑内容和
+发布包物化结果。发布包仍是当前固件可消费的单套 PDO/SDO/battery 二进制 ABI，不把完整
+Profile JSON 下发到设备。
+
 ## React 表现层
 
 负责：
@@ -70,11 +75,13 @@ Infrastructure 基础设施适配层
 | 项目管理 | 创建、打开、迁移、校验、保存、另存为、恢复草稿和项目窗口生命周期 | `.jcpro`、sidecar |
 | 设置数据 | 编辑 SDO 参数树和参数元数据 | `sdo_info` |
 | 实时数据 | 编辑简化 PDO、高级 PDO 和 CANopen 节点/PDO 通信参数 | `pdo_simple_send_recv`、`pdo_*`、`canopen` |
+| 控制器协议 Profile | 维护 ACM/Inmotion 的 PDO、SDO 和 CANopen 协议 | `protocol_profiles.controller_profiles` |
 | 业务信号字典 | 维护业务 Signal 及显示语义 | `signal_dictionary` |
 | 私有协议 | 维护自定义传输帧和载荷 | `private_protocol` |
 | 协议映射 | 维护 Signal 到 CANopen/私有帧的映射 | `protocol_mapping` |
 | UI 资源 | 维护资源位置、选项和目标路径 | `ui_info`、`img/` |
-| 锂电监控 | 维护帧、信号解析、显示项和超时策略 | `battery_monitor`、二进制扩展段 |
+| 锂电协议 Profile | 独立维护不同 BMS 的帧、信号解析、显示项和超时策略 | `protocol_profiles.battery_profiles` |
+| 锂电监控运行时 | 消费当前激活锂电 Profile 的二进制扩展段 | `battery_monitor`、二进制扩展段 |
 | 故障代码 | 维护故障来源和故障码 | `fault_code_info`、二进制扩展段 |
 | 多国语言 v1 | 维护旧语言列表、文本和编辑顺序索引 | `language_info`、索引语言块 |
 | 多国语言 v2 | 维护 locale、稳定消息 key 和复数形式 | `localization`、`LVI2` 动态包 |
@@ -152,11 +159,13 @@ config_version == jc002 -> localization  -> LVI2 动态语言包 -> bin_generate
 ### 保存项目
 
 - 保存为 `.jcpro` 时写入 `jc001` 兼容格式，刷新 `project.update_time`，并移除 `signal_dictionary`、`private_protocol`、`protocol_mapping`；
+- 保存 jc002 时保留 `config_version`、`localization` 和 `protocol_profiles`，不经过 jc001 清洗器；
 - 如果这些重构专属段有修改，则写入或更新独立 sidecar；
 - 保存为非 `.jcpro` JSON 时保留完整编辑文档；
 - 另存为项目时会复制 UI 图片，并把绝对资源路径转换为目标项目下的相对路径。
 
-上述兼容保存流程是当前 v1 `.jcpro` 生命周期。v2 文件必须保留 `config_version: "jc002"` 和 `localization`，不得经过会强制生成 `jc001` 或剥离 v2 字段的兼容保存函数。当前实现应在正式开放 v2 编辑保存前补充独立保存入口和端到端测试。
+上述兼容保存流程只属于 v1 `.jcpro` 生命周期。v2 文件必须保留 `config_version: "jc002"`、
+`localization` 和可选的 `protocol_profiles`，不得经过会强制生成 `jc001` 或剥离 v2 字段的兼容保存函数。
 
 ### 导出项目
 

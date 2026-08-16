@@ -15,6 +15,9 @@ use crate::domain::signal::SignalDictionary;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
+
+const PROTOCOL_PROFILE_SCHEMA_VERSION: u64 = 2;
+const PROTOCOL_PROFILE_ID_MAX_BYTES: usize = 63;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -143,6 +146,10 @@ impl ProjectValidationReport {
                     warnings.push(error);
                     schema_valid = false;
                 }
+                if let Err(error) = validate_protocol_profiles_contract(value) {
+                    warnings.push(error);
+                    schema_valid = false;
+                }
             }
             Some(version) if version != "jc001" => {
                 warnings.push(format!("不支持的 config_version：{version}"));
@@ -217,9 +224,363 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
         None => Ok(()),
     };
     result?;
+    validate_protocol_profiles_contract(document)?;
     validate_fault_code_version_contract(document)?;
     validate_canopen_contract(document)?;
     validate_battery_monitor_version_contract(document)
+}
+
+/// Validate the optional jc002 controller and battery protocol registries.
+///
+/// Controller and battery protocols intentionally have independent identity
+/// spaces and active selections. The firmware receives their selected runtime
+/// sections only after the exporter combines them into the existing ABI.
+pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), String> {
+    let Some(root) = document.get("protocol_profiles") else {
+        return Ok(());
+    };
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
+        return Err("protocol_profiles 仅支持 jc002 项目".to_string());
+    }
+    let schema_version = root
+        .get("schema_version")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    if schema_version != PROTOCOL_PROFILE_SCHEMA_VERSION {
+        return Err(format!(
+            "jc002 protocol_profiles 必须使用 schema_version={}，当前为 {schema_version}",
+            PROTOCOL_PROFILE_SCHEMA_VERSION
+        ));
+    }
+    let active_controller_profile_id = root
+        .get("active_controller_profile_id")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "protocol_profiles.active_controller_profile_id 不能为空".to_string())?;
+    if active_controller_profile_id.len() > PROTOCOL_PROFILE_ID_MAX_BYTES {
+        return Err(
+            "protocol_profiles.active_controller_profile_id 超过固件 63 字节限制".to_string(),
+        );
+    }
+    let controller_profiles = root
+        .get("controller_profiles")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "protocol_profiles.controller_profiles 必须为数组".to_string())?;
+    if controller_profiles.is_empty() {
+        return Err("protocol_profiles.controller_profiles 不能为空".to_string());
+    }
+    let battery_profiles = root
+        .get("battery_profiles")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "protocol_profiles.battery_profiles 必须为数组".to_string())?;
+    let active_battery_profile_id = match root.get("active_battery_profile_id") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| {
+                    "protocol_profiles.active_battery_profile_id 必须为非空字符串".to_string()
+                })?,
+        ),
+    };
+    if let Some(profile_id) = active_battery_profile_id {
+        if profile_id.len() > PROTOCOL_PROFILE_ID_MAX_BYTES {
+            return Err(
+                "protocol_profiles.active_battery_profile_id 超过固件 63 字节限制".to_string(),
+            );
+        }
+    } else if !battery_profiles.is_empty() {
+        return Err(
+            "protocol_profiles.battery_profiles 非空时必须设置 active_battery_profile_id"
+                .to_string(),
+        );
+    }
+
+    let mut controller_profile_ids = HashSet::new();
+    let mut active_controller_found = false;
+    for (index, profile) in controller_profiles.iter().enumerate() {
+        let label = format!("controller profile {}", index + 1);
+        let profile_id = profile
+            .get("profile_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| format!("{label}.profile_id 不能为空"))?;
+        if !controller_profile_ids.insert(profile_id.to_string()) {
+            return Err(format!("controller profile_id 重复：{profile_id}"));
+        }
+        if profile_id.len() > PROTOCOL_PROFILE_ID_MAX_BYTES {
+            return Err(format!(
+                "{label}.profile_id 超过固件 63 字节限制：{profile_id}"
+            ));
+        }
+        if profile_id == active_controller_profile_id {
+            active_controller_found = true;
+        }
+        if profile
+            .get("controller_family")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_none()
+        {
+            return Err(format!("{label}.controller_family 不能为空"));
+        }
+        if profile
+            .get("controller_revision")
+            .and_then(Value::as_str)
+            .is_none()
+        {
+            return Err(format!("{label}.controller_revision 必须为字符串"));
+        }
+        let protocol = profile
+            .get("protocol")
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("{label}.protocol 必须为对象"))?;
+        if protocol.contains_key("battery_monitor") {
+            return Err(format!("{label}.protocol 不得包含 battery_monitor"));
+        }
+        for section in ["pdo_global_param", "pdo_condition", "pdo_recv", "pdo_send"] {
+            if !protocol.get(section).is_some_and(Value::is_array) {
+                return Err(format!("{label}.protocol.{section} 必须为数组"));
+            }
+        }
+        if !protocol.get("sdo_info").is_some_and(Value::is_object) {
+            return Err(format!("{label}.protocol.sdo_info 必须为对象"));
+        }
+
+        let mut materialized = document.clone();
+        let object = materialized
+            .as_object_mut()
+            .ok_or_else(|| "jc002 项目根节点必须为对象".to_string())?;
+        object.remove("protocol_profiles");
+        for section in [
+            "pdo_global_param",
+            "pdo_condition",
+            "pdo_recv",
+            "pdo_send",
+            "sdo_info",
+            "canopen",
+            "battery_monitor",
+        ] {
+            object.remove(section);
+        }
+        for (key, value) in protocol {
+            object.insert(key.clone(), value.clone());
+        }
+        validate_canopen_contract(&materialized)?;
+    }
+    if !active_controller_found {
+        return Err(format!(
+            "protocol_profiles.active_controller_profile_id 不存在：{active_controller_profile_id}"
+        ));
+    }
+
+    let mut battery_profile_ids = HashSet::new();
+    let mut active_battery_found = false;
+    for (index, profile) in battery_profiles.iter().enumerate() {
+        let label = format!("battery profile {}", index + 1);
+        let profile_id = profile
+            .get("profile_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| format!("{label}.profile_id 不能为空"))?;
+        if !battery_profile_ids.insert(profile_id.to_string()) {
+            return Err(format!("battery profile_id 重复：{profile_id}"));
+        }
+        if profile_id.len() > PROTOCOL_PROFILE_ID_MAX_BYTES {
+            return Err(format!(
+                "{label}.profile_id 超过固件 63 字节限制：{profile_id}"
+            ));
+        }
+        if Some(profile_id) == active_battery_profile_id {
+            active_battery_found = true;
+        }
+        if profile
+            .get("battery_family")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_none()
+        {
+            return Err(format!("{label}.battery_family 不能为空"));
+        }
+        if profile
+            .get("battery_revision")
+            .and_then(Value::as_str)
+            .is_none()
+        {
+            return Err(format!("{label}.battery_revision 必须为字符串"));
+        }
+        let protocol = profile
+            .get("protocol")
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("{label}.protocol 必须为对象"))?;
+        if protocol.keys().any(|key| key != "battery_monitor")
+            || !protocol
+                .get("battery_monitor")
+                .is_some_and(Value::is_object)
+        {
+            return Err(format!("{label}.protocol 必须只包含 battery_monitor 对象"));
+        }
+
+        let mut materialized = document.clone();
+        let object = materialized
+            .as_object_mut()
+            .ok_or_else(|| "jc002 项目根节点必须为对象".to_string())?;
+        object.remove("protocol_profiles");
+        for section in [
+            "pdo_global_param",
+            "pdo_condition",
+            "pdo_recv",
+            "pdo_send",
+            "sdo_info",
+            "canopen",
+            "battery_monitor",
+        ] {
+            object.remove(section);
+        }
+        object.insert(
+            "battery_monitor".to_string(),
+            protocol
+                .get("battery_monitor")
+                .cloned()
+                .ok_or_else(|| format!("{label}.protocol 缺少 battery_monitor"))?,
+        );
+        validate_battery_monitor_version_contract(&materialized)?;
+    }
+    if let Some(active_battery_profile_id) = active_battery_profile_id {
+        if !active_battery_found {
+            return Err(format!(
+                "protocol_profiles.active_battery_profile_id 不存在：{active_battery_profile_id}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Return a project document with the active controller and battery protocol
+/// sections materialized at the jc002 runtime locations used by the builder.
+/// The returned document is only an export/build view; it is never persisted.
+pub fn materialize_active_protocol_profiles(document: &Value) -> Result<Value, String> {
+    let Some(root) = document.get("protocol_profiles") else {
+        return Ok(document.clone());
+    };
+    validate_protocol_profiles_contract(document)?;
+    let active_controller_profile_id = root
+        .get("active_controller_profile_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "protocol_profiles.active_controller_profile_id 不能为空".to_string())?;
+    let controller_profiles = root
+        .get("controller_profiles")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "protocol_profiles.controller_profiles 必须为数组".to_string())?;
+    let controller_profile = controller_profiles
+        .iter()
+        .find(|profile| {
+            profile.get("profile_id").and_then(Value::as_str) == Some(active_controller_profile_id)
+        })
+        .ok_or_else(|| {
+            format!("找不到 active controller protocol profile：{active_controller_profile_id}")
+        })?;
+    let controller_protocol = controller_profile
+        .get("protocol")
+        .and_then(Value::as_object)
+        .ok_or_else(|| "active controller protocol profile 缺少 protocol 对象".to_string())?;
+    let battery_protocol = root
+        .get("active_battery_profile_id")
+        .and_then(Value::as_str)
+        .and_then(|active_id| {
+            root.get("battery_profiles")
+                .and_then(Value::as_array)
+                .map(|profiles| (active_id, profiles))
+        })
+        .and_then(|(active_id, profiles)| {
+            profiles.iter().find(|profile| {
+                profile.get("profile_id").and_then(Value::as_str) == Some(active_id)
+            })
+        })
+        .and_then(|profile| profile.get("protocol"))
+        .and_then(Value::as_object);
+    let mut materialized = document.clone();
+    let object = materialized
+        .as_object_mut()
+        .ok_or_else(|| "jc002 项目根节点必须为对象".to_string())?;
+    object.remove("protocol_profiles");
+    for section in [
+        "pdo_global_param",
+        "pdo_condition",
+        "pdo_recv",
+        "pdo_send",
+        "sdo_info",
+        "canopen",
+        "battery_monitor",
+    ] {
+        object.remove(section);
+    }
+    for (key, value) in controller_protocol {
+        object.insert(key.clone(), value.clone());
+    }
+    if let Some(battery_protocol) = battery_protocol {
+        if let Some(value) = battery_protocol.get("battery_monitor") {
+            object.insert("battery_monitor".to_string(), value.clone());
+        }
+    }
+    Ok(materialized)
+}
+
+/// Build the manifest-only identity block. Controller and battery payloads
+/// remain in the selected jc002 data.bin runtime sections.
+pub fn protocol_profiles_manifest(document: &Value) -> Option<Value> {
+    let root = document.get("protocol_profiles")?.as_object()?;
+    let controller_profiles = root.get("controller_profiles")?.as_array()?;
+    let battery_profiles = root.get("battery_profiles")?.as_array()?;
+    let controller_entries = controller_profiles
+        .iter()
+        .filter_map(|profile| {
+            Some(json!({
+                "profile_id": profile.get("profile_id")?.as_str()?,
+                "controller_family": profile.get("controller_family").and_then(Value::as_str).unwrap_or("generic"),
+                "controller_revision": profile.get("controller_revision").and_then(Value::as_str).unwrap_or(""),
+            }))
+        })
+        .collect::<Vec<_>>();
+    let battery_entries = battery_profiles
+        .iter()
+        .filter_map(|profile| {
+            Some(json!({
+                "profile_id": profile.get("profile_id")?.as_str()?,
+                "battery_family": profile.get("battery_family").and_then(Value::as_str).unwrap_or("generic"),
+                "battery_revision": profile.get("battery_revision").and_then(Value::as_str).unwrap_or(""),
+            }))
+        })
+        .collect::<Vec<_>>();
+    let mut manifest = Map::new();
+    manifest.insert(
+        "schema_version".to_string(),
+        json!(root
+            .get("schema_version")
+            .and_then(Value::as_u64)
+            .unwrap_or(PROTOCOL_PROFILE_SCHEMA_VERSION)),
+    );
+    manifest.insert(
+        "active_controller_profile_id".to_string(),
+        json!(root
+            .get("active_controller_profile_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")),
+    );
+    if let Some(active_id) = root
+        .get("active_battery_profile_id")
+        .and_then(Value::as_str)
+    {
+        manifest.insert("active_battery_profile_id".to_string(), json!(active_id));
+    }
+    manifest.insert("controller_profiles".to_string(), json!(controller_entries));
+    manifest.insert("battery_profiles".to_string(), json!(battery_entries));
+    Some(Value::Object(manifest))
 }
 
 /// 校验 jc002 的 CANopen 拓扑元数据。
@@ -1719,5 +2080,91 @@ mod tests {
             validate_project_version_contract(&document),
             Err("jc002 项目禁止包含 jc001 language_info".to_string())
         );
+    }
+
+    fn v2_document_with_protocol_profiles() -> Value {
+        let mut document = valid_v2_document();
+        document["protocol_profiles"] = json!({
+            "schema_version": 2,
+            "active_controller_profile_id": "inmotion",
+            "active_battery_profile_id": "battery_a",
+            "controller_profiles": [
+                {
+                    "profile_id": "acm",
+                    "controller_family": "ACM",
+                    "controller_revision": "1.x",
+                    "protocol": {
+                        "pdo_global_param": [{ "name": "acm.speed" }],
+                        "pdo_condition": [],
+                        "pdo_recv": [],
+                        "pdo_send": [],
+                        "sdo_info": { "type": 0, "children": [] }
+                    }
+                },
+                {
+                    "profile_id": "inmotion",
+                    "controller_family": "Inmotion",
+                    "controller_revision": "2.x",
+                    "protocol": {
+                        "pdo_global_param": [{ "name": "inmotion.speed" }],
+                        "pdo_condition": [],
+                        "pdo_recv": [],
+                        "pdo_send": [],
+                        "sdo_info": { "type": 0, "children": [] }
+                    }
+                }
+            ],
+            "battery_profiles": [
+                {
+                    "profile_id": "battery_a",
+                    "battery_family": "BMS-A",
+                    "battery_revision": "1.x",
+                    "protocol": {
+                        "battery_monitor": {
+                            "schema_version": 2,
+                            "enabled": true,
+                            "version": 2,
+                            "default_timeout_ticks": 200,
+                            "page_size": 4,
+                            "frames": [],
+                            "signals": [],
+                            "items": []
+                        }
+                    }
+                }
+            ]
+        });
+        document
+    }
+
+    #[test]
+    fn protocol_profiles_validate_and_materialize_only_active_sections() {
+        let document = v2_document_with_protocol_profiles();
+
+        assert!(validate_protocol_profiles_contract(&document).is_ok());
+        let materialized = materialize_active_protocol_profiles(&document).unwrap();
+
+        assert!(materialized.get("protocol_profiles").is_none());
+        assert_eq!(
+            materialized["pdo_global_param"][0]["name"],
+            "inmotion.speed"
+        );
+        assert_eq!(materialized["battery_monitor"]["version"], 2);
+        assert_eq!(materialized["config_version"], "jc002");
+    }
+
+    #[test]
+    fn protocol_profiles_reject_duplicate_ids_and_unknown_active_profile() {
+        let mut duplicate = v2_document_with_protocol_profiles();
+        duplicate["protocol_profiles"]["controller_profiles"][1]["profile_id"] = json!("acm");
+        assert!(validate_protocol_profiles_contract(&duplicate)
+            .unwrap_err()
+            .contains("profile_id 重复"));
+
+        let mut unknown_active = v2_document_with_protocol_profiles();
+        unknown_active["protocol_profiles"]["active_controller_profile_id"] = json!("missing");
+        assert!(validate_protocol_profiles_contract(&unknown_active)
+            .unwrap_err()
+            .contains("active_controller_profile_id 不存在"));
     }
 }
