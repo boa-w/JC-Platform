@@ -3523,10 +3523,16 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn fs_path_join_preserves_windows_separators_for_absolute_paths() {
-        assert_eq!(
-            join_fs_path(r"C:\Users\JCSH\Downloads\111", "jc_export"),
-            r"C:\Users\JCSH\Downloads\111\jc_export"
-        );
+        let base = std::env::temp_dir()
+            .join("jc-platform-export-test")
+            .to_string_lossy()
+            .into_owned();
+        let expected = std::path::Path::new(&base)
+            .join("jc_export")
+            .to_string_lossy()
+            .into_owned();
+
+        assert_eq!(join_fs_path(&base, "jc_export"), expected);
     }
 
     #[test]
