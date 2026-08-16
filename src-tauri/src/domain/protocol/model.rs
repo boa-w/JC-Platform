@@ -46,6 +46,21 @@ pub struct CanOpenPdoFrame {
     pub direction: PdoMappingDirection,
     pub description: String,
     pub mappings: Vec<CanOpenPdoMapping>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<CanOpenPdoMetadata>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CanOpenPdoMetadata {
+    pub key: String,
+    pub cob_id_mode: String,
+    pub pdo_type: String,
+    pub pdo_number: Option<u32>,
+    pub consumer_pdo_number: Option<u32>,
+    pub producer_node_id: Option<u32>,
+    #[serde(default)]
+    pub consumer_node_ids: Vec<u32>,
+    pub transmission_type: Option<u8>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,0 +1,285 @@
+.canopen-page {
+  gap: 12px;
+}
+
+.canopen-page-header > div:first-child {
+  min-width: 0;
+}
+
+.canopen-page .sample-actions button,
+.canopen-page .config-table-toolbar button,
+.canopen-inline-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.canopen-version-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.canopen-version-bar > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border-left: 2px solid var(--action-primary-border);
+  padding: 7px 10px;
+  background: var(--surface-subtle);
+}
+
+.canopen-version-bar span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.canopen-version-bar strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.canopen-version-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--status-warning-border-strong);
+  border-left: 3px solid var(--status-warning-accent);
+  padding: 12px;
+  background: var(--status-warning-surface);
+  color: var(--text-primary);
+}
+
+.canopen-version-warning > svg {
+  flex: 0 0 auto;
+  color: var(--status-warning);
+}
+
+.canopen-version-warning strong {
+  display: block;
+  font-size: 13px;
+}
+
+.canopen-version-warning p {
+  margin-top: 4px;
+}
+
+.canopen-inline-button {
+  margin-top: 10px;
+  border: 1px solid var(--action-primary-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  background: var(--action-primary-solid);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.canopen-inline-button:hover {
+  background: var(--action-primary-solid-hover);
+}
+
+.canopen-summary-strip {
+  margin-top: 0;
+}
+
+.canopen-validation {
+  margin: 0;
+  border-left: 3px solid var(--status-danger);
+  padding: 8px 12px;
+  background: var(--status-danger-surface);
+}
+
+.canopen-validation ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  line-height: 1.55;
+}
+
+.canopen-validation p {
+  margin: 6px 0 0;
+}
+
+.canopen-validation-success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--status-success);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.canopen-editor-section {
+  gap: 10px;
+}
+
+.canopen-editor-section .config-table-toolbar > div:first-child {
+  min-width: 0;
+}
+
+.canopen-editor-section .config-helper-text {
+  margin-top: 5px;
+}
+
+.canopen-editor-list {
+  display: grid;
+  gap: 8px;
+}
+
+.canopen-node-card,
+.canopen-pdo-card {
+  gap: 10px;
+}
+
+.canopen-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.canopen-card-header > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.canopen-card-header strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.canopen-card-index {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.canopen-danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--status-danger-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-panel);
+  color: var(--status-danger-text);
+  cursor: pointer;
+}
+
+.canopen-danger-button:hover {
+  border-color: var(--status-danger);
+  background: var(--status-danger);
+  color: white;
+}
+
+.canopen-editor-grid,
+.canopen-sdo-grid {
+  display: grid;
+  gap: 8px;
+  align-items: end;
+}
+
+.canopen-editor-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.canopen-node-grid {
+  grid-template-columns: 120px minmax(180px, 1.6fr) 130px 120px;
+}
+
+.canopen-sdo-grid {
+  grid-template-columns: 130px repeat(2, minmax(170px, 1fr));
+  padding-top: 2px;
+}
+
+.canopen-pdo-grid {
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+.canopen-editor-grid label,
+.canopen-sdo-grid label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.canopen-editor-grid input,
+.canopen-editor-grid select,
+.canopen-sdo-grid input,
+.canopen-sdo-grid select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.canopen-editor-grid input:focus,
+.canopen-editor-grid select:focus,
+.canopen-sdo-grid input:focus,
+.canopen-sdo-grid select:focus {
+  outline: none;
+  border-color: var(--action-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.canopen-field-wide {
+  grid-column: span 2;
+}
+
+.canopen-checkbox-field {
+  align-content: start;
+}
+
+.canopen-checkbox-field input {
+  width: 16px;
+  height: 16px;
+  margin: 5px 0 0;
+  accent-color: var(--action-primary);
+}
+
+@media (max-width: 980px) {
+  .canopen-node-grid,
+  .canopen-pdo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .canopen-field-wide {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .canopen-version-bar,
+  .canopen-node-grid,
+  .canopen-sdo-grid,
+  .canopen-pdo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .canopen-field-wide {
+    grid-column: auto;
+  }
+
+  .canopen-page-header {
+    align-items: flex-start;
+  }
+}

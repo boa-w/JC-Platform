@@ -15,6 +15,7 @@ export type DocumentSectionKey =
   | 'pdo_condition'
   | 'pdo_recv'
   | 'pdo_send'
+  | 'canopen'
   | 'language_info'
   | 'localization'
   | 'battery_monitor'
@@ -34,6 +35,7 @@ export const modifiedSectionLabelKeys: Record<DocumentSectionKey, string> = {
   pdo_condition: 'documentSections.pdoConditions',
   pdo_recv: 'documentSections.pdoReceive',
   pdo_send: 'documentSections.pdoSend',
+  canopen: 'documentSections.canopen',
   language_info: 'documentSections.languages',
   localization: 'documentSections.languages',
   battery_monitor: 'documentSections.batteryMonitor',
@@ -71,6 +73,7 @@ const legacyTableByModule: Partial<Record<NavigationKey, LegacyTableKind>> = {
 const sectionByModule: Partial<Record<NavigationKey, DocumentSectionKey>> = {
   language: 'language_info',
   'battery-monitor': 'battery_monitor',
+  'canopen-export': 'canopen',
   'signal-dictionary': 'signal_dictionary',
   'private-protocol': 'private_protocol',
   'protocol-mapping': 'protocol_mapping',

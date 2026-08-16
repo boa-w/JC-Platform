@@ -122,6 +122,10 @@ impl ProjectValidationReport {
                 warnings.push("jc001 项目禁止包含 jc002 localization".to_string());
                 schema_valid = false;
             }
+            Some("jc001") if value.get("canopen").is_some() => {
+                warnings.push("jc001 项目禁止包含 jc002 canopen".to_string());
+                schema_valid = false;
+            }
             Some("jc002") if value.get("language_info").is_some() => {
                 warnings.push("jc002 项目禁止包含 jc001 language_info".to_string());
                 schema_valid = false;
@@ -132,6 +136,10 @@ impl ProjectValidationReport {
                     schema_valid = false;
                 }
                 if let Err(error) = validate_fault_code_version_contract(value) {
+                    warnings.push(error);
+                    schema_valid = false;
+                }
+                if let Err(error) = validate_canopen_contract(value) {
                     warnings.push(error);
                     schema_valid = false;
                 }
@@ -197,6 +205,9 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
         Some("jc001") if document.get("localization").is_some() => {
             Err("jc001 项目禁止包含 jc002 localization".to_string())
         }
+        Some("jc001") if document.get("canopen").is_some() => {
+            Err("jc001 项目禁止包含 jc002 canopen".to_string())
+        }
         Some("jc001") => Ok(()),
         Some("jc002") if document.get("language_info").is_some() => {
             Err("jc002 项目禁止包含 jc001 language_info".to_string())
@@ -207,7 +218,285 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
     };
     result?;
     validate_fault_code_version_contract(document)?;
+    validate_canopen_contract(document)?;
     validate_battery_monitor_version_contract(document)
+}
+
+/// 校验 jc002 的 CANopen 拓扑元数据。
+///
+/// PDO 的实际数据映射仍由 `pdo_recv`/`pdo_send` 写入现有二进制 ABI，`canopen`
+/// 只负责声明节点、SDO COB-ID、PDO 类型和显式 COB-ID。这样自定义 ID（例如
+/// 0x3C0、0x294）不会再被默认连接集推断逻辑误判为无效帧。
+pub fn validate_canopen_contract(document: &Value) -> Result<(), String> {
+    let Some(value) = document.get("canopen") else {
+        return Ok(());
+    };
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
+        return Err("canopen 拓扑仅支持 jc002 项目".to_string());
+    }
+    let config = serde_json::from_value::<CanOpenProjectDocument>(value.clone())
+        .map_err(|error| format!("jc002 canopen 配置格式无效：{error}"))?;
+    if config.schema_version != 1 {
+        return Err(format!(
+            "jc002 canopen 必须使用 schema_version=1，当前为 {}",
+            config.schema_version
+        ));
+    }
+    if value.get("nodes").and_then(Value::as_array).is_none()
+        || value.get("pdos").and_then(Value::as_array).is_none()
+    {
+        return Err("jc002 canopen 必须同时声明 nodes 和 pdos 数组".to_string());
+    }
+
+    let mut node_ids = HashSet::new();
+    let mut sdo_cob_ids = HashSet::<(u32, u8)>::new();
+    for node in &config.nodes {
+        if !(1..=127).contains(&node.node_id) || !node_ids.insert(node.node_id) {
+            return Err(format!(
+                "jc002 canopen 节点 node_id 无效或重复：{}",
+                node.node_id
+            ));
+        }
+        if let Some(sdo) = &node.sdo {
+            validate_canopen_cob_id(
+                sdo.client_to_server_cob_id,
+                0,
+                &format!("节点 {} SDO client_to_server", node.node_id),
+            )?;
+            validate_canopen_cob_id(
+                sdo.server_to_client_cob_id,
+                0,
+                &format!("节点 {} SDO server_to_client", node.node_id),
+            )?;
+            if !sdo_cob_ids.insert((sdo.client_to_server_cob_id, 0))
+                || !sdo_cob_ids.insert((sdo.server_to_client_cob_id, 0))
+            {
+                return Err(format!(
+                    "节点 {} 的 SDO COB-ID 与其他 SDO 通道重复",
+                    node.node_id
+                ));
+            }
+            if sdo.cob_id_mode == "default"
+                && (sdo.client_to_server_cob_id != 0x600 + node.node_id
+                    || sdo.server_to_client_cob_id != 0x580 + node.node_id)
+            {
+                return Err(format!(
+                    "节点 {} 的默认 SDO COB-ID 必须为 0x{:X}/0x{:X}",
+                    node.node_id,
+                    0x600 + node.node_id,
+                    0x580 + node.node_id
+                ));
+            }
+            if !matches!(sdo.cob_id_mode.as_str(), "default" | "explicit") {
+                return Err(format!(
+                    "节点 {} 的 SDO cob_id_mode 无效：{}",
+                    node.node_id, sdo.cob_id_mode
+                ));
+            }
+        }
+    }
+
+    let mut pdo_keys = HashSet::new();
+    let mut pdo_ids = HashSet::new();
+    let mut endpoint_pdo_numbers = HashSet::<(u32, String, u32)>::new();
+    for pdo in &config.pdos {
+        if pdo.key.trim().is_empty() || !pdo_keys.insert(pdo.key.as_str()) {
+            return Err(format!("jc002 canopen PDO key 无效或重复：{}", pdo.key));
+        }
+        if !matches!(pdo.direction.as_str(), "receive" | "send") {
+            return Err(format!(
+                "CANopen PDO {} 的 direction 必须为 receive 或 send",
+                pdo.key
+            ));
+        }
+        if !matches!(pdo.pdo_type.as_str(), "tpdo" | "rpdo") {
+            return Err(format!(
+                "CANopen PDO {} 的 pdo_type 必须为 tpdo 或 rpdo",
+                pdo.key
+            ));
+        }
+        if pdo.producer_node_id.is_some() && pdo.pdo_type != "tpdo" {
+            return Err(format!(
+                "CANopen PDO {} 指定 producer_node_id 时，pdo_type 必须为 tpdo",
+                pdo.key
+            ));
+        }
+        if !matches!(pdo.cob_id_mode.as_str(), "default" | "explicit") {
+            return Err(format!(
+                "CANopen PDO {} 的 cob_id_mode 无效：{}",
+                pdo.key, pdo.cob_id_mode
+            ));
+        }
+        validate_canopen_cob_id(pdo.cob_id, pdo.frame_type, &format!("PDO {}", pdo.key))?;
+        if sdo_cob_ids.contains(&(pdo.cob_id, pdo.frame_type)) {
+            return Err(format!(
+                "CANopen PDO {} 的 COB-ID 与 SDO 通道重复：0x{:X} frame_type={}",
+                pdo.key, pdo.cob_id, pdo.frame_type
+            ));
+        }
+        if !pdo_ids.insert((pdo.cob_id, pdo.frame_type)) {
+            return Err(format!(
+                "CANopen PDO COB-ID 重复：0x{:X} frame_type={}",
+                pdo.cob_id, pdo.frame_type
+            ));
+        }
+        if let Some(node_id) = pdo.producer_node_id {
+            if !node_ids.contains(&node_id) {
+                return Err(format!(
+                    "CANopen PDO {} 引用了不存在的 producer node_id {}",
+                    pdo.key, node_id
+                ));
+            }
+        }
+        for node_id in &pdo.consumer_node_ids {
+            if !node_ids.contains(node_id) {
+                return Err(format!(
+                    "CANopen PDO {} 引用了不存在的 consumer node_id {}",
+                    pdo.key, node_id
+                ));
+            }
+        }
+        if let Some(number) = pdo.consumer_pdo_number {
+            if !(1..=4).contains(&number) {
+                return Err(format!(
+                    "CANopen PDO {} 的 consumer_pdo_number 必须在 1..=4 内",
+                    pdo.key
+                ));
+            }
+            if pdo.consumer_node_ids.is_empty() {
+                return Err(format!(
+                    "CANopen PDO {} 声明 consumer_pdo_number 时必须至少有一个 consumer_node_id",
+                    pdo.key
+                ));
+            }
+        }
+        if let Some(number) = pdo.pdo_number {
+            if let Some(node_id) = pdo.producer_node_id {
+                if !endpoint_pdo_numbers.insert((node_id, pdo.pdo_type.clone(), number)) {
+                    return Err(format!(
+                        "CANopen PDO {} 与同一生产者节点的 PDO 编号重复：node_id={} pdo_type={} pdo_number={}",
+                        pdo.key, node_id, pdo.pdo_type, number
+                    ));
+                }
+            }
+        }
+        let consumer_number = pdo.consumer_pdo_number.or(pdo.pdo_number);
+        if let Some(number) = consumer_number {
+            for node_id in &pdo.consumer_node_ids {
+                if !endpoint_pdo_numbers.insert((*node_id, "rpdo".to_string(), number)) {
+                    return Err(format!(
+                        "CANopen PDO {} 与同一消费者节点的 PDO 编号重复：node_id={} pdo_type=rpdo pdo_number={}",
+                        pdo.key, node_id, number
+                    ));
+                }
+            }
+        }
+        if let Some(number) = pdo.pdo_number {
+            if !(1..=4).contains(&number) {
+                return Err(format!(
+                    "CANopen PDO {} 的 pdo_number 必须在 1..=4 内",
+                    pdo.key
+                ));
+            }
+            if pdo.cob_id_mode == "default" {
+                let Some(node_id) = pdo.producer_node_id else {
+                    return Err(format!(
+                        "CANopen PDO {} 使用 default COB-ID 时必须声明 producer_node_id",
+                        pdo.key
+                    ));
+                };
+                let base = if pdo.pdo_type == "tpdo" { 0x180 } else { 0x200 };
+                let expected = base + (number - 1) * 0x100 + node_id;
+                if pdo.cob_id != expected {
+                    return Err(format!(
+                        "CANopen PDO {} 的默认 COB-ID 应为 0x{:X}，当前为 0x{:X}",
+                        pdo.key, expected, pdo.cob_id
+                    ));
+                }
+            }
+        } else if pdo.cob_id_mode == "default" {
+            return Err(format!(
+                "CANopen PDO {} 使用 default COB-ID 时必须声明 pdo_number",
+                pdo.key
+            ));
+        }
+        if let Some(transmission_type) = pdo.transmission_type {
+            if !(transmission_type <= 240 || transmission_type == 254 || transmission_type == 255) {
+                return Err(format!(
+                    "CANopen PDO {} 的 transmission_type 无效：{}",
+                    pdo.key, transmission_type
+                ));
+            }
+        }
+        validate_canopen_pdo_source(document, pdo)?;
+    }
+    Ok(())
+}
+
+fn validate_canopen_cob_id(cob_id: u32, frame_type: u8, label: &str) -> Result<(), String> {
+    let max = if frame_type == 0 { 0x7ff } else { 0x1fff_ffff };
+    if frame_type > 1 || cob_id > max {
+        return Err(format!(
+            "{} 的 COB-ID/frame_type 无效：0x{:X}/{}",
+            label, cob_id, frame_type
+        ));
+    }
+    Ok(())
+}
+
+fn validate_canopen_pdo_source(document: &Value, pdo: &CanOpenPdoDocument) -> Result<(), String> {
+    let Some(section) = pdo.source_section.as_deref() else {
+        return Err(format!(
+            "CANopen PDO {} 必须声明 source_section/source_index 以绑定 jc002 PDO 二进制表",
+            pdo.key
+        ));
+    };
+    let Some(index) = pdo.source_index else {
+        return Err(format!(
+            "CANopen PDO {} 指定了 source_section={} 但缺少 source_index",
+            pdo.key, section
+        ));
+    };
+    let section_matches_direction = match pdo.direction.as_str() {
+        "receive" => matches!(section, "pdo_recv" | "pdo_simple_send_recv.pdo_recv"),
+        "send" => matches!(section, "pdo_send" | "pdo_simple_send_recv.pdo_send"),
+        _ => false,
+    };
+    if !section_matches_direction {
+        return Err(format!(
+            "CANopen PDO {} 的 source_section={} 与 direction={} 不一致",
+            pdo.key, section, pdo.direction
+        ));
+    }
+    let Some(frames) = document.get(section).and_then(Value::as_array) else {
+        return Err(format!(
+            "CANopen PDO {} 引用了不存在的源段 {}",
+            pdo.key, section
+        ));
+    };
+    let Some(frame) = frames.get(index) else {
+        return Err(format!(
+            "CANopen PDO {} 的 source_index 越界：{}[{}]",
+            pdo.key, section, index
+        ));
+    };
+    let source_id = frame
+        .get("id")
+        .and_then(Value::as_u64)
+        .or_else(|| frame.get("can_id").and_then(Value::as_u64))
+        .unwrap_or(u64::MAX);
+    let source_type = frame
+        .get("type")
+        .and_then(Value::as_u64)
+        .or_else(|| frame.get("frame_type").and_then(Value::as_u64))
+        .unwrap_or(0);
+    if source_id != u64::from(pdo.cob_id) || source_type != u64::from(pdo.frame_type) {
+        return Err(format!(
+            "CANopen PDO {} 与源段 {}[{}] 的 COB-ID/frame_type 不一致：0x{:X}/{} != 0x{:X}/{}",
+            pdo.key, section, index, source_id, source_type, pdo.cob_id, pdo.frame_type
+        ));
+    }
+    Ok(())
 }
 
 fn validate_battery_monitor_version_contract(document: &Value) -> Result<(), String> {
@@ -1041,6 +1330,7 @@ pub struct ProjectDocument {
     pub pdo_send: Vec<Value>,
     #[serde(default)]
     pub sdo_info: SdoNodeDocument,
+    pub canopen: Option<CanOpenProjectDocument>,
     #[serde(default)]
     pub signal_dictionary: SignalDictionary,
     #[serde(default)]
@@ -1051,6 +1341,55 @@ pub struct ProjectDocument {
     pub localization: Option<Value>,
     pub battery_monitor: Option<Value>,
     pub fault_code_info: Option<Value>,
+}
+
+/// jc002 CANopen 拓扑描述。该段是项目的协议语义层，不替代现有 PDO 二进制表。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CanOpenProjectDocument {
+    #[serde(default)]
+    pub schema_version: u8,
+    #[serde(default)]
+    pub nodes: Vec<CanOpenNodeDocument>,
+    #[serde(default)]
+    pub pdos: Vec<CanOpenPdoDocument>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CanOpenNodeDocument {
+    pub node_id: u32,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub role: String,
+    pub sdo: Option<CanOpenSdoChannelDocument>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CanOpenSdoChannelDocument {
+    #[serde(default)]
+    pub cob_id_mode: String,
+    pub client_to_server_cob_id: u32,
+    pub server_to_client_cob_id: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CanOpenPdoDocument {
+    pub key: String,
+    pub direction: String,
+    pub pdo_type: String,
+    pub cob_id: u32,
+    #[serde(default)]
+    pub cob_id_mode: String,
+    #[serde(default)]
+    pub frame_type: u8,
+    pub producer_node_id: Option<u32>,
+    #[serde(default)]
+    pub consumer_node_ids: Vec<u32>,
+    pub pdo_number: Option<u32>,
+    pub consumer_pdo_number: Option<u32>,
+    pub transmission_type: Option<u8>,
+    pub source_section: Option<String>,
+    pub source_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

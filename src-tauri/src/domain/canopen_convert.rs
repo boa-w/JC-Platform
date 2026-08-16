@@ -1,3 +1,4 @@
+use crate::domain::project::validate_canopen_contract;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -29,6 +30,8 @@ pub struct CanopenNodeSummary {
 #[derive(Debug, Clone)]
 struct ObjectSpec {
     node_id: u32,
+    sdo_rx_cob_id: u32,
+    sdo_tx_cob_id: u32,
     index: u32,
     subindex: u32,
     name: String,
@@ -46,10 +49,36 @@ struct ObjectSpec {
 struct PdoSpec {
     node_id: Option<u32>,
     direction: String,
+    runtime_direction: String,
+    pdo_type: String,
     pdo_number: Option<u32>,
+    consumer_pdo_number: Option<u32>,
     cob_id: u32,
+    cob_id_mode: String,
+    frame_type: u8,
+    consumer_node_ids: Vec<u32>,
+    transmission_type: Option<u8>,
+    source_section: Option<String>,
+    source_index: Option<usize>,
     name: String,
     mappings: Vec<PdoMappingSpec>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct CanopenPdoMetadata {
+    key: String,
+    direction: String,
+    pdo_type: String,
+    cob_id: u32,
+    cob_id_mode: String,
+    frame_type: u8,
+    producer_node_id: Option<u32>,
+    consumer_node_ids: Vec<u32>,
+    pdo_number: Option<u32>,
+    consumer_pdo_number: Option<u32>,
+    transmission_type: Option<u8>,
+    source_section: Option<String>,
+    source_index: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +128,120 @@ fn object_string(value: &Value, key: &str) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+fn canopen_node_sdo_cob_ids(document: &Value, node_id: u32) -> (u32, u32) {
+    let Some(nodes) = document
+        .get("canopen")
+        .and_then(|value| value.get("nodes"))
+        .and_then(Value::as_array)
+    else {
+        return (0x600 + node_id, 0x580 + node_id);
+    };
+    for node in nodes {
+        if object_u32(node, "node_id") != Some(node_id) {
+            continue;
+        }
+        if let Some(sdo) = node.get("sdo") {
+            return (
+                object_u32(sdo, "client_to_server_cob_id").unwrap_or(0x600 + node_id),
+                object_u32(sdo, "server_to_client_cob_id").unwrap_or(0x580 + node_id),
+            );
+        }
+    }
+    (0x600 + node_id, 0x580 + node_id)
+}
+
+fn canopen_node_sdo_channel(document: &Value, node_id: u32) -> Option<(u32, u32)> {
+    let Some(nodes) = document
+        .get("canopen")
+        .and_then(|value| value.get("nodes"))
+        .and_then(Value::as_array)
+    else {
+        return Some((0x600 + node_id, 0x580 + node_id));
+    };
+    let node = nodes
+        .iter()
+        .find(|node| object_u32(node, "node_id") == Some(node_id))?;
+    let sdo = node.get("sdo")?;
+    Some((
+        object_u32(sdo, "client_to_server_cob_id").unwrap_or(0x600 + node_id),
+        object_u32(sdo, "server_to_client_cob_id").unwrap_or(0x580 + node_id),
+    ))
+}
+
+fn canopen_node_name(document: &Value, node_id: u32) -> String {
+    document
+        .get("canopen")
+        .and_then(|value| value.get("nodes"))
+        .and_then(Value::as_array)
+        .and_then(|nodes| {
+            nodes
+                .iter()
+                .find(|node| object_u32(node, "node_id") == Some(node_id))
+        })
+        .and_then(|node| object_string(node, "name"))
+        .unwrap_or_else(|| format!("Node {node_id}"))
+}
+
+fn collect_canopen_pdo_metadata(document: &Value) -> Vec<CanopenPdoMetadata> {
+    document
+        .get("canopen")
+        .and_then(|value| value.get("pdos"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    let key = object_string(item, "key")?;
+                    Some(CanopenPdoMetadata {
+                        key,
+                        direction: object_string(item, "direction").unwrap_or_default(),
+                        pdo_type: object_string(item, "pdo_type").unwrap_or_default(),
+                        cob_id: object_u32(item, "cob_id")?,
+                        cob_id_mode: object_string(item, "cob_id_mode").unwrap_or_default(),
+                        frame_type: object_u32(item, "frame_type").unwrap_or(0) as u8,
+                        producer_node_id: object_u32(item, "producer_node_id"),
+                        consumer_node_ids: item
+                            .get("consumer_node_ids")
+                            .and_then(Value::as_array)
+                            .map(|values| values.iter().filter_map(value_u32).collect())
+                            .unwrap_or_default(),
+                        pdo_number: object_u32(item, "pdo_number"),
+                        consumer_pdo_number: object_u32(item, "consumer_pdo_number"),
+                        transmission_type: object_u32(item, "transmission_type")
+                            .map(|value| value as u8),
+                        source_section: object_string(item, "source_section"),
+                        source_index: object_u32(item, "source_index").map(|value| value as usize),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn canopen_pdos_declared(document: &Value) -> bool {
+    document.get("canopen").is_some()
+}
+
+fn pdo_endpoint_type<'a>(pdo: &'a PdoSpec, node_id: u32) -> &'a str {
+    if pdo.node_id == Some(node_id) {
+        pdo.pdo_type.as_str()
+    } else if pdo.consumer_node_ids.contains(&node_id) {
+        "rpdo"
+    } else {
+        pdo.pdo_type.as_str()
+    }
+}
+
+fn pdo_endpoint_number(pdo: &PdoSpec, node_id: u32) -> Option<u32> {
+    if pdo.node_id == Some(node_id) {
+        pdo.pdo_number
+    } else if pdo.consumer_node_ids.contains(&node_id) {
+        pdo.consumer_pdo_number.or(pdo.pdo_number)
+    } else {
+        pdo.pdo_number
+    }
+}
+
 fn access_type(value: u32) -> String {
     match value {
         1 => "rw",
@@ -133,6 +276,17 @@ fn eds_data_type(
 
 fn collect_sdo_objects(document: &Value, warnings: &mut Vec<String>) -> Vec<ObjectSpec> {
     let mut objects = Vec::new();
+    let node_sdo_cob_ids = document
+        .get("sdo_info")
+        .map(|_| {
+            let mut ids = HashMap::new();
+            let node_ids = collect_sdo_node_ids(document);
+            for node_id in node_ids {
+                ids.insert(node_id, canopen_node_sdo_cob_ids(document, node_id));
+            }
+            ids
+        })
+        .unwrap_or_default();
     let Some(root) = document.get("sdo_info") else {
         warnings.push("缺少 sdo_info，无法生成对象字典".to_string());
         return objects;
@@ -143,6 +297,7 @@ fn collect_sdo_objects(document: &Value, warnings: &mut Vec<String>) -> Vec<Obje
         path: &mut Vec<String>,
         objects: &mut Vec<ObjectSpec>,
         warnings: &mut Vec<String>,
+        node_sdo_cob_ids: &HashMap<u32, (u32, u32)>,
     ) {
         let node_type = object_u32(node, "type").unwrap_or(0);
         let name = object_string(node, "name").unwrap_or_else(|| {
@@ -161,10 +316,16 @@ fn collect_sdo_objects(document: &Value, warnings: &mut Vec<String>) -> Vec<Obje
                 warnings.push(format!("设置项 {} 缺少有效 fid/mid", name));
             }
             let handle = object_u32(node, "handle").unwrap_or(0);
+            let (sdo_rx_cob_id, sdo_tx_cob_id) = node_sdo_cob_ids
+                .get(&node_id)
+                .copied()
+                .unwrap_or((0x600 + node_id, 0x580 + node_id));
             let min_value = object_string(node, "data_min");
             let max_value = object_string(node, "data_max");
             objects.push(ObjectSpec {
                 node_id,
+                sdo_rx_cob_id,
+                sdo_tx_cob_id,
                 index,
                 subindex,
                 name,
@@ -184,15 +345,35 @@ fn collect_sdo_objects(document: &Value, warnings: &mut Vec<String>) -> Vec<Obje
         path.push(name);
         if let Some(children) = node.get("children").and_then(|v| v.as_array()) {
             for child in children {
-                visit(child, path, objects, warnings);
+                visit(child, path, objects, warnings, node_sdo_cob_ids);
             }
         }
         path.pop();
     }
 
     let mut path = Vec::new();
-    visit(root, &mut path, &mut objects, warnings);
+    visit(root, &mut path, &mut objects, warnings, &node_sdo_cob_ids);
     objects
+}
+
+fn collect_sdo_node_ids(document: &Value) -> BTreeSet<u32> {
+    let mut node_ids = BTreeSet::new();
+    fn visit(node: &Value, node_ids: &mut BTreeSet<u32>) {
+        if object_u32(node, "type") == Some(1) {
+            if let Some(node_id) = object_u32(node, "fid") {
+                node_ids.insert(node_id);
+            }
+        }
+        if let Some(children) = node.get("children").and_then(Value::as_array) {
+            for child in children {
+                visit(child, node_ids);
+            }
+        }
+    }
+    if let Some(root) = document.get("sdo_info") {
+        visit(root, &mut node_ids);
+    }
+    node_ids
 }
 
 fn collect_param_names(document: &Value) -> HashMap<String, String> {
@@ -230,6 +411,47 @@ fn pdo_kind(cob_id: u32, node_ids: &BTreeSet<u32>) -> (Option<u32>, String, Opti
     (None, "custom".to_string(), None)
 }
 
+fn collect_pdo_mappings(
+    frame: &Value,
+    cob_id: u32,
+    param_names: &HashMap<String, String>,
+    by_name: &HashMap<String, (u32, u32)>,
+    warnings: &mut Vec<String>,
+) -> Vec<PdoMappingSpec> {
+    frame
+        .get("data")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|signal| {
+            let param_id = object_string(&signal, "param_id")
+                .or_else(|| object_string(&signal, "pdo_param_name"))
+                .unwrap_or_else(|| "unknown".to_string());
+            let name = param_names
+                .get(&param_id)
+                .cloned()
+                .unwrap_or_else(|| param_id.clone());
+            let resolved = by_name.get(&name).copied();
+            if resolved.is_none() {
+                warnings.push(format!(
+                    "PDO 0x{:X} 信号 {} 无法映射到对象字典 index/subindex，EDS PDO Mapping 将标记为未解析",
+                    cob_id, name
+                ));
+            }
+            PdoMappingSpec {
+                param_id,
+                name,
+                bit_offset: object_u32(&signal, "pos").unwrap_or(0),
+                bit_length: object_u32(&signal, "len").unwrap_or(0),
+                show_type: object_u32(&signal, "show_type").unwrap_or(0),
+                index: resolved.map(|item| item.0),
+                subindex: resolved.map(|item| item.1),
+            }
+        })
+        .collect()
+}
+
 fn collect_pdos(
     document: &Value,
     objects: &[ObjectSpec],
@@ -247,10 +469,71 @@ fn collect_pdos(
             .or_insert((obj.index, obj.subindex));
     }
 
+    let explicit = collect_canopen_pdo_metadata(document);
     let mut pdos = Vec::new();
+    if canopen_pdos_declared(document) {
+        for metadata in explicit {
+            let default_section = if metadata.direction == "receive" {
+                "pdo_recv"
+            } else {
+                "pdo_send"
+            };
+            let frame = metadata
+                .source_section
+                .as_deref()
+                .and_then(|section| document.get(section))
+                .and_then(Value::as_array)
+                .and_then(|frames| metadata.source_index.and_then(|index| frames.get(index)))
+                .or_else(|| {
+                    document
+                        .get(default_section)
+                        .and_then(Value::as_array)
+                        .and_then(|frames| {
+                            frames.iter().find(|frame| {
+                                object_u32(frame, "id").or_else(|| object_u32(frame, "can_id"))
+                                    == Some(metadata.cob_id)
+                            })
+                        })
+                });
+            let Some(frame) = frame else {
+                warnings.push(format!(
+                    "CANopen PDO {} 未找到 source_section/source_index 对应的实时帧",
+                    metadata.key
+                ));
+                continue;
+            };
+            let node_id = metadata.producer_node_id;
+            let mappings =
+                collect_pdo_mappings(frame, metadata.cob_id, &param_names, &by_name, warnings);
+            pdos.push(PdoSpec {
+                node_id,
+                direction: metadata.pdo_type.clone(),
+                runtime_direction: metadata.direction,
+                pdo_type: metadata.pdo_type,
+                pdo_number: metadata.pdo_number,
+                consumer_pdo_number: metadata.consumer_pdo_number,
+                cob_id: metadata.cob_id,
+                cob_id_mode: metadata.cob_id_mode,
+                frame_type: metadata.frame_type,
+                consumer_node_ids: metadata.consumer_node_ids,
+                transmission_type: metadata.transmission_type,
+                source_section: metadata.source_section,
+                source_index: metadata.source_index,
+                name: object_string(frame, "desc")
+                    .unwrap_or_else(|| format!("PDO_0x{:X}", metadata.cob_id)),
+                mappings,
+            });
+        }
+        return pdos;
+    }
+
+    warnings.push(
+        "未声明 canopen.pdos，已按 jc002 PDO 段生成默认连接集投影；建议补齐显式 CANopen 元数据"
+            .to_string(),
+    );
     for section in ["pdo_recv", "pdo_send"] {
         if let Some(frames) = document.get(section).and_then(|v| v.as_array()) {
-            for frame in frames {
+            for (frame_index, frame) in frames.iter().enumerate() {
                 let cob_id = object_u32(frame, "id")
                     .or_else(|| object_u32(frame, "can_id"))
                     .unwrap_or(0);
@@ -295,9 +578,22 @@ fn collect_pdos(
                 }
                 pdos.push(PdoSpec {
                     node_id,
-                    direction,
+                    direction: direction.clone(),
+                    runtime_direction: if section == "pdo_recv" {
+                        "receive".to_string()
+                    } else {
+                        "send".to_string()
+                    },
+                    pdo_type: direction,
                     pdo_number,
+                    consumer_pdo_number: None,
                     cob_id,
+                    cob_id_mode: "inferred".to_string(),
+                    frame_type: object_u32(frame, "type").unwrap_or(0) as u8,
+                    consumer_node_ids: Vec::new(),
+                    transmission_type: None,
+                    source_section: Some(section.to_string()),
+                    source_index: Some(frame_index),
                     name: object_string(frame, "desc")
                         .unwrap_or_else(|| format!("PDO_0x{cob_id:X}")),
                     mappings,
@@ -308,23 +604,49 @@ fn collect_pdos(
     pdos
 }
 
-fn model_json(objects: &[ObjectSpec], pdos: &[PdoSpec], warnings: &[String]) -> Value {
+fn model_json(
+    document: &Value,
+    objects: &[ObjectSpec],
+    pdos: &[PdoSpec],
+    warnings: &[String],
+) -> Value {
     let mut nodes = BTreeMap::<u32, Vec<&ObjectSpec>>::new();
     let bitfields = collect_bitfields(objects);
     for obj in objects {
         nodes.entry(obj.node_id).or_default().push(obj);
+    }
+    for pdo in pdos {
+        if let Some(node_id) = pdo.node_id {
+            nodes.entry(node_id).or_default();
+        }
+        for node_id in &pdo.consumer_node_ids {
+            nodes.entry(*node_id).or_default();
+        }
     }
     let node_values = nodes
         .iter()
         .map(|(node_id, objects)| {
             let node_pdos = pdos
                 .iter()
-                .filter(|pdo| pdo.node_id == Some(*node_id))
+                .filter(|pdo| {
+                    pdo.node_id == Some(*node_id) || pdo.consumer_node_ids.contains(node_id)
+                })
                 .map(|pdo| {
                     json!({
                         "cobId": format!("0x{:X}", pdo.cob_id),
-                        "direction": pdo.direction,
+                        "direction": pdo.runtime_direction,
+                        "pdoType": pdo_endpoint_type(pdo, *node_id),
+                        "producerPdoType": pdo.pdo_type,
                         "pdoNumber": pdo.pdo_number,
+                        "consumerPdoNumber": pdo.consumer_pdo_number,
+                        "cobIdMode": pdo.cob_id_mode,
+                        "frameType": pdo.frame_type,
+                        "producerNodeId": pdo.node_id,
+                        "consumerNodeIds": pdo.consumer_node_ids,
+                        "endpointNodeId": node_id,
+                        "transmissionType": pdo.transmission_type,
+                        "sourceSection": pdo.source_section,
+                        "sourceIndex": pdo.source_index,
                         "name": pdo.name,
                         "mappings": pdo.mappings.iter().map(|m| json!({
                             "paramId": m.param_id,
@@ -339,12 +661,17 @@ fn model_json(objects: &[ObjectSpec], pdos: &[PdoSpec], warnings: &[String]) -> 
                     })
                 })
                 .collect::<Vec<_>>();
+            let (sdo_rx_cob_id, sdo_tx_cob_id) = objects
+                .first()
+                .map(|object| (object.sdo_rx_cob_id, object.sdo_tx_cob_id))
+                .unwrap_or_else(|| canopen_node_sdo_cob_ids(document, *node_id));
             json!({
                 "nodeId": node_id,
-                "source": "sdo_info + canopen-compatible pdo_recv/pdo_send",
+                "name": canopen_node_name(document, *node_id),
+                "source": "sdo_info + explicit canopen.nodes/pdos",
                 "sdo": {
-                    "rxCobId": format!("0x{:X}", 0x600 + node_id),
-                    "txCobId": format!("0x{:X}", 0x580 + node_id),
+                    "rxCobId": format!("0x{:X}", sdo_rx_cob_id),
+                    "txCobId": format!("0x{:X}", sdo_tx_cob_id),
                 },
                 "objects": objects.iter().map(|obj| json!({
                     "index": format!("0x{:04X}", obj.index),
@@ -381,7 +708,7 @@ fn model_json(objects: &[ObjectSpec], pdos: &[PdoSpec], warnings: &[String]) -> 
     json!({
         "version": 1,
         "scope": "setting-data-and-canopen-pdo",
-        "description": "CANopen-compatible SDO objects are generated from 数据/设置数据(sdo_info). PDOs are included only when their COB-ID matches the CANopen default PDO connection set for a known Node-ID.",
+        "description": "jc002 CANopen nodes, SDO channels and PDO COB-IDs are explicit. PDO signal mappings remain sourced from the binary-compatible pdo_recv/pdo_send sections.",
         "nodes": node_values,
         "warnings": warnings,
     })
@@ -523,8 +850,8 @@ fn generate_sdo_object_csv(objects: &[ObjectSpec]) -> String {
         lines.push(format!(
             "{},0x{:X},0x{:X},0x{:04X},{},{},{},{},{},{},{},{},{},{}",
             obj.node_id,
-            0x600 + obj.node_id,
-            0x580 + obj.node_id,
+            obj.sdo_rx_cob_id,
+            obj.sdo_tx_cob_id,
             obj.index,
             obj.subindex,
             csv_cell(&obj.name),
@@ -548,8 +875,8 @@ fn sdo_object_json(objects: &[ObjectSpec]) -> Value {
         "description": "Object dictionary entries addressable through SDO frames. DBC describes the generic SDO transport frames; this map provides object-level names, indexes and value constraints.",
         "objects": objects.iter().map(|obj| json!({
             "nodeId": obj.node_id,
-            "sdoRxCobId": format!("0x{:X}", 0x600 + obj.node_id),
-            "sdoTxCobId": format!("0x{:X}", 0x580 + obj.node_id),
+            "sdoRxCobId": format!("0x{:X}", obj.sdo_rx_cob_id),
+            "sdoTxCobId": format!("0x{:X}", obj.sdo_tx_cob_id),
             "index": format!("0x{:04X}", obj.index),
             "subindex": obj.subindex,
             "name": obj.name,
@@ -626,11 +953,15 @@ fn generate_canopen_protocol_dbc(objects: &[ObjectSpec], pdos: &[PdoSpec]) -> St
         objects_by_node.entry(obj.node_id).or_default().push(obj);
     }
     for (node_id, node_objects) in &objects_by_node {
+        let (sdo_rx_cob_id, sdo_tx_cob_id) = node_objects
+            .first()
+            .map(|object| (object.sdo_rx_cob_id, object.sdo_tx_cob_id))
+            .unwrap_or((0x600 + node_id, 0x580 + node_id));
         push_sdo_dbc_message(
             &mut lines,
             &mut comments,
             &mut values,
-            0x600 + node_id,
+            sdo_rx_cob_id,
             &format!("SDO_RX_Node{node_id}"),
             *node_id,
             "client_to_server",
@@ -640,7 +971,7 @@ fn generate_canopen_protocol_dbc(objects: &[ObjectSpec], pdos: &[PdoSpec]) -> St
             &mut lines,
             &mut comments,
             &mut values,
-            0x580 + node_id,
+            sdo_tx_cob_id,
             &format!("SDO_TX_Node{node_id}"),
             *node_id,
             "server_to_client",
@@ -762,23 +1093,32 @@ fn eds_object_list_section(name: &str, indices: &BTreeSet<u32>) -> String {
     lines.concat()
 }
 
-fn generate_eds(node_id: u32, objects: &[&ObjectSpec], pdos: &[&PdoSpec]) -> String {
+fn generate_eds(
+    node_id: u32,
+    objects: &[&ObjectSpec],
+    pdos: &[&PdoSpec],
+    sdo: Option<(u32, u32)>,
+) -> String {
     let mut lines = Vec::new();
     let eds_objects = unique_objects(objects);
     let mandatory_indices = BTreeSet::from([0x1000, 0x1001, 0x1018]);
-    let mut optional_indices = BTreeSet::from([0x1200]);
+    let mut optional_indices = BTreeSet::new();
+    if sdo.is_some() {
+        optional_indices.insert(0x1200);
+    }
     let mut manufacturer_indices = BTreeSet::new();
 
     for pdo in pdos {
-        let Some(number) = pdo.pdo_number else {
+        let Some(number) = pdo_endpoint_number(pdo, node_id) else {
             continue;
         };
-        let comm_base = if pdo.direction == "tpdo" {
+        let endpoint_type = pdo_endpoint_type(pdo, node_id);
+        let comm_base = if endpoint_type == "tpdo" {
             0x1800
         } else {
             0x1400
         };
-        let map_base = if pdo.direction == "tpdo" {
+        let map_base = if endpoint_type == "tpdo" {
             0x1A00
         } else {
             0x1600
@@ -810,8 +1150,12 @@ fn generate_eds(node_id: u32, objects: &[&ObjectSpec], pdos: &[&PdoSpec]) -> Str
     lines.push("BaudRate_125=1\nBaudRate_250=1\nBaudRate_500=1\nSimpleBootUpSlave=1\n".to_string());
     lines.push(format!(
         "NrOfRXPDO={}\nNrOfTXPDO={}\nLSS_Supported=0\n\n",
-        pdos.iter().filter(|pdo| pdo.direction == "rpdo").count(),
-        pdos.iter().filter(|pdo| pdo.direction == "tpdo").count()
+        pdos.iter()
+            .filter(|pdo| pdo_endpoint_type(pdo, node_id) == "rpdo")
+            .count(),
+        pdos.iter()
+            .filter(|pdo| pdo_endpoint_type(pdo, node_id) == "tpdo")
+            .count()
     ));
 
     lines.push(
@@ -834,22 +1178,26 @@ fn generate_eds(node_id: u32, objects: &[&ObjectSpec], pdos: &[&PdoSpec]) -> Str
     lines.push("[1018sub2]\nParameterName=Product Code\nObjectType=0x7\nDataType=0x0007\nAccessType=ro\nDefaultValue=0\nPDOMapping=0\n\n".to_string());
     lines.push("[1018sub3]\nParameterName=Revision Number\nObjectType=0x7\nDataType=0x0007\nAccessType=ro\nDefaultValue=1\nPDOMapping=0\n\n".to_string());
     lines.push("[1018sub4]\nParameterName=Serial Number\nObjectType=0x7\nDataType=0x0007\nAccessType=ro\nDefaultValue=0\nPDOMapping=0\n\n".to_string());
-    lines.push(
-        "[1200]\nParameterName=SDO Server Parameter\nObjectType=0x9\nSubNumber=2\n\n".to_string(),
-    );
-    lines.push(format!("[1200sub1]\nParameterName=COB-ID client to server\nObjectType=0x7\nDataType=0x0007\nAccessType=ro\nDefaultValue=0x{:X}\nPDOMapping=0\n\n", 0x600 + node_id));
-    lines.push(format!("[1200sub2]\nParameterName=COB-ID server to client\nObjectType=0x7\nDataType=0x0007\nAccessType=ro\nDefaultValue=0x{:X}\nPDOMapping=0\n\n", 0x580 + node_id));
+    if let Some((sdo_rx_cob_id, sdo_tx_cob_id)) = sdo {
+        lines.push(
+            "[1200]\nParameterName=SDO Server Parameter\nObjectType=0x9\nSubNumber=2\n\n"
+                .to_string(),
+        );
+        lines.push(format!("[1200sub1]\nParameterName=COB-ID client to server\nObjectType=0x7\nDataType=0x0007\nAccessType=ro\nDefaultValue=0x{:X}\nPDOMapping=0\n\n", sdo_rx_cob_id));
+        lines.push(format!("[1200sub2]\nParameterName=COB-ID server to client\nObjectType=0x7\nDataType=0x0007\nAccessType=ro\nDefaultValue=0x{:X}\nPDOMapping=0\n\n", sdo_tx_cob_id));
+    }
 
     for pdo in pdos {
-        let Some(number) = pdo.pdo_number else {
+        let Some(number) = pdo_endpoint_number(pdo, node_id) else {
             continue;
         };
-        let comm_base = if pdo.direction == "tpdo" {
+        let endpoint_type = pdo_endpoint_type(pdo, node_id);
+        let comm_base = if endpoint_type == "tpdo" {
             0x1800
         } else {
             0x1400
         };
-        let map_base = if pdo.direction == "tpdo" {
+        let map_base = if endpoint_type == "tpdo" {
             0x1A00
         } else {
             0x1600
@@ -948,7 +1296,7 @@ fn sdo_write_data(obj: &ObjectSpec, value: &str) -> String {
 fn generate_sdo_csv(objects: &[ObjectSpec]) -> String {
     let mut lines = vec!["CASE_ID,CAN_ID,TYPE,NAME,DLC,CYCLE_MS,DATA_HEX".to_string()];
     for obj in unique_owned_objects(objects) {
-        let can_id = 0x600 + obj.node_id;
+        let can_id = obj.sdo_rx_cob_id;
         let index_low = obj.index & 0xff;
         let index_high = (obj.index >> 8) & 0xff;
         lines.push(format!(
@@ -986,15 +1334,17 @@ fn generate_pdo_csv(pdos: &[PdoSpec]) -> String {
     let mut lines = vec!["CASE_ID,CAN_ID,TYPE,NAME,DLC,CYCLE_MS,DATA_HEX".to_string()];
     for pdo in pdos {
         lines.push(format!(
-            "PDO_ZERO_0x{:X},0x{:X},0,{},8,100,00 00 00 00 00 00 00 00",
+            "PDO_ZERO_0x{:X},0x{:X},{},{},8,100,00 00 00 00 00 00 00 00",
             pdo.cob_id,
             pdo.cob_id,
+            pdo.frame_type,
             csv_cell(&pdo.name)
         ));
         lines.push(format!(
-            "PDO_FF_0x{:X},0x{:X},0,{},8,100,FF FF FF FF FF FF FF FF",
+            "PDO_FF_0x{:X},0x{:X},{},{},8,100,FF FF FF FF FF FF FF FF",
             pdo.cob_id,
             pdo.cob_id,
+            pdo.frame_type,
             csv_cell(&pdo.name)
         ));
     }
@@ -1030,28 +1380,71 @@ fn vendor_json(objects: &[ObjectSpec], pdos: &[PdoSpec], warnings: &[String]) ->
     })
 }
 
+fn collect_export_node_ids(
+    document: &Value,
+    objects: &[ObjectSpec],
+    pdos: &[PdoSpec],
+) -> BTreeSet<u32> {
+    let mut node_ids = objects
+        .iter()
+        .map(|object| object.node_id)
+        .collect::<BTreeSet<_>>();
+    for pdo in pdos {
+        if let Some(node_id) = pdo.node_id {
+            node_ids.insert(node_id);
+        }
+        node_ids.extend(pdo.consumer_node_ids.iter().copied());
+    }
+    if let Some(nodes) = document
+        .get("canopen")
+        .and_then(|value| value.get("nodes"))
+        .and_then(Value::as_array)
+    {
+        for node in nodes {
+            if let Some(node_id) = object_u32(node, "node_id") {
+                node_ids.insert(node_id);
+            }
+        }
+    }
+    node_ids
+}
+
 pub fn convert_canopen_document(document: &Value) -> CanopenConversionReport {
     let mut warnings = Vec::new();
+    let schema_valid = match validate_canopen_contract(document) {
+        Ok(()) => true,
+        Err(error) => {
+            warnings.push(error);
+            false
+        }
+    };
     let objects = collect_sdo_objects(document, &mut warnings);
     let pdos = collect_pdos(document, &objects, &mut warnings);
     let bitfields = collect_bitfields(&objects);
-    let model = model_json(&objects, &pdos, &warnings);
-    let node_ids = objects
-        .iter()
-        .map(|obj| obj.node_id)
-        .collect::<BTreeSet<_>>();
+    let model = model_json(document, &objects, &pdos, &warnings);
+    let node_ids = collect_export_node_ids(document, &objects, &pdos);
     let unique = unique_owned_objects(&objects);
     let nodes = node_ids
         .into_iter()
         .map(|node_id| CanopenNodeSummary {
             node_id,
-            name: format!("Node {node_id}"),
-            sdo_rx_cob_id: 0x600 + node_id,
-            sdo_tx_cob_id: 0x580 + node_id,
+            name: canopen_node_name(document, node_id),
+            sdo_rx_cob_id: objects
+                .iter()
+                .find(|object| object.node_id == node_id)
+                .map(|object| object.sdo_rx_cob_id)
+                .unwrap_or_else(|| canopen_node_sdo_cob_ids(document, node_id).0),
+            sdo_tx_cob_id: objects
+                .iter()
+                .find(|object| object.node_id == node_id)
+                .map(|object| object.sdo_tx_cob_id)
+                .unwrap_or_else(|| canopen_node_sdo_cob_ids(document, node_id).1),
             object_count: unique.iter().filter(|obj| obj.node_id == node_id).count() as u32,
             pdo_count: pdos
                 .iter()
-                .filter(|pdo| pdo.node_id == Some(node_id))
+                .filter(|pdo| {
+                    pdo.node_id == Some(node_id) || pdo.consumer_node_ids.contains(&node_id)
+                })
                 .count() as u32,
             bitfield_count: bitfields
                 .iter()
@@ -1060,7 +1453,7 @@ pub fn convert_canopen_document(document: &Value) -> CanopenConversionReport {
         })
         .collect::<Vec<_>>();
     CanopenConversionReport {
-        valid: !objects.is_empty(),
+        valid: schema_valid && !objects.is_empty(),
         nodes,
         files: Vec::new(),
         warnings,
@@ -1078,15 +1471,12 @@ pub fn export_canopen_package(
     let pdos = collect_pdos(document, &objects, &mut warnings);
     let bitfields = collect_bitfields(&objects);
     report.warnings = warnings;
-    report.model = model_json(&objects, &pdos, &report.warnings);
+    report.model = model_json(document, &objects, &pdos, &report.warnings);
     let root = Path::new(output_dir).join("canopen_export");
     fs::create_dir_all(&root).map_err(|e| format!("创建 CANopen 导出目录失败：{}", e))?;
 
     let mut files = Vec::new();
-    let node_ids = objects
-        .iter()
-        .map(|obj| obj.node_id)
-        .collect::<BTreeSet<_>>();
+    let node_ids = collect_export_node_ids(document, &objects, &pdos);
     for node_id in node_ids {
         let node_objects = objects
             .iter()
@@ -1094,18 +1484,26 @@ pub fn export_canopen_package(
             .collect::<Vec<_>>();
         let node_pdos = pdos
             .iter()
-            .filter(|pdo| pdo.node_id == Some(node_id))
+            .filter(|pdo| pdo.node_id == Some(node_id) || pdo.consumer_node_ids.contains(&node_id))
             .collect::<Vec<_>>();
         let path = root.join(format!("node_{node_id:02}.eds"));
-        fs::write(&path, generate_eds(node_id, &node_objects, &node_pdos))
-            .map_err(|e| format!("写入 EDS 失败：{}", e))?;
+        fs::write(
+            &path,
+            generate_eds(
+                node_id,
+                &node_objects,
+                &node_pdos,
+                canopen_node_sdo_channel(document, node_id),
+            ),
+        )
+        .map_err(|e| format!("写入 EDS 失败：{}", e))?;
         files.push(path.to_string_lossy().to_string());
     }
 
     let model_path = root.join("canopen.model.json");
     fs::write(
         &model_path,
-        serde_json::to_string_pretty(&model_json(&objects, &pdos, &report.warnings))
+        serde_json::to_string_pretty(&model_json(document, &objects, &pdos, &report.warnings))
             .map_err(|e| format!("序列化 CANopen model 失败：{}", e))?,
     )
     .map_err(|e| format!("写入 CANopen model 失败：{}", e))?;
@@ -1179,4 +1577,123 @@ pub fn export_canopen_package(
     .map_err(|e| format!("写入转换报告失败：{}", e))?;
 
     Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::convert_canopen_document;
+    use serde_json::json;
+
+    fn explicit_document() -> serde_json::Value {
+        json!({
+            "config_version": "jc002",
+            "sdo_info": {
+                "type": 0,
+                "name": "root",
+                "children": [
+                    {
+                        "type": 1,
+                        "name": "Speed limit",
+                        "fid": 7,
+                        "mid": 8192,
+                        "sid": 1,
+                        "handle": 0,
+                        "control_rw": 1
+                    }
+                ]
+            },
+            "pdo_global_param": [
+                { "param_id": "sig.limit", "name": "Limit", "inner": -1 }
+            ],
+            "pdo_recv": [
+                {
+                    "id": 660,
+                    "type": 0,
+                    "desc": "Pump fault",
+                    "data": [
+                        { "param_id": "sig.limit", "pos": 16, "len": 8, "show_type": 0 }
+                    ]
+                }
+            ],
+            "pdo_send": [
+                {
+                    "id": 960,
+                    "type": 0,
+                    "desc": "Meter command",
+                    "data": []
+                }
+            ],
+            "canopen": {
+                "schema_version": 1,
+                "nodes": [
+                    {
+                        "node_id": 7,
+                        "name": "Pump controller",
+                        "role": "remote",
+                        "sdo": {
+                            "cob_id_mode": "explicit",
+                            "client_to_server_cob_id": 1543,
+                            "server_to_client_cob_id": 1415
+                        }
+                    },
+                    { "node_id": 64, "name": "Meter", "role": "local" }
+                ],
+                "pdos": [
+                    {
+                        "key": "pump_fault",
+                        "direction": "receive",
+                        "pdo_type": "tpdo",
+                        "cob_id": 660,
+                        "cob_id_mode": "explicit",
+                        "frame_type": 0,
+                        "producer_node_id": 7,
+                        "consumer_node_ids": [64],
+                        "pdo_number": 2,
+                        "transmission_type": 255,
+                        "source_section": "pdo_recv",
+                        "source_index": 0
+                    },
+                    {
+                        "key": "meter_command",
+                        "direction": "send",
+                        "pdo_type": "tpdo",
+                        "cob_id": 960,
+                        "cob_id_mode": "explicit",
+                        "frame_type": 0,
+                        "producer_node_id": 64,
+                        "consumer_node_ids": [7],
+                        "pdo_number": 3,
+                        "transmission_type": 255,
+                        "source_section": "pdo_send",
+                        "source_index": 0
+                    }
+                ]
+            }
+        })
+    }
+
+    #[test]
+    fn explicit_cob_ids_are_kept_in_conversion() {
+        let report = convert_canopen_document(&explicit_document());
+
+        assert!(report.valid, "{:?}", report.warnings);
+        assert_eq!(report.nodes.len(), 2);
+        assert_eq!(report.nodes[0].sdo_rx_cob_id, 0x607);
+        assert!(report.model.to_string().contains("0x294"));
+        assert!(report.model.to_string().contains("0x3C0"));
+    }
+
+    #[test]
+    fn explicit_source_mismatch_invalidates_conversion() {
+        let mut document = explicit_document();
+        document["canopen"]["pdos"][0]["cob_id"] = json!(0x293);
+
+        let report = convert_canopen_document(&document);
+
+        assert!(!report.valid);
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("不一致")));
+    }
 }

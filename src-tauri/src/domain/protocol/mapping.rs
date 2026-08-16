@@ -116,6 +116,7 @@ fn pdo_frames_from_mappings(
                     .map(|frame| frame.description.clone())
                     .unwrap_or_default(),
                 mappings: grouped.remove(&frame_id).unwrap_or_default(),
+                metadata: existing.and_then(|frame| frame.metadata.clone()),
             }
         })
         .collect()

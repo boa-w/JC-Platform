@@ -1,7 +1,8 @@
 //! CANOpen legacy 段到统一传输模型的投影。
 
 use super::model::{
-    CanOpenPdoFrame, CanOpenPdoMapping, CanOpenSdoObject, CanOpenTransport, PdoMappingDirection,
+    CanOpenPdoFrame, CanOpenPdoMapping, CanOpenPdoMetadata, CanOpenSdoObject, CanOpenTransport,
+    PdoMappingDirection,
 };
 use crate::domain::signal::normalize_signal_id;
 use serde_json::Value;
@@ -57,7 +58,7 @@ fn collect_advanced_pdo(document: &Value, transport: &mut CanOpenTransport) {
         } else {
             &mut transport.pdo_send
         };
-        for frame in frames {
+        for (frame_index, frame) in frames.iter().enumerate() {
             target.push(CanOpenPdoFrame {
                 frame_id: object_u32(frame, "id"),
                 frame_type: object_u32(frame, "type") as u8,
@@ -84,6 +85,7 @@ fn collect_advanced_pdo(document: &Value, transport: &mut CanOpenTransport) {
                             .collect()
                     })
                     .unwrap_or_default(),
+                metadata: canopen_pdo_metadata(document, section, frame_index),
             });
         }
     }
@@ -105,7 +107,7 @@ fn collect_simple_pdo(document: &Value, transport: &mut CanOpenTransport) {
         } else {
             &mut transport.pdo_send
         };
-        for frame in frames {
+        for (frame_index, frame) in frames.iter().enumerate() {
             target.push(CanOpenPdoFrame {
                 frame_id: object_u32(frame, "id"),
                 frame_type: object_u32(frame, "type") as u8,
@@ -132,9 +134,69 @@ fn collect_simple_pdo(document: &Value, transport: &mut CanOpenTransport) {
                             .collect()
                     })
                     .unwrap_or_default(),
+                metadata: canopen_pdo_metadata(
+                    document,
+                    &format!("pdo_simple_send_recv.{section}"),
+                    frame_index,
+                ),
             });
         }
     }
+}
+
+fn canopen_pdo_metadata(
+    document: &Value,
+    source_section: &str,
+    source_index: usize,
+) -> Option<CanOpenPdoMetadata> {
+    let items = document
+        .get("canopen")
+        .and_then(|value| value.get("pdos"))
+        .and_then(Value::as_array)?;
+    let item = items.iter().find(|item| {
+        item.get("source_section").and_then(Value::as_str) == Some(source_section)
+            && item.get("source_index").and_then(Value::as_u64) == Some(source_index as u64)
+    })?;
+    Some(CanOpenPdoMetadata {
+        key: item.get("key").and_then(Value::as_str)?.to_string(),
+        cob_id_mode: item
+            .get("cob_id_mode")
+            .and_then(Value::as_str)
+            .unwrap_or("explicit")
+            .to_string(),
+        pdo_type: item
+            .get("pdo_type")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        pdo_number: item
+            .get("pdo_number")
+            .and_then(Value::as_u64)
+            .map(|value| value as u32),
+        consumer_pdo_number: item
+            .get("consumer_pdo_number")
+            .and_then(Value::as_u64)
+            .map(|value| value as u32),
+        producer_node_id: item
+            .get("producer_node_id")
+            .and_then(Value::as_u64)
+            .map(|value| value as u32),
+        consumer_node_ids: item
+            .get("consumer_node_ids")
+            .and_then(Value::as_array)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_u64)
+                    .map(|value| value as u32)
+                    .collect()
+            })
+            .unwrap_or_default(),
+        transmission_type: item
+            .get("transmission_type")
+            .and_then(Value::as_u64)
+            .map(|value| value as u8),
+    })
 }
 
 fn object_string(value: &Value, key: &str) -> String {

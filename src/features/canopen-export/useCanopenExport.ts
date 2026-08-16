@@ -46,15 +46,21 @@ export function useCanopenExport(loadedProject: LoadedProject | null) {
       const nextReport = await exportCanopenPackage(selected, loadedProject.document);
       const nextExportDir = `${selected}\\canopen_export`;
       setReport(nextReport);
-      setExportDir(nextExportDir);
-      setStatus(
-        t('canopenExport.success', {
-          files: nextReport.files.length,
-          nodes: nextReport.nodes.length,
-          warnings: nextReport.warnings.length,
-        }),
-      );
-      setStatusTone('success');
+      if (!nextReport.valid) {
+        setExportDir(null);
+        setStatus(nextReport.warnings[0] ?? t('canopenExport.validationFailed'));
+        setStatusTone('error');
+      } else {
+        setExportDir(nextExportDir);
+        setStatus(
+          t('canopenExport.success', {
+            files: nextReport.files.length,
+            nodes: nextReport.nodes.length,
+            warnings: nextReport.warnings.length,
+          }),
+        );
+        setStatusTone('success');
+      }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
       setStatusTone('error');

@@ -35,6 +35,7 @@ const V2_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "project",
     "export_info",
     "ui_info",
+    "canopen",
     "fault_code_info",
     "pdo_simple_send_recv",
     "pdo_global_param",
@@ -48,6 +49,28 @@ const V2_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
 ];
 const LOCALIZATION_FIELD_ORDER: &[&str] = &["default_locale", "locale_order", "locales"];
 const LOCALE_FIELD_ORDER: &[&str] = &["enabled", "direction", "translations"];
+const CANOPEN_FIELD_ORDER: &[&str] = &["schema_version", "nodes", "pdos"];
+const CANOPEN_NODE_FIELD_ORDER: &[&str] = &["node_id", "name", "role", "sdo"];
+const CANOPEN_SDO_FIELD_ORDER: &[&str] = &[
+    "cob_id_mode",
+    "client_to_server_cob_id",
+    "server_to_client_cob_id",
+];
+const CANOPEN_PDO_FIELD_ORDER: &[&str] = &[
+    "key",
+    "direction",
+    "pdo_type",
+    "cob_id",
+    "cob_id_mode",
+    "frame_type",
+    "producer_node_id",
+    "consumer_node_ids",
+    "pdo_number",
+    "consumer_pdo_number",
+    "transmission_type",
+    "source_section",
+    "source_index",
+];
 
 const PROJECT_FIELD_ORDER: &[&str] = &["name", "create_time", "update_time", "from", "base_path"];
 const EXPORT_INFO_FIELD_ORDER: &[&str] = &[
@@ -215,8 +238,47 @@ fn order_v2_jcpro_document(mut document: Value) -> Value {
     );
     order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
     order_fault_code_info(&mut document);
+    order_canopen(&mut document);
     order_localization(&mut document);
     order_object_value(document, V2_JCPRO_TOP_LEVEL_ORDER)
+}
+
+fn order_canopen(root: &mut Value) {
+    let Some(canopen) = root.get_mut("canopen") else {
+        return;
+    };
+    if let Some(nodes) = canopen.get_mut("nodes").and_then(Value::as_array_mut) {
+        for node in nodes.iter_mut() {
+            order_child_object(node, "sdo", CANOPEN_SDO_FIELD_ORDER);
+            let value = std::mem::take(node);
+            *node = order_object_value(value, CANOPEN_NODE_FIELD_ORDER);
+        }
+        nodes.sort_by(|left, right| {
+            left.get("node_id")
+                .and_then(Value::as_i64)
+                .unwrap_or_default()
+                .cmp(
+                    &right
+                        .get("node_id")
+                        .and_then(Value::as_i64)
+                        .unwrap_or_default(),
+                )
+        });
+    }
+    if let Some(pdos) = canopen.get_mut("pdos").and_then(Value::as_array_mut) {
+        for pdo in pdos.iter_mut() {
+            let value = std::mem::take(pdo);
+            *pdo = order_object_value(value, CANOPEN_PDO_FIELD_ORDER);
+        }
+        pdos.sort_by(|left, right| {
+            left.get("key")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .cmp(right.get("key").and_then(Value::as_str).unwrap_or(""))
+        });
+    }
+    let value = std::mem::take(canopen);
+    *canopen = order_object_value(value, CANOPEN_FIELD_ORDER);
 }
 
 fn order_localization(root: &mut Value) {

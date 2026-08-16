@@ -170,6 +170,7 @@ export interface ProjectDocument {
   pdo_recv: unknown[];
   pdo_send: unknown[];
   sdo_info: SdoNodeDocument;
+  canopen?: CanOpenProjectDocument;
   signal_dictionary: SignalDictionary;
   private_protocol: PrivateProtocolDocument;
   protocol_mapping: ProtocolMapping[];
@@ -249,6 +250,41 @@ export interface CanOpenTransport {
   pdo_send: CanOpenPdoFrame[];
 }
 
+export interface CanOpenProjectDocument {
+  schema_version: number;
+  nodes: CanOpenNodeDocument[];
+  pdos: CanOpenPdoDocument[];
+}
+
+export interface CanOpenNodeDocument {
+  node_id: number;
+  name: string;
+  role: 'local' | 'remote' | string;
+  sdo?: CanOpenSdoChannelDocument;
+}
+
+export interface CanOpenSdoChannelDocument {
+  cob_id_mode: 'default' | 'explicit' | string;
+  client_to_server_cob_id: number;
+  server_to_client_cob_id: number;
+}
+
+export interface CanOpenPdoDocument {
+  key: string;
+  direction: 'receive' | 'send' | string;
+  pdo_type: 'tpdo' | 'rpdo' | string;
+  cob_id: number;
+  cob_id_mode: 'default' | 'explicit' | string;
+  frame_type: number;
+  producer_node_id?: number;
+  consumer_node_ids: number[];
+  pdo_number?: number;
+  consumer_pdo_number?: number;
+  transmission_type?: number;
+  source_section?: 'pdo_recv' | 'pdo_send' | string;
+  source_index?: number;
+}
+
 export interface CanOpenSdoObject {
   signal_id?: string;
   name: string;
@@ -265,6 +301,18 @@ export interface CanOpenPdoFrame {
   direction: 'receive' | 'send';
   description: string;
   mappings: CanOpenPdoMapping[];
+  metadata?: CanOpenPdoMetadata;
+}
+
+export interface CanOpenPdoMetadata {
+  key: string;
+  cob_id_mode: 'default' | 'explicit' | string;
+  pdo_type: 'tpdo' | 'rpdo' | string;
+  pdo_number?: number;
+  producer_node_id?: number;
+  consumer_node_ids: number[];
+  consumer_pdo_number?: number;
+  transmission_type?: number;
 }
 
 export interface CanOpenPdoMapping {

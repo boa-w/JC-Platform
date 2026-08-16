@@ -57,6 +57,81 @@ language_info
 因此，`ConfigUpdate.json` 和 `data.bin` 必须来自同一次导出，设备不得从 JSON
 读取第二份 battery 协议定义。
 
+## CANopen 传输拓扑
+
+v2 使用可选的 `canopen` 段显式描述 CANopen 节点、SDO 通道和 PDO 通信参数。
+它是项目的协议语义层，不会把电池或故障协议大对象复制到设备清单；现有
+`pdo_recv`、`pdo_send` 仍是二进制映射数据的唯一来源。
+
+```json
+{
+  "canopen": {
+    "schema_version": 1,
+    "nodes": [
+      {
+        "node_id": 7,
+        "name": "油泵控制器",
+        "role": "remote",
+        "sdo": {
+          "cob_id_mode": "default",
+          "client_to_server_cob_id": 1543,
+          "server_to_client_cob_id": 1415
+        }
+      },
+      { "node_id": 64, "name": "仪表", "role": "local" }
+    ],
+    "pdos": [
+      {
+        "key": "pump_fault",
+        "direction": "receive",
+        "pdo_type": "tpdo",
+        "cob_id": 660,
+        "cob_id_mode": "explicit",
+        "frame_type": 0,
+        "producer_node_id": 7,
+        "consumer_node_ids": [64],
+        "pdo_number": 2,
+        "consumer_pdo_number": 1,
+        "transmission_type": 255,
+        "source_section": "pdo_recv",
+        "source_index": 3
+      }
+    ]
+  }
+}
+```
+
+规则：
+
+- `node_id` 为 1..127 且不能重复；SDO 默认 COB-ID 为 `0x600 + node_id` 和
+  `0x580 + node_id`，需要不同值时将 `cob_id_mode` 设为 `explicit`。
+- `direction` 是本机运行时的 receive/send 视角；`pdo_type` 是
+  `producer_node_id` 在 CANopen 中的端点类型。当前拓扑描述的是一条由生产者发出的
+  PDO，因此生产者端通常为 `tpdo`，同一条连接在 `consumer_node_ids` 对应节点上导出为
+  `rpdo`。这样不会把“本机发送给远端”误标成生产者 RPDO。
+- `cob_id_mode: explicit` 允许任意合法的标准/扩展 COB-ID。标准帧范围为
+  `0x000..0x7FF`，扩展帧范围为 `0x000..0x1FFFFFFF`；因此 `0x3C0`、`0x294`
+  都是有效的显式 CANopen PDO COB-ID，不应再按默认连接集推断节点。
+- `source_section` 和 `source_index` 必须与 `pdo_recv`/`pdo_send` 中的 `id`、
+  `type` 一致。映射数据仍由对应源帧写入 v2 二进制 PDO 描述表。
+- `pdo_number` 表示生产者端节点的 RPDO/TPDO 通信参数编号，范围为 1..4；
+  `consumer_pdo_number` 表示消费者端节点的 RPDO 通信参数编号，范围同为 1..4。
+  两者属于不同端点，必须分别检查同一节点上的编号冲突；未提供
+  `consumer_pdo_number` 时，消费者沿用 `pdo_number`。自定义 COB-ID 仍可以绑定到
+  明确的 PDO 编号。`transmission_type` 使用 CANopen 的
+  0..240、254、255 值，当前固件只使用已构建的静态发送调度。
+- 当前 v2 范围覆盖 SDO expedited 读写和 PDO 静态映射，不包含 NMT、Heartbeat、
+  EMCY、SYNC。后续扩展必须增加独立版本字段，不应复用 `canopen` v1 字段。
+
+设备端 `data.bin` 的 PDO 描述记录已经保存原始 COB-ID 和帧类型；CANopen 节点的
+SDO 通道另以固定 12 字节记录保存 `node_id`、client-to-server COB-ID 和
+server-to-client COB-ID。设备只读取清单中的地址/数量索引，不解析完整 `canopen`
+JSON，也不会因为清单不携带节点拓扑而丢失 `0x3C0`、`0x294` 或显式 SDO ID。
+
+当 `canopen_version=1` 时，`canopen_sdo_base_addr` 和
+`canopen_sdo_total` 必须同时出现；没有 SDO 通道时使用 `-1` 和 `0`。下位机
+对所有通道执行标准帧范围、节点唯一性和 COB-ID 唯一性校验，失败则拒绝整包。
+
 ## localization
 
 ```json

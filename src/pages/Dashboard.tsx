@@ -691,7 +691,10 @@ export function Dashboard({
           ) : null}
 
           {activeModule.key === 'canopen-export' ? (
-            <CanopenExportPage loadedProject={loadedProject} />
+            <CanopenExportPage
+              loadedProject={loadedProject}
+              onUpdateDocument={updateProjectDocument}
+            />
           ) : null}
 
           {activeModule.key === 'ui' ? (

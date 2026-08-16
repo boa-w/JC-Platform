@@ -69,7 +69,7 @@ Infrastructure 基础设施适配层
 | --- | --- | --- |
 | 项目管理 | 创建、打开、迁移、校验、保存、另存为、恢复草稿和项目窗口生命周期 | `.jcpro`、sidecar |
 | 设置数据 | 编辑 SDO 参数树和参数元数据 | `sdo_info` |
-| 实时数据 | 编辑简化 PDO 或高级 PDO | `pdo_simple_send_recv`、`pdo_*` |
+| 实时数据 | 编辑简化 PDO、高级 PDO 和 CANopen 节点/PDO 通信参数 | `pdo_simple_send_recv`、`pdo_*`、`canopen` |
 | 业务信号字典 | 维护业务 Signal 及显示语义 | `signal_dictionary` |
 | 私有协议 | 维护自定义传输帧和载荷 | `private_protocol` |
 | 协议映射 | 维护 Signal 到 CANopen/私有帧的映射 | `protocol_mapping` |

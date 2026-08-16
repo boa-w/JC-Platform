@@ -74,6 +74,7 @@ export function useProjectJsonEditor({
       const editorKey = jsonEditorKeyForModule(activeModuleKey, { realtimeMode });
       if (editorKey === 'sdo') document.sdo_info = parsed;
       if (editorKey === 'pdo-simple') document.pdo_simple_send_recv = parsed;
+      if (activeModuleKey === 'canopen-export') document.canopen = parsed;
       if (activeModuleKey === 'language') document[languageSectionForDocument(document)] = parsed;
       if (activeModuleKey === 'battery-monitor') document.battery_monitor = parsed;
       if (activeModuleKey === 'signal-dictionary') document.signal_dictionary = parsed;

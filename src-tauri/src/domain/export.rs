@@ -10,7 +10,7 @@
 //! ```text
 //! [全局参数表] [全局参数索引表] [条件表达式表]
 //! [PDO 接收帧描述+数据] [PDO 发送帧描述+数据]
-//! [电池监控段] [故障码段] [SDO 菜单树] [语言包 × N] [CRC16]
+//! [电池监控段] [故障码段] [CANopen SDO 通道表] [SDO 菜单树] [语言包 × N] [CRC16]
 //! ```
 
 use crate::domain::localization::{build_dynamic_language_pack, DynamicLanguagePackBuild};
@@ -18,6 +18,7 @@ use crate::domain::pdo::{
     parse_pdo_advanced_document, PdoAdvancedDocument, PdoAdvancedFrame, PdoAdvancedSignal,
     PdoGlobalParam,
 };
+use crate::domain::project::validate_canopen_contract;
 use crate::domain::project::ProjectExportSettings;
 use crate::domain::protocol::battery_monitor::{
     BatteryByteOrder, BatteryMonitorProtocol, BatteryRawType, BatteryValueType,
@@ -193,6 +194,8 @@ pub struct DataDescriptionPlan {
     pub fault_code_version: usize,
     pub fault_source_total: usize,
     pub fault_code_total: usize,
+    pub canopen_sdo_base_addr: isize,
+    pub canopen_sdo_total: usize,
     pub sdo_base_addr: isize,
     pub sdo_version: usize,
     pub language_addr: Vec<isize>,
@@ -231,6 +234,8 @@ impl DataDescriptionPlan {
             fault_code_version: 0,
             fault_source_total: 0,
             fault_code_total: 0,
+            canopen_sdo_base_addr: -1,
+            canopen_sdo_total: 0,
             sdo_base_addr: -1,
             sdo_version: 0,
             language_addr: Vec::new(),
@@ -605,6 +610,19 @@ fn build_project_binary_from_settings(
             errors: vec![error.to_string()],
         };
     }
+    if config_version == "jc002" {
+        if let Err(error) = validate_canopen_contract(document) {
+            return BinaryBuildReport {
+                valid: false,
+                file_size: 0,
+                crc: 0,
+                data_description: DataDescriptionPlan::empty(Vec::new()),
+                bytes: Vec::new(),
+                warnings: Vec::new(),
+                errors: vec![error],
+            };
+        }
+    }
     let language_code = if config_version == "jc001" {
         document
             .get("language_info")
@@ -723,6 +741,8 @@ fn build_config_update_manifest(
                     "i18n_version",
                     "i18n_locale_total",
                     "i18n_message_total",
+                    "canopen_sdo_base_addr",
+                    "canopen_sdo_total",
                     "sdo_version",
                 ] {
                     description.remove(key);
@@ -731,6 +751,12 @@ fn build_config_update_manifest(
             Some("jc002") => {
                 description.remove("language_addr");
                 description.remove("language_code");
+                if request.document.get("canopen").is_some() {
+                    description.insert("canopen_version".to_string(), json!(1));
+                } else {
+                    description.remove("canopen_sdo_base_addr");
+                    description.remove("canopen_sdo_total");
+                }
             }
             _ => errors.push("清单导出要求 config_version 为 jc001 或 jc002".to_string()),
         }
@@ -1159,6 +1185,14 @@ fn build_binary_from_pdo(
         description.fault_code_total = code_total;
         description.fault_code_version = version;
         bytes.extend(fault_code_bytes);
+    }
+
+    if config_version == "jc002" {
+        if let Some((canopen_sdo_bytes, channel_total)) = build_canopen_sdo_bytes(source_document) {
+            description.canopen_sdo_base_addr = bytes.len() as isize;
+            description.canopen_sdo_total = channel_total;
+            bytes.extend(canopen_sdo_bytes);
+        }
     }
 
     description.sdo_base_addr = bytes.len() as isize;
@@ -1994,6 +2028,45 @@ fn battery_formatter_kind(kind: &str) -> u8 {
         "datetime" => 6,
         _ => 0,
     }
+}
+
+/// Build the jc002 runtime SDO channel table.
+///
+/// The editable CANopen topology remains in the `.jcpro` document, while the
+/// device receives only the compact node/COB-ID records it needs at runtime.
+/// The legacy menu tree still carries object indexes and node IDs; this table
+/// is what lets an explicit SDO COB-ID override the default `0x600/0x580 + node`
+/// pair without putting protocol metadata in the device JSON manifest.
+fn build_canopen_sdo_bytes(document: &Value) -> Option<(Vec<u8>, usize)> {
+    let mut channels = document
+        .get("canopen")
+        .and_then(|value| value.get("nodes"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|node| {
+            let node_id = u32::try_from(object_i64(node, "node_id", -1)).ok()?;
+            let sdo = node.get("sdo")?;
+            let client_to_server =
+                u32::try_from(object_i64(sdo, "client_to_server_cob_id", -1)).ok()?;
+            let server_to_client =
+                u32::try_from(object_i64(sdo, "server_to_client_cob_id", -1)).ok()?;
+            Some((node_id, client_to_server, server_to_client))
+        })
+        .collect::<Vec<_>>();
+    if channels.is_empty() {
+        return None;
+    }
+    channels.sort_by_key(|channel| channel.0);
+
+    let mut bytes = Vec::with_capacity(channels.len() * 12);
+    for (node_id, client_to_server, server_to_client) in channels {
+        write_u32(&mut bytes, node_id);
+        write_u32(&mut bytes, client_to_server);
+        write_u32(&mut bytes, server_to_client);
+    }
+    let channel_total = bytes.len() / 12;
+    Some((bytes, channel_total))
 }
 
 fn build_sdo_bytes(
@@ -3619,6 +3692,93 @@ mod tests {
         );
 
         assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 3);
+    }
+
+    #[test]
+    fn jc002_packs_explicit_canopen_sdo_channels_before_the_menu_tree() {
+        let document = jc002(
+            json!({
+                "pdo_global_param": [{
+                    "param_id": "PARAM_A",
+                    "name": "参数A",
+                    "def": "1",
+                    "reserved": 0,
+                    "type": 0,
+                    "inner": -1
+                }],
+                "pdo_condition": [],
+                "pdo_recv": [],
+                "pdo_send": [],
+                "sdo_info": {
+                    "type": 0,
+                    "user_auth": 0,
+                    "message_key": "menu.root",
+                    "children": []
+                },
+                "canopen": {
+                    "schema_version": 1,
+                    "nodes": [
+                        {
+                            "node_id": 7,
+                            "name": "油泵控制器",
+                            "role": "remote",
+                            "sdo": {
+                                "cob_id_mode": "default",
+                                "client_to_server_cob_id": 0x607,
+                                "server_to_client_cob_id": 0x587
+                            }
+                        },
+                        {
+                            "node_id": 8,
+                            "name": "牵引控制器",
+                            "role": "remote",
+                            "sdo": {
+                                "cob_id_mode": "explicit",
+                                "client_to_server_cob_id": 0x700,
+                                "server_to_client_cob_id": 0x680
+                            }
+                        }
+                    ],
+                    "pdos": []
+                }
+            }),
+            &["menu.root"],
+        );
+
+        let report = build_project_binary(&document);
+
+        assert!(
+            report.valid,
+            "unexpected export errors: {:?}",
+            report.errors
+        );
+        assert_eq!(report.data_description.canopen_sdo_total, 2);
+        let base = report.data_description.canopen_sdo_base_addr as usize;
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[base..base + 4].try_into().unwrap()),
+            7
+        );
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[base + 4..base + 8].try_into().unwrap()),
+            0x607
+        );
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[base + 8..base + 12].try_into().unwrap()),
+            0x587
+        );
+        let second = base + 12;
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[second..second + 4].try_into().unwrap()),
+            8
+        );
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[second + 4..second + 8].try_into().unwrap()),
+            0x700
+        );
+        assert_eq!(
+            u32::from_le_bytes(report.bytes[second + 8..second + 12].try_into().unwrap()),
+            0x680
+        );
     }
 
     #[test]

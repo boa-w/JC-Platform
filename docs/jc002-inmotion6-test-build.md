@@ -7,7 +7,7 @@
 - 清单：`jc_export_v2/ConfigUpdate.json`
 - 二进制：`jc_export_v2/bin/data.bin`
 
-当前构建包含 10 个 locale、555 个稳定消息 key、288 个故障定义、288 条来源绑定和完整 Inmotion6 SDO。127 个故障文案 key 被多个独立故障定义复用。原项目没有 `battery_monitor`，因此该测试包不包含 battery 段。
+当前构建包含 10 个 locale、561 个稳定消息 key、288 个故障定义、288 条来源绑定和完整 Inmotion6 SDO。127 个故障文案 key 被多个独立故障定义复用。项目声明了 3 个 CANopen 节点、2 个 SDO 通道和 5 个 PDO 通道，其中 `0x294`、`0x3C0` 使用显式 COB-ID。项目同时包含 jc002 `battery_monitor`，本包带 4 个锂电帧和 12 个锂电显示项。
 
 ## 可重复生成
 
@@ -29,13 +29,17 @@ cargo run --manifest-path src-tauri/Cargo.toml --bin jc-cli -- `
 
 | 项目 | 值 |
 | --- | ---: |
-| data.bin size | 354004 bytes |
-| CRC16-CCITT-FALSE | 1665 |
+| data.bin size | 356825 bytes |
+| CRC16-CCITT-FALSE | 1905 |
 | LVI2 schema | 2 |
 | locale count | 10 |
-| message count | 555 |
+| message count | 561 |
 | fault text ABI | 2 |
 | fault code count | 288 |
 | SDO text ABI | 2 |
+| CANopen metadata | schema_version 1 |
+| CANopen SDO table | 2 records, 12 bytes/record |
+| PDO receive/send | 4 / 1 |
+| battery frame/item | 4 / 12 |
 
 清单不得包含 `language_addr` 或 `language_code`。下位机查询只读取当前 locale；缺失文本返回 `NULL`，不会回退默认 locale、中文、v1 表或原始 key。
