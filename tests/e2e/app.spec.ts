@@ -1,5 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
+import { featureModules } from '../../src/data/modules';
+import { navGroups } from '../../src/data/navigation';
 import {
   installRichProjectDesktopMock,
   installV2FaultProjectDesktopMock,
@@ -17,6 +19,15 @@ function captureRuntimeErrors(page: Page) {
 }
 
 const runtimeErrorsByPage = new WeakMap<Page, string[]>();
+
+const workspaceGroups = navGroups.map((group) => ({
+  id: group.id,
+  modules: group.keys.map((key) => {
+    const module = featureModules.find((item) => item.key === key);
+    if (!module) throw new Error(`Missing browser test module definition: ${key}`);
+    return { key };
+  }),
+}));
 
 async function expectNoSeriousAccessibilityViolations(page: Page, context: string) {
   const result = await new AxeBuilder({ page }).analyze();
@@ -333,59 +344,29 @@ test('meets the serious accessibility baseline across primary surfaces', async (
 
 test('meets the serious accessibility baseline across every workspace', async ({ page }) => {
   test.setTimeout(180_000);
-  const workspaceGroups = [
-    {
-      group: '项目',
-      modules: ['项目管理'],
-    },
-    {
-      group: '数据',
-      modules: ['设置数据', '实时数据', '锂电监控协议'],
-    },
-    {
-      group: '协议',
-      modules: [
-        '业务信号字典',
-        '私有协议 实验/废弃',
-        '协议映射 实验',
-        'CANopen 导出 实验',
-      ],
-    },
-    {
-      group: '配置',
-      modules: ['UI 资源编辑', '故障代码'],
-    },
-    {
-      group: '多国语言',
-      modules: ['多国语言'],
-    },
-    {
-      group: '输出',
-      modules: ['项目导出', 'CAN 测试数据构建'],
-    },
-    {
-      group: '系统',
-      modules: ['软件设置'],
-    },
-  ] as const;
-
   for (const theme of ['light', 'dark'] as const) {
     if ((await page.locator('html').getAttribute('data-theme')) !== theme) {
       await page.getByRole('button', { name: '切换主题' }).click();
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     }
 
-    for (const { group, modules } of workspaceGroups) {
-      const groupButton = page.getByRole('button', { name: group, exact: true });
+    for (const { id, modules } of workspaceGroups) {
+      const groupButton = page.locator(`[data-navigation-group="${id}"]`);
+      await expect(groupButton).toHaveCount(1);
       if ((await groupButton.getAttribute('aria-expanded')) !== 'true') {
         await groupButton.click();
       }
-      const navigation = page.getByRole('navigation', { name: `${group} 功能` });
+      const groupLabel = await groupButton.getAttribute('aria-label');
+      expect(groupLabel).toBeTruthy();
+      const navigation = page.getByRole('navigation', { name: `${groupLabel} 功能` });
 
-      for (const accessibleName of modules) {
-        await navigation.getByRole('button', { name: accessibleName, exact: true }).click();
-        const title = accessibleName.replace(/ (实验\/废弃|实验)$/, '');
-        await expect(page.getByRole('main', { name: title })).toBeVisible();
+      for (const module of modules) {
+        const moduleButton = navigation.locator(`[data-navigation-key="${module.key}"]`);
+        await expect(moduleButton).toHaveCount(1);
+        const title = (await moduleButton.locator('.activity-item-label').innerText()).trim();
+        await moduleButton.click();
+        await expect(moduleButton).toHaveAttribute('aria-current', 'page');
+        await expect(page.getByRole('main', { name: title, exact: true })).toBeVisible();
         await expectNoSeriousAccessibilityViolations(
           page,
           `${theme === 'dark' ? '深色' : '浅色'}${title}工作区`,

@@ -39,7 +39,7 @@ jobs:
         run: npm ci
 
       - name: Verify frontend
-        run: npm run lint && npm run test:frontend && npm run build
+        run: npm run verify:frontend
 
   rust_quality:
     name: Rust quality
@@ -47,6 +47,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -57,7 +62,7 @@ jobs:
           workspaces: src-tauri -> target
 
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: npm run verify:rust
 
   ui_quality:
     name: UI quality
@@ -79,7 +84,7 @@ jobs:
         run: npx playwright install chromium
 
       - name: Run UI tests
-        run: npm run test:e2e
+        run: npm run verify:ui
 
       - name: Upload UI test diagnostics
         if: failure()

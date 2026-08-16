@@ -73,6 +73,7 @@ docs/                        项目文档
 - [jc002 固件运行时](docs/firmware-i18n-v2.md)：加载、严格查询、测试和设备验收边界。
 - [Inmotion6 jc002 测试构建](docs/jc002-inmotion6-test-build.md)：完整业务测试配置、发布包和可重复生成命令。
 - [开发指南](docs/development.md)：环境、命令、代码组织和测试边界。
+- [本地 CI 预检](docs/ci-preflight.md)：按 GitHub Actions 相同入口执行前端、Rust 和 Playwright 检查。
 
 ## 开发命令
 
@@ -98,6 +99,12 @@ npm run tauri:dev
 
 ```bash
 npm run build
+```
+
+提交前完整预检（包含 Playwright UI 测试）：
+
+```powershell
+npm run verify:ci
 ```
 
 Rust 检查：

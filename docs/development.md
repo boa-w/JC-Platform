@@ -96,6 +96,18 @@ macOS CI 产物当前未签名，首次打开可能受 Gatekeeper 限制；正�
 - 前端组件测试：表格编辑、树操作、表单校验。
 - 集成测试：打开样例 `.jcpro` 并导出。
 
+### GitHub Actions 对齐预检
+
+提交前建议执行：
+
+```powershell
+npm ci
+npx playwright install chromium
+npm run verify:ci
+```
+
+该命令按 Action 的共享脚本执行前端、Rust 和 UI 质量检查。完整说明、定向命令和 Playwright 失败产物见 [本地 CI 预检](ci-preflight.md)。
+
 ### 配置版本回归
 
 v1/v2 fixture 位于 `src-tauri/tests/fixtures/i18n/`。新增版本字段或二进制文本引用时，至少验证：

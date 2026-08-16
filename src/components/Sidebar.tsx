@@ -251,6 +251,7 @@ export function Sidebar({
           return (
             <button
               className={isActive ? 'activity-icon active' : 'activity-icon'}
+              data-navigation-group={group.id}
               key={group.id}
               type="button"
               onClick={() => selectGroup(group.id)}
@@ -451,6 +452,7 @@ export function Sidebar({
                 <button
                   aria-current={module.key === activeKey ? 'page' : undefined}
                   className={module.key === activeKey ? 'activity-item active' : 'activity-item'}
+                  data-navigation-key={module.key}
                   key={module.key}
                   type="button"
                   onClick={() => onSelect(module.key)}

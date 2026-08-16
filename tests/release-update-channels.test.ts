@@ -77,13 +77,13 @@ test('runs independent quality checks in parallel before the build', () => {
   );
   assert.match(
     workflow,
-    /- name: Verify frontend\n {8}run: npm run lint && npm run test:frontend && npm run build/,
+    /- name: Verify frontend\n {8}run: npm run verify:frontend/,
   );
   assert.match(
     workflow,
-    /- name: Test Rust\n {8}run: cargo test --manifest-path src-tauri\/Cargo.toml/,
+    /- name: Test Rust\n {8}run: npm run verify:rust/,
   );
-  assert.match(workflow, /- name: Run UI tests\n {8}run: npm run test:e2e/);
+  assert.match(workflow, /- name: Run UI tests\n {8}run: npm run verify:ui/);
   assert.doesNotMatch(workflow, /run: npm run verify$/m);
   assert.match(
     workflow,

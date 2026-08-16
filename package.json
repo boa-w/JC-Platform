@@ -31,9 +31,14 @@
     "test:bundle:macos": "bash scripts/test-macos-bundle.sh",
     "test:upgrade:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows-upgrade.ps1",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "verify:code": "npm run lint && npm run test:frontend && npm run build && npm run test:rust",
-    "verify": "npm run verify:code && npm run test:e2e",
-    "verify:strict": "npm run verify:code && npm run test:e2e:strict"
+    "verify:frontend": "npm run lint && npm run test:frontend && npm run build",
+    "verify:rust": "npm run test:rust",
+    "verify:ui": "npm run test:e2e",
+    "verify:ui:strict": "npm run test:e2e:strict",
+    "verify:code": "npm run verify:frontend && npm run verify:rust",
+    "verify:ci": "node scripts/verify-ci.mjs",
+    "verify": "npm run verify:ci",
+    "verify:strict": "node scripts/verify-ci.mjs --strict"
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",
