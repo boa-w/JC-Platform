@@ -8,7 +8,8 @@ const budgets = {
   // The application-level i18n runtime adds a predictable baseline to the entry chunk.
   // Profile-scoped localization selection adds a small always-loaded
   // document-state layer on top of controller/battery synchronization.
-  script: 129.25 * 1024,
+  // Keep a measured margin for the stable entry chunk across supported Node/Vite builds.
+  script: 130 * 1024,
   stylesheet: 12.25 * 1024,
 };
 

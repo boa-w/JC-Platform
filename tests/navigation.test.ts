@@ -25,3 +25,11 @@ test('marks the legacy signal dictionary as deprecated', () => {
     'navigation.modules.signalDictionary.lifecycleReason',
   );
 });
+
+test('places fault-code management under the data workspace', () => {
+  const dataGroup = navGroups.find((group) => group.id === 'data');
+  const configurationGroup = navGroups.find((group) => group.id === 'configuration');
+
+  assert.ok(dataGroup?.keys.includes('fault-code'));
+  assert.equal(configurationGroup?.keys.includes('fault-code'), false);
+});

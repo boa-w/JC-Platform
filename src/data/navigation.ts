@@ -18,7 +18,7 @@ export const navGroups: NavGroup[] = [
     id: 'data',
     labelKey: 'navigation.groups.data',
     accentToken: '--navigation-accent-data',
-    keys: ['setting-data', 'realtime-data', 'battery-monitor'],
+    keys: ['setting-data', 'realtime-data', 'battery-monitor', 'fault-code'],
   },
   {
     id: 'protocol',
@@ -35,7 +35,7 @@ export const navGroups: NavGroup[] = [
     id: 'configuration',
     labelKey: 'navigation.groups.configuration',
     accentToken: '--navigation-accent-config',
-    keys: ['ui', 'fault-code'],
+    keys: ['ui'],
   },
   {
     id: 'language',

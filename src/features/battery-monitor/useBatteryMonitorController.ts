@@ -26,7 +26,10 @@ import type {
 import type { JsonPath } from '../../utils/projectDirty';
 import { runSystemDialog } from '../../utils/systemDialog';
 import { defaultBatteryMonitor } from '../project-document/projectDocumentDefaults';
-import { readProtocolProfiles } from '../protocol-profiles/protocolProfiles';
+import {
+  initializeBatteryProtocolSections,
+  readProtocolProfiles,
+} from '../protocol-profiles/protocolProfiles';
 import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
 import { type BatteryValidationReport, validateBatteryMonitor } from './batteryMonitorValidation';
 
@@ -230,14 +233,21 @@ export function useBatteryMonitorController({
     const source = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
     if (!isBatteryMonitorSupported || !source.localization) return;
     const normalized = normalizeBatteryMonitor(next);
+    const existingProfiles = readProtocolProfiles(source);
+    const profileSections =
+      existingProfiles && !existingProfiles.active_battery_profile_id
+        ? initializeBatteryProtocolSections(source)
+        : {};
+    const profileDocument =
+      Object.keys(profileSections).length > 0 ? { ...source, ...profileSections } : source;
     const previousLanguage = languageDocument();
     const nextLanguage = batteryLanguageFor(normalized);
     const localization = source.localization as LocalizationDocument;
-    const profiles = readProtocolProfiles(source);
+    const profiles = readProtocolProfiles(profileDocument);
     const localizationUpdate = updateLocalizationScopeFromLanguageDocument(
       localization,
       profiles ?? undefined,
-      batteryLocalizationScope(source),
+      batteryLocalizationScope(profileDocument),
       previousLanguage,
       nextLanguage,
     );
@@ -247,6 +257,8 @@ export function useBatteryMonitorController({
     };
     if (localizationUpdate.protocolProfiles) {
       sections.protocol_profiles = localizationUpdate.protocolProfiles;
+    } else if (profileSections.protocol_profiles) {
+      sections.protocol_profiles = profileSections.protocol_profiles;
     }
     updateProjectSections(sections);
   }

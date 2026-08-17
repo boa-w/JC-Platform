@@ -142,6 +142,56 @@ const {
 } = richProjectDocument;
 
 export const v2FaultProjectPath = 'D:\\projects\\fault-catalog-v2.jcpro';
+const v2FaultCatalog = {
+  schema_version: 2,
+  enabled: true,
+  version: 2,
+  sources: [
+    {
+      source_key: 'traction',
+      source_id: 1,
+      type_char: 'T',
+      name: '牵引',
+      can_id: 0x288,
+      frame_type: 0,
+      code_byte: 2,
+      clear_code: 0,
+      invalid_codes: [],
+      enabled: true,
+    },
+    {
+      source_key: 'pump',
+      source_id: 2,
+      type_char: 'P',
+      name: '油泵',
+      can_id: 0x294,
+      frame_type: 0,
+      code_byte: 2,
+      clear_code: 0,
+      invalid_codes: [],
+      enabled: true,
+    },
+  ],
+  definitions: [
+    {
+      fault_key: 'fault.traction.052',
+      message_key: 'fault.message.dc_bus_low',
+      severity: 'fault',
+      enabled: true,
+    },
+    {
+      fault_key: 'fault.pump.052',
+      message_key: 'fault.message.dc_bus_low',
+      severity: 'fault',
+      enabled: true,
+    },
+  ],
+  bindings: [
+    { source_key: 'traction', code: 52, fault_key: 'fault.traction.052', enabled: true },
+    { source_key: 'pump', code: 52, fault_key: 'fault.pump.052', enabled: true },
+  ],
+};
+
 export const v2FaultProjectDocument = {
   ...richProjectWithoutLegacyLanguage,
   config_version: 'jc002',
@@ -166,53 +216,37 @@ export const v2FaultProjectDocument = {
       },
     },
   },
-  fault_code_info: {
+  fault_code_info: v2FaultCatalog,
+  protocol_profiles: {
     schema_version: 2,
-    enabled: true,
-    version: 2,
-    sources: [
+    active_controller_profile_id: 'controller.default',
+    active_fault_code_profile_id: 'fault.default',
+    controller_profiles: [
       {
-        source_key: 'traction',
-        source_id: 1,
-        type_char: 'T',
-        name: '牵引',
-        can_id: 0x288,
-        frame_type: 0,
-        code_byte: 2,
-        clear_code: 0,
-        invalid_codes: [],
-        enabled: true,
-      },
-      {
-        source_key: 'pump',
-        source_id: 2,
-        type_char: 'P',
-        name: '油泵',
-        can_id: 0x294,
-        frame_type: 0,
-        code_byte: 2,
-        clear_code: 0,
-        invalid_codes: [],
-        enabled: true,
+        profile_id: 'controller.default',
+        controller_family: 'generic',
+        controller_revision: '',
+        localization_overlay: { locales: {} },
+        protocol: {
+          pdo_global_param: richProjectDocument.pdo_global_param,
+          pdo_condition: richProjectDocument.pdo_condition,
+          pdo_recv: richProjectDocument.pdo_recv,
+          pdo_send: richProjectDocument.pdo_send,
+          sdo_info: richProjectDocument.sdo_info,
+        },
       },
     ],
-    definitions: [
+    battery_profiles: [],
+    fault_code_profiles: [
       {
-        fault_key: 'fault.traction.052',
-        message_key: 'fault.message.dc_bus_low',
-        severity: 'fault',
-        enabled: true,
+        profile_id: 'fault.default',
+        fault_family: 'generic',
+        fault_revision: '',
+        localization_overlay: { locales: {} },
+        protocol: {
+          fault_code_info: v2FaultCatalog,
+        },
       },
-      {
-        fault_key: 'fault.pump.052',
-        message_key: 'fault.message.dc_bus_low',
-        severity: 'fault',
-        enabled: true,
-      },
-    ],
-    bindings: [
-      { source_key: 'traction', code: 52, fault_key: 'fault.traction.052', enabled: true },
-      { source_key: 'pump', code: 52, fault_key: 'fault.pump.052', enabled: true },
     ],
   },
 };

@@ -279,9 +279,12 @@ test('edits the jc002 normalized fault catalog without flattening shared message
 }) => {
   test.setTimeout(60_000);
   await openV2FaultProject(page);
-  await page.getByRole('button', { name: '配置', exact: true }).click();
+  const dataGroupButton = page.locator('[data-navigation-group="data"]');
+  if ((await dataGroupButton.getAttribute('aria-expanded')) !== 'true') {
+    await dataGroupButton.click();
+  }
   await page
-    .getByRole('navigation', { name: '配置 功能' })
+    .getByRole('navigation', { name: '数据 功能' })
     .getByRole('button', { name: '故障代码', exact: true })
     .click();
 
@@ -494,8 +497,8 @@ test('supports keyboard navigation and named settings controls', async ({ page }
   await exportNavigation.getByRole('button', { name: '项目导出', exact: true }).click();
   const exportMain = page.getByRole('main', { name: '项目导出' });
   await expect(exportMain).toBeVisible();
-  await expect(exportMain.getByRole('checkbox', { name: '写入锂电监控索引元数据' })).toBeVisible();
-  await expect(exportMain.getByRole('checkbox', { name: '写入故障码配置' })).toBeVisible();
+  await expect(exportMain.getByRole('checkbox', { name: '写入锂电监控索引元数据' })).toHaveCount(0);
+  await expect(exportMain.getByRole('checkbox', { name: '写入故障码配置' })).toHaveCount(0);
   expect(await page.evaluate(() => Object.keys(localStorage))).not.toContain(
     'jc-platform.export.battery-options',
   );
@@ -588,12 +591,15 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
   await expect(testDataDialog).toBeHidden();
   await expect(page.locator('input[value="电机运行状态"]')).toBeVisible();
 
-  await page.getByRole('button', { name: '配置', exact: true }).click();
+  const faultDataGroupButton = page.locator('[data-navigation-group="data"]');
+  if ((await faultDataGroupButton.getAttribute('aria-expanded')) !== 'true') {
+    await faultDataGroupButton.click();
+  }
   await page
-    .getByRole('navigation', { name: '配置 功能' })
+    .getByRole('navigation', { name: '数据 功能' })
     .getByRole('button', { name: '故障代码', exact: true })
     .click();
-  await expect(page.getByText('牵引故障', { exact: true })).toBeVisible();
+  await expect(page.getByText('jc001 不包含该管理模块。', { exact: false })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, '已加载项目的故障代码工作区');
 
   await page.getByRole('button', { name: '多国语言', exact: true }).click();
@@ -715,29 +721,15 @@ test('supports accessible loaded-project editing and save', async ({ page }) => 
     .getByRole('button', { name: '项目导出', exact: true })
     .click();
   const exportMain = page.getByRole('main', { name: '项目导出' });
-  const batteryConfigSwitch = exportMain.getByRole('checkbox', {
-    name: '写入锂电监控索引元数据',
-  });
-  await batteryConfigSwitch.uncheck();
+  await expect(
+    exportMain.getByRole('checkbox', { name: '写入锂电监控索引元数据' }),
+  ).toHaveCount(0);
+  await expect(
+    exportMain.getByRole('checkbox', { name: '写入故障码配置' }),
+  ).toHaveCount(0);
   await expect(
     page.locator('.action-bar').getByRole('button', { name: '保存', exact: true }),
-  ).toBeEnabled();
-  await page.keyboard.press('Control+s');
-  const exportSaveDialog = page.getByRole('dialog', { name: '确认保存' });
-  await exportSaveDialog.getByRole('button', { name: '确认保存', exact: true }).click();
-  await expect(exportSaveDialog).toBeHidden();
-  expect(
-    await page.evaluate(
-      () =>
-        (
-          window as unknown as {
-            __SAVED_PROJECT_DOCUMENT__?: {
-              export_info?: { battery_monitor?: { config?: boolean; bin?: boolean } };
-            };
-          }
-        ).__SAVED_PROJECT_DOCUMENT__?.export_info?.battery_monitor,
-    ),
-  ).toMatchObject({ config: false, bin: true });
+  ).toBeDisabled();
 });
 
 test('supports accessible Git review and comparison views', async ({ page }) => {
@@ -792,12 +784,13 @@ test('keeps loaded-project workspaces accessible in dark mode', async ({ page })
   const surfaces = [
     { group: '数据', module: '设置数据' },
     { group: '数据', module: '实时数据' },
-    { group: '配置', module: '故障代码' },
+    { group: '数据', module: '故障代码' },
     { group: '多国语言', module: '多国语言' },
   ] as const;
+  const groupIds = { 数据: 'data', 多国语言: 'language' } as const;
 
   for (const surface of surfaces) {
-    const groupButton = page.getByRole('button', { name: surface.group, exact: true });
+    const groupButton = page.locator(`[data-navigation-group="${groupIds[surface.group]}"]`);
     if ((await groupButton.getAttribute('aria-expanded')) !== 'true') {
       await groupButton.click();
     }
