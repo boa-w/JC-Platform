@@ -134,35 +134,6 @@ export const richProjectDocument = {
       诊断模式: { zh: '诊断模式', en: '' },
     },
   },
-  fault_code_info: {
-    schema_version: 1,
-    enabled: true,
-    version: 1,
-    sources: [
-      {
-        source_key: 'traction',
-        source_id: 1,
-        type_char: 'T',
-        name: '牵引',
-        can_id: 0x288,
-        frame_type: 0,
-        code_byte: 2,
-        clear_code: 0,
-        invalid_codes: [],
-        enabled: true,
-      },
-    ],
-    codes: [
-      {
-        source_key: 'traction',
-        source_id: 1,
-        type_char: 'T',
-        code: 42,
-        severity: 'fault',
-        message_key: '牵引故障',
-      },
-    ],
-  },
 };
 
 const {

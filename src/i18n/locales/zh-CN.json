@@ -328,6 +328,12 @@
         "zhCN": "简体中文"
       }
     },
+    "functionPages": {
+      "sectionTitle": "功能页面",
+      "description": "选择左侧导航中显示的功能页，默认全部显示；隐藏后可随时恢复。",
+      "showAll": "全部显示",
+      "alwaysVisible": "项目入口页，无法隐藏"
+    },
     "appearance": {
       "sectionTitle": "外观",
       "themeMode": "主题模式",
@@ -388,6 +394,17 @@
     }
   },
   "language": {
+    "scope": {
+      "title": "语言作用域",
+      "common": "公共语言目录",
+      "controller": "控制器 {{id}} · {{family}}",
+      "battery": "锂电监控 {{id}} · {{family}}",
+      "fault": "故障码 {{id}} · {{family}}",
+      "commonDescription": "所有控制器和锂电 Profile 共享的基础语言目录；语言顺序在这里统一管理。",
+      "overlayDescription": "编辑 {{id}} 的 Profile overlay；未覆盖的 key 继承公共语言目录。",
+      "overlayBadge": "Profile overlay",
+      "overlayCount": "覆盖 {{count}} 个 key"
+    },
     "service": {
       "sourceLanguage": "源语言",
       "targetLanguage": "目标语言",
@@ -735,20 +752,26 @@
     "controllerDescription": "独立管理控制器的 PDO、SDO 和 CANopen 拓扑。",
     "batteryTitle": "锂电监控 Profile",
     "batteryDescription": "独立管理锂电帧、信号、显示项和超时策略。",
+    "faultTitle": "故障码 Profile",
+    "faultDescription": "独立管理故障来源、故障定义、绑定关系和故障文案。",
     "notInitialized": "尚未启用{{scope}}。",
     "notConfigured": "未配置",
     "initialize": "启用 Profile 管理",
     "activeController": "当前控制器协议",
     "activeBattery": "当前锂电协议",
+    "activeFault": "当前故障码目录",
     "controllerFamily": "控制器/协议族",
     "controllerRevision": "控制器协议版本",
     "batteryFamily": "电池协议族",
     "batteryRevision": "电池协议版本",
+    "faultFamily": "故障码族",
+    "faultRevision": "故障码版本",
     "profileId": "Profile ID",
     "description": "备注",
     "profileIdEmpty": "Profile ID 不能为空。",
     "profileIdTooLong": "Profile ID 不能超过 63 个 UTF-8 字节。",
     "profileIdDuplicate": "Profile ID 已存在，请使用其他 ID。",
+    "create": "新增空白 Profile",
     "clone": "复制 Profile",
     "remove": "删除 Profile",
     "removeConfirm": "确定删除 Profile「{{id}}」吗？",
@@ -793,6 +816,11 @@
     "noNodes": "暂无 CANopen 节点，请先新增节点。",
     "unnamedNode": "未命名节点",
     "nodeId": "Node-ID",
+    "nodeIdDisplay": "Node-ID 显示",
+    "nodeIdDecimal": "十进制",
+    "nodeIdHexadecimal": "十六进制",
+    "nodeIdDecimalPlaceholder": "例如：8",
+    "nodeIdHexadecimalPlaceholder": "例如：0x08",
     "nodeName": "节点名称",
     "nodeRole": "节点角色",
     "sdoChannel": "启用 SDO",
@@ -813,6 +841,7 @@
     "producerNode": "生产者节点",
     "consumerNodes": "消费者 Node-ID",
     "consumerNodesPlaceholder": "例如：7, 8, 64",
+    "consumerNodesHexadecimalPlaceholder": "例如：0x07, 0x08, 0x40",
     "producerPdoNumber": "生产者 PDO 编号",
     "consumerPdoNumber": "消费者 PDO 编号",
     "transmissionType": "传输类型",
@@ -1157,163 +1186,6 @@
     "exportedConfig": "说明配置已导出：{{path}}",
     "noValidFrames": "配置文件中没有有效的 CAN 帧。",
     "importedFrames": "已导入 {{count}} 帧"
-  },
-  "faultCode": {
-    "title": "故障代码",
-    "openProjectDescription": "打开项目后可编辑故障来源帧、故障码和多语言文案绑定。",
-    "description": "配置会随项目导出写入 data.bin，设备端优先读取动态配置。",
-    "enabled": "启用",
-    "disabled": "停用",
-    "severity": {
-      "info": "信息",
-      "warning": "警告",
-      "fault": "故障",
-      "critical": "严重"
-    },
-    "meta": {
-      "schemaVersion": "结构版本",
-      "binaryVersion": "二进制版本",
-      "sourceCount": "来源数量",
-      "codeCount": "故障码数量"
-    },
-    "sourceRules": {
-      "title": "来源规则",
-      "enabled": "启用",
-      "key": "来源 Key",
-      "name": "名称",
-      "id": "来源 ID",
-      "type": "类型",
-      "frameType": "帧类型",
-      "codeByte": "取码字节",
-      "clearCode": "清除码",
-      "invalidCodes": "无效码"
-    },
-    "actions": {
-      "addSource": "新增来源",
-      "exportCsv": "导出 CSV",
-      "importCsv": "导入 CSV",
-      "column": "操作"
-    },
-    "frameTypes": {
-      "standard": "标准帧",
-      "extended": "扩展帧"
-    },
-    "batch": {
-      "title": "批量管理",
-      "source": "复制来源",
-      "target": "目标来源",
-      "copy": "批量复制",
-      "currentFilter": "当前筛选：",
-      "allSources": "全部来源 {{count}} 条",
-      "filteredSource": "{{source}} {{count}} 条",
-      "translationKey": "翻译 Key",
-      "independentKey": "创建独立翻译 Key",
-      "sharedKey": "复用原翻译 Key",
-      "completeKeys": "补齐 Key/i18n",
-      "enable": "批量启用",
-      "disable": "批量禁用",
-      "deleteFiltered": "删除筛选项"
-    },
-    "codes": {
-      "title": "故障码",
-      "source": "来源",
-      "allSources": "全部来源 ({{count}})",
-      "add": "新增故障码",
-      "enabled": "启用",
-      "type": "类型",
-      "codeByte": "取码字节",
-      "severity": "等级",
-      "messageKey": "文案 Key",
-      "zhText": "中文文案",
-      "emptyForSource": "当前来源下没有故障码"
-    },
-    "readonly": {
-      "canId": "CAN ID 由来源规则决定",
-      "type": "类型由来源规则决定",
-      "codeByte": "取码字节由来源规则决定"
-    },
-    "clone": {
-      "noOtherSources": "无其他来源",
-      "copyToSource": "复制到来源"
-    },
-    "i18n": {
-      "searchPlaceholder": "搜索 i18n key / 文案",
-      "clearSearch": "清空搜索",
-      "clear": "清空",
-      "noEntries": "暂无可绑定 i18n",
-      "focusToSelect": "聚焦选择已有 i18n",
-      "noMatches": "无匹配 i18n",
-      "selectExisting": "选择已有 i18n",
-      "addEntryFirst": "请先在语言表中添加条目",
-      "matchCount": "{{matched}}/{{total}} 个匹配{{limited}}",
-      "limited": "，仅显示前 {{count}} 个"
-    },
-    "duplicates": {
-      "code": "{{canId}} 下故障码 {{code}} 重复 {{count}} 次",
-      "messageKey": "文案 Key “{{key}}”重复 {{count}} 次",
-      "row": "{{source}} 来源下已存在相同故障码",
-      "messageKeyRow": "已存在相同文案 Key"
-    },
-    "aria": {
-      "sourceEnabled": "来源 {{index}} 启用",
-      "sourceKey": "来源 {{index}} Key",
-      "sourceName": "来源 {{index}} 名称",
-      "sourceId": "来源 {{index}} ID",
-      "sourceType": "来源 {{index}} 类型字符",
-      "sourceCanId": "来源 {{index}} CAN ID",
-      "sourceFrameType": "来源 {{index}} 帧类型",
-      "sourceCodeByte": "来源 {{index}} 取码字节",
-      "sourceClearCode": "来源 {{index}} 清除码",
-      "sourceInvalidCodes": "来源 {{index}} 无效码",
-      "codeEnabled": "故障码 {{index}} 启用",
-      "codeSource": "故障码 {{index}} 来源",
-      "codeValue": "故障码 {{index}} Code",
-      "codeSeverity": "故障码 {{index}} 等级",
-      "i18nSearch": "故障码 {{index}} 搜索 i18n",
-      "i18nBinding": "故障码 {{index}} 绑定 i18n",
-      "messageKey": "故障码 {{index}} 文案 Key",
-      "zhText": "故障码 {{index}} 中文文案",
-      "cloneTarget": "故障码 {{index}} 复制目标来源"
-    },
-    "confirmDelete": {
-      "title": "删除筛选结果？",
-      "message": "将删除当前筛选范围内的 {{count}} 条故障码。保存项目后此操作将无法撤销。",
-      "confirm": "删除 {{count}} 条"
-    },
-    "status": {
-      "selectCopySources": "请选择要复制的来源和目标来源",
-      "copySourcesMustDiffer": "批量复制的来源和目标来源不能相同",
-      "noCopyableCodes": "没有可复制的故障码，已跳过 {{count}} 条目标来源已存在的故障码",
-      "copiedCodes": "已从 {{source}} 复制 {{count}} 条到 {{target}}{{keyMode}}{{skipped}}",
-      "keyMode": {
-        "shared": "，复用原翻译 Key",
-        "independent": "，已创建独立翻译 Key"
-      },
-      "skippedDuplicates": "，跳过 {{count}} 条重复故障码",
-      "noCodesToComplete": "当前筛选范围内没有故障码可补齐",
-      "completedCodes": "已补齐当前筛选范围 {{count}} 条故障码的来源参数、文案 Key 和 i18n 条目{{changed}}",
-      "changedCodes": "，其中 {{count}} 条发生字段更新",
-      "noCodesToUpdate": "当前筛选范围内没有故障码可操作",
-      "updatedEnabled": "已{{state}}当前筛选范围 {{count}} 条故障码",
-      "noCodesToDelete": "当前筛选范围内没有故障码可删除",
-      "deletedCodes": "已删除当前筛选范围 {{count}} 条故障码",
-      "selectCloneTarget": "请先选择要复制到的故障来源",
-      "cloneTargetMustDiffer": "目标来源不能与当前来源相同",
-      "targetAlreadyHasCode": "{{target}} 已存在故障码 {{code}}",
-      "clonedCode": "已将故障码 {{code}} 复制到 {{target}}",
-      "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
-      "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
-      "sourcesExported": "来源规则 CSV 已导出：{{path}}",
-      "sourcesImportError": "导入来源规则 CSV 出错：{{errors}}",
-      "sourcesImported": "已导入 {{count}} 条来源规则",
-      "codesExported": "故障码 CSV 已导出：{{path}}",
-      "codesImportError": "导入故障码 CSV 出错：{{errors}}",
-      "codesImported": "已导入 {{count}} 条故障码，并同步多语言文案"
-    },
-    "filters": {
-      "sourcesCsv": "故障来源 CSV",
-      "codesCsv": "故障码 CSV"
-    }
   },
   "batteryMonitor": {
     "title": "锂电监控协议",
@@ -1702,7 +1574,9 @@
       "controllerCount": "控制器协议数：{{count}}",
       "batteryActive": "锂电协议：{{id}}",
       "batteryCount": "锂电协议数：{{count}}",
-      "buildHint": "构建将组合当前激活的控制器协议和锂电协议，生成单套 jc002 运行时 bin。"
+      "faultActive": "故障码目录：{{id}}",
+      "faultCount": "故障码目录数：{{count}}",
+      "buildHint": "构建将组合控制器、锂电和故障码 Profile，生成统一 jc002 运行时 bin。"
     },
     "writeControls": {
       "title": "写入控制",

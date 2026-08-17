@@ -4,7 +4,7 @@
 //! handled by the legacy exporter; version 2 exclusively uses `localization`.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::collections::{BTreeMap, HashMap};
 
 pub const I18N_MAGIC: u32 = u32::from_le_bytes(*b"LVI2");
@@ -191,6 +191,130 @@ pub fn build_dynamic_language_pack(document: &Value) -> Result<DynamicLanguagePa
 pub fn validate_localization(document: &Value) -> Result<(), String> {
     require_jc002(document)?;
     source_pack(document).map(|_| ())
+}
+
+/// Validate a partial localization catalog owned by one protocol Profile.
+///
+/// The project-level catalog owns the locale set and its order. A Profile
+/// overlay may only provide translations for those locales, while its message
+/// keys may be shared with or additional to the public catalog.
+pub fn validate_localization_overlay(
+    document: &Value,
+    overlay: &Value,
+    label: &str,
+) -> Result<(), String> {
+    let base_locales = document
+        .get("localization")
+        .and_then(|value| value.get("locales"))
+        .and_then(Value::as_object)
+        .ok_or_else(|| format!("{label} 无法校验：项目缺少 localization.locales"))?;
+    let overlay_object = overlay
+        .as_object()
+        .ok_or_else(|| format!("{label} 必须为对象"))?;
+    if overlay_object.keys().any(|key| key != "locales") {
+        return Err(format!(
+            "{label} 只允许包含 locales，不得定义 default_locale 或 locale_order"
+        ));
+    }
+    let empty_locales = Map::new();
+    let locales = overlay_object
+        .get("locales")
+        .map(|value| {
+            value
+                .as_object()
+                .ok_or_else(|| format!("{label}.locales 必须为对象"))
+        })
+        .transpose()?
+        .unwrap_or(&empty_locales);
+
+    for (locale, value) in locales {
+        if !base_locales.contains_key(locale) {
+            return Err(format!(
+                "{label}.locales.{locale} 不在公共 localization.locale_order 中"
+            ));
+        }
+        let locale_object = value
+            .as_object()
+            .ok_or_else(|| format!("{label}.locales.{locale} 必须为对象"))?;
+        if locale_object.keys().any(|key| key != "translations") {
+            return Err(format!("{label}.locales.{locale} 只允许包含 translations"));
+        }
+        let empty_translations = Map::new();
+        let translations = locale_object
+            .get("translations")
+            .map(|value| {
+                value
+                    .as_object()
+                    .ok_or_else(|| format!("{label}.locales.{locale}.translations 必须为对象"))
+            })
+            .transpose()?
+            .unwrap_or(&empty_translations);
+        for (key, message) in translations {
+            if key.trim().is_empty() {
+                return Err(format!("{label}.locales.{locale} 存在空消息 key"));
+            }
+            parse_forms(message).map_err(|error| {
+                format!("{label}.locales.{locale}.translations.{key} 无效：{error}")
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// Merge controller, battery, and fault-code overlays onto the common localization tree.
+///
+/// Overlay order is controller, battery, then fault code. If selected
+/// Profiles define the same locale/key with different values, the combination
+/// is rejected instead of relying on an undocumented precedence rule.
+pub fn merge_localization_overlays(
+    localization: &Value,
+    overlays: &[(&str, &Value)],
+) -> Result<Value, String> {
+    let mut merged = localization.clone();
+    let locales = merged
+        .as_object_mut()
+        .and_then(|root| root.get_mut("locales"))
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "jc002 localization.locales 必须为对象".to_string())?;
+    let mut applied = HashMap::<(String, String), Value>::new();
+    let empty_locales = Map::new();
+    let empty_translations = Map::new();
+
+    for (label, overlay) in overlays {
+        let overlay_locales = overlay
+            .get("locales")
+            .and_then(Value::as_object)
+            .unwrap_or(&empty_locales);
+        for (locale, locale_value) in overlay_locales {
+            let translations = locale_value
+                .get("translations")
+                .and_then(Value::as_object)
+                .unwrap_or(&empty_translations);
+            let locale_object = locales
+                .get_mut(locale)
+                .and_then(Value::as_object_mut)
+                .ok_or_else(|| format!("{label}.locales.{locale} 不在公共语言目录中"))?;
+            let target_translations = locale_object
+                .entry("translations".to_string())
+                .or_insert_with(|| Value::Object(Map::new()))
+                .as_object_mut()
+                .ok_or_else(|| format!("公共语言目录 {locale}.translations 必须为对象"))?;
+            for (key, value) in translations {
+                let identity = (locale.clone(), key.clone());
+                if let Some(previous) = applied.get(&identity) {
+                    if previous != value {
+                        return Err(format!(
+                            "Profile overlay 文案冲突：{locale}/{key} 同时由多个 Profile 定义"
+                        ));
+                    }
+                } else {
+                    applied.insert(identity, value.clone());
+                }
+                target_translations.insert(key.clone(), value.clone());
+            }
+        }
+    }
+    Ok(merged)
 }
 
 pub fn decode_dynamic_language_pack(bytes: &[u8]) -> Result<DynamicLanguagePackSummary, String> {

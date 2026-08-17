@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   addProtocolProfileSections,
+  createNewProtocolProfileSections,
   initializeBatteryProtocolSections,
+  initializeFaultCodeProtocolSections,
   initializeProtocolProfilesSections,
   protocolProfileSectionsForSelection,
-  renameProtocolProfileSections,
   readProtocolProfiles,
+  renameProtocolProfileSections,
   syncProtocolProfileSections,
 } from '../src/features/protocol-profiles/protocolProfiles.ts';
 
@@ -29,6 +31,14 @@ function baseDocument() {
       signals: [],
       items: [],
     },
+    fault_code_info: {
+      schema_version: 2,
+      enabled: false,
+      version: 2,
+      sources: [],
+      definitions: [],
+      bindings: [],
+    },
   };
 }
 
@@ -38,6 +48,7 @@ test('initializes independent controller and battery registries', () => {
   assert.equal(profiles?.schema_version, 2);
   assert.equal(profiles?.controller_profiles.length, 1);
   assert.equal(profiles?.battery_profiles.length, 1);
+  assert.equal(profiles?.fault_code_profiles.length, 1);
 
   const clonedController = {
     ...initialized,
@@ -57,6 +68,104 @@ test('initializes independent controller and battery registries', () => {
   assert.equal(batteryProfiles?.controller_profiles.length, 2);
   assert.equal(batteryProfiles?.battery_profiles.length, 2);
   assert.equal(batteryProfiles?.active_battery_profile_id, 'battery.default_2');
+});
+
+test('fault code Profiles are independent from controller and battery selections', () => {
+  const initialized = { ...baseDocument(), ...initializeProtocolProfilesSections(baseDocument()) };
+  const added = {
+    ...initialized,
+    ...addProtocolProfileSections(initialized, 'fault'),
+  };
+  const profiles = readProtocolProfiles(added);
+  assert.equal(profiles?.fault_code_profiles.length, 2);
+  assert.equal(profiles?.active_fault_code_profile_id, 'fault.default_2');
+  assert.equal(profiles?.active_controller_profile_id, 'controller.default');
+  assert.equal(profiles?.active_battery_profile_id, 'battery.default');
+
+  const switched = syncProtocolProfileSections(
+    added,
+    protocolProfileSectionsForSelection(added, 'fault', 'fault.default'),
+  );
+  assert.equal(
+    (switched.protocol_profiles as { active_fault_code_profile_id: string })
+      .active_fault_code_profile_id,
+    'fault.default',
+  );
+  assert.equal((switched.fault_code_info as { version: number }).version, 2);
+  assert.equal(
+    (switched.protocol_profiles as { active_controller_profile_id: string })
+      .active_controller_profile_id,
+    'controller.default',
+  );
+});
+
+test('initializes a fault Profile from a jc002 root fault catalog without v1 conversion', () => {
+  const document = {
+    ...baseDocument(),
+    protocol_profiles: {
+      schema_version: 2,
+      active_controller_profile_id: 'controller.default',
+      controller_profiles: [
+        {
+          profile_id: 'controller.default',
+          controller_family: 'generic',
+          controller_revision: '',
+          protocol: {
+            pdo_global_param: [],
+            pdo_condition: [],
+            pdo_recv: [],
+            pdo_send: [],
+            sdo_info: { type: 0, children: [] },
+          },
+        },
+      ],
+      battery_profiles: [],
+    },
+  };
+  const initialized = initializeFaultCodeProtocolSections(document);
+  const profiles = readProtocolProfiles({ ...document, ...initialized });
+  assert.equal(profiles?.fault_code_profiles.length, 1);
+  assert.equal(profiles?.fault_code_profiles[0].protocol.fault_code_info.schema_version, 2);
+  assert.equal(profiles?.active_fault_code_profile_id, 'fault.default');
+});
+
+test('creates a blank controller profile instead of copying the active payload', () => {
+  const initialized = { ...baseDocument(), ...initializeProtocolProfilesSections(baseDocument()) };
+  const created = {
+    ...initialized,
+    ...createNewProtocolProfileSections(initialized, 'controller'),
+  };
+  const profiles = readProtocolProfiles(created);
+  const newProfile = profiles?.controller_profiles.find(
+    (profile) => profile.profile_id === 'controller.new',
+  );
+
+  assert.equal(profiles?.active_controller_profile_id, 'controller.new');
+  assert.equal(profiles?.controller_profiles.length, 2);
+  assert.deepEqual(newProfile?.protocol.pdo_global_param, []);
+  assert.deepEqual(newProfile?.protocol.pdo_condition, []);
+  assert.deepEqual(newProfile?.protocol.pdo_recv, []);
+  assert.deepEqual(newProfile?.protocol.pdo_send, []);
+  assert.deepEqual(newProfile?.protocol.sdo_info, {
+    type: 0,
+    user_auth: 0,
+    name_index: 0,
+    name: '',
+    children: [],
+  });
+  assert.deepEqual(newProfile?.protocol.canopen, {
+    schema_version: 1,
+    nodes: [],
+    pdos: [],
+  });
+  assert.deepEqual(created.pdo_global_param, []);
+  assert.notEqual(newProfile?.protocol.pdo_global_param, initialized.pdo_global_param);
+
+  const second = {
+    ...created,
+    ...createNewProtocolProfileSections(created, 'controller'),
+  };
+  assert.equal(readProtocolProfiles(second)?.active_controller_profile_id, 'controller.new_2');
 });
 
 test('switching controller and battery profiles independently mirrors both active sections', () => {
@@ -139,6 +248,31 @@ test('switching controller and battery profiles independently mirrors both activ
   assert.equal(
     (batterySwitch.battery_monitor as { default_timeout_ticks: number }).default_timeout_ticks,
     200,
+  );
+});
+
+test('keeps an atomic active battery mirror patch when the profile registry is also updated', () => {
+  const initialized = { ...baseDocument(), ...initializeProtocolProfilesSections(baseDocument()) };
+  const profiles = readProtocolProfiles(initialized);
+  assert.ok(profiles);
+
+  const nextBatteryMonitor = {
+    ...baseDocument().battery_monitor,
+    default_timeout_ticks: 333,
+  };
+  const updated = syncProtocolProfileSections(initialized, {
+    protocol_profiles: profiles,
+    battery_monitor: nextBatteryMonitor,
+  });
+  const updatedProfiles = readProtocolProfiles(updated);
+
+  assert.equal(
+    (updated.battery_monitor as { default_timeout_ticks: number }).default_timeout_ticks,
+    333,
+  );
+  assert.equal(
+    updatedProfiles?.battery_profiles[0].protocol.battery_monitor.default_timeout_ticks,
+    333,
   );
 });
 

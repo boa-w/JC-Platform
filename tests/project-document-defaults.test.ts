@@ -5,7 +5,6 @@ import { withRequiredEditorSections } from '../src/features/project-document/pro
 test('does not synthesize a deprecated battery monitor section for a legacy recovery document', () => {
   const restored = withRequiredEditorSections({
     project: { name: 'Recovery Fixture', revision: 2 },
-    fault_code_info: {},
   });
 
   assert.equal(restored?.project.name, 'Recovery Fixture');
@@ -14,7 +13,6 @@ test('does not synthesize a deprecated battery monitor section for a legacy reco
     manifest_filename: 'ConfigUpdate.json',
     binary_filename: 'pdo_sdo_data.bin',
     battery_monitor: { config: true, bin: true },
-    fault_code_info: { config: true, bin: true },
   });
   assert.equal(restored?.battery_monitor, undefined);
 });
@@ -34,7 +32,6 @@ test('fills missing project export target flags without replacing project names'
     manifest_filename: 'device.json',
     binary_filename: 'device.bin',
     battery_monitor: { config: false, bin: true },
-    fault_code_info: { config: true, bin: true },
   });
 });
 

@@ -15,8 +15,8 @@ import type {
   ProjectExportTargetSettings,
   UiImageCopyReport,
 } from '../../types/platform';
-import { readProtocolProfiles } from '../protocol-profiles/protocolProfiles';
 import { runSystemDialog } from '../../utils/systemDialog';
+import { readProtocolProfiles } from '../protocol-profiles/protocolProfiles';
 import {
   defaultProjectExportSettings,
   projectDirectory,
@@ -43,6 +43,8 @@ export function useProjectExport({
   const [outputDir, setOutputDir] = useState(() => projectDirectory(projectPath));
   const exportSettings = useMemo(() => readProjectExportSettings(document), [document]);
   const protocolProfiles = useMemo(() => readProtocolProfiles(document), [document]);
+  const configuredVersion = (document as { config_version?: unknown } | null)?.config_version;
+  const supportsV2Extensions = configuredVersion === 'jc002';
   const [exportReport, setExportReport] = useState<ProjectExportReport | null>(null);
   const [imageCopyReport, setImageCopyReport] = useState<UiImageCopyReport | null>(null);
   const [binaryReport, setBinaryReport] = useState<BinaryBuildReport | null>(null);
@@ -95,8 +97,7 @@ export function useProjectExport({
       setImageCopyReport(report);
       if (!report.valid)
         setError(
-          report.errors.join(t('common.punctuation.semicolon')) ||
-            t('projectExport.errors.uiCopy'),
+          report.errors.join(t('common.punctuation.semicolon')) || t('projectExport.errors.uiCopy'),
         );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -208,6 +209,7 @@ export function useProjectExport({
     batteryMonitorExport: exportSettings.battery_monitor,
     faultCodeExport: exportSettings.fault_code_info,
     protocolProfiles,
+    supportsV2Extensions,
     updateExportTarget,
     exportReport,
     imageCopyReport,

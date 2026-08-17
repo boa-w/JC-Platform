@@ -37,7 +37,6 @@
 | `pdo_send` | array | 高级 PDO 发送帧 | 二进制 PDO 发送段 |
 | `sdo_info` | object | SDO 菜单树和参数 | 二进制 SDO 段 |
 | `language_info` | object | 语言代码、内部键和翻译值 | 二进制语言块、表格交换 |
-| `fault_code_info` | object | 故障来源和故障码 | 可选二进制扩展段和清单描述 |
 | `signal_dictionary` | object | 历史统一业务信号字典 | 编辑态；`.jcpro` 保存到 v1 废弃 sidecar |
 | `private_protocol` | object | 私有协议帧模型 | 编辑态；`.jcpro` 保存到 v1 废弃 sidecar |
 | `protocol_mapping` | array | Signal 到传输协议的映射 | 编辑态；`.jcpro` 保存到 v1 废弃 sidecar |
@@ -48,8 +47,8 @@
 
 ```text
 config_version → device → project → export_info → ui_info → language_info
-→ fault_code_info → pdo_simple_send_recv → pdo_global_param → pdo_condition
-→ pdo_recv → pdo_send → sdo_info → history_ui
+→ pdo_simple_send_recv → pdo_global_param → pdo_condition → pdo_recv
+→ pdo_send → sdo_info → history_ui
 ```
 
 顺序主要用于生成稳定 diff，不改变 JSON 语义。
@@ -74,8 +73,7 @@ config_version → device → project → export_info → ui_info → language_i
 {
   "folder_name": "jc_export",
   "manifest_filename": "ConfigUpdate.json",
-  "binary_filename": "pdo_sdo_data.bin",
-  "fault_code_info": { "config": true, "bin": true }
+  "binary_filename": "pdo_sdo_data.bin"
 }
 ```
 
@@ -211,14 +209,11 @@ SDO 菜单树。
 
 jc001 不再定义锂电监控解析段。锂电监控已统一使用 jc002 的 Battery V2 契约，字段、消息 key 和二进制布局见 [v2 数据格式](data-format-v2.md#锂电监控)。
 
-## fault_code_info
+## 故障码
 
-顶层字段为 `schema_version`、`enabled`、`version`、`sources[]` 和 `codes[]`。
-
-- `sources[]` 定义来源 key/ID、类型字符、CAN ID、帧类型、取码字节、清除码和无效码；
-- `codes[]` 定义来源引用、数值 code、等级、`message_key`/名称和启用状态。
-
-保存为兼容 `.jcpro` 时，编辑态的 `groups`、`bindings`、`generated_from_group` 和 `group_key` 等重构生成辅助字段会被裁剪；设备文件只接收已展开的来源和故障码记录。
+`jc001` 不包含故障码管理，也不接受根级 `fault_code_info`。故障码只属于 `jc002`，持久化在
+`protocol_profiles.fault_code_profiles[]`，使用 schema v2 的 `sources[]`、`definitions[]` 和
+`bindings[]`。详见 [jc002 项目数据格式](data-format-v2.md#故障码)。
 
 ## language_info
 
@@ -243,7 +238,7 @@ jc001 不再定义锂电监控解析段。锂电监控已统一使用 jc002 的 
 - `list_code_language` 的顺序就是设备语言块的顺序；
 - `list_inner` 保存语言名称和普通翻译项的有序键列表；
 - `list_translate[key][code]` 保存每个键在各语言中的文本；
-- jc001 导出器只收集 SDO 和故障码的旧语言条目；锂电监控不属于 jc001 发布包。
+- jc001 导出器只收集 SDO 的旧语言条目；故障码和锂电监控均不属于 jc001 发布包。
 
 ## 统一协议编辑段和 v1 废弃 sidecar
 

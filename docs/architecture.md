@@ -45,12 +45,19 @@ Infrastructure 基础设施适配层
                                └─ img/
 ```
 
-对于 jc002，编辑文档中的 `protocol_profiles` 分别保存控制器协议集合和锂电协议集合，
-`active_controller_profile_id` 与 `active_battery_profile_id` 独立决定各自页面编辑内容和
-发布包物化结果。发布包仍是当前固件可消费的单套 PDO/SDO/battery 二进制 ABI，不把完整
-Profile JSON 下发到设备。
+对于 jc002，编辑文档中的 `protocol_profiles` 分别保存控制器、锂电和故障码协议集合，
+`active_controller_profile_id`、`active_battery_profile_id` 与
+`active_fault_code_profile_id` 独立决定各自页面编辑内容和发布包默认生成的 Profile Bundle。
+单套编辑文档在导出时自动包装为默认 Profile，所有组合进入同一个 data.bin；下位机选择后
+仍以单套 PDO/SDO/battery/fault 二进制 ABI 运行，不把完整 Profile JSON 下发到设备。
 
 ## React 表现层
+
+jc002 多国语言采用“公共语言目录 + Profile overlay”：根级 localization 统一维护
+locale 集合、default_locale 和 locale_order；控制器、锂电和故障码 Profile 分别维护局部 overlay。
+导出每个控制器 × 锂电 × 故障码组合时独立合并并生成 LVI2，因此不同 Profile 可以拥有不同文案，
+同时保持固件语言索引一致。多国语言页的 Profile 作用域只编辑 overlay，公共作用域负责
+语言集合和顺序。
 
 负责：
 
@@ -84,7 +91,7 @@ Profile JSON 下发到设备。
 | UI 资源 | 维护资源位置、选项和目标路径 | `ui_info`、`img/` |
 | 锂电协议 Profile | 独立维护不同 BMS 的帧、信号解析、显示项和超时策略 | `protocol_profiles.battery_profiles` |
 | 锂电监控运行时 | 消费当前激活锂电 Profile 的二进制扩展段 | `battery_monitor`、二进制扩展段 |
-| 故障代码 | 维护故障来源和故障码 | `fault_code_info`、二进制扩展段 |
+| 故障代码 Profile | 维护故障来源、定义、绑定和故障专属文案 | `protocol_profiles.fault_code_profiles`、二进制扩展段 |
 | 多国语言 v1 | 维护旧语言列表、文本和编辑顺序索引 | `language_info`、索引语言块 |
 | 多国语言 v2 | 维护 locale、稳定消息 key 和复数形式 | `localization`、`LVI2` 动态包 |
 | 项目导出 | 构建发布目录和设备兼容格式 | `ConfigUpdate.json`、`bin/` |
@@ -120,7 +127,7 @@ Command 层不重新实现领域规则，主要把前端请求转换为领域请
 - PDO：`PdoFrame` / `PdoSignal`、`PdoAdvancedDocument`；
 - SDO：递归 `SdoNodeDocument`；
 - 统一协议：`SignalDictionary`、`PrivateProtocolDocument`、`ProtocolMapping`、`UnifiedProtocolModel`；
-- 专用协议：`BatteryMonitorProtocol`、`fault_code_info` 文档段；
+- 专用协议：`BatteryMonitorProtocol`、`fault_code_profiles` 文档段；
 - 语言与导出：`LanguageConfig`、`ExportPlanReport`、`BinaryBuildReport`、`DataDescriptionPlan`。
 
 导出领域服务的核心原则是：先计算所有路径、地址、数量和校验结果，再执行文件操作；二进制中的各段使用小端序，所有可选段通过 `-1` 地址和 `0` 数量表示缺失。
@@ -153,7 +160,7 @@ config_version == jc002 -> localization  -> LVI2 动态语言包 -> bin_generate
 ### 打开项目
 
 1. 解析路径并加载 JSON；
-2. 前端为编辑态补齐缺失的导出、锂电监控和故障码段；
+2. 前端仅为 jc002 编辑态管理故障码 Profile；jc001 不补齐、不读取故障码段；
 3. 对 v1 `.jcpro` 自动查找同名 `.refactor-config.json`（兼容查找同名 `.json`）；该 sidecar 机制已废弃，仅用于历史兼容；
 4. 只把 sidecar 中的重构专属三段合并到编辑文档；
 5. 运行项目结构校验，并按需解析统一协议；完整迁移由用户显式执行“迁移项目”操作。

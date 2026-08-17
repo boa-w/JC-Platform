@@ -1,23 +1,30 @@
 import { Copy, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { BatteryProtocolProfile, ControllerProtocolProfile } from '../../types/platform';
-import {
-  activeBatteryProtocolProfile,
-  activeControllerProtocolProfile,
-  addProtocolProfileSections,
-  initializeBatteryProtocolSections,
-  initializeControllerProtocolSections,
-  readProtocolProfiles,
-  renameProtocolProfileSections,
-  removeProtocolProfileSections,
-  protocolProfileSectionsForSelection,
-  updateProtocolProfileMetadataSections,
-} from '../../features/protocol-profiles/protocolProfiles';
 import type {
   ProtocolProfileIdError,
   ProtocolProfileScope,
 } from '../../features/protocol-profiles/protocolProfiles';
+import {
+  activeBatteryProtocolProfile,
+  activeControllerProtocolProfile,
+  activeFaultCodeProtocolProfile,
+  addProtocolProfileSections,
+  createNewProtocolProfileSections,
+  initializeBatteryProtocolSections,
+  initializeControllerProtocolSections,
+  initializeFaultCodeProtocolSections,
+  protocolProfileSectionsForSelection,
+  readProtocolProfiles,
+  removeProtocolProfileSections,
+  renameProtocolProfileSections,
+  updateProtocolProfileMetadataSections,
+} from '../../features/protocol-profiles/protocolProfiles';
+import type {
+  BatteryProtocolProfile,
+  ControllerProtocolProfile,
+  FaultCodeProfile,
+} from '../../types/platform';
 import './protocol-profile.css';
 
 interface ProtocolProfileBarProps {
@@ -32,35 +39,51 @@ export function ProtocolProfileBar({ document, onUpdateSections, scope }: Protoc
   const activeProfile =
     scope === 'controller'
       ? activeControllerProtocolProfile(document)
-      : activeBatteryProtocolProfile(document);
+      : scope === 'battery'
+        ? activeBatteryProtocolProfile(document)
+        : activeFaultCodeProtocolProfile(document);
   const profiles =
     scope === 'controller'
       ? (profilesDocument?.controller_profiles ?? [])
-      : (profilesDocument?.battery_profiles ?? []);
+      : scope === 'battery'
+        ? (profilesDocument?.battery_profiles ?? [])
+        : (profilesDocument?.fault_code_profiles ?? []);
   const title =
     scope === 'controller'
       ? t('protocolProfiles.controllerTitle')
-      : t('protocolProfiles.batteryTitle');
+      : scope === 'battery'
+        ? t('protocolProfiles.batteryTitle')
+        : t('protocolProfiles.faultTitle');
   const description =
     scope === 'controller'
       ? t('protocolProfiles.controllerDescription')
-      : t('protocolProfiles.batteryDescription');
+      : scope === 'battery'
+        ? t('protocolProfiles.batteryDescription')
+        : t('protocolProfiles.faultDescription');
   const activeLabel =
     scope === 'controller'
       ? t('protocolProfiles.activeController')
-      : t('protocolProfiles.activeBattery');
+      : scope === 'battery'
+        ? t('protocolProfiles.activeBattery')
+        : t('protocolProfiles.activeFault');
   const familyLabel =
     scope === 'controller'
       ? t('protocolProfiles.controllerFamily')
-      : t('protocolProfiles.batteryFamily');
+      : scope === 'battery'
+        ? t('protocolProfiles.batteryFamily')
+        : t('protocolProfiles.faultFamily');
   const revisionLabel =
     scope === 'controller'
       ? t('protocolProfiles.controllerRevision')
-      : t('protocolProfiles.batteryRevision');
+      : scope === 'battery'
+        ? t('protocolProfiles.batteryRevision')
+        : t('protocolProfiles.faultRevision');
   const profileId =
     scope === 'controller'
       ? profilesDocument?.active_controller_profile_id
-      : profilesDocument?.active_battery_profile_id;
+      : scope === 'battery'
+        ? profilesDocument?.active_battery_profile_id
+        : profilesDocument?.active_fault_code_profile_id;
   const activeProfileId = activeProfile?.profile_id ?? '';
   const [profileIdDraft, setProfileIdDraft] = useState(activeProfileId);
   const [profileIdError, setProfileIdError] = useState<ProtocolProfileIdError | undefined>();
@@ -103,10 +126,13 @@ export function ProtocolProfileBar({ document, onUpdateSections, scope }: Protoc
   const initialize =
     scope === 'controller'
       ? initializeControllerProtocolSections
-      : initializeBatteryProtocolSections;
+      : scope === 'battery'
+        ? initializeBatteryProtocolSections
+        : initializeFaultCodeProtocolSections;
   const activeProfileFields = activeProfile as
     | ControllerProtocolProfile
     | BatteryProtocolProfile
+    | FaultCodeProfile
     | null;
 
   return (
@@ -141,7 +167,9 @@ export function ProtocolProfileBar({ document, onUpdateSections, scope }: Protoc
                   {profile.profile_id} ·{' '}
                   {'controller_family' in profile
                     ? profile.controller_family
-                    : profile.battery_family}
+                    : 'battery_family' in profile
+                      ? profile.battery_family
+                      : profile.fault_family}
                 </option>
               ))}
             </select>
@@ -181,13 +209,17 @@ export function ProtocolProfileBar({ document, onUpdateSections, scope }: Protoc
               value={
                 scope === 'controller'
                   ? (activeProfileFields as ControllerProtocolProfile).controller_family
-                  : (activeProfileFields as BatteryProtocolProfile).battery_family
+                  : scope === 'battery'
+                    ? (activeProfileFields as BatteryProtocolProfile).battery_family
+                    : (activeProfileFields as FaultCodeProfile).fault_family
               }
               onChange={(event) =>
                 updateMetadata(
                   scope === 'controller'
                     ? { controller_family: event.target.value }
-                    : { battery_family: event.target.value },
+                    : scope === 'battery'
+                      ? { battery_family: event.target.value }
+                      : { fault_family: event.target.value },
                 )
               }
             />
@@ -198,13 +230,17 @@ export function ProtocolProfileBar({ document, onUpdateSections, scope }: Protoc
               value={
                 scope === 'controller'
                   ? (activeProfileFields as ControllerProtocolProfile).controller_revision
-                  : (activeProfileFields as BatteryProtocolProfile).battery_revision
+                  : scope === 'battery'
+                    ? (activeProfileFields as BatteryProtocolProfile).battery_revision
+                    : (activeProfileFields as FaultCodeProfile).fault_revision
               }
               onChange={(event) =>
                 updateMetadata(
                   scope === 'controller'
                     ? { controller_revision: event.target.value }
-                    : { battery_revision: event.target.value },
+                    : scope === 'battery'
+                      ? { battery_revision: event.target.value }
+                      : { fault_revision: event.target.value },
                 )
               }
             />
@@ -217,6 +253,14 @@ export function ProtocolProfileBar({ document, onUpdateSections, scope }: Protoc
             />
           </label>
           <div className="protocol-profile-bar__actions">
+            <button
+              title={t('protocolProfiles.create')}
+              type="button"
+              onClick={() => onUpdateSections(createNewProtocolProfileSections(document, scope))}
+            >
+              <Plus aria-hidden="true" size={15} />
+              <span>{t('protocolProfiles.create')}</span>
+            </button>
             <button
               title={t('protocolProfiles.clone')}
               type="button"

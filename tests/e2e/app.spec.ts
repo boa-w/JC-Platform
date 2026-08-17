@@ -82,9 +82,7 @@ test('marks deprecated v1 signal and sidecar features', async ({ page }) => {
 
   await page.getByRole('button', { name: '协议', exact: true }).click();
   const protocolNavigation = page.getByRole('navigation', { name: '协议 功能' });
-  const signalDictionary = protocolNavigation.locator(
-    '[data-navigation-key="signal-dictionary"]',
-  );
+  const signalDictionary = protocolNavigation.locator('[data-navigation-key="signal-dictionary"]');
   await expect(signalDictionary).toContainText('废弃');
   await signalDictionary.click();
   await expect(page.getByRole('main', { name: '业务信号字典' })).toBeVisible();
@@ -825,7 +823,6 @@ test('offers to restore an unsaved project draft', async ({ page }) => {
   await page.evaluate((path) => {
     const baseDocument = {
       project: { name: 'Recovery Fixture', revision: 1 },
-      fault_code_info: {},
     };
     localStorage.setItem(
       'jc-custom-platform.projectRecoveryDraft',

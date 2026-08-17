@@ -19,7 +19,7 @@ codex/jc002-full-config-support
 - `CommonLocalization.h`：公开 API 和 `_()` / `_p()` 宏。
 - `CommonLocalization.c`：`LVI2` 校验、locale、查询和复数规则。
 - `jclib_ui.c`：按 `config_version` 分派 loader，并映射 v2 SDO 文本引用。
-- `jclib_ui.c`：校验独立 `protocol_profiles` 清单与 bin 描述元数据，并记录两类 active Profile。
+- `jclib_ui.c`：校验独立 `protocol_profiles` 清单与 bin 描述元数据，并记录三类 active Profile。
 - `CommonLocalizationKeys.c/.h`：固定 UI 枚举到稳定消息 key 的生成映射。
 - `LvglUpdateScreen.c`：更新入口允许明确的 `jc001` 或 `jc002` token。
 
@@ -30,7 +30,7 @@ codex/jc002-full-config-support
         ↓
 验证 config_version == jc002 和 device.version
         ↓
-验证 protocol_profiles（若存在）的 schema、两类 Profile ID、两类 active ID
+验证 protocol_profiles 的 schema、三类 Profile ID、三类 active ID 和完整组合索引
         ↓
 bin_generate_jc002()
         ↓
@@ -51,11 +51,15 @@ lv_i18n_init_dynamic() 校验 LVI2 和 CRC32
 
 初始化失败返回现有 `JCLIB_ERR_CONFIG_*` 错误，不把 `global_flag_init_ok` 设为 1，也不调用 v1 语言表作为替代。
 
-## 多协议 Profile 与锂电协议
+## 多协议 Profile、锂电与故障码协议
 
-当前固件 ABI 每次只加载导出包中的一套 PDO、SDO 和 battery v2 表。上位机可以在同一
-个 jc002 项目维护独立的控制器和锂电 Profile 集合，但导出时只物化两个 active ID；完整的
-`protocol_profiles` 和 `battery_monitor` 编辑对象不会复制到设备 JSON。设备清单只携带：
+当前固件从一个 `data.bin` Profile Bundle 中选择并加载一套 PDO、SDO、battery v2 和故障码表。
+语言包同样按选中组合独立构建：公共 localization 提供 locale 目录和顺序，控制器
+Profile overlay、锂电 Profile overlay 和故障码 Profile overlay 在导出时合并进该组合的 LVI2 段。下位机无需知道
+overlay JSON，只按所选 payload 的 i18n_base_addr/i18n_size 加载最终语言包。
+上位机可以在同一个 jc002 项目维护独立的控制器、锂电和故障码 Profile 集合；所有控制器×锂电×故障码
+组合都会进入同一个 bin，完整的 `protocol_profiles` 和 `battery_monitor` 编辑对象不会
+复制到设备 JSON。即使只有单套协议，导出器也会生成统一的 `controller.default` 组合：
 
 ```text
 protocol_profiles.schema_version
@@ -63,19 +67,26 @@ protocol_profiles.active_controller_profile_id
 protocol_profiles.active_battery_profile_id（可选）
 protocol_profiles.controller_profiles[].profile_id/controller_family/controller_revision
 protocol_profiles.battery_profiles[].profile_id/battery_family/battery_revision
+protocol_profiles.fault_code_profiles[].profile_id/fault_family/fault_revision
 data_description.protocol_profile_version
 data_description.controller_profile_total
 data_description.active_controller_profile_id
 data_description.battery_profile_total
 data_description.active_battery_profile_id（可选）
+data_description.fault_code_profile_total
+data_description.active_fault_code_profile_id（可选）
+data_description.protocol_bundle_version = 1
+data_description.protocol_profile_payloads[]
+  controller_profile_id / battery_profile_id / fault_code_profile_id / base_addr / file_size / crc / description
 ```
 
-下位机在 USB 升级检查、bin 描述复制和冷启动加载时校验这些字段。任一侧 Profile 切换流程是：
+下位机在 USB 升级检查、bin 描述复制和冷启动加载时校验这些字段以及整包/局部 CRC。任一侧
+Profile 切换流程是：
 
 1. 上位机在对应页面选择控制器或锂电 Profile；
-2. 重新构建成对的 `ConfigUpdate.json` 与 `data.bin`；
-3. 更新成功后重启；
-4. 现有动态 PDO/SDO/battery loader 使用新 Profile 已物化的表。
+2. 导出包含全部组合的 `ConfigUpdate.json` 与 `data.bin`；
+3. 高级设置写入控制器选择后重启；
+4. Common PDO loader 与 jc002 loader 使用同一选择加载对应 payload。
 
 当前不支持运行中切换，也不需要修改 `aic_ui.c` 或新增 `app_can_bottom.c`/`app_config.c`
 协议入口。固件侧可通过以下 API 查看已加载身份：

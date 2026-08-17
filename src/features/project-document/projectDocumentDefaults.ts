@@ -11,39 +11,6 @@ export const defaultBatteryMonitor: BatteryMonitorProtocol = {
   items: [],
 };
 
-const defaultFaultCodeInfo = {
-  schema_version: 1,
-  enabled: true,
-  version: 1,
-  sources: [
-    {
-      source_key: 'traction',
-      source_id: 1,
-      type_char: 'T',
-      name: '牵引',
-      can_id: 648,
-      frame_type: 0,
-      code_byte: 2,
-      clear_code: 0,
-      invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
-      enabled: true,
-    },
-    {
-      source_key: 'pump',
-      source_id: 2,
-      type_char: 'P',
-      name: '油泵',
-      can_id: 660,
-      frame_type: 0,
-      code_byte: 2,
-      clear_code: 0,
-      invalid_codes: [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
-      enabled: true,
-    },
-  ],
-  codes: [],
-};
-
 export const defaultExportInfo: ProjectExportSettings = {
   folder_name: 'jc_export',
   manifest_filename: 'ConfigUpdate.json',
@@ -71,27 +38,26 @@ function hasExportTargetFlags(value: unknown) {
 }
 
 export function withRequiredEditorSections(document: unknown) {
-  const source = (document as Record<string, unknown>) ?? {};
+  const source = { ...((document as Record<string, unknown>) ?? {}) };
   if (source.config_version === 'jc002') return null;
   const defaults: Record<string, unknown> = {};
+  const sourceExportInfo = isRecord(source.export_info) ? source.export_info : null;
+  const legacyExportInfo = sourceExportInfo
+    ? { ...sourceExportInfo }
+    : cloneDefault(defaultExportInfo);
+  delete legacyExportInfo.fault_code_info;
   if (!isRecord(source.export_info)) {
-    defaults.export_info = cloneDefault(defaultExportInfo);
-  } else if (
-    !hasExportTargetFlags(source.export_info.battery_monitor) ||
-    !hasExportTargetFlags(source.export_info.fault_code_info)
-  ) {
+    defaults.export_info = legacyExportInfo;
+  } else if (sourceExportInfo && 'fault_code_info' in sourceExportInfo) {
+    defaults.export_info = legacyExportInfo;
+  } else if (!hasExportTargetFlags(source.export_info.battery_monitor)) {
     defaults.export_info = {
       ...source.export_info,
       battery_monitor: {
         ...defaultExportInfo.battery_monitor,
         ...(isRecord(source.export_info.battery_monitor) ? source.export_info.battery_monitor : {}),
       },
-      fault_code_info: {
-        ...defaultExportInfo.fault_code_info,
-        ...(isRecord(source.export_info.fault_code_info) ? source.export_info.fault_code_info : {}),
-      },
     };
   }
-  if (!source.fault_code_info) defaults.fault_code_info = cloneDefault(defaultFaultCodeInfo);
   return Object.keys(defaults).length > 0 ? { ...source, ...defaults } : null;
 }

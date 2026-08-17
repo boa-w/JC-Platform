@@ -14,7 +14,9 @@ import {
   pdoSimpleDocumentTable,
   sdoDocumentTable,
 } from '../../api/commands';
+import type { LocalizationScope } from '../../components/language/localizationAdapter';
 import {
+  localizationForScope,
   localizationToLanguageDocument,
   updateLocalizationFromLanguageDocument,
 } from '../../components/language/localizationAdapter';
@@ -31,6 +33,7 @@ import type {
   SdoImportReport,
 } from '../../types/platform';
 import { runSystemDialog } from '../../utils/systemDialog';
+import { readProtocolProfiles } from '../protocol-profiles/protocolProfiles';
 
 export type TableConfigKind = Extract<LegacyTableKind, 'sdo' | 'pdoSimple' | 'language'>;
 export type TableImportReport = SdoImportReport | PdoSimpleImportReport | LanguageImportReport;
@@ -52,13 +55,15 @@ const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS
 interface UseTableConfigControllerOptions {
   activeModuleKey: NavigationKey;
   loadedProject: LoadedProject | null;
-  applyLoadedProject: (project: LoadedProject) => void;
+  languageScope: LocalizationScope;
+  updateProjectSections: (sections: Record<string, unknown>) => void;
 }
 
 export function useTableConfigController({
   activeModuleKey,
   loadedProject,
-  applyLoadedProject,
+  languageScope,
+  updateProjectSections,
 }: UseTableConfigControllerOptions) {
   const { t } = useTranslation();
   const [importReport, setImportReport] = useState<TableImportReport | null>(null);
@@ -120,7 +125,13 @@ export function useTableConfigController({
       const root = targetProject.document as Record<string, unknown>;
       const document =
         kind === 'language' && root.config_version === 'jc002'
-          ? localizationToLanguageDocument(root.localization as LocalizationDocument)
+          ? localizationToLanguageDocument(
+              localizationForScope(
+                root.localization as LocalizationDocument,
+                readProtocolProfiles(root) ?? undefined,
+                languageScope,
+              ),
+            )
           : root[tableConfigSections[kind]];
       const table = await exportableDocument(kind, document);
       if (format === 'csv') await exportTableCsv({ path, document: table });
@@ -197,13 +208,7 @@ export function useTableConfigController({
           report.document as LanguageDocument,
         );
       }
-      applyLoadedProject({
-        ...targetProject,
-        document: {
-          ...root,
-          [section]: nextDocument,
-        },
-      });
+      updateProjectSections({ [section]: nextDocument });
     } catch (error) {
       if (operationGuard.isCurrent(operation)) {
         setImportError(error instanceof Error ? error.message : String(error));

@@ -1,6 +1,11 @@
 import { Link2, Plus, Search, Trash2 } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 import { ConfirmDialogHost } from '../../components/ConfirmDialog';
+import {
+  localizationForScope,
+  updateLocalizationScopeText,
+} from '../../components/language/localizationAdapter';
+import { ProtocolProfileBar } from '../../components/protocol/ProtocolProfileBar';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import type {
   FaultCodeBinding,
@@ -11,13 +16,16 @@ import type {
   LocalizationDocument,
 } from '../../types/platform';
 import {
+  activeFaultCodeProtocolProfile,
+  readProtocolProfiles,
+} from '../protocol-profiles/protocolProfiles';
+import {
   bindingCountByDefinition,
   clampCatalogCode,
   createFaultDefinition,
   definitionCountByMessageKey,
   localizationText,
   normalizeFaultCatalog,
-  updateLocalizationText,
   validateFaultCatalog,
 } from './faultCodeCatalogModel';
 import {
@@ -46,11 +54,23 @@ const severityOptions = [
 
 export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2PageProps) {
   const document = loadedProject.document as Record<string, unknown>;
+  const profiles = readProtocolProfiles(document);
+  const activeFaultProfile = activeFaultCodeProtocolProfile(document);
+  const faultScope = activeFaultProfile
+    ? { kind: 'fault' as const, profileId: activeFaultProfile.profile_id }
+    : undefined;
   const catalog = useMemo(
-    () => normalizeFaultCatalog(document.fault_code_info),
-    [document.fault_code_info],
+    () =>
+      normalizeFaultCatalog(
+        document.fault_code_info ?? activeFaultProfile?.protocol.fault_code_info,
+      ),
+    [activeFaultProfile, document.fault_code_info],
   );
   const localization = document.localization as LocalizationDocument | undefined;
+  const effectiveLocalization =
+    localization && faultScope
+      ? localizationForScope(localization, profiles ?? undefined, faultScope)
+      : localization;
   const sources = catalog.sources ?? [];
   const definitions = catalog.definitions ?? [];
   const bindings = catalog.bindings ?? [];
@@ -58,7 +78,7 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
   const [query, setQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [locale, setLocale] = useState(
-    localization?.default_locale || localization?.locale_order[0] || '',
+    effectiveLocalization?.default_locale || effectiveLocalization?.locale_order[0] || '',
   );
   const confirmation = useConfirmDialog();
   const messageKeyListId = useId();
@@ -74,15 +94,17 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
   const bindingCounts = useMemo(() => bindingCountByDefinition(bindings), [bindings]);
   const messageCounts = useMemo(() => definitionCountByMessageKey(definitions), [definitions]);
   const messageKeys = useMemo(() => {
-    if (!localization) return [];
+    if (!effectiveLocalization) return [];
     const keys = new Set<string>();
-    for (const currentLocale of localization.locale_order) {
-      for (const key of Object.keys(localization.locales[currentLocale]?.translations ?? {})) {
+    for (const currentLocale of effectiveLocalization.locale_order) {
+      for (const key of Object.keys(
+        effectiveLocalization.locales[currentLocale]?.translations ?? {},
+      )) {
         keys.add(key);
       }
     }
     return [...keys].sort((left, right) => left.localeCompare(right));
-  }, [localization]);
+  }, [effectiveLocalization]);
   const keyword = query.trim().toLowerCase();
 
   const filteredBindings = bindings
@@ -91,8 +113,8 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
       if (sourceFilter !== 'all' && binding.source_key !== sourceFilter) return false;
       if (!keyword) return true;
       const definition = definitionByKey.get(binding.fault_key);
-      const text = localization
-        ? localizationText(localization, locale, definition?.message_key ?? '')
+      const text = effectiveLocalization
+        ? localizationText(effectiveLocalization, locale, definition?.message_key ?? '')
         : '';
       return `${binding.source_key} ${binding.code} ${binding.fault_key} ${definition?.message_key ?? ''} ${text}`
         .toLowerCase()
@@ -102,8 +124,8 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
     .map((definition, index) => ({ definition, index }))
     .filter(({ definition }) => {
       if (!keyword) return true;
-      const text = localization
-        ? localizationText(localization, locale, definition.message_key)
+      const text = effectiveLocalization
+        ? localizationText(effectiveLocalization, locale, definition.message_key)
         : '';
       return `${definition.fault_key} ${definition.message_key} ${definition.name ?? ''} ${text}`
         .toLowerCase()
@@ -118,12 +140,26 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
         .includes(keyword);
     });
 
-  function updateCatalog(nextCatalog: FaultCodeInfo, nextLocalization = localization) {
-    const sections: Record<string, unknown> = {
+  function updateCatalog(nextCatalog: FaultCodeInfo) {
+    onUpdateSections({
       fault_code_info: { ...nextCatalog, schema_version: 2 },
-    };
-    if (nextLocalization) sections.localization = nextLocalization;
-    onUpdateSections(sections);
+    });
+  }
+
+  function updateFaultLocalizationText(key: string, text: string) {
+    if (!localization || !faultScope) return;
+    const updated = updateLocalizationScopeText(
+      localization,
+      profiles ?? undefined,
+      faultScope,
+      locale,
+      key,
+      text,
+    );
+    onUpdateSections({
+      localization: updated.localization,
+      ...(updated.protocolProfiles ? { protocol_profiles: updated.protocolProfiles } : {}),
+    });
   }
 
   function updateSource(index: number, patch: Partial<FaultCodeSource>) {
@@ -284,15 +320,21 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
 
   if (!localization) {
     return (
-      <section className="table-spec-card">
-        <h2>故障代码</h2>
-        <p>当前 jc002 项目缺少 localization，无法编辑故障文案。</p>
+      <section className="fault-code-page fault-catalog-page">
+        <ProtocolProfileBar document={document} onUpdateSections={onUpdateSections} scope="fault" />
+        <section className="table-spec-card">
+          <h2>故障代码</h2>
+          <p>当前 jc002 项目缺少 localization，无法编辑故障文案。</p>
+        </section>
       </section>
     );
   }
 
+  const displayLocalization = effectiveLocalization ?? localization;
+
   return (
     <section className="fault-code-page fault-catalog-page">
+      <ProtocolProfileBar document={document} onUpdateSections={onUpdateSections} scope="fault" />
       <section className="table-spec-card fault-catalog-header">
         <div className="fault-code-header">
           <div>
@@ -383,7 +425,7 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
                 value={locale}
                 onChange={(event) => setLocale(event.target.value)}
               >
-                {localization.locale_order.map((item) => (
+                {effectiveLocalization?.locale_order.map((item) => (
                   <option key={item} value={item}>
                     {item}
                   </option>
@@ -511,7 +553,7 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
                       </td>
                       <td className="fault-catalog-preview">
                         {definition
-                          ? localizationText(localization, locale, definition.message_key) ||
+                          ? localizationText(displayLocalization, locale, definition.message_key) ||
                             '未翻译'
                           : '-'}
                       </td>
@@ -604,17 +646,13 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
                     <td>
                       <input
                         aria-label={`${definition.fault_key} ${locale} 文案`}
-                        value={localizationText(localization, locale, definition.message_key)}
+                        value={localizationText(
+                          displayLocalization,
+                          locale,
+                          definition.message_key,
+                        )}
                         onChange={(event) =>
-                          updateCatalog(
-                            catalog,
-                            updateLocalizationText(
-                              localization,
-                              locale,
-                              definition.message_key,
-                              event.target.value,
-                            ),
-                          )
+                          updateFaultLocalizationText(definition.message_key, event.target.value)
                         }
                       />
                     </td>

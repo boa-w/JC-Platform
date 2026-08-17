@@ -35,3 +35,5 @@ Thumbs.db
 # Local exported artifacts
 jc_export/
 *.tmp
+
+.qoder/

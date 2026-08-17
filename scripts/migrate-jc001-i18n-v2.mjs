@@ -120,59 +120,11 @@ function migrateSdo(items, pathParts = []) {
 }
 migrateSdo(source.sdo_info?.children);
 
-const faultDefinitions = [];
-const faultBindings = [];
-const canonicalFaultMessageByVector = new Map();
-const usedFaultKeys = new Set();
-for (const code of source.fault_code_info?.codes ?? []) {
-  if (!code.message_key)
-    throw new Error(`Fault ${code.source_key}:${code.code} has no message_key`);
-  const row = translations[code.message_key];
-  if (!row || typeof row !== 'object')
-    throw new Error(`Missing fault translation row: ${code.message_key}`);
-  const vector = JSON.stringify(localeOrder.map((locale) => row[locale]));
-  const canonicalMessageKey = canonicalFaultMessageByVector.get(vector) ?? code.message_key;
-  canonicalFaultMessageByVector.set(vector, canonicalMessageKey);
-  if (!usedKeys.has(canonicalMessageKey)) addMessage(canonicalMessageKey, canonicalMessageKey);
-
-  const sourceKey = code.source_key || `source_${code.source_id ?? 0}`;
-  const faultKey = `fault.${sourceKey}.${String(code.code).padStart(3, '0')}`;
-  if (usedFaultKeys.has(faultKey))
-    throw new Error(`Duplicate fault identity: ${sourceKey}:${code.code}`);
-  usedFaultKeys.add(faultKey);
-  faultDefinitions.push({
-    fault_key: faultKey,
-    message_key: canonicalMessageKey,
-    name: code.name ?? '',
-    severity: code.severity ?? 'fault',
-    enabled: code.enabled ?? true,
-  });
-  faultBindings.push({
-    source_key: sourceKey,
-    code: code.code,
-    fault_key: faultKey,
-    enabled: code.enabled ?? true,
-  });
+if (source.fault_code_info !== undefined) {
+  throw new Error(
+    'jc001 故障码 MVP 不参与迁移；请在 jc002 protocol_profiles.fault_code_profiles 中重新配置',
+  );
 }
-
-source.fault_code_info = {
-  ...source.fault_code_info,
-  schema_version: 2,
-  version: 2,
-  sources: [...(source.fault_code_info?.sources ?? [])].sort(
-    (left, right) =>
-      Number(left.source_id ?? 0) - Number(right.source_id ?? 0) ||
-      String(left.source_key ?? '').localeCompare(String(right.source_key ?? '')),
-  ),
-  definitions: faultDefinitions.sort((left, right) =>
-    left.fault_key.localeCompare(right.fault_key),
-  ),
-  bindings: faultBindings.sort(
-    (left, right) =>
-      left.source_key.localeCompare(right.source_key) || Number(left.code) - Number(right.code),
-  ),
-};
-delete source.fault_code_info.codes;
 
 if (source.battery_monitor !== undefined) {
   if (
@@ -183,9 +135,7 @@ if (source.battery_monitor !== undefined) {
     throw new Error('battery_monitor must be an object when migrating to jc002');
   }
   if (source.battery_monitor.schema_version !== 2 || source.battery_monitor.version !== 2) {
-    throw new Error(
-      'battery_monitor must already use schema_version=2 and version=2',
-    );
+    throw new Error('battery_monitor must already use schema_version=2 and version=2');
   }
 }
 
@@ -224,9 +174,6 @@ console.log(
       locales: localeOrder.length,
       messages: usedKeys.size,
       firmwareUiKeys: firmwareKeys.length,
-      faultDefinitions: faultDefinitions.length,
-      faultBindings: faultBindings.length,
-      faultMessages: canonicalFaultMessageByVector.size,
     },
     null,
     2,

@@ -19,7 +19,8 @@ use crate::domain::pdo::{
     PdoGlobalParam,
 };
 use crate::domain::project::{
-    materialize_active_protocol_profiles, protocol_profiles_manifest, validate_canopen_contract,
+    materialize_active_protocol_profiles, materialize_protocol_profiles_for_selection,
+    normalize_protocol_profiles_for_export, protocol_profiles_manifest, validate_canopen_contract,
     validate_protocol_profiles_contract, ProjectExportSettings,
 };
 use crate::domain::protocol::battery_monitor::{
@@ -35,6 +36,10 @@ use std::{fs, path::PathBuf};
 
 fn is_zero_usize(value: &usize) -> bool {
     *value == 0
+}
+
+fn is_empty_payloads(value: &[ProtocolProfilePayloadPlan]) -> bool {
+    value.is_empty()
 }
 
 /// 导出包摘要。
@@ -165,6 +170,23 @@ pub struct ScreenItemPlan {
     pub p_num: Option<usize>,
 }
 
+/// One self-contained jc002 runtime payload inside the shared data.bin.
+/// Offsets in `description` are relative to `base_addr`, not to the whole
+/// bundle. This lets the firmware select a payload by rebasing its data
+/// pointer without changing the existing table ABI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProtocolProfilePayloadPlan {
+    pub controller_profile_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub battery_profile_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fault_code_profile_id: Option<String>,
+    pub base_addr: usize,
+    pub file_size: usize,
+    pub crc: u16,
+    pub description: Value,
+}
+
 #[derive(Debug, Clone)]
 struct ExportScreenEntry {
     item: ScreenItemPlan,
@@ -221,6 +243,14 @@ pub struct DataDescriptionPlan {
     pub battery_profile_total: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_battery_profile_id: Option<String>,
+    #[serde(skip_serializing_if = "is_zero_usize", default)]
+    pub fault_code_profile_total: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_fault_code_profile_id: Option<String>,
+    #[serde(skip_serializing_if = "is_zero_usize", default)]
+    pub protocol_bundle_version: usize,
+    #[serde(skip_serializing_if = "is_empty_payloads", default)]
+    pub protocol_profile_payloads: Vec<ProtocolProfilePayloadPlan>,
 }
 
 impl DataDescriptionPlan {
@@ -266,6 +296,10 @@ impl DataDescriptionPlan {
             active_controller_profile_id: None,
             battery_profile_total: 0,
             active_battery_profile_id: None,
+            fault_code_profile_total: 0,
+            active_fault_code_profile_id: None,
+            protocol_bundle_version: 0,
+            protocol_profile_payloads: Vec::new(),
         }
     }
 
@@ -581,13 +615,27 @@ pub fn compare_project_binary(request: BinaryCompareRequest) -> BinaryCompareRep
 /// PDO 与锂电监控分别构建，锂电帧不再投影到普通 PDO 表。
 pub fn build_project_binary(document: &Value) -> BinaryBuildReport {
     let export_settings = project_export_settings(document);
-    if document.get("protocol_profiles").is_some() {
-        return build_project_binary_from_active_profile(document, &export_settings);
+    if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        let normalized = match normalize_protocol_profiles_for_export(document) {
+            Ok(document) => document,
+            Err(error) => {
+                return BinaryBuildReport {
+                    valid: false,
+                    file_size: 0,
+                    crc: 0,
+                    data_description: DataDescriptionPlan::empty(Vec::new()),
+                    bytes: Vec::new(),
+                    warnings: Vec::new(),
+                    errors: vec![error],
+                };
+            }
+        };
+        return build_project_binary_from_protocol_profiles(&normalized, &export_settings);
     }
     build_project_binary_from_settings(document, &export_settings)
 }
 
-fn build_project_binary_from_active_profile(
+fn build_project_binary_from_protocol_profiles(
     document: &Value,
     export_settings: &ProjectExportSettings,
 ) -> BinaryBuildReport {
@@ -602,8 +650,14 @@ fn build_project_binary_from_active_profile(
             errors: vec![error],
         };
     }
-    let materialized = match materialize_active_protocol_profiles(document) {
-        Ok(document) => document,
+    let profile_root = document.get("protocol_profiles");
+    let active_controller_id = profile_root
+        .and_then(|root| root.get("active_controller_profile_id"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| "protocol_profiles.active_controller_profile_id 不能为空".to_string());
+    let active_controller_id = match active_controller_id {
+        Ok(value) => value,
         Err(error) => {
             return BinaryBuildReport {
                 valid: false,
@@ -616,32 +670,184 @@ fn build_project_binary_from_active_profile(
             };
         }
     };
-    let mut report = build_project_binary_from_settings(&materialized, export_settings);
-    let profile_root = document.get("protocol_profiles");
-    let controller_total = profile_root
-        .and_then(|root| root.get("controller_profiles"))
-        .and_then(Value::as_array)
-        .map(Vec::len)
-        .unwrap_or(0);
-    let active_controller_id = profile_root
-        .and_then(|root| root.get("active_controller_profile_id"))
-        .and_then(Value::as_str)
-        .map(str::to_string);
-    let battery_total = profile_root
-        .and_then(|root| root.get("battery_profiles"))
-        .and_then(Value::as_array)
-        .map(Vec::len)
-        .unwrap_or(0);
     let active_battery_id = profile_root
         .and_then(|root| root.get("active_battery_profile_id"))
         .and_then(Value::as_str)
         .map(str::to_string);
-    report.data_description.protocol_profile_version = 2;
-    report.data_description.controller_profile_total = controller_total;
-    report.data_description.active_controller_profile_id = active_controller_id;
-    report.data_description.battery_profile_total = battery_total;
-    report.data_description.active_battery_profile_id = active_battery_id;
-    report
+    let active_fault_code_id = profile_root
+        .and_then(|root| root.get("active_fault_code_profile_id"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let controller_ids = profile_root
+        .and_then(|root| root.get("controller_profiles"))
+        .and_then(Value::as_array)
+        .map(|profiles| {
+            profiles
+                .iter()
+                .filter_map(|profile| profile.get("profile_id").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let battery_ids = profile_root
+        .and_then(|root| root.get("battery_profiles"))
+        .and_then(Value::as_array)
+        .map(|profiles| {
+            profiles
+                .iter()
+                .filter_map(|profile| profile.get("profile_id").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let fault_code_ids = profile_root
+        .and_then(|root| root.get("fault_code_profiles"))
+        .and_then(Value::as_array)
+        .map(|profiles| {
+            profiles
+                .iter()
+                .filter_map(|profile| profile.get("profile_id").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let battery_selections = if battery_ids.is_empty() {
+        vec![None]
+    } else {
+        battery_ids.into_iter().map(Some).collect::<Vec<_>>()
+    };
+    let fault_code_selections = if fault_code_ids.is_empty() {
+        vec![None]
+    } else {
+        fault_code_ids.into_iter().map(Some).collect::<Vec<_>>()
+    };
+
+    // Keep the configured default at offset zero. This preserves the active
+    // payload as the default while making every controller/battery/fault
+    // combination independently addressable inside one data.bin.
+    let mut combinations = vec![(
+        active_controller_id.clone(),
+        active_battery_id.clone(),
+        active_fault_code_id.clone(),
+    )];
+    for controller_id in &controller_ids {
+        for battery_id in &battery_selections {
+            for fault_code_id in &fault_code_selections {
+                let combination = (
+                    controller_id.clone(),
+                    battery_id.clone(),
+                    fault_code_id.clone(),
+                );
+                if !combinations.contains(&combination) {
+                    combinations.push(combination);
+                }
+            }
+        }
+    }
+
+    let mut bytes = Vec::new();
+    let mut warnings = Vec::new();
+    let mut errors = Vec::new();
+    let mut payloads = Vec::new();
+    let mut default_description = None;
+
+    for (controller_id, battery_id, fault_code_id) in combinations {
+        let materialized = match materialize_protocol_profiles_for_selection(
+            document,
+            &controller_id,
+            battery_id.as_deref(),
+            fault_code_id.as_deref(),
+        ) {
+            Ok(document) => document,
+            Err(error) => {
+                errors.push(format!(
+                    "构建协议组合 controller={controller_id}, battery={battery_id:?}, fault={fault_code_id:?} 失败：{error}"
+                ));
+                continue;
+            }
+        };
+        let report = build_project_binary_from_settings(&materialized, export_settings);
+        warnings.extend(report.warnings);
+        if !report.valid {
+            errors.extend(report.errors.into_iter().map(|error| {
+                format!(
+                    "构建协议组合 controller={controller_id}, battery={battery_id:?}, fault={fault_code_id:?} 失败：{error}"
+                )
+            }));
+            continue;
+        }
+        if default_description.is_none() {
+            default_description = Some(report.data_description.clone());
+        }
+        let base_addr = bytes.len();
+        let file_size = report.bytes.len();
+        let crc = report.crc;
+        let description = match serde_json::to_value(&report.data_description) {
+            Ok(value) => value,
+            Err(error) => {
+                errors.push(format!(
+                    "协议组合 controller={controller_id}, battery={battery_id:?}, fault={fault_code_id:?} 的描述序列化失败：{error}"
+                ));
+                continue;
+            }
+        };
+        bytes.extend(report.bytes);
+        payloads.push(ProtocolProfilePayloadPlan {
+            controller_profile_id: controller_id,
+            battery_profile_id: battery_id,
+            fault_code_profile_id: fault_code_id,
+            base_addr,
+            file_size,
+            crc,
+            description,
+        });
+    }
+
+    if !errors.is_empty() || payloads.is_empty() {
+        return BinaryBuildReport {
+            valid: false,
+            file_size: 0,
+            crc: 0,
+            data_description: DataDescriptionPlan::empty(Vec::new()),
+            bytes: Vec::new(),
+            warnings,
+            errors,
+        };
+    }
+
+    let mut description =
+        default_description.expect("valid profile build must have a default payload");
+    description.file_size = bytes.len();
+    description.crc = crc16_ccitt_false(&bytes);
+    description.protocol_profile_version = 2;
+    description.controller_profile_total = controller_ids.len();
+    description.active_controller_profile_id = Some(active_controller_id);
+    description.battery_profile_total =
+        if battery_selections.len() == 1 && battery_selections[0].is_none() {
+            0
+        } else {
+            battery_selections.len()
+        };
+    description.active_battery_profile_id = active_battery_id;
+    description.fault_code_profile_total =
+        if fault_code_selections.len() == 1 && fault_code_selections[0].is_none() {
+            0
+        } else {
+            fault_code_selections.len()
+        };
+    description.active_fault_code_profile_id = active_fault_code_id;
+    description.protocol_bundle_version = 1;
+    description.protocol_profile_payloads = payloads;
+
+    BinaryBuildReport {
+        valid: true,
+        file_size: bytes.len(),
+        crc: description.crc,
+        data_description: description,
+        bytes,
+        warnings,
+        errors,
+    }
 }
 
 fn build_project_binary_from_settings(
@@ -668,6 +874,9 @@ fn build_project_binary_from_settings(
     let schema_error = match config_version {
         "jc001" if document.get("language_info").is_none() => {
             Some("jc001 项目必须包含 language_info")
+        }
+        "jc001" if document.get("fault_code_info").is_some() => {
+            Some("jc001 项目不包含故障码管理；请使用 jc002 fault_code_profiles")
         }
         "jc001" if document.get("localization").is_some() => {
             Some("jc001 项目禁止包含 jc002 localization")
@@ -812,6 +1021,15 @@ fn build_config_update_manifest(
     );
     let mut manifest_data_description = json!(data_description);
     omit_disabled_export_descriptions(&mut manifest_data_description, export_settings);
+    add_canopen_version_to_payload_descriptions(&mut manifest_data_description);
+    if request
+        .document
+        .get("config_version")
+        .and_then(Value::as_str)
+        == Some("jc002")
+    {
+        remove_legacy_language_description_fields(&mut manifest_data_description);
+    }
     if let Some(description) = manifest_data_description.as_object_mut() {
         match request
             .document
@@ -833,6 +1051,8 @@ fn build_config_update_manifest(
                     "active_controller_profile_id",
                     "battery_profile_total",
                     "active_battery_profile_id",
+                    "protocol_bundle_version",
+                    "protocol_profile_payloads",
                 ] {
                     description.remove(key);
                 }
@@ -857,10 +1077,10 @@ fn build_config_update_manifest(
         }
     }
     manifest.insert("data_description".to_string(), manifest_data_description);
-    // jc002 keeps the editable battery protocol in the .jcpro project, but
-    // ships its runtime representation exclusively in the binary section.
-    // The manifest only exposes the address/count/version index above so the
-    // device cannot accidentally parse a second, stale copy from JSON.
+    // jc002 keeps editable protocol definitions in the .jcpro project, but
+    // ships every selected controller/battery combination in data.bin. The
+    // manifest contains only the identity/index metadata required to select a
+    // self-contained payload at boot.
     if request
         .document
         .get("config_version")
@@ -900,6 +1120,67 @@ fn omit_disabled_export_descriptions(
             "fault_code_total",
         ] {
             object.remove(key);
+        }
+    }
+    if let Some(payloads) = object
+        .get_mut("protocol_profile_payloads")
+        .and_then(Value::as_array_mut)
+    {
+        for payload in payloads {
+            if let Some(description) = payload.get_mut("description") {
+                omit_disabled_export_descriptions(description, export_settings);
+            }
+        }
+    }
+}
+
+fn remove_legacy_language_description_fields(data_description: &mut Value) {
+    let Some(object) = data_description.as_object_mut() else {
+        return;
+    };
+    object.remove("language_addr");
+    object.remove("language_code");
+    if let Some(payloads) = object
+        .get_mut("protocol_profile_payloads")
+        .and_then(Value::as_array_mut)
+    {
+        for payload in payloads {
+            if let Some(description) = payload.get_mut("description") {
+                remove_legacy_language_description_fields(description);
+            }
+        }
+    }
+}
+
+fn add_canopen_version_to_payload_descriptions(data_description: &mut Value) {
+    let Some(object) = data_description.as_object_mut() else {
+        return;
+    };
+    if let Some(payloads) = object
+        .get_mut("protocol_profile_payloads")
+        .and_then(Value::as_array_mut)
+    {
+        for payload in payloads {
+            let Some(description) = payload
+                .get_mut("description")
+                .and_then(Value::as_object_mut)
+            else {
+                continue;
+            };
+            let has_canopen = description
+                .get("canopen_sdo_base_addr")
+                .and_then(Value::as_i64)
+                .is_some_and(|value| value >= 0)
+                && description
+                    .get("canopen_sdo_total")
+                    .and_then(Value::as_u64)
+                    .is_some_and(|value| value > 0);
+            if has_canopen {
+                description.insert("canopen_version".to_string(), json!(1));
+            } else {
+                description.remove("canopen_sdo_base_addr");
+                description.remove("canopen_sdo_total");
+            }
         }
     }
 }
@@ -1422,28 +1703,16 @@ fn collect_fault_code_language_entries(document: &Value, entries: &mut Vec<Strin
     if !root.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
         return;
     }
-    if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
-        if let Some(definitions) = root.get("definitions").and_then(Value::as_array) {
-            for definition in definitions {
-                if !definition
-                    .get("enabled")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(true)
-                {
-                    continue;
-                }
-                let key = object_string(definition, "message_key");
-                if !key.is_empty() {
-                    push_unique(entries, &key);
-                }
-            }
-        }
-    } else if let Some(codes) = root.get("codes").and_then(Value::as_array) {
-        for code in codes {
-            if !code.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
+    if let Some(definitions) = root.get("definitions").and_then(Value::as_array) {
+        for definition in definitions {
+            if !definition
+                .get("enabled")
+                .and_then(Value::as_bool)
+                .unwrap_or(true)
+            {
                 continue;
             }
-            let key = fault_code_language_key(code);
+            let key = object_string(definition, "message_key");
             if !key.is_empty() {
                 push_unique(entries, &key);
             }
@@ -1752,26 +2021,8 @@ fn signed_index(value: i64) -> u16 {
     }
 }
 
-fn fault_code_export_records(
-    root: &Value,
-    dynamic: bool,
-    errors: &mut Vec<String>,
-) -> Option<Vec<Value>> {
-    let schema_version = object_i64(root, "schema_version", 1);
-    if !dynamic {
-        if schema_version != 1 {
-            errors.push(format!(
-                "jc001 fault_code_info 仅支持 schema_version=1，当前为 {schema_version}"
-            ));
-            return None;
-        }
-        return Some(
-            root.get("codes")
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default(),
-        );
-    }
+fn fault_code_export_records(root: &Value, errors: &mut Vec<String>) -> Option<Vec<Value>> {
+    let schema_version = object_i64(root, "schema_version", 0);
     if schema_version != 2 {
         errors.push(format!(
             "jc002 fault_code_info 必须使用 schema_version=2 的 definitions/bindings，当前为 {schema_version}"
@@ -1891,7 +2142,7 @@ fn build_fault_code_bytes(
             }
         })
         .collect::<HashMap<_, _>>();
-    let mut codes = fault_code_export_records(root, text_catalog.is_dynamic(), errors)?;
+    let mut codes = fault_code_export_records(root, errors)?;
     codes.retain(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true));
     codes.retain(|code| {
         let source_key = object_string(code, "source_key");
@@ -3247,6 +3498,42 @@ mod tests {
         assert_eq!(v2_description["i18n_version"], 2);
         assert_eq!(v2_description["i18n_locale_total"], 2);
         assert_eq!(v2_description["sdo_version"], 2);
+        assert_eq!(v2_manifest["protocol_profiles"]["schema_version"], 2);
+        assert_eq!(
+            v2_manifest["protocol_profiles"]["active_controller_profile_id"],
+            "controller.default"
+        );
+        assert_eq!(
+            v2_manifest["data_description"]["protocol_bundle_version"],
+            1
+        );
+        assert_eq!(
+            v2_manifest["data_description"]["protocol_profile_payloads"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn jc001_rejects_the_removed_fault_code_mvp() {
+        let mut document = i18n_fixture("jc001-valid");
+        document["fault_code_info"] = json!({
+            "schema_version": 1,
+            "enabled": true,
+            "version": 1,
+            "sources": [],
+            "codes": []
+        });
+
+        let report = build_project_binary(&document);
+
+        assert!(!report.valid);
+        assert!(report
+            .errors
+            .iter()
+            .any(|error| error.contains("jc001 项目不包含故障码管理")));
     }
 
     #[test]
@@ -3267,7 +3554,7 @@ mod tests {
     }
 
     #[test]
-    fn jc002_profile_build_materializes_active_protocol_and_manifest_identity() {
+    fn jc002_profile_builds_all_controller_battery_payloads_and_manifest_identity() {
         let mut document = i18n_fixture("jc002-valid");
         let mut acm_protocol = json!({
             "pdo_global_param": document["pdo_global_param"].clone(),
@@ -3288,6 +3575,7 @@ mod tests {
             "schema_version": 2,
             "active_controller_profile_id": "inmotion",
             "active_battery_profile_id": "battery_b",
+            "active_fault_code_profile_id": "fault.default",
             "controller_profiles": [
                 {
                     "profile_id": "acm",
@@ -3337,7 +3625,67 @@ mod tests {
                         }
                     }
                 }
+            ],
+            "fault_code_profiles": [
+                {
+                    "profile_id": "fault.default",
+                    "fault_family": "generic",
+                    "fault_revision": "2.x",
+                    "protocol": {
+                        "fault_code_info": {
+                            "schema_version": 2,
+                            "enabled": false,
+                            "version": 2,
+                            "sources": [],
+                            "definitions": [],
+                            "bindings": []
+                        }
+                    }
+                },
+                {
+                    "profile_id": "fault.alt",
+                    "fault_family": "ACM",
+                    "fault_revision": "1.x",
+                    "protocol": {
+                        "fault_code_info": {
+                            "schema_version": 2,
+                            "enabled": false,
+                            "version": 2,
+                            "sources": [],
+                            "definitions": [],
+                            "bindings": []
+                        }
+                    }
+                }
             ]
+        });
+        document["protocol_profiles"]["controller_profiles"][0]["localization_overlay"] = json!({
+            "locales": {
+                "en-US": {
+                    "translations": {
+                        "controller.acm.only": "ACM only"
+                    }
+                },
+                "ru-RU": {
+                    "translations": {
+                        "controller.acm.only": "ACM только"
+                    }
+                }
+            }
+        });
+        document["protocol_profiles"]["controller_profiles"][1]["localization_overlay"] = json!({
+            "locales": {
+                "en-US": {
+                    "translations": {
+                        "controller.inmotion.only": "Inmotion only"
+                    }
+                },
+                "ru-RU": {
+                    "translations": {
+                        "controller.inmotion.only": "Inmotion только"
+                    }
+                }
+            }
         });
 
         let binary = build_project_binary(&document);
@@ -3360,6 +3708,37 @@ mod tests {
             binary.data_description.active_battery_profile_id.as_deref(),
             Some("battery_b")
         );
+        assert_eq!(binary.data_description.fault_code_profile_total, 2);
+        assert_eq!(
+            binary
+                .data_description
+                .active_fault_code_profile_id
+                .as_deref(),
+            Some("fault.default")
+        );
+        assert_eq!(binary.data_description.protocol_bundle_version, 1);
+        let payloads = &binary.data_description.protocol_profile_payloads;
+        assert_eq!(payloads.len(), 8);
+        assert_eq!(payloads[0].controller_profile_id, "inmotion");
+        assert_eq!(payloads[0].battery_profile_id.as_deref(), Some("battery_b"));
+        assert_eq!(
+            payloads[0].fault_code_profile_id.as_deref(),
+            Some("fault.default")
+        );
+        assert_eq!(payloads[0].base_addr, 0);
+        for payload in payloads {
+            let end = payload.base_addr + payload.file_size;
+            assert!(end <= binary.bytes.len());
+            assert_eq!(payload.description["file_size"], payload.file_size);
+            assert_eq!(payload.description["crc"], payload.crc);
+            assert_eq!(
+                crc16_ccitt_false(&binary.bytes[payload.base_addr..end]),
+                payload.crc
+            );
+        }
+        assert_eq!(binary.file_size, binary.bytes.len());
+        assert_eq!(binary.data_description.file_size, binary.bytes.len());
+        assert_eq!(binary.crc, crc16_ccitt_false(&binary.bytes));
 
         let manifest = fixture_manifest(document, &binary);
         assert_eq!(
@@ -3369,6 +3748,10 @@ mod tests {
         assert_eq!(
             manifest["protocol_profiles"]["active_battery_profile_id"],
             "battery_b"
+        );
+        assert_eq!(
+            manifest["protocol_profiles"]["active_fault_code_profile_id"],
+            "fault.default"
         );
         assert_eq!(
             manifest["protocol_profiles"]["controller_profiles"]
@@ -3385,6 +3768,13 @@ mod tests {
             2
         );
         assert_eq!(
+            manifest["protocol_profiles"]["fault_code_profiles"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
             manifest["data_description"]["active_controller_profile_id"],
             "inmotion"
         );
@@ -3393,50 +3783,79 @@ mod tests {
             "battery_b"
         );
         assert_eq!(manifest["data_description"]["canopen_version"], 1);
+        assert_eq!(
+            manifest["data_description"]["protocol_profile_payloads"]
+                .as_array()
+                .unwrap()
+                .len(),
+            8
+        );
+        for payload in manifest["data_description"]["protocol_profile_payloads"]
+            .as_array()
+            .unwrap()
+        {
+            assert!(payload["description"].get("language_addr").is_none());
+            assert!(payload["description"].get("language_code").is_none());
+        }
+        let acm_payload = payloads
+            .iter()
+            .find(|payload| payload.controller_profile_id == "acm")
+            .unwrap();
+        let inmotion_payload = payloads
+            .iter()
+            .find(|payload| payload.controller_profile_id == "inmotion")
+            .unwrap();
+        assert_ne!(
+            &binary.bytes[acm_payload.base_addr..acm_payload.base_addr + acm_payload.file_size],
+            &binary.bytes[inmotion_payload.base_addr
+                ..inmotion_payload.base_addr + inmotion_payload.file_size]
+        );
     }
 
     #[test]
     fn build_project_binary_packs_fault_code_section() {
-        let document = jc001(json!({
-            "language_info": {
-                "list_code_language": ["zh"],
-                "list_inner": [],
-                "list_translate": {
-                    "fault.traction.001": { "zh": "牵引故障1" }
+        let document = jc002(
+            json!({
+                "pdo_global_param": [
+                    { "param_id": "A", "name": "A", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
+                ],
+                "pdo_condition": [],
+                "pdo_recv": [],
+                "pdo_send": [],
+                "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
+                "fault_code_info": {
+                    "schema_version": 2,
+                    "enabled": true,
+                    "version": 2,
+                    "sources": [{
+                        "source_key": "traction",
+                        "source_id": 1,
+                        "type_char": "T",
+                        "can_id": 648,
+                        "frame_type": 0,
+                        "code_byte": 2,
+                        "clear_code": 0,
+                        "invalid_codes": [1, 5]
+                    }],
+                    "definitions": [{
+                        "fault_key": "fault.traction.001",
+                        "message_key": "fault.traction.001",
+                        "severity": "warning"
+                    }],
+                    "bindings": [{
+                        "source_key": "traction",
+                        "code": 1,
+                        "fault_key": "fault.traction.001"
+                    }]
                 }
-            },
-            "pdo_global_param": [
-                { "param_id": "A", "name": "A", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
-            ],
-            "pdo_condition": [],
-            "pdo_recv": [],
-            "pdo_send": [],
-            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
-            "fault_code_info": {
-                "enabled": true,
-                "version": 3,
-                "sources": [{
-                    "source_id": 1,
-                    "type_char": "T",
-                    "can_id": 648,
-                    "frame_type": 0,
-                    "code_byte": 2,
-                    "clear_code": 0,
-                    "invalid_codes": [1, 5]
-                }],
-                "codes": [{
-                    "type_char": "T",
-                    "code": 1,
-                    "message_key": "fault.traction.001",
-                    "severity": "warning"
-                }]
-            }
-        }));
+            }),
+            &["fault.traction.001"],
+        );
 
         let report = build_project_binary(&document);
 
         assert!(report.valid, "{:?}", report.errors);
-        assert_eq!(report.data_description.fault_code_version, 3);
+        assert_eq!(report.data_description.fault_code_version, 2);
         assert_eq!(report.data_description.fault_source_total, 1);
         assert_eq!(report.data_description.fault_code_total, 1);
         assert!(report.data_description.fault_code_base_addr >= 0);
@@ -3449,7 +3868,7 @@ mod tests {
 
         assert_eq!(
             u16::from_le_bytes(report.bytes[base..base + 2].try_into().unwrap()),
-            3
+            2
         );
         assert_eq!(source_table_addr, base + 20);
         assert_eq!(code_table_addr, base + 36);
@@ -3466,14 +3885,14 @@ mod tests {
         assert_eq!(report.bytes[code_table_addr], b'T');
         assert_eq!(report.bytes[code_table_addr + 1], 1);
         assert_eq!(
-            u16::from_le_bytes(
-                report.bytes[code_table_addr + 2..code_table_addr + 4]
+            u32::from_le_bytes(
+                report.bytes[code_table_addr + 2..code_table_addr + 6]
                     .try_into()
                     .unwrap()
             ),
-            1
+            0
         );
-        assert_eq!(report.bytes[code_table_addr + 4], 2);
+        assert_eq!(report.bytes[code_table_addr + 6], 2);
 
         let mut config_off = document.clone();
         config_off["export_info"] = json!({
@@ -3573,65 +3992,69 @@ mod tests {
 
     #[test]
     fn build_project_binary_keeps_same_fault_code_for_different_sources() {
-        let document = jc001(json!({
-            "language_info": {
-                "list_code_language": ["zh"],
-                "list_inner": [],
-                "list_translate": {
-                    "fault.traction.182": { "zh": "牵引 BMS 故障" },
-                    "fault.pump.182": { "zh": "油泵容量过低" }
-                }
-            },
-            "pdo_global_param": [
-                { "param_id": "A", "name": "A", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
-            ],
-            "pdo_condition": [],
-            "pdo_recv": [],
-            "pdo_send": [],
-            "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
-            "fault_code_info": {
-                "enabled": true,
-                "version": 1,
-                "sources": [
-                    {
-                        "source_key": "traction",
-                        "source_id": 1,
-                        "type_char": "T",
-                        "can_id": 648,
-                        "frame_type": 0,
-                        "code_byte": 2,
-                        "clear_code": 0,
-                        "invalid_codes": []
-                    },
-                    {
-                        "source_key": "pump",
-                        "source_id": 2,
-                        "type_char": "P",
-                        "can_id": 660,
-                        "frame_type": 0,
-                        "code_byte": 2,
-                        "clear_code": 0,
-                        "invalid_codes": []
-                    }
+        let document = jc002(
+            json!({
+                "pdo_global_param": [
+                    { "param_id": "A", "name": "A", "def": "0", "reserved": 0, "type": 0, "inner": -1 }
                 ],
-                "codes": [
-                    {
-                        "source_key": "traction",
-                        "source_id": 1,
-                        "code": 182,
-                        "message_key": "fault.traction.182",
-                        "severity": "fault"
-                    },
-                    {
-                        "source_key": "pump",
-                        "source_id": 2,
-                        "code": 182,
-                        "message_key": "fault.pump.182",
-                        "severity": "fault"
-                    }
-                ]
-            }
-        }));
+                "pdo_condition": [],
+                "pdo_recv": [],
+                "pdo_send": [],
+                "sdo_info": { "type": 0, "user_auth": 0, "name": "菜单", "children": [] },
+                "fault_code_info": {
+                    "schema_version": 2,
+                    "enabled": true,
+                    "version": 1,
+                    "sources": [
+                        {
+                            "source_key": "traction",
+                            "source_id": 1,
+                            "type_char": "T",
+                            "can_id": 648,
+                            "frame_type": 0,
+                            "code_byte": 2,
+                            "clear_code": 0,
+                            "invalid_codes": []
+                        },
+                        {
+                            "source_key": "pump",
+                            "source_id": 2,
+                            "type_char": "P",
+                            "can_id": 660,
+                            "frame_type": 0,
+                            "code_byte": 2,
+                            "clear_code": 0,
+                            "invalid_codes": []
+                        }
+                    ],
+                    "definitions": [
+                        {
+                            "fault_key": "fault.traction.182",
+                            "message_key": "fault.traction.182",
+                            "severity": "fault"
+                        },
+                        {
+                            "fault_key": "fault.pump.182",
+                            "message_key": "fault.pump.182",
+                            "severity": "fault"
+                        }
+                    ],
+                    "bindings": [
+                        {
+                            "source_key": "traction",
+                            "code": 182,
+                            "fault_key": "fault.traction.182"
+                        },
+                        {
+                            "source_key": "pump",
+                            "code": 182,
+                            "fault_key": "fault.pump.182"
+                        }
+                    ]
+                }
+            }),
+            &["fault.traction.182", "fault.pump.182"],
+        );
 
         let report = build_project_binary(&document);
 
@@ -3642,8 +4065,8 @@ mod tests {
         let base = report.data_description.fault_code_base_addr as usize;
         let code_table_addr =
             u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
-        let first = &report.bytes[code_table_addr..code_table_addr + 8];
-        let second = &report.bytes[code_table_addr + 8..code_table_addr + 16];
+        let first = &report.bytes[code_table_addr..code_table_addr + 12];
+        let second = &report.bytes[code_table_addr + 12..code_table_addr + 24];
 
         assert_eq!(first[0], b'T');
         assert_eq!(first[1], 182);

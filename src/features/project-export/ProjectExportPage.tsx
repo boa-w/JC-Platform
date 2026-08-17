@@ -21,6 +21,7 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
     batteryMonitorExport,
     faultCodeExport,
     protocolProfiles,
+    supportsV2Extensions,
     updateExportTarget,
     exportReport,
     imageCopyReport,
@@ -97,6 +98,18 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
               count: protocolProfiles.battery_profiles.length,
             })}
           </span>
+          <span>
+            {t('projectExport.protocolProfile.faultActive', {
+              id:
+                protocolProfiles.active_fault_code_profile_id ??
+                t('protocolProfiles.notConfigured'),
+            })}
+          </span>
+          <span>
+            {t('projectExport.protocolProfile.faultCount', {
+              count: protocolProfiles.fault_code_profiles.length,
+            })}
+          </span>
           <small>{t('projectExport.protocolProfile.buildHint')}</small>
         </div>
       ) : null}
@@ -135,89 +148,91 @@ export function ProjectExportPage({ controller }: ProjectExportPageProps) {
           {t('projectExport.restoreDefaultNames')}
         </button>
       </div>
-      <section className="export-write-controls">
-        <div className="export-write-controls__header">
-          <div>
-            <strong className="section-label--muted">
-              {t('projectExport.writeControls.title')}
-            </strong>
-            <p>{t('projectExport.writeControls.description')}</p>
-          </div>
-          <button
-            className="export-naming-reset"
-            type="button"
-            onClick={handleResetExportSettings}
-            disabled={isExporting}
-          >
-            {t('projectExport.restoreAllDefaults')}
-          </button>
-        </div>
-        <div className="export-option-grid">
-          <div className="export-option-grid__head">{t('projectExport.writeControls.item')}</div>
-          <div className="export-option-grid__head">
-            {t('projectExport.writeControls.writeConfig')}
-          </div>
-          <div className="export-option-grid__head">
-            {t('projectExport.writeControls.writeBin')}
-          </div>
-          <div className="export-option-info">
-            <span>{t('navigation.modules.batteryMonitor.title')}</span>
-            <small>{t('projectExport.writeControls.batteryDescription')}</small>
-          </div>
-          <label className="export-check">
-            <input
-              aria-label={t('projectExport.writeControls.batteryConfigAria')}
-              checked={batteryMonitorExport.config}
+      {supportsV2Extensions ? (
+        <section className="export-write-controls">
+          <div className="export-write-controls__header">
+            <div>
+              <strong className="section-label--muted">
+                {t('projectExport.writeControls.title')}
+              </strong>
+              <p>{t('projectExport.writeControls.description')}</p>
+            </div>
+            <button
+              className="export-naming-reset"
+              type="button"
+              onClick={handleResetExportSettings}
               disabled={isExporting}
-              onChange={(event) =>
-                updateExportTarget('battery_monitor', 'config', event.target.checked)
-              }
-              type="checkbox"
-            />
-            <span>{t('projectExport.writeControls.configFile')}</span>
-          </label>
-          <label className="export-check">
-            <input
-              aria-label={t('projectExport.writeControls.batteryBinAria')}
-              checked={batteryMonitorExport.bin}
-              disabled={isExporting}
-              onChange={(event) =>
-                updateExportTarget('battery_monitor', 'bin', event.target.checked)
-              }
-              type="checkbox"
-            />
-            <span>{t('projectExport.writeControls.binFile')}</span>
-          </label>
-          <div className="export-option-info">
-            <span>{t('projectExport.writeControls.faultCodes')}</span>
-            <small>{t('projectExport.writeControls.faultDescription')}</small>
+            >
+              {t('projectExport.restoreAllDefaults')}
+            </button>
           </div>
-          <label className="export-check">
-            <input
-              aria-label={t('projectExport.writeControls.faultConfigAria')}
-              checked={faultCodeExport.config}
-              disabled={isExporting}
-              onChange={(event) =>
-                updateExportTarget('fault_code_info', 'config', event.target.checked)
-              }
-              type="checkbox"
-            />
-            <span>{t('projectExport.writeControls.configFile')}</span>
-          </label>
-          <label className="export-check">
-            <input
-              aria-label={t('projectExport.writeControls.faultBinAria')}
-              checked={faultCodeExport.bin}
-              disabled={isExporting}
-              onChange={(event) =>
-                updateExportTarget('fault_code_info', 'bin', event.target.checked)
-              }
-              type="checkbox"
-            />
-            <span>{t('projectExport.writeControls.binFile')}</span>
-          </label>
-        </div>
-      </section>
+          <div className="export-option-grid">
+            <div className="export-option-grid__head">{t('projectExport.writeControls.item')}</div>
+            <div className="export-option-grid__head">
+              {t('projectExport.writeControls.writeConfig')}
+            </div>
+            <div className="export-option-grid__head">
+              {t('projectExport.writeControls.writeBin')}
+            </div>
+            <div className="export-option-info">
+              <span>{t('navigation.modules.batteryMonitor.title')}</span>
+              <small>{t('projectExport.writeControls.batteryDescription')}</small>
+            </div>
+            <label className="export-check">
+              <input
+                aria-label={t('projectExport.writeControls.batteryConfigAria')}
+                checked={batteryMonitorExport.config}
+                disabled={isExporting}
+                onChange={(event) =>
+                  updateExportTarget('battery_monitor', 'config', event.target.checked)
+                }
+                type="checkbox"
+              />
+              <span>{t('projectExport.writeControls.configFile')}</span>
+            </label>
+            <label className="export-check">
+              <input
+                aria-label={t('projectExport.writeControls.batteryBinAria')}
+                checked={batteryMonitorExport.bin}
+                disabled={isExporting}
+                onChange={(event) =>
+                  updateExportTarget('battery_monitor', 'bin', event.target.checked)
+                }
+                type="checkbox"
+              />
+              <span>{t('projectExport.writeControls.binFile')}</span>
+            </label>
+            <div className="export-option-info">
+              <span>{t('projectExport.writeControls.faultCodes')}</span>
+              <small>{t('projectExport.writeControls.faultDescription')}</small>
+            </div>
+            <label className="export-check">
+              <input
+                aria-label={t('projectExport.writeControls.faultConfigAria')}
+                checked={faultCodeExport.config}
+                disabled={isExporting}
+                onChange={(event) =>
+                  updateExportTarget('fault_code_info', 'config', event.target.checked)
+                }
+                type="checkbox"
+              />
+              <span>{t('projectExport.writeControls.configFile')}</span>
+            </label>
+            <label className="export-check">
+              <input
+                aria-label={t('projectExport.writeControls.faultBinAria')}
+                checked={faultCodeExport.bin}
+                disabled={isExporting}
+                onChange={(event) =>
+                  updateExportTarget('fault_code_info', 'bin', event.target.checked)
+                }
+                type="checkbox"
+              />
+              <span>{t('projectExport.writeControls.binFile')}</span>
+            </label>
+          </div>
+        </section>
+      ) : null}
       {exportError ? (
         <p className="export-error" role="alert">
           {exportError}

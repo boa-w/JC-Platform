@@ -265,7 +265,7 @@ export function TranslationTable({
               : '';
             const isModified = modifiedKeys.has(row.key);
             const isSelected = selectedKeys.has(row.key);
-            const isReadonlyKey = row.isConfigKey || row.isExternalKey;
+            const isReadonlyKey = row.isConfigKey || row.isInheritedKey || row.isExternalKey;
             const rowClassName = [
               isModified ? 'config-entry-modified' : '',
               isDraggingRow(row) ? 'lang-row-dragging' : '',

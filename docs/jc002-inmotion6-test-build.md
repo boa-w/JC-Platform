@@ -23,7 +23,7 @@ cargo run --manifest-path src-tauri/Cargo.toml --bin jc-cli -- `
   --project-path <liugong_70T_Inmotion6.jc002.jcpro>
 ```
 
-迁移器通过固件枚举名和中文注释匹配固定 UI，不使用 `list_inner` 数组位置。少量历史名称差异集中在脚本的 `legacyAliases`，新增文本集中在 `explicitMessages`。
+迁移器通过固件枚举名和中文注释匹配固定 UI，不使用 `list_inner` 数组位置。少量历史名称差异集中在脚本的 `legacyAliases`，新增文本集中在 `explicitMessages`。旧 jc001 故障码 MVP 不参与迁移；故障码必须在输出项目的 `fault_code_profiles[]` 中独立配置。
 
 ## 当前验证值
 

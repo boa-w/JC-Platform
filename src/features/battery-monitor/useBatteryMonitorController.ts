@@ -10,8 +10,9 @@ import {
   saveTextFile,
 } from '../../api/commands';
 import {
+  localizationForScope,
   localizationToLanguageDocument,
-  updateLocalizationFromLanguageDocument,
+  updateLocalizationScopeFromLanguageDocument,
 } from '../../components/language/localizationAdapter';
 import { useOperationGuard } from '../../hooks/useOperationGuard';
 import type {
@@ -25,13 +26,13 @@ import type {
 import type { JsonPath } from '../../utils/projectDirty';
 import { runSystemDialog } from '../../utils/systemDialog';
 import { defaultBatteryMonitor } from '../project-document/projectDocumentDefaults';
+import { readProtocolProfiles } from '../protocol-profiles/protocolProfiles';
 import { formatFrameId, parseFrameId } from '../realtime-data/usePdoEditor';
-import { validateBatteryMonitor, type BatteryValidationReport } from './batteryMonitorValidation';
+import { type BatteryValidationReport, validateBatteryMonitor } from './batteryMonitorValidation';
 
 interface UseBatteryMonitorControllerOptions {
   document: unknown | null;
   projectPath?: string;
-  updateProjectDocument: (section: string, value: unknown) => void;
   updateProjectSections: (sections: Record<string, unknown>) => void;
   isModifiedPath: (path: JsonPath) => boolean;
   restoreModifiedPath: (path: JsonPath) => void;
@@ -105,7 +106,6 @@ function normalizeImportedBatteryMonitor(value: unknown): BatteryMonitorProtocol
 export function useBatteryMonitorController({
   document,
   projectPath,
-  updateProjectDocument,
   updateProjectSections,
   isModifiedPath,
   restoreModifiedPath,
@@ -131,7 +131,7 @@ export function useBatteryMonitorController({
   const batteryValidation: BatteryValidationReport = validateBatteryMonitor(
     currentBatteryMonitorDocument,
     {
-      localization: source.localization as LocalizationDocument | undefined,
+      localization: batteryLocalization(source),
     },
   );
 
@@ -175,9 +175,27 @@ export function useBatteryMonitorController({
     if (!loadedProject) return defaultLanguageDocument();
     const source = loadedProject.document as Record<string, unknown>;
     if (source.localization) {
-      return localizationToLanguageDocument(source.localization as LocalizationDocument);
+      const localization = batteryLocalization(source);
+      if (localization) return localizationToLanguageDocument(localization);
     }
     return defaultLanguageDocument();
+  }
+
+  function batteryLocalizationScope(sourceDocument: Record<string, unknown>) {
+    const profiles = readProtocolProfiles(sourceDocument);
+    const profileId = profiles?.active_battery_profile_id;
+    return profileId ? ({ kind: 'battery', profileId } as const) : ({ kind: 'common' } as const);
+  }
+
+  function batteryLocalization(sourceDocument: Record<string, unknown>) {
+    const localization = sourceDocument.localization as LocalizationDocument | undefined;
+    if (!localization) return undefined;
+    const profiles = readProtocolProfiles(sourceDocument);
+    return localizationForScope(
+      localization,
+      profiles ?? undefined,
+      batteryLocalizationScope(sourceDocument),
+    );
   }
 
   function batteryLanguageFor(next: BatteryMonitorProtocol) {
@@ -201,7 +219,8 @@ export function useBatteryMonitorController({
         item.validity?.empty_text,
       ]) {
         const normalizedKey = textKey?.trim();
-        if (normalizedKey) language = ensureLanguageEntry(language, normalizedKey, normalizedKey, defaultLocale);
+        if (normalizedKey)
+          language = ensureLanguageEntry(language, normalizedKey, normalizedKey, defaultLocale);
       }
     }
     return language;
@@ -213,14 +232,22 @@ export function useBatteryMonitorController({
     const normalized = normalizeBatteryMonitor(next);
     const previousLanguage = languageDocument();
     const nextLanguage = batteryLanguageFor(normalized);
+    const localization = source.localization as LocalizationDocument;
+    const profiles = readProtocolProfiles(source);
+    const localizationUpdate = updateLocalizationScopeFromLanguageDocument(
+      localization,
+      profiles ?? undefined,
+      batteryLocalizationScope(source),
+      previousLanguage,
+      nextLanguage,
+    );
     const sections: Record<string, unknown> = {
       battery_monitor: normalized,
-      localization: updateLocalizationFromLanguageDocument(
-        source.localization as LocalizationDocument,
-        previousLanguage,
-        nextLanguage,
-      ),
+      localization: localizationUpdate.localization,
     };
+    if (localizationUpdate.protocolProfiles) {
+      sections.protocol_profiles = localizationUpdate.protocolProfiles;
+    }
     updateProjectSections(sections);
   }
 
@@ -424,14 +451,21 @@ export function useBatteryMonitorController({
     );
     const source = (loadedProject?.document as Record<string, unknown> | undefined) ?? {};
     if (!isBatteryMonitorSupported || !source.localization) return;
-    updateProjectDocument(
-      'localization',
-      updateLocalizationFromLanguageDocument(
-        source.localization as LocalizationDocument,
-        language,
-        nextLanguage,
-      ),
+    const localization = source.localization as LocalizationDocument;
+    const profiles = readProtocolProfiles(source);
+    const localizationUpdate = updateLocalizationScopeFromLanguageDocument(
+      localization,
+      profiles ?? undefined,
+      batteryLocalizationScope(source),
+      language,
+      nextLanguage,
     );
+    updateProjectSections({
+      localization: localizationUpdate.localization,
+      ...(localizationUpdate.protocolProfiles
+        ? { protocol_profiles: localizationUpdate.protocolProfiles }
+        : {}),
+    });
   }
 
   function addBatteryItem() {

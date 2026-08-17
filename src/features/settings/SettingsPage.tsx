@@ -2,17 +2,26 @@ import { Save, ShieldCheck } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { featureModules } from '../../data/modules';
+import { navGroups } from '../../data/navigation';
 import { useAppLanguage } from '../../i18n';
-import { appLanguageLabelKeys, type AppLanguage } from '../../i18n/resources';
+import { type AppLanguage, appLanguageLabelKeys } from '../../i18n/resources';
+import type { ModuleVisibilityController } from '../../stores/moduleVisibility';
 import type { TranslationSettingsController } from '../../stores/translationSettings';
 import './settings.css';
 
 interface SettingsPageProps {
   translationController: TranslationSettingsController;
+  moduleVisibility: ModuleVisibilityController;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
 }
-export function SettingsPage({ translationController, theme, onToggleTheme }: SettingsPageProps) {
+export function SettingsPage({
+  translationController,
+  moduleVisibility,
+  theme,
+  onToggleTheme,
+}: SettingsPageProps) {
   const { t } = useTranslation();
   const { language, supportedLanguages, changeLanguage } = useAppLanguage();
   const [pendingReset, setPendingReset] = useState<'translation' | null>(null);
@@ -116,11 +125,7 @@ export function SettingsPage({ translationController, theme, onToggleTheme }: Se
                 type="button"
               >
                 <Save aria-hidden="true" size={14} strokeWidth={1.8} />
-                {t(
-                  credentialSaving
-                    ? 'settings.credentials.saving'
-                    : 'settings.credentials.save',
-                )}
+                {t(credentialSaving ? 'settings.credentials.saving' : 'settings.credentials.save')}
               </button>
               <button
                 disabled={clearCredentialsDisabled}
@@ -135,11 +140,11 @@ export function SettingsPage({ translationController, theme, onToggleTheme }: Se
               </button>
             </div>
           </div>
-          <small className="settings-credential-privacy">
-            {t('settings.credentials.privacy')}
-          </small>
+          <small className="settings-credential-privacy">{t('settings.credentials.privacy')}</small>
         </div>
-        <strong className="section-label--muted">{t('settings.interfaceLanguage.sectionTitle')}</strong>
+        <strong className="section-label--muted">
+          {t('settings.interfaceLanguage.sectionTitle')}
+        </strong>
         <label className="settings-field">
           <span>{t('settings.interfaceLanguage.label')}</span>
           <select
@@ -154,6 +159,65 @@ export function SettingsPage({ translationController, theme, onToggleTheme }: Se
           </select>
           <small>{t('settings.interfaceLanguage.description')}</small>
         </label>
+        <strong className="section-label--muted">{t('settings.functionPages.sectionTitle')}</strong>
+        <div className="settings-function-pages">
+          <div className="settings-function-pages-header">
+            <small>{t('settings.functionPages.description')}</small>
+            <button
+              disabled={moduleVisibility.hiddenKeys.size === 0}
+              onClick={moduleVisibility.showAllModules}
+              type="button"
+            >
+              {t('settings.functionPages.showAll')}
+            </button>
+          </div>
+          {navGroups.map((group) => {
+            const groupModules = group.keys
+              .map((key) => featureModules.find((module) => module.key === key))
+              .filter(Boolean);
+            if (groupModules.length === 0) return null;
+            return (
+              <div className="settings-function-group" key={group.id}>
+                <span className="settings-function-group-label">{t(group.labelKey)}</span>
+                {groupModules.map((module) => {
+                  if (!module) return null;
+                  const hidden = moduleVisibility.hiddenKeys.has(module.key);
+                  const alwaysVisible = module.key === 'project';
+                  return (
+                    <label
+                      className={
+                        alwaysVisible ? 'settings-function-row--locked' : 'settings-function-row'
+                      }
+                      key={module.key}
+                    >
+                      <span className="settings-function-row-label">
+                        {t(module.titleKey)}
+                        {alwaysVisible ? (
+                          <small>{t('settings.functionPages.alwaysVisible')}</small>
+                        ) : null}
+                      </span>
+                      <button
+                        aria-checked={!hidden}
+                        aria-label={t(module.titleKey)}
+                        className="theme-toggle-btn"
+                        disabled={alwaysVisible}
+                        onClick={() => moduleVisibility.setModuleVisible(module.key, hidden)}
+                        role="switch"
+                        type="button"
+                      >
+                        <span
+                          className={`theme-toggle-track ${!hidden ? 'theme-toggle-track--dark' : ''}`}
+                        >
+                          <span className="theme-toggle-thumb" />
+                        </span>
+                      </button>
+                    </label>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
         <strong className="section-label--muted">{t('settings.appearance.sectionTitle')}</strong>
         <div className="theme-toggle-row">
           <div className="theme-toggle-info">

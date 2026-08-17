@@ -277,6 +277,8 @@ export interface ControllerProtocolProfile {
   controller_family: string;
   controller_revision: string;
   description?: string;
+  /** Partial catalog layered over the project-wide localization directory. */
+  localization_overlay?: LocalizationOverlayDocument;
   protocol: ControllerProtocolSections;
 }
 
@@ -285,6 +287,8 @@ export interface BatteryProtocolProfile {
   battery_family: string;
   battery_revision: string;
   description?: string;
+  /** Partial catalog layered over the project-wide localization directory. */
+  localization_overlay?: LocalizationOverlayDocument;
   protocol: {
     battery_monitor: BatteryMonitorProtocol;
   };
@@ -294,8 +298,23 @@ export interface ProtocolProfilesDocument {
   schema_version: 2;
   active_controller_profile_id: string;
   active_battery_profile_id?: string;
+  active_fault_code_profile_id?: string;
   controller_profiles: ControllerProtocolProfile[];
   battery_profiles: BatteryProtocolProfile[];
+  fault_code_profiles: FaultCodeProfile[];
+}
+
+/** Independent fault-code parser and catalog profile. */
+export interface FaultCodeProfile {
+  profile_id: string;
+  fault_family: string;
+  fault_revision: string;
+  description?: string;
+  /** Partial catalog layered over the project-wide localization directory. */
+  localization_overlay?: LocalizationOverlayDocument;
+  protocol: {
+    fault_code_info: FaultCodeInfo;
+  };
 }
 
 export interface CanOpenNodeDocument {
@@ -443,7 +462,6 @@ export interface FaultCodeInfo {
   enabled: boolean;
   version?: number;
   sources?: FaultCodeSource[];
-  codes?: FaultCodeItem[];
   definitions?: FaultCodeDefinition[];
   bindings?: FaultCodeBinding[];
   [key: string]: unknown;
@@ -478,19 +496,6 @@ export interface FaultCodeSource {
   code_offset?: number;
   clear_code?: number;
   invalid_codes?: number[];
-  enabled?: boolean;
-  [key: string]: unknown;
-}
-
-export interface FaultCodeItem {
-  source_key?: string;
-  type_char?: string;
-  source_id?: number;
-  code: number;
-  message_key?: string;
-  name_key?: string;
-  name?: string;
-  severity?: string;
   enabled?: boolean;
   [key: string]: unknown;
 }
@@ -655,6 +660,8 @@ export interface LanguageDocument {
   list_translate: Record<string, unknown>;
   language_labels?: Record<string, string>;
   editor_locked_key_count?: number;
+  /** UI-only protected keys, used by Profile overlay views without hiding value editors. */
+  editor_protected_keys?: string[];
 }
 
 export type LocalizationMessage = string | Record<string, string>;
@@ -670,6 +677,17 @@ export interface LocalizationDocument {
   default_locale: string;
   locale_order: string[];
   locales: Record<string, LocalizationLocale>;
+  [key: string]: unknown;
+}
+
+/** Profile-local messages. Locale membership and ordering remain project-wide. */
+export interface LocalizationOverlayDocument {
+  locales: Record<string, LocalizationOverlayLocale>;
+  [key: string]: unknown;
+}
+
+export interface LocalizationOverlayLocale {
+  translations: Record<string, LocalizationMessage>;
   [key: string]: unknown;
 }
 
@@ -899,6 +917,20 @@ export interface DataDescriptionPlan {
   active_controller_profile_id?: string;
   battery_profile_total?: number;
   active_battery_profile_id?: string;
+  fault_code_profile_total?: number;
+  active_fault_code_profile_id?: string;
+  protocol_bundle_version?: number;
+  protocol_profile_payloads?: ProtocolProfilePayloadPlan[];
+}
+
+export interface ProtocolProfilePayloadPlan {
+  controller_profile_id: string;
+  battery_profile_id?: string;
+  fault_code_profile_id?: string;
+  base_addr: number;
+  file_size: number;
+  crc: number;
+  description: DataDescriptionPlan;
 }
 
 export interface SdoImportReport {

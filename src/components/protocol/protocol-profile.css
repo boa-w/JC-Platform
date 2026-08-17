@@ -66,6 +66,12 @@
   gap: 6px;
 }
 
+.protocol-profile-bar__actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
 .protocol-profile-bar button {
   display: inline-flex;
   align-items: center;

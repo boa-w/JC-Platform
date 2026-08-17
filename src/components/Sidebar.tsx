@@ -110,8 +110,15 @@ export function Sidebar({
 }: SidebarProps) {
   const { t } = useTranslation();
   const groupOfActive = findGroupForKey(activeKey);
+  const visibleGroupIds = useMemo(
+    () =>
+      navGroups
+        .filter((group) => group.keys.some((key) => modules.some((module) => module.key === key)))
+        .map((group) => group.id),
+    [modules],
+  );
   const [selectedGroupId, setSelectedGroupId] = useState<string>(
-    groupOfActive?.id ?? navGroups[0].id,
+    groupOfActive?.id ?? visibleGroupIds[0] ?? navGroups[0].id,
   );
   const activeGroupId = groupOfActive?.id ?? selectedGroupId;
 
@@ -158,6 +165,21 @@ export function Sidebar({
     [activeGroup, modules],
   );
 
+  // 当前选中分组的所有功能页都被隐藏时，回退到第一个有可见功能页的分组。
+  useEffect(() => {
+    if (activeGroupModules.length > 0) return;
+    const firstVisibleGroup = navGroups.find((group) =>
+      group.keys.some((key) => modules.some((module) => module.key === key)),
+    );
+    if (!firstVisibleGroup || firstVisibleGroup.id === selectedGroupId) return;
+    const firstVisibleKey = firstVisibleGroup.keys.find((key) =>
+      modules.some((module) => module.key === key),
+    );
+    if (!firstVisibleKey) return;
+    setSelectedGroupId(firstVisibleGroup.id);
+    onSelect(firstVisibleKey);
+  }, [activeGroupModules, modules, onSelect, selectedGroupId]);
+
   function selectGroup(id: string) {
     const group = navGroups.find((item) => item.id === id);
     if (!group) return;
@@ -169,7 +191,10 @@ export function Sidebar({
 
     setSelectedGroupId(id);
     if (!group.keys.includes(activeKey)) {
-      onSelect(group.keys[0]);
+      const firstVisibleKey = group.keys.find((key) =>
+        modules.some((module) => module.key === key),
+      );
+      if (firstVisibleKey) onSelect(firstVisibleKey);
     }
     if (collapsed) {
       onToggleCollapsed();
@@ -399,7 +424,9 @@ export function Sidebar({
               </div>
             </section>
             <section>
-              <strong className="section-label--muted">{t('sidebar.diagnostics.sectionTitle')}</strong>
+              <strong className="section-label--muted">
+                {t('sidebar.diagnostics.sectionTitle')}
+              </strong>
               <div className="version-diagnostic-panel">
                 <div className="version-diagnostic-row">
                   <span
@@ -427,9 +454,7 @@ export function Sidebar({
                     )}
                   </button>
                 </div>
-                <p className="version-diagnostic-privacy">
-                  {t('sidebar.diagnostics.privacy')}
-                </p>
+                <p className="version-diagnostic-privacy">{t('sidebar.diagnostics.privacy')}</p>
               </div>
             </section>
           </div>

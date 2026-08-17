@@ -129,6 +129,12 @@ impl ProjectValidationReport {
                 warnings.push("jc001 项目禁止包含 jc002 canopen".to_string());
                 schema_valid = false;
             }
+            Some("jc001") if value.get("fault_code_info").is_some() => {
+                warnings.push(
+                    "jc001 项目不包含故障码管理；请在 jc002 fault_code_profiles 中配置".to_string(),
+                );
+                schema_valid = false;
+            }
             Some("jc002") if value.get("language_info").is_some() => {
                 warnings.push("jc002 项目禁止包含 jc001 language_info".to_string());
                 schema_valid = false;
@@ -230,9 +236,9 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
     validate_battery_monitor_version_contract(document)
 }
 
-/// Validate the optional jc002 controller and battery protocol registries.
+/// Validate the jc002 controller, battery, and fault-code protocol registries.
 ///
-/// Controller and battery protocols intentionally have independent identity
+/// These protocol families intentionally have independent identity
 /// spaces and active selections. The firmware receives their selected runtime
 /// sections only after the exporter combines them into the existing ABI.
 pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), String> {
@@ -296,6 +302,34 @@ pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), Strin
                 .to_string(),
         );
     }
+    let fault_code_profiles: &[Value] = root
+        .get("fault_code_profiles")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+    let active_fault_code_profile_id = match root.get("active_fault_code_profile_id") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(
+            value
+                .as_str()
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| {
+                    "protocol_profiles.active_fault_code_profile_id 必须为非空字符串".to_string()
+                })?,
+        ),
+    };
+    if let Some(profile_id) = active_fault_code_profile_id {
+        if profile_id.len() > PROTOCOL_PROFILE_ID_MAX_BYTES {
+            return Err(
+                "protocol_profiles.active_fault_code_profile_id 超过固件 63 字节限制".to_string(),
+            );
+        }
+    } else if !fault_code_profiles.is_empty() {
+        return Err(
+            "protocol_profiles.fault_code_profiles 非空时必须设置 active_fault_code_profile_id"
+                .to_string(),
+        );
+    }
 
     let mut controller_profile_ids = HashSet::new();
     let mut active_controller_found = false;
@@ -348,6 +382,13 @@ pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), Strin
         }
         if !protocol.get("sdo_info").is_some_and(Value::is_object) {
             return Err(format!("{label}.protocol.sdo_info 必须为对象"));
+        }
+        if let Some(overlay) = profile.get("localization_overlay") {
+            crate::domain::localization::validate_localization_overlay(
+                document,
+                overlay,
+                &format!("{label}.localization_overlay"),
+            )?;
         }
 
         let mut materialized = document.clone();
@@ -425,6 +466,13 @@ pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), Strin
         {
             return Err(format!("{label}.protocol 必须只包含 battery_monitor 对象"));
         }
+        if let Some(overlay) = profile.get("localization_overlay") {
+            crate::domain::localization::validate_localization_overlay(
+                document,
+                overlay,
+                &format!("{label}.localization_overlay"),
+            )?;
+        }
 
         let mut materialized = document.clone();
         let object = materialized
@@ -458,21 +506,145 @@ pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), Strin
             ));
         }
     }
+
+    let mut fault_code_profile_ids = HashSet::new();
+    let mut active_fault_code_found = false;
+    for (index, profile) in fault_code_profiles.iter().enumerate() {
+        let label = format!("fault code profile {}", index + 1);
+        let profile_id = profile
+            .get("profile_id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| format!("{label}.profile_id 不能为空"))?;
+        if !fault_code_profile_ids.insert(profile_id.to_string()) {
+            return Err(format!("fault code profile_id 重复：{profile_id}"));
+        }
+        if profile_id.len() > PROTOCOL_PROFILE_ID_MAX_BYTES {
+            return Err(format!(
+                "{label}.profile_id 超过固件 63 字节限制：{profile_id}"
+            ));
+        }
+        if Some(profile_id) == active_fault_code_profile_id {
+            active_fault_code_found = true;
+        }
+        if profile
+            .get("fault_family")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_none()
+        {
+            return Err(format!("{label}.fault_family 不能为空"));
+        }
+        if profile
+            .get("fault_revision")
+            .and_then(Value::as_str)
+            .is_none()
+        {
+            return Err(format!("{label}.fault_revision 必须为字符串"));
+        }
+        let protocol = profile
+            .get("protocol")
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("{label}.protocol 必须为对象"))?;
+        if protocol.keys().any(|key| key != "fault_code_info")
+            || !protocol
+                .get("fault_code_info")
+                .is_some_and(Value::is_object)
+        {
+            return Err(format!("{label}.protocol 必须只包含 fault_code_info 对象"));
+        }
+        validate_fault_code_info_value(
+            protocol
+                .get("fault_code_info")
+                .expect("validated fault_code_info object"),
+            Some("jc002"),
+        )?;
+        if let Some(overlay) = profile.get("localization_overlay") {
+            crate::domain::localization::validate_localization_overlay(
+                document,
+                overlay,
+                &format!("{label}.localization_overlay"),
+            )?;
+        }
+    }
+    if let Some(active_fault_code_profile_id) = active_fault_code_profile_id {
+        if !active_fault_code_found {
+            return Err(format!(
+                "protocol_profiles.active_fault_code_profile_id 不存在：{active_fault_code_profile_id}"
+            ));
+        }
+    }
+
+    // Validate every controller/battery/fault combination now so conflicting
+    // overlay keys are reported while opening the project, not only during
+    // export of a particular payload.
+    if let Some(localization) = document.get("localization") {
+        let battery_options = if battery_profiles.is_empty() {
+            vec![None]
+        } else {
+            battery_profiles.iter().map(Some).collect::<Vec<_>>()
+        };
+        let fault_options = if fault_code_profiles.is_empty() {
+            vec![None]
+        } else {
+            fault_code_profiles.iter().map(Some).collect::<Vec<_>>()
+        };
+        for controller_profile in controller_profiles {
+            let controller_id = controller_profile
+                .get("profile_id")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown-controller");
+            let controller_overlay = controller_profile.get("localization_overlay");
+            for battery_profile in &battery_options {
+                for fault_profile in &fault_options {
+                    let mut overlays = Vec::new();
+                    if let Some(overlay) = controller_overlay {
+                        overlays.push((controller_id, overlay));
+                    }
+                    if let Some(profile) = battery_profile {
+                        let profile_id = profile
+                            .get("profile_id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("unknown-battery");
+                        if let Some(overlay) = profile.get("localization_overlay") {
+                            overlays.push((profile_id, overlay));
+                        }
+                    }
+                    if let Some(profile) = fault_profile {
+                        let profile_id = profile
+                            .get("profile_id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("unknown-fault");
+                        if let Some(overlay) = profile.get("localization_overlay") {
+                            overlays.push((profile_id, overlay));
+                        }
+                    }
+                    crate::domain::localization::merge_localization_overlays(
+                        localization,
+                        &overlays,
+                    )?;
+                }
+            }
+        }
+    }
     Ok(())
 }
 
-/// Return a project document with the active controller and battery protocol
-/// sections materialized at the jc002 runtime locations used by the builder.
-/// The returned document is only an export/build view; it is never persisted.
-pub fn materialize_active_protocol_profiles(document: &Value) -> Result<Value, String> {
+/// Return a project document with one controller/battery/fault protocol combination
+/// materialized at the jc002 runtime locations used by the builder. The
+/// returned document is only an export/build view; it is never persisted.
+pub fn materialize_protocol_profiles_for_selection(
+    document: &Value,
+    controller_profile_id: &str,
+    battery_profile_id: Option<&str>,
+    fault_code_profile_id: Option<&str>,
+) -> Result<Value, String> {
     let Some(root) = document.get("protocol_profiles") else {
         return Ok(document.clone());
     };
     validate_protocol_profiles_contract(document)?;
-    let active_controller_profile_id = root
-        .get("active_controller_profile_id")
-        .and_then(Value::as_str)
-        .ok_or_else(|| "protocol_profiles.active_controller_profile_id 不能为空".to_string())?;
     let controller_profiles = root
         .get("controller_profiles")
         .and_then(Value::as_array)
@@ -480,30 +652,84 @@ pub fn materialize_active_protocol_profiles(document: &Value) -> Result<Value, S
     let controller_profile = controller_profiles
         .iter()
         .find(|profile| {
-            profile.get("profile_id").and_then(Value::as_str) == Some(active_controller_profile_id)
+            profile.get("profile_id").and_then(Value::as_str) == Some(controller_profile_id)
         })
-        .ok_or_else(|| {
-            format!("找不到 active controller protocol profile：{active_controller_profile_id}")
-        })?;
+        .ok_or_else(|| format!("找不到 controller protocol profile：{controller_profile_id}"))?;
     let controller_protocol = controller_profile
         .get("protocol")
         .and_then(Value::as_object)
         .ok_or_else(|| "active controller protocol profile 缺少 protocol 对象".to_string())?;
-    let battery_protocol = root
-        .get("active_battery_profile_id")
-        .and_then(Value::as_str)
-        .and_then(|active_id| {
-            root.get("battery_profiles")
+    let battery_protocol = match battery_profile_id {
+        Some(selected_id) => {
+            let profiles = root
+                .get("battery_profiles")
                 .and_then(Value::as_array)
-                .map(|profiles| (active_id, profiles))
-        })
-        .and_then(|(active_id, profiles)| {
-            profiles.iter().find(|profile| {
-                profile.get("profile_id").and_then(Value::as_str) == Some(active_id)
+                .ok_or_else(|| "protocol_profiles.battery_profiles 必须为数组".to_string())?;
+            let profile = profiles
+                .iter()
+                .find(|profile| {
+                    profile.get("profile_id").and_then(Value::as_str) == Some(selected_id)
+                })
+                .ok_or_else(|| format!("找不到 battery protocol profile：{selected_id}"))?;
+            Some(
+                profile
+                    .get("protocol")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| {
+                        format!("battery protocol profile 缺少 protocol 对象：{selected_id}")
+                    })?,
+            )
+        }
+        None => None,
+    };
+    let fault_code_protocol = match fault_code_profile_id {
+        Some(selected_id) => {
+            let profiles = root
+                .get("fault_code_profiles")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "protocol_profiles.fault_code_profiles 必须为数组".to_string())?;
+            let profile = profiles
+                .iter()
+                .find(|profile| {
+                    profile.get("profile_id").and_then(Value::as_str) == Some(selected_id)
+                })
+                .ok_or_else(|| format!("找不到 fault code protocol profile：{selected_id}"))?;
+            Some(
+                profile
+                    .get("protocol")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| {
+                        format!("fault code protocol profile 缺少 protocol 对象：{selected_id}")
+                    })?,
+            )
+        }
+        None => None,
+    };
+    let controller_overlay = controller_profile.get("localization_overlay");
+    let battery_overlay = match battery_profile_id {
+        Some(selected_id) => root
+            .get("battery_profiles")
+            .and_then(Value::as_array)
+            .and_then(|profiles| {
+                profiles.iter().find(|profile| {
+                    profile.get("profile_id").and_then(Value::as_str) == Some(selected_id)
+                })
             })
-        })
-        .and_then(|profile| profile.get("protocol"))
-        .and_then(Value::as_object);
+            .and_then(|profile| profile.get("localization_overlay")),
+        None => None,
+    };
+    let fault_code_overlay = match fault_code_profile_id {
+        Some(selected_id) => root
+            .get("fault_code_profiles")
+            .and_then(Value::as_array)
+            .and_then(|profiles| {
+                profiles.iter().find(|profile| {
+                    profile.get("profile_id").and_then(Value::as_str) == Some(selected_id)
+                })
+            })
+            .and_then(|profile| profile.get("localization_overlay")),
+        None => None,
+    };
     let mut materialized = document.clone();
     let object = materialized
         .as_object_mut()
@@ -517,6 +743,7 @@ pub fn materialize_active_protocol_profiles(document: &Value) -> Result<Value, S
         "sdo_info",
         "canopen",
         "battery_monitor",
+        "fault_code_info",
     ] {
         object.remove(section);
     }
@@ -528,15 +755,225 @@ pub fn materialize_active_protocol_profiles(document: &Value) -> Result<Value, S
             object.insert("battery_monitor".to_string(), value.clone());
         }
     }
+    if let Some(fault_code_protocol) = fault_code_protocol {
+        if let Some(value) = fault_code_protocol.get("fault_code_info") {
+            object.insert("fault_code_info".to_string(), value.clone());
+        }
+    }
+    if let Some(localization) = document.get("localization") {
+        let controller_label = format!("controller profile {controller_profile_id}");
+        let battery_label = battery_profile_id.map(|value| format!("battery profile {value}"));
+        let fault_label = fault_code_profile_id.map(|value| format!("fault code profile {value}"));
+        let mut overlays = Vec::new();
+        if let Some(overlay) = controller_overlay {
+            overlays.push((controller_label.as_str(), overlay));
+        }
+        if let (Some(label), Some(overlay)) = (battery_label.as_deref(), battery_overlay) {
+            overlays.push((label, overlay));
+        }
+        if let (Some(label), Some(overlay)) = (fault_label.as_deref(), fault_code_overlay) {
+            overlays.push((label, overlay));
+        }
+        let merged =
+            crate::domain::localization::merge_localization_overlays(localization, &overlays)?;
+        object.insert("localization".to_string(), merged);
+    }
     Ok(materialized)
+}
+
+/// Return a project document with the configured active protocol Profiles
+/// materialized. This is the single-profile convenience entry point used by
+/// validation and manifest generation.
+pub fn materialize_active_protocol_profiles(document: &Value) -> Result<Value, String> {
+    let Some(root) = document.get("protocol_profiles") else {
+        return Ok(document.clone());
+    };
+    let controller_profile_id = root
+        .get("active_controller_profile_id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "protocol_profiles.active_controller_profile_id 不能为空".to_string())?;
+    let battery_profile_id = root
+        .get("active_battery_profile_id")
+        .and_then(Value::as_str);
+    let fault_code_profile_id = root
+        .get("active_fault_code_profile_id")
+        .and_then(Value::as_str);
+    materialize_protocol_profiles_for_selection(
+        document,
+        controller_profile_id,
+        battery_profile_id,
+        fault_code_profile_id,
+    )
+}
+
+/// Normalize every jc002 export to the multi-profile document shape.
+///
+/// Existing v2 editing documents may still have their single controller and
+/// battery sections at the root. Export must not create a second runtime ABI
+/// for that case, so it wraps those sections in stable default Profile IDs
+/// before building the shared payload bundle. The normalized value is an
+/// export-only view and is never written back implicitly.
+pub fn normalize_protocol_profiles_for_export(document: &Value) -> Result<Value, String> {
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
+        return Ok(document.clone());
+    }
+    if document.get("protocol_profiles").is_some() {
+        validate_protocol_profiles_contract(document)?;
+        let mut normalized = document.clone();
+        let root_fault_code_info = normalized.get("fault_code_info").cloned();
+        let profile_root = normalized
+            .get_mut("protocol_profiles")
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| "jc002 protocol_profiles 必须为对象".to_string())?;
+        for collection in [
+            "controller_profiles",
+            "battery_profiles",
+            "fault_code_profiles",
+        ] {
+            if let Some(profiles) = profile_root
+                .get_mut(collection)
+                .and_then(Value::as_array_mut)
+            {
+                for profile in profiles {
+                    if let Some(object) = profile.as_object_mut() {
+                        object
+                            .entry("localization_overlay".to_string())
+                            .or_insert_with(|| json!({ "locales": {} }));
+                    }
+                }
+            }
+        }
+        if !profile_root.contains_key("fault_code_profiles") {
+            if let Some(fault_code_info) = root_fault_code_info {
+                profile_root.insert(
+                    "active_fault_code_profile_id".to_string(),
+                    json!("fault.default"),
+                );
+                profile_root.insert(
+                    "fault_code_profiles".to_string(),
+                    json!([{
+                        "profile_id": "fault.default",
+                        "fault_family": "generic",
+                        "fault_revision": "",
+                        "localization_overlay": { "locales": {} },
+                        "protocol": { "fault_code_info": fault_code_info }
+                    }]),
+                );
+            }
+        }
+        return Ok(normalized);
+    }
+
+    let mut normalized = document.clone();
+    let root = normalized
+        .as_object_mut()
+        .ok_or_else(|| "jc002 项目根节点必须为对象".to_string())?;
+    let mut controller_protocol = Map::new();
+    for section in ["pdo_global_param", "pdo_condition", "pdo_recv", "pdo_send"] {
+        controller_protocol.insert(
+            section.to_string(),
+            document.get(section).cloned().unwrap_or_else(|| json!([])),
+        );
+    }
+    controller_protocol.insert(
+        "sdo_info".to_string(),
+        document.get("sdo_info").cloned().unwrap_or_else(|| {
+            json!({
+                "type": 0,
+                "user_auth": 0,
+                "name_index": 0,
+                "name": "",
+                "children": []
+            })
+        }),
+    );
+    if let Some(canopen) = document.get("canopen") {
+        controller_protocol.insert("canopen".to_string(), canopen.clone());
+    }
+
+    let mut controller_profile = Map::new();
+    controller_profile.insert("profile_id".to_string(), json!("controller.default"));
+    controller_profile.insert("controller_family".to_string(), json!("generic"));
+    controller_profile.insert("controller_revision".to_string(), json!(""));
+    controller_profile.insert("localization_overlay".to_string(), json!({ "locales": {} }));
+    controller_profile.insert("protocol".to_string(), Value::Object(controller_protocol));
+
+    let battery_profile = document
+        .get("battery_monitor")
+        .filter(|value| value.is_object())
+        .map(|battery_monitor| {
+            json!({
+                "profile_id": "battery.default",
+                "battery_family": "generic",
+                "battery_revision": "",
+                "localization_overlay": { "locales": {} },
+                "protocol": { "battery_monitor": battery_monitor }
+            })
+        });
+    let has_battery_profile = battery_profile.is_some();
+
+    let mut profile_root = Map::new();
+    profile_root.insert(
+        "schema_version".to_string(),
+        json!(PROTOCOL_PROFILE_SCHEMA_VERSION),
+    );
+    profile_root.insert(
+        "active_controller_profile_id".to_string(),
+        json!("controller.default"),
+    );
+    profile_root.insert(
+        "controller_profiles".to_string(),
+        Value::Array(vec![Value::Object(controller_profile)]),
+    );
+    profile_root.insert(
+        "battery_profiles".to_string(),
+        Value::Array(battery_profile.into_iter().collect()),
+    );
+    if has_battery_profile {
+        profile_root.insert(
+            "active_battery_profile_id".to_string(),
+            json!("battery.default"),
+        );
+    }
+    if let Some(fault_code_info) = document.get("fault_code_info") {
+        profile_root.insert(
+            "active_fault_code_profile_id".to_string(),
+            json!("fault.default"),
+        );
+        profile_root.insert(
+            "fault_code_profiles".to_string(),
+            json!([{
+                "profile_id": "fault.default",
+                "fault_family": "generic",
+                "fault_revision": "",
+                "localization_overlay": { "locales": {} },
+                "protocol": { "fault_code_info": fault_code_info }
+            }]),
+        );
+    } else {
+        profile_root.insert("fault_code_profiles".to_string(), Value::Array(Vec::new()));
+    }
+    root.insert("protocol_profiles".to_string(), Value::Object(profile_root));
+    validate_protocol_profiles_contract(&normalized)?;
+    Ok(normalized)
 }
 
 /// Build the manifest-only identity block. Controller and battery payloads
 /// remain in the selected jc002 data.bin runtime sections.
 pub fn protocol_profiles_manifest(document: &Value) -> Option<Value> {
-    let root = document.get("protocol_profiles")?.as_object()?;
+    let normalized = if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        normalize_protocol_profiles_for_export(document).ok()?
+    } else {
+        document.clone()
+    };
+    let root = normalized.get("protocol_profiles")?.as_object()?;
     let controller_profiles = root.get("controller_profiles")?.as_array()?;
     let battery_profiles = root.get("battery_profiles")?.as_array()?;
+    let fault_code_profiles = root
+        .get("fault_code_profiles")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let controller_entries = controller_profiles
         .iter()
         .filter_map(|profile| {
@@ -554,6 +991,16 @@ pub fn protocol_profiles_manifest(document: &Value) -> Option<Value> {
                 "profile_id": profile.get("profile_id")?.as_str()?,
                 "battery_family": profile.get("battery_family").and_then(Value::as_str).unwrap_or("generic"),
                 "battery_revision": profile.get("battery_revision").and_then(Value::as_str).unwrap_or(""),
+            }))
+        })
+        .collect::<Vec<_>>();
+    let fault_code_entries = fault_code_profiles
+        .iter()
+        .filter_map(|profile| {
+            Some(json!({
+                "profile_id": profile.get("profile_id")?.as_str()?,
+                "fault_family": profile.get("fault_family").and_then(Value::as_str).unwrap_or("generic"),
+                "fault_revision": profile.get("fault_revision").and_then(Value::as_str).unwrap_or(""),
             }))
         })
         .collect::<Vec<_>>();
@@ -578,8 +1025,15 @@ pub fn protocol_profiles_manifest(document: &Value) -> Option<Value> {
     {
         manifest.insert("active_battery_profile_id".to_string(), json!(active_id));
     }
+    if let Some(active_id) = root
+        .get("active_fault_code_profile_id")
+        .and_then(Value::as_str)
+    {
+        manifest.insert("active_fault_code_profile_id".to_string(), json!(active_id));
+    }
     manifest.insert("controller_profiles".to_string(), json!(controller_entries));
     manifest.insert("battery_profiles".to_string(), json!(battery_entries));
+    manifest.insert("fault_code_profiles".to_string(), json!(fault_code_entries));
     Some(Value::Object(manifest))
 }
 
@@ -887,24 +1341,20 @@ fn validate_fault_code_version_contract(document: &Value) -> Result<(), String> 
     let Some(root) = document.get("fault_code_info") else {
         return Ok(());
     };
-    let config_version = document.get("config_version").and_then(Value::as_str);
+    validate_fault_code_info_value(root, document.get("config_version").and_then(Value::as_str))
+}
+
+fn validate_fault_code_info_value(
+    root: &Value,
+    config_version: Option<&str>,
+) -> Result<(), String> {
+    if config_version != Some("jc002") {
+        return Err("故障码管理仅支持 jc002 fault_code_profiles".to_string());
+    }
     let schema_version = root
         .get("schema_version")
         .and_then(Value::as_i64)
-        .unwrap_or(1);
-    if config_version == Some("jc001") {
-        if schema_version != 1
-            || root.get("codes").and_then(Value::as_array).is_none()
-            || root.get("definitions").is_some()
-            || root.get("bindings").is_some()
-        {
-            return Err("jc001 fault_code_info 必须使用 schema_version=1 的 codes[]".to_string());
-        }
-        return Ok(());
-    }
-    if config_version != Some("jc002") {
-        return Ok(());
-    }
+        .unwrap_or_default();
     if schema_version != 2
         || root.get("definitions").and_then(Value::as_array).is_none()
         || root.get("bindings").and_then(Value::as_array).is_none()
@@ -1007,6 +1457,11 @@ pub struct SaveProjectAsReport {
 
 /// 创建包含所有必要段落的新项目 JSON 文档。
 pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_h: u32) -> Value {
+    let mut export_info = serde_json::to_value(ProjectExportSettings::default())
+        .expect("default export settings must serialize");
+    if let Some(object) = export_info.as_object_mut() {
+        object.remove("fault_code_info");
+    }
     json!({
         "config_version": "jc001",
         "device": {
@@ -1020,10 +1475,9 @@ pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_
             "create_time": "",
             "update_time": ""
         },
-        "export_info": ProjectExportSettings::default(),
+        "export_info": export_info,
         "ui_info": [],
         "language_info": default_language_info(),
-        "fault_code_info": default_fault_code_info(),
         "pdo_simple_send_recv": default_pdo_simple(),
         "pdo_global_param": [],
         "pdo_condition": [],
@@ -1536,7 +1990,6 @@ fn required_project_sections() -> &'static [&'static str] {
         "private_protocol",
         "protocol_mapping",
         "language_info",
-        "fault_code_info",
     ]
 }
 
@@ -1583,7 +2036,6 @@ fn default_section_value(section: &str) -> Value {
         "private_protocol" => json!(PrivateProtocolDocument::default()),
         "protocol_mapping" => Value::Array(Vec::new()),
         "language_info" => default_language_info(),
-        "fault_code_info" => default_fault_code_info(),
         _ => Value::Array(Vec::new()),
     }
 }
@@ -1618,41 +2070,6 @@ fn default_language_info() -> Value {
         },
         "list_inner": list_inner,
         "list_translate": {}
-    })
-}
-
-pub fn default_fault_code_info() -> Value {
-    json!({
-        "schema_version": 1,
-        "enabled": true,
-        "version": 1,
-        "sources": [
-            {
-                "source_key": "traction",
-                "source_id": 1,
-                "type_char": "T",
-                "name": "牵引",
-                "can_id": 648,
-                "frame_type": 0,
-                "code_byte": 2,
-                "clear_code": 0,
-                "invalid_codes": [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
-                "enabled": true
-            },
-            {
-                "source_key": "pump",
-                "source_id": 2,
-                "type_char": "P",
-                "name": "油泵",
-                "can_id": 660,
-                "frame_type": 0,
-                "code_byte": 2,
-                "clear_code": 0,
-                "invalid_codes": [1, 5, 15, 17, 25, 29, 31, 35, 218, 219, 220, 221, 222],
-                "enabled": true
-            }
-        ],
-        "codes": []
     })
 }
 
@@ -2088,6 +2505,7 @@ mod tests {
             "schema_version": 2,
             "active_controller_profile_id": "inmotion",
             "active_battery_profile_id": "battery_a",
+            "active_fault_code_profile_id": "fault.default",
             "controller_profiles": [
                 {
                     "profile_id": "acm",
@@ -2132,6 +2550,23 @@ mod tests {
                         }
                     }
                 }
+            ],
+            "fault_code_profiles": [
+                {
+                    "profile_id": "fault.default",
+                    "fault_family": "generic",
+                    "fault_revision": "2.x",
+                    "protocol": {
+                        "fault_code_info": {
+                            "schema_version": 2,
+                            "enabled": false,
+                            "version": 2,
+                            "sources": [],
+                            "definitions": [],
+                            "bindings": []
+                        }
+                    }
+                }
             ]
         });
         document
@@ -2151,6 +2586,144 @@ mod tests {
         );
         assert_eq!(materialized["battery_monitor"]["version"], 2);
         assert_eq!(materialized["config_version"], "jc002");
+    }
+
+    #[test]
+    fn protocol_profiles_merge_common_catalog_and_selected_overlays() {
+        let mut document = v2_document_with_protocol_profiles();
+        document["protocol_profiles"]["controller_profiles"][1]["localization_overlay"] = json!({
+            "locales": {
+                "zh": {
+                    "translations": {
+                        "menu.root": "Inmotion 菜单",
+                        "controller.inmotion.only": "Inmotion 专属"
+                    }
+                },
+                "en": {
+                    "translations": {
+                        "menu.root": "Inmotion menu",
+                        "controller.inmotion.only": "Inmotion only"
+                    }
+                }
+            }
+        });
+        document["protocol_profiles"]["battery_profiles"][0]["localization_overlay"] = json!({
+            "locales": {
+                "zh": {
+                    "translations": {
+                        "battery.a.only": "电池专属"
+                    }
+                }
+            }
+        });
+
+        assert!(validate_protocol_profiles_contract(&document).is_ok());
+        let materialized = materialize_protocol_profiles_for_selection(
+            &document,
+            "inmotion",
+            Some("battery_a"),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            materialized["localization"]["locales"]["zh"]["translations"]["menu.root"],
+            "Inmotion 菜单"
+        );
+        assert_eq!(
+            materialized["localization"]["locales"]["zh"]["translations"]
+                ["controller.inmotion.only"],
+            "Inmotion 专属"
+        );
+        assert_eq!(
+            materialized["localization"]["locales"]["zh"]["translations"]["battery.a.only"],
+            "电池专属"
+        );
+        assert_eq!(
+            document["localization"]["locales"]["zh"]["translations"]["menu.root"],
+            "菜单"
+        );
+    }
+
+    #[test]
+    fn fault_code_profile_is_materialized_independently_from_controller_and_battery() {
+        let mut document = v2_document_with_protocol_profiles();
+        document["protocol_profiles"]["fault_code_profiles"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({
+            "profile_id": "fault.inmotion",
+            "fault_family": "Inmotion",
+            "fault_revision": "6.x",
+            "localization_overlay": {
+                "locales": {
+                    "zh": { "translations": { "fault.inmotion.only": "Inmotion 故障" } }
+                }
+            },
+            "protocol": {
+                "fault_code_info": {
+                    "schema_version": 2,
+                    "enabled": true,
+                    "version": 2,
+                    "sources": [{
+                        "source_key": "inmotion",
+                        "source_id": 1,
+                        "type_char": "I",
+                        "can_id": 648
+                    }],
+                    "definitions": [{
+                        "fault_key": "inmotion.overheat",
+                        "message_key": "fault.inmotion.only",
+                        "severity": "critical"
+                    }],
+                    "bindings": [{
+                        "source_key": "inmotion",
+                        "code": 7,
+                        "fault_key": "inmotion.overheat"
+                    }]
+                }
+            }
+            }));
+
+        assert!(validate_protocol_profiles_contract(&document).is_ok());
+        let materialized = materialize_protocol_profiles_for_selection(
+            &document,
+            "inmotion",
+            Some("battery_a"),
+            Some("fault.inmotion"),
+        )
+        .unwrap();
+        assert_eq!(materialized["fault_code_info"]["version"], 2);
+        assert_eq!(
+            materialized["fault_code_info"]["definitions"][0]["message_key"],
+            "fault.inmotion.only"
+        );
+        assert_eq!(
+            materialized["localization"]["locales"]["zh"]["translations"]["fault.inmotion.only"],
+            "Inmotion 故障"
+        );
+        assert_eq!(
+            materialized["pdo_global_param"][0]["name"],
+            "inmotion.speed"
+        );
+        assert_eq!(materialized["battery_monitor"]["version"], 2);
+    }
+
+    #[test]
+    fn protocol_profiles_reject_conflicting_controller_and_battery_overlays() {
+        let mut document = v2_document_with_protocol_profiles();
+        document["protocol_profiles"]["controller_profiles"][1]["localization_overlay"] = json!({
+            "locales": {
+                "zh": { "translations": { "shared.key": "controller" } }
+            }
+        });
+        document["protocol_profiles"]["battery_profiles"][0]["localization_overlay"] = json!({
+            "locales": {
+                "zh": { "translations": { "shared.key": "battery" } }
+            }
+        });
+
+        let error = validate_protocol_profiles_contract(&document).unwrap_err();
+        assert!(error.contains("Profile overlay 文案冲突"));
     }
 
     #[test]

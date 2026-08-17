@@ -22,10 +22,7 @@ import {
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TestDataType } from '../../data/test-data/metadata';
-import {
-  type DocumentSectionKey,
-  modifiedSectionLabelKeys,
-} from '../../modules/documentSections';
+import { type DocumentSectionKey, modifiedSectionLabelKeys } from '../../modules/documentSections';
 import type {
   FeatureModule,
   GitProjectStatus,
@@ -53,6 +50,7 @@ interface DashboardActionBarProps {
   generatingTestKey: string | null;
   pdoMode: 'simple' | 'advanced';
   showCanvasLabels: boolean;
+  jsonEditorAllowed: boolean;
   showJsonEditor: boolean;
   gitStatus: GitProjectStatus | null;
   gitBusy: boolean;
@@ -96,6 +94,7 @@ export function DashboardActionBar({
   generatingTestKey,
   pdoMode,
   showCanvasLabels,
+  jsonEditorAllowed,
   showJsonEditor,
   gitStatus,
   gitBusy,
@@ -323,9 +322,7 @@ export function DashboardActionBar({
               type="button"
             >
               <SaveIcon aria-hidden="true" size={14} strokeWidth={1.8} />
-              {t(
-                savingProjectAction === 'save' ? 'common.status.saving' : 'common.actions.save',
-              )}
+              {t(savingProjectAction === 'save' ? 'common.status.saving' : 'common.actions.save')}
             </button>
           </div>
           <span className="action-bar-sep" />
@@ -367,9 +364,7 @@ export function DashboardActionBar({
               </button>
             </div>
           ) : null}
-          {(['realtime-data', 'battery-monitor'] as string[]).includes(
-            activeModule.key,
-          ) ? (
+          {(['realtime-data', 'battery-monitor'] as string[]).includes(activeModule.key) ? (
             <button
               className="action-bar-btn action-bar-btn--secondary"
               disabled={!loadedProject || generatingTestKey !== null || isFormattingJcpro}
@@ -420,7 +415,7 @@ export function DashboardActionBar({
               className={`action-bar-btn ${
                 showJsonEditor ? 'action-bar-btn--secondary' : 'action-bar-btn--ghost'
               }`}
-              disabled={!loadedProject || isFormattingJcpro}
+              disabled={!loadedProject || isFormattingJcpro || !jsonEditorAllowed}
               onClick={onToggleJsonEditor}
               type="button"
               title={t('dashboard.actionBar.openJsonEditor')}
@@ -555,9 +550,7 @@ export function DashboardActionBar({
               >
                 <GitCommitHorizontal aria-hidden="true" size={17} strokeWidth={1.7} />
                 <span className="git-summary-row-label">
-                  {t(
-                    gitBusy ? 'dashboard.gitSummary.committing' : 'dashboard.gitSummary.commit',
-                  )}
+                  {t(gitBusy ? 'dashboard.gitSummary.committing' : 'dashboard.gitSummary.commit')}
                 </span>
               </button>
 

@@ -1,7 +1,7 @@
 //! Legacy 项目文件兼容策略。
 //!
 //! 该模块集中定义写回 `.jcpro` 时需要剥离的重构专属段，避免命令层和项目层各自维护
-//! 一份规则。锂电监控只属于 jc002，不进入 jc001 保存结果。
+//! 一份规则。锂电监控和故障码 Profile 只属于 jc002，不进入 jc001 保存结果。
 
 use chrono::Local;
 use serde_json::{Map, Value};
@@ -19,7 +19,6 @@ const LEGACY_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "export_info",
     "ui_info",
     "language_info",
-    "fault_code_info",
     "pdo_simple_send_recv",
     "pdo_global_param",
     "pdo_condition",
@@ -50,6 +49,8 @@ const V2_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
 ];
 const LOCALIZATION_FIELD_ORDER: &[&str] = &["default_locale", "locale_order", "locales"];
 const LOCALE_FIELD_ORDER: &[&str] = &["enabled", "direction", "translations"];
+const LOCALIZATION_OVERLAY_FIELD_ORDER: &[&str] = &["locales"];
+const LOCALIZATION_OVERLAY_LOCALE_FIELD_ORDER: &[&str] = &["translations"];
 const CANOPEN_FIELD_ORDER: &[&str] = &["schema_version", "nodes", "pdos"];
 const CANOPEN_NODE_FIELD_ORDER: &[&str] = &["node_id", "name", "role", "sdo"];
 const CANOPEN_SDO_FIELD_ORDER: &[&str] = &[
@@ -76,14 +77,17 @@ const PROTOCOL_PROFILES_FIELD_ORDER: &[&str] = &[
     "schema_version",
     "active_controller_profile_id",
     "active_battery_profile_id",
+    "active_fault_code_profile_id",
     "controller_profiles",
     "battery_profiles",
+    "fault_code_profiles",
 ];
 const CONTROLLER_PROFILE_FIELD_ORDER: &[&str] = &[
     "profile_id",
     "controller_family",
     "controller_revision",
     "description",
+    "localization_overlay",
     "protocol",
 ];
 const CONTROLLER_PROTOCOL_FIELD_ORDER: &[&str] = &[
@@ -99,9 +103,19 @@ const BATTERY_PROFILE_FIELD_ORDER: &[&str] = &[
     "battery_family",
     "battery_revision",
     "description",
+    "localization_overlay",
     "protocol",
 ];
 const BATTERY_PROTOCOL_FIELD_ORDER: &[&str] = &["battery_monitor"];
+const FAULT_CODE_PROFILE_FIELD_ORDER: &[&str] = &[
+    "profile_id",
+    "fault_family",
+    "fault_revision",
+    "description",
+    "localization_overlay",
+    "protocol",
+];
+const FAULT_CODE_PROTOCOL_FIELD_ORDER: &[&str] = &["fault_code_info"];
 
 const PROJECT_FIELD_ORDER: &[&str] = &["name", "create_time", "update_time", "from", "base_path"];
 const EXPORT_INFO_FIELD_ORDER: &[&str] = &[
@@ -142,8 +156,6 @@ const LANGUAGE_INFO_FIELD_ORDER: &[&str] = &[
 ];
 const PDO_SIMPLE_FIELD_ORDER: &[&str] = &["pdo_send", "pdo_recv"];
 const SDO_FIELD_ORDER: &[&str] = &["type", "user_auth", "name_index", "name", "children"];
-const FAULT_CODE_INFO_FIELD_ORDER: &[&str] =
-    &["schema_version", "enabled", "version", "sources", "codes"];
 const FAULT_CODE_V2_INFO_FIELD_ORDER: &[&str] = &[
     "schema_version",
     "enabled",
@@ -162,16 +174,6 @@ const FAULT_CODE_SOURCE_FIELD_ORDER: &[&str] = &[
     "code_byte",
     "clear_code",
     "invalid_codes",
-    "enabled",
-];
-const FAULT_CODE_ITEM_FIELD_ORDER: &[&str] = &[
-    "source_key",
-    "source_id",
-    "type_char",
-    "code",
-    "severity",
-    "message_key",
-    "name",
     "enabled",
 ];
 const FAULT_CODE_DEFINITION_FIELD_ORDER: &[&str] =
@@ -201,6 +203,12 @@ pub fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
                     object.remove(*section);
                 }
                 object.remove("battery_monitor");
+                object.remove("fault_code_info");
+                if let Some(export_info) =
+                    object.get_mut("export_info").and_then(Value::as_object_mut)
+                {
+                    export_info.remove("fault_code_info");
+                }
             }
             set_legacy_config_version(&mut document);
             update_project_update_time(&mut document, &current_legacy_timestamp());
@@ -253,7 +261,6 @@ fn order_legacy_jcpro_document(mut document: Value) -> Value {
         PDO_SIMPLE_FIELD_ORDER,
     );
     order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
-    order_fault_code_info(&mut document);
     order_object_value(document, LEGACY_JCPRO_TOP_LEVEL_ORDER)
 }
 
@@ -314,6 +321,12 @@ fn order_canopen(root: &mut Value) {
 }
 
 fn order_protocol_profiles(root: &mut Value) {
+    let locale_order = root
+        .get("localization")
+        .and_then(|value| value.get("locale_order"))
+        .and_then(Value::as_array)
+        .map(|items| string_array_values(items))
+        .unwrap_or_default();
     let Some(protocol_profiles) = root.get_mut("protocol_profiles") else {
         return;
     };
@@ -322,6 +335,9 @@ fn order_protocol_profiles(root: &mut Value) {
         .and_then(Value::as_array_mut)
     {
         for profile in profiles.iter_mut() {
+            if let Some(overlay) = profile.get_mut("localization_overlay") {
+                order_localization_overlay(overlay, &locale_order);
+            }
             if let Some(protocol) = profile.get_mut("protocol") {
                 order_child_object(protocol, "sdo_info", SDO_FIELD_ORDER);
                 order_canopen(protocol);
@@ -344,10 +360,44 @@ fn order_protocol_profiles(root: &mut Value) {
         });
     }
     if let Some(profiles) = protocol_profiles
+        .get_mut("fault_code_profiles")
+        .and_then(Value::as_array_mut)
+    {
+        for profile in profiles.iter_mut() {
+            if let Some(overlay) = profile.get_mut("localization_overlay") {
+                order_localization_overlay(overlay, &locale_order);
+            }
+            if let Some(protocol) = profile.get_mut("protocol") {
+                order_child_object(protocol, "fault_code_info", FAULT_CODE_V2_INFO_FIELD_ORDER);
+                if let Some(fault_code_info) = protocol.get_mut("fault_code_info") {
+                    order_fault_code_info_value(fault_code_info);
+                }
+                let value = std::mem::take(protocol);
+                *protocol = order_object_value(value, FAULT_CODE_PROTOCOL_FIELD_ORDER);
+            }
+            let value = std::mem::take(profile);
+            *profile = order_object_value(value, FAULT_CODE_PROFILE_FIELD_ORDER);
+        }
+        profiles.sort_by(|left, right| {
+            left.get("profile_id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .cmp(
+                    right
+                        .get("profile_id")
+                        .and_then(Value::as_str)
+                        .unwrap_or(""),
+                )
+        });
+    }
+    if let Some(profiles) = protocol_profiles
         .get_mut("battery_profiles")
         .and_then(Value::as_array_mut)
     {
         for profile in profiles.iter_mut() {
+            if let Some(overlay) = profile.get_mut("localization_overlay") {
+                order_localization_overlay(overlay, &locale_order);
+            }
             if let Some(protocol) = profile.get_mut("protocol") {
                 let value = std::mem::take(protocol);
                 *protocol = order_object_value(value, BATTERY_PROTOCOL_FIELD_ORDER);
@@ -410,6 +460,30 @@ fn order_locale(locale: &mut Value) {
     }
     let value = std::mem::take(locale);
     *locale = order_object_value(value, LOCALE_FIELD_ORDER);
+}
+
+fn order_localization_overlay(overlay: &mut Value, locale_order: &[String]) {
+    if let Some(locales) = overlay.get_mut("locales") {
+        let Value::Object(mut locale_map) = std::mem::take(locales) else {
+            return;
+        };
+        let mut ordered_locales = Map::new();
+        for locale in locale_order {
+            if let Some(mut value) = locale_map.remove(locale) {
+                value = order_object_value(value, LOCALIZATION_OVERLAY_LOCALE_FIELD_ORDER);
+                ordered_locales.insert(locale.clone(), value);
+            }
+        }
+        let mut remaining = locale_map.into_iter().collect::<Vec<_>>();
+        remaining.sort_by(|(left, _), (right, _)| left.cmp(right));
+        for (locale, mut value) in remaining {
+            value = order_object_value(value, LOCALIZATION_OVERLAY_LOCALE_FIELD_ORDER);
+            ordered_locales.insert(locale, value);
+        }
+        *locales = Value::Object(ordered_locales);
+    }
+    let value = std::mem::take(overlay);
+    *overlay = order_object_value(value, LOCALIZATION_OVERLAY_FIELD_ORDER);
 }
 
 fn order_export_info(root: &mut Value) {
@@ -544,21 +618,17 @@ fn order_fault_code_info(root: &mut Value) {
     let Some(fault_code_info) = root.get_mut("fault_code_info") else {
         return;
     };
+    order_fault_code_info_value(fault_code_info);
+}
 
-    let is_v2 = fault_code_info
+fn order_fault_code_info_value(fault_code_info: &mut Value) {
+    if fault_code_info
         .get("schema_version")
         .and_then(Value::as_i64)
-        == Some(2);
-    if let Some(object) = fault_code_info.as_object_mut() {
-        object.remove("groups");
-        if is_v2 {
-            object.remove("codes");
-        } else {
-            object.remove("definitions");
-            object.remove("bindings");
-        }
+        != Some(2)
+    {
+        return;
     }
-
     if let Some(sources) = fault_code_info
         .get_mut("sources")
         .and_then(Value::as_array_mut)
@@ -567,37 +637,21 @@ fn order_fault_code_info(root: &mut Value) {
             let value = std::mem::take(source);
             *source = order_object_value(value, FAULT_CODE_SOURCE_FIELD_ORDER);
         }
-        if is_v2 {
-            sources.sort_by(|left, right| {
-                let left_id = left.get("source_id").and_then(Value::as_i64).unwrap_or(0);
-                let right_id = right.get("source_id").and_then(Value::as_i64).unwrap_or(0);
-                left_id.cmp(&right_id).then_with(|| {
-                    left.get("source_key")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .cmp(
-                            right
-                                .get("source_key")
-                                .and_then(Value::as_str)
-                                .unwrap_or(""),
-                        )
-                })
-            });
-        }
-    }
-
-    if let Some(codes) = fault_code_info
-        .get_mut("codes")
-        .and_then(Value::as_array_mut)
-    {
-        for code in codes {
-            if let Some(object) = code.as_object_mut() {
-                object.remove("generated_from_group");
-                object.remove("group_key");
-            }
-            let value = std::mem::take(code);
-            *code = order_object_value(value, FAULT_CODE_ITEM_FIELD_ORDER);
-        }
+        sources.sort_by(|left, right| {
+            let left_id = left.get("source_id").and_then(Value::as_i64).unwrap_or(0);
+            let right_id = right.get("source_id").and_then(Value::as_i64).unwrap_or(0);
+            left_id.cmp(&right_id).then_with(|| {
+                left.get("source_key")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .cmp(
+                        right
+                            .get("source_key")
+                            .and_then(Value::as_str)
+                            .unwrap_or(""),
+                    )
+            })
+        });
     }
 
     if let Some(definitions) = fault_code_info
@@ -644,14 +698,7 @@ fn order_fault_code_info(root: &mut Value) {
     }
 
     let value = std::mem::take(fault_code_info);
-    *fault_code_info = order_object_value(
-        value,
-        if is_v2 {
-            FAULT_CODE_V2_INFO_FIELD_ORDER
-        } else {
-            FAULT_CODE_INFO_FIELD_ORDER
-        },
-    );
+    *fault_code_info = order_object_value(value, FAULT_CODE_V2_INFO_FIELD_ORDER);
 }
 
 fn order_object_value(value: Value, field_order: &[&str]) -> Value {
@@ -677,7 +724,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn sanitize_jcpro_removes_unified_sections_and_unsupported_battery_section() {
+    fn sanitize_jc001_removes_unified_sections_and_fault_code_mvp() {
         let document = json!({
             "signal_dictionary": {},
             "private_protocol": {},
@@ -686,7 +733,8 @@ mod tests {
             "export_info": {
                 "binary_filename": "data.bin",
                 "folder_name": "release",
-                "manifest_filename": "update.json"
+                "manifest_filename": "update.json",
+                "fault_code_info": { "config": true, "bin": true }
             },
             "fault_code_info": { "sources": [], "codes": [] },
             "pdo_recv": []
@@ -705,7 +753,8 @@ mod tests {
                 .map(|value| value.keys().map(String::as_str).collect::<Vec<_>>()),
             Some(vec!["folder_name", "manifest_filename", "binary_filename"])
         );
-        assert!(sanitized.get("fault_code_info").is_some());
+        assert!(sanitized["export_info"].get("fault_code_info").is_none());
+        assert!(sanitized.get("fault_code_info").is_none());
         assert!(sanitized.get("pdo_recv").is_some());
     }
 
@@ -735,292 +784,6 @@ mod tests {
                 .and_then(|project| project.get("update_time"))
                 .and_then(Value::as_str),
             Some("2026-07-03 12:34:56")
-        );
-    }
-
-    #[test]
-    fn sanitize_jcpro_orders_sections_like_legacy_generator() {
-        let document = json!({
-            "sdo_info": { "children": [], "name": "", "name_index": 0, "type": 0, "user_auth": 0 },
-            "project": { "base_path": "", "from": "", "update_time": "", "create_time": "", "name": "demo" },
-            "export_info": {
-                "fault_code_info": { "bin": false, "config": true },
-                "battery_monitor": { "bin": true, "config": false },
-                "binary_filename": "data.bin",
-                "manifest_filename": "update.json",
-                "folder_name": "release"
-            },
-            "pdo_recv": [],
-            "language_info": { "list_translate": {}, "list_inner": [], "list_code_language": [] },
-            "fault_code_info": {
-                "codes": [
-                    {
-                        "group_key": "traction_common",
-                        "generated_from_group": true,
-                        "enabled": true,
-                        "name": "故障",
-                        "message_key": "fault.traction.001",
-                        "severity": "fault",
-                        "code": 1,
-                        "type_char": "T",
-                        "source_id": 1,
-                        "source_key": "traction"
-                    }
-                ],
-                "bindings": [
-                    {
-                        "overrides": [
-                            {
-                                "enabled": true,
-                                "name": "覆盖故障",
-                                "message_key": "fault.pump.001",
-                                "severity": "warning",
-                                "code": 1
-                            }
-                        ],
-                        "excludes": [2],
-                        "enabled": true,
-                        "group_key": "traction_common",
-                        "source_key": "pump"
-                    }
-                ],
-                "groups": [
-                    {
-                        "codes": [
-                            {
-                                "enabled": true,
-                                "name": "模板故障",
-                                "message_key": "fault.common.001",
-                                "severity": "fault",
-                                "code": 1
-                            }
-                        ],
-                        "enabled": true,
-                        "name": "通用故障",
-                        "group_key": "traction_common"
-                    }
-                ],
-                "sources": [
-                    {
-                        "enabled": true,
-                        "invalid_codes": [],
-                        "clear_code": 0,
-                        "code_byte": 2,
-                        "frame_type": 0,
-                        "can_id": 648,
-                        "type_char": "T",
-                        "name": "牵引",
-                        "source_id": 1,
-                        "source_key": "traction"
-                    }
-                ],
-                "version": 1,
-                "enabled": true,
-                "schema_version": 1
-            },
-            "device": { "resolution_h": 480, "resolution_w": 800, "meter_code": "D70T", "version": "1", "type": "meter" },
-            "config_version": "1",
-            "ui_info": {
-                "main": {
-                    "item": {
-                        "bg": {
-                            "option": ["image/bg.png"],
-                            "dest": "main/Bg",
-                            "default_option": 0,
-                            "handle": "show",
-                            "h": 480,
-                            "w": 800,
-                            "y": 0,
-                            "x": 0,
-                            "name": "背景"
-                        }
-                    },
-                    "name": "主界面"
-                },
-                "logo": {
-                    "option": ["image/logo/nuoli.jpg"],
-                    "isjpg": 1,
-                    "dest": "logo/CustomerLogo",
-                    "default_option": 1,
-                    "handle": "show",
-                    "h": 480,
-                    "w": 800,
-                    "y": 0,
-                    "x": 0,
-                    "name": "开机logo"
-                }
-            },
-            "pdo_simple_send_recv": { "pdo_recv": [], "pdo_send": [] },
-            "pdo_global_param": [],
-            "pdo_condition": [],
-            "pdo_send": [],
-            "history_ui": []
-        });
-
-        let sanitized = sanitize_document_for_target("demo.jcpro", document);
-        let object = sanitized.as_object().unwrap();
-        assert_eq!(
-            sanitized.get("config_version").and_then(Value::as_str),
-            Some("jc001")
-        );
-        assert_eq!(
-            object
-                .keys()
-                .take(14)
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
-            vec![
-                "config_version",
-                "device",
-                "project",
-                "export_info",
-                "ui_info",
-                "language_info",
-                "fault_code_info",
-                "pdo_simple_send_recv",
-                "pdo_global_param",
-                "pdo_condition",
-                "pdo_recv",
-                "pdo_send",
-                "sdo_info",
-                "history_ui",
-            ]
-        );
-
-        let export_info = sanitized
-            .get("export_info")
-            .and_then(Value::as_object)
-            .unwrap();
-        assert_eq!(
-            export_info.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec![
-                "folder_name",
-                "manifest_filename",
-                "binary_filename",
-                "battery_monitor",
-                "fault_code_info"
-            ]
-        );
-        assert_eq!(
-            export_info
-                .get("battery_monitor")
-                .and_then(Value::as_object)
-                .unwrap()
-                .keys()
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
-            vec!["config", "bin"]
-        );
-
-        let fault = sanitized
-            .get("fault_code_info")
-            .unwrap()
-            .as_object()
-            .unwrap();
-        assert_eq!(
-            fault.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec!["schema_version", "enabled", "version", "sources", "codes"]
-        );
-        assert!(fault.get("groups").is_none());
-        assert!(fault.get("bindings").is_none());
-
-        let source = fault
-            .get("sources")
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .first()
-            .unwrap()
-            .as_object()
-            .unwrap();
-        assert_eq!(
-            source.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec![
-                "source_key",
-                "source_id",
-                "name",
-                "type_char",
-                "can_id",
-                "frame_type",
-                "code_byte",
-                "clear_code",
-                "invalid_codes",
-                "enabled",
-            ]
-        );
-
-        let fault_code = fault
-            .get("codes")
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .first()
-            .unwrap()
-            .as_object()
-            .unwrap();
-        assert_eq!(
-            fault_code.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec![
-                "source_key",
-                "source_id",
-                "type_char",
-                "code",
-                "severity",
-                "message_key",
-                "name",
-                "enabled"
-            ]
-        );
-
-        let ui_info = sanitized.get("ui_info").unwrap().as_object().unwrap();
-        assert_eq!(
-            ui_info.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec!["logo", "main"]
-        );
-
-        let logo = ui_info.get("logo").unwrap().as_object().unwrap();
-        assert_eq!(
-            logo.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec![
-                "name",
-                "x",
-                "y",
-                "w",
-                "h",
-                "handle",
-                "default_option",
-                "dest",
-                "isjpg",
-                "option",
-            ]
-        );
-
-        let main = ui_info.get("main").unwrap().as_object().unwrap();
-        assert_eq!(
-            main.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec!["name", "item"]
-        );
-
-        let bg = main
-            .get("item")
-            .unwrap()
-            .get("bg")
-            .unwrap()
-            .as_object()
-            .unwrap();
-        assert_eq!(
-            bg.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec![
-                "name",
-                "x",
-                "y",
-                "w",
-                "h",
-                "handle",
-                "default_option",
-                "dest",
-                "option",
-            ]
         );
     }
 

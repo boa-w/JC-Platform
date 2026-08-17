@@ -36,9 +36,9 @@
 | `localization` | 必填 | v2 唯一语言来源 |
 | `pdo_*` | 按项目需要 | 基础 PDO 数据 |
 | `sdo_info` | 当前固件部署必填 | v2 loader 当前要求 `sdo_version=2` |
-| `battery_monitor` | 可选 | `.jcpro` 编辑态锂电协议模型；导出为二进制协议段 |
-| `fault_code_info` | 可选 | 启用时故障文案必须引用消息 key |
-| `protocol_profiles` | 可选 | 独立的控制器协议 Profile 集合和锂电协议 Profile 集合 |
+| `battery_monitor` | 可选 | 当前激活锂电 Profile 的编辑镜像；导出为二进制协议段 |
+| `fault_code_info` | 可选 | 当前激活故障码 Profile 的编辑镜像；文案必须引用消息 key |
+| `protocol_profiles` | 编辑态可省略 | 导出时统一归一化为独立的控制器/锂电/故障码 Profile 集合 |
 
 禁止字段：
 
@@ -50,7 +50,7 @@ language_info
 
 ## 独立协议 Profile
 
-`protocol_profiles` 的 `schema_version=2` 明确分开两类协议：
+`protocol_profiles` 的 `schema_version=2` 明确分开三类协议：
 
 ```json
 {
@@ -58,11 +58,21 @@ language_info
     "schema_version": 2,
     "active_controller_profile_id": "inmotion",
     "active_battery_profile_id": "bms-a",
+    "active_fault_code_profile_id": "fault.default",
     "controller_profiles": [
       {
         "profile_id": "inmotion",
         "controller_family": "Inmotion",
         "controller_revision": "2.x",
+        "localization_overlay": {
+          "locales": {
+            "en-US": {
+              "translations": {
+                "controller.inmotion.speed": "Traction speed"
+              }
+            }
+          }
+        },
         "protocol": {
           "pdo_global_param": [],
           "pdo_condition": [],
@@ -78,6 +88,15 @@ language_info
         "profile_id": "bms-a",
         "battery_family": "Lithium-A",
         "battery_revision": "1.x",
+        "localization_overlay": {
+          "locales": {
+            "en-US": {
+              "translations": {
+                "battery.bms_a.status": "BMS status"
+              }
+            }
+          }
+        },
         "protocol": {
           "battery_monitor": {
             "schema_version": 2,
@@ -89,6 +108,23 @@ language_info
           }
         }
       }
+    ],
+    "fault_code_profiles": [
+      {
+        "profile_id": "fault.default",
+        "fault_family": "generic",
+        "fault_revision": "2.x",
+        "protocol": {
+          "fault_code_info": {
+            "schema_version": 2,
+            "enabled": true,
+            "version": 2,
+            "sources": [],
+            "definitions": [],
+            "bindings": []
+          }
+        }
+      }
     ]
   }
 }
@@ -97,46 +133,69 @@ language_info
 规则：
 
 - `controller_profiles` 必须非空，`active_controller_profile_id` 必须存在。
-- `battery_profiles` 可以为空；非空时必须设置 `active_battery_profile_id` 并引用现有项。
-- 两个集合分别保证 `profile_id` 唯一；控制器和锂电允许使用相同的 ID，因为它们是
-  两个独立命名空间。
+- `battery_profiles` 和 `fault_code_profiles` 可以为空；非空时必须设置各自的激活 ID
+  并引用现有项。
+- 三个集合分别保证 `profile_id` 唯一；不同集合允许使用相同的 ID，因为它们是独立命名空间。
 - 控制器 Profile 只包含 PDO、SDO 和可选 CANopen；锂电 Profile 只包含
   `battery_monitor`，禁止交叉嵌套。
-- 顶层协议段是当前两个激活项的编辑镜像，`protocol_profiles` 是持久化的唯一来源。
-- 导出器将两个激活项组合成当前 jc002 二进制 ABI 的一套 PDO/SDO/锂电表；完整集合
-  不写入 `data.bin`，也不复制到设备端 JSON。
-- 切换任意一侧都需要重新导出成对的清单和 bin，更新后重启生效；当前不支持在线切换。
+- 故障码 Profile 只包含 `fault_code_info`，且必须使用 `definitions[]` 与 `bindings[]`；
+  jc002 不接受历史 MVP 的 `codes[]`。
+- localization 是公共语言目录，统一维护 locale 集合、默认语言和语言顺序。每个
+  Profile 可选 localization_overlay，只能引用公共 locale；overlay 可以覆盖公共 key，
+  也可以新增当前 Profile 专属 key。
+- 控制器、锂电和故障码 overlay 在同一组合中定义相同 key 时，文案必须一致；不同文案会被校验
+  拒绝，不依赖隐式覆盖优先级。
+- 顶层协议段是当前三个激活项的编辑镜像；存在 `protocol_profiles` 时，它是 Profile
+  持久化的唯一来源。
+- 为保持 jc002 运行时结构统一，导出器会把未填写 `protocol_profiles` 的单套编辑文档包装为
+  `controller.default`；存在顶层 `battery_monitor` 或 `fault_code_info` 时同时包装为对应的
+  `battery.default` 或 `fault.default`。因此
+  `ConfigUpdate.json` 和 `data.bin` 始终使用 Profile Bundle 结构，单协议也不走另一套 ABI。
+- 导出器按 `controller_profiles × battery_profiles × fault_code_profiles` 构建全部组合。
+  空的可选集合按一个空维度处理。每个组合都是一个自包含的 PDO/SDO/锂电/故障码/i18n
+  payload，全部顺序写入同一个 `data.bin`；完整协议 JSON
+  仍不复制到设备端清单。
+- 默认激活组合位于 `data.bin` 的 `base_addr=0`，其余组合按 Profile 数组顺序追加。
+  `data_description.protocol_profile_payloads[]` 保存每段的组合 ID、整包偏移、长度、CRC
+  以及段内相对偏移描述。
+- 下位机高级设置可写入待生效的控制器 Profile；重启时按持久化选择查找 payload。
+  锂电 Profile 与控制器 Profile 独立选择，允许相同控制器搭配不同锂电协议。
 
 ### 同一 jcpro 的 Profile 编辑流程
 
-上位机把 Profile 管理分成两个独立入口：CANopen 页操作
-`controller_profiles`，锂电监控页操作 `battery_profiles`。即使可选的 `canopen` 拓扑段
+上位机把 Profile 管理分成三个独立入口：CANopen 页操作
+`controller_profiles`，锂电监控页操作 `battery_profiles`，故障码页操作
+`fault_code_profiles`。即使可选的 `canopen` 拓扑段
 尚未初始化，CANopen 页仍显示控制器 Profile 管理栏；每个入口都提供当前 Profile
 选择、复制、删除、ID 重命名、备注以及族/版本编辑。协议编辑器修改的顶层字段不是第二
 份数据，而是激活 Profile 的临时编辑镜像；统一同步函数会在每次修改时写回对应数组。
 
-Profile ID 是数组内的稳定引用键，遵守以下规则：
+Profile ID 是各数组内的稳定引用键，遵守以下规则：
 
-- 同一 Profile 数组内唯一；控制器和锂电可以使用相同 ID；
+- 同一 Profile 数组内唯一；控制器、锂电和故障码可以使用相同 ID；
 - 非空，最多 63 个 UTF-8 字节；
 - 重命名激活 Profile 时同步更新对应 `active_*_profile_id`；
 - 复制会生成唯一 ID 并切换到复制项，原 Profile 不被修改；
-- 删除会弹窗确认，控制器数组不能删除最后一项。
+- 删除会弹窗确认，控制器数组不能删除最后一项；锂电和故障码数组可以为空。
 
-因此，一个项目可以保存例如 `ACM + default`、`Inmotion6 + default` 和
-`Inmotion6 + BMS-A` 三种构建组合，但每次导出仍只选择一组激活 ID：
+因此，一个项目可以保存例如 `ACM + default + generic`、`Inmotion6 + default + generic`
+和 `Inmotion6 + BMS-A + inmotion` 三种运行组合，导出时组合都会进入同一个 `data.bin`：
 
 ```text
 controller_profiles: ACM, Inmotion6
 battery_profiles: default, BMS-A
+fault_code_profiles: generic, inmotion
 active_controller_profile_id: Inmotion6
 active_battery_profile_id: default
+active_fault_code_profile_id: generic
                  ↓
-              当前 data.bin
+          data.bin payload[ACM,default,generic]
+          data.bin payload[Inmotion6,default,generic]
+          data.bin payload[Inmotion6,BMS-A,inmotion]
 ```
 
-保存 `.jcpro` 会保留全部数组；构建器只物化当前两个激活项。切换任意一侧后必须重新
-生成同批次的 `ConfigUpdate.json` 与 `data.bin`，设备更新并重启后才会使用新的组合。
+保存 `.jcpro` 会保留全部数组；激活 ID 决定默认 payload 和首次启动选择。切换任意一侧
+后重新导出同批次的 `ConfigUpdate.json` 与 `data.bin`，设备更新并重启后才会使用目标组合。
 
 ## 编辑文件与运行时清单
 
@@ -310,6 +369,34 @@ JSON，也不会因为清单不携带节点拓扑而丢失 `0x3C0`、`0x294` 或
 
 ## 稳定消息 key
 
+## Profile overlay
+
+Profile overlay 是公共目录上的局部补丁，不拥有独立的 `default_locale` 或
+`locale_order`：
+
+```json
+{
+  "localization_overlay": {
+    "locales": {
+      "ru-RU": {
+        "translations": {
+          "controller.inmotion.speed": "Скорость тяги",
+          "menu.root": "Меню Inmotion"
+        }
+      }
+    }
+  }
+}
+```
+
+- `localization_overlay.locales` 的语言代码必须出现在公共 `localization.locale_order` 中。
+- overlay 中的 key 可以是公共 key 的覆盖，也可以是当前 Profile 新增的稳定 key。
+- 导出每个控制器 × 锂电 × 故障码组合时，按“公共目录 → 控制器 overlay → 锂电 overlay
+  → 故障码 overlay”合并，
+  合并后的完整目录独立编码为该 payload 的 `LVI2` 段。
+- 公共语言页负责语言集合和顺序；Profile 语言作用域只允许编辑 overlay，公共 key
+  在 Profile 作用域中不可删除或重命名。
+
 推荐命名：
 
 ```text
@@ -347,39 +434,55 @@ v2 SDO 菜单和参数必须提供：
 
 ### 故障码
 
+故障码目录的持久化来源是 `protocol_profiles.fault_code_profiles[]`；顶层
+`fault_code_info` 仅是当前激活故障码 Profile 的编辑镜像。故障码 Profile 与控制器、
+锂电 Profile 独立选择，导出器会把三者组合写入同一个 `data.bin`。
+
 ```json
 {
-  "fault_code_info": {
-    "schema_version": 2,
-    "enabled": true,
-    "version": 2,
-    "sources": [
+  "protocol_profiles": {
+    "active_fault_code_profile_id": "fault.default",
+    "fault_code_profiles": [
       {
-        "source_key": "traction",
-        "source_id": 1,
-        "type_char": "T",
-        "can_id": 648,
-        "frame_type": 0,
-        "code_byte": 2,
-        "clear_code": 0,
-        "invalid_codes": [31],
-        "enabled": true
-      }
-    ],
-    "definitions": [
-      {
-        "fault_key": "fault.traction.052",
-        "message_key": "fault.message.dc_bus_voltage_low",
-        "severity": "fault",
-        "enabled": true
-      }
-    ],
-    "bindings": [
-      {
-        "source_key": "traction",
-        "code": 52,
-        "fault_key": "fault.traction.052",
-        "enabled": true
+        "profile_id": "fault.default",
+        "fault_family": "traction",
+        "fault_revision": "2.x",
+        "protocol": {
+          "fault_code_info": {
+            "schema_version": 2,
+            "enabled": true,
+            "version": 2,
+            "sources": [
+              {
+                "source_key": "traction",
+                "source_id": 1,
+                "type_char": "T",
+                "can_id": 648,
+                "frame_type": 0,
+                "code_byte": 2,
+                "clear_code": 0,
+                "invalid_codes": [31],
+                "enabled": true
+              }
+            ],
+            "definitions": [
+              {
+                "fault_key": "fault.traction.052",
+                "message_key": "fault.message.dc_bus_voltage_low",
+                "severity": "fault",
+                "enabled": true
+              }
+            ],
+            "bindings": [
+              {
+                "source_key": "traction",
+                "code": 52,
+                "fault_key": "fault.traction.052",
+                "enabled": true
+              }
+            ]
+          }
+        }
       }
     ]
   }
@@ -394,7 +497,7 @@ v2 SDO 菜单和参数必须提供：
 - 多个独立 `fault_key` 可以共享同一个 `message_key`；这表示文案复用，不是重复错误。
 - 删除绑定不会删除定义或翻译。删除来源/定义时，编辑器必须先确认并级联删除引用绑定。
 - 保存时来源按 ID、定义按 `fault_key`、绑定按来源和 code 稳定排序。
-- v2 不接受 v1 的 `codes[]`，也不会从 `codes[]` 隐式迁移或回退。
+- jc002 fault Profile 不接受历史 MVP 的 `codes[]`，也不会从 `codes[]` 隐式迁移或回退。
 
 v2 项目应使用 `message_key`。`name_key`、`name` 的读取仍存在于共享解析函数中，但不应作为新 v2 文件规范使用。
 

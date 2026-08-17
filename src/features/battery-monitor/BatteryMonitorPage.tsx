@@ -21,8 +21,11 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
+import {
+  localizationForScope,
+  localizationToLanguageDocument,
+} from '../../components/language/localizationAdapter';
 import { ProtocolProfileBar } from '../../components/protocol/ProtocolProfileBar';
-import { localizationToLanguageDocument } from '../../components/language/localizationAdapter';
 import type {
   LanguageDocument,
   LoadedProject,
@@ -30,6 +33,7 @@ import type {
   LocalizationMessage,
 } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
+import { readProtocolProfiles } from '../protocol-profiles/protocolProfiles';
 import type { BatteryValidationIssue } from './batteryMonitorValidation';
 import type { BatteryMonitorController } from './useBatteryMonitorController';
 import './BatteryMonitorPage.css';
@@ -84,16 +88,22 @@ function parseMask(value: string) {
 }
 
 function languageDocumentFor(project: LoadedProject | null): LanguageDocument {
-  const document = project?.document as Record<string, unknown> | undefined;
-  if (document?.localization) {
-    return localizationToLanguageDocument(document.localization as LocalizationDocument);
-  }
+  const localization = localizationFor(project);
+  if (localization) return localizationToLanguageDocument(localization);
   return { list_code_language: [], list_inner: [], list_translate: {} };
 }
 
 function localizationFor(project: LoadedProject | null) {
   const document = project?.document as Record<string, unknown> | undefined;
-  return document?.localization as LocalizationDocument | undefined;
+  const localization = document?.localization as LocalizationDocument | undefined;
+  if (!localization) return undefined;
+  const profiles = readProtocolProfiles(document);
+  const profileId = profiles?.active_battery_profile_id;
+  return localizationForScope(
+    localization,
+    profiles ?? undefined,
+    profileId ? { kind: 'battery', profileId } : { kind: 'common' },
+  );
 }
 
 function localizedValue(value: LocalizationMessage | undefined) {
@@ -421,15 +431,11 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
           <div className="battery-contract-grid">
             <div>
               <span>{t('batteryMonitor.overview.schema')}</span>
-              <strong>
-                schema_version = 2
-              </strong>
+              <strong>schema_version = 2</strong>
             </div>
             <div>
               <span>{t('batteryMonitor.overview.binary')}</span>
-              <strong>
-                version = 2
-              </strong>
+              <strong>version = 2</strong>
             </div>
             <div>
               <span>{t('batteryMonitor.overview.languageSource')}</span>
@@ -449,9 +455,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
               <Database aria-hidden="true" size={18} />
               <div>
                 <strong>{t('batteryMonitor.setup.title')}</strong>
-                <p>
-                  {t('batteryMonitor.setup.message')}
-                </p>
+                <p>{t('batteryMonitor.setup.message')}</p>
               </div>
               <ActionButton
                 icon={<Plus aria-hidden="true" size={15} />}
@@ -712,10 +716,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
 
   function renderSignals() {
     const signalHeader = (code: string, label: string, description?: string) => (
-      <span
-        className="battery-signal-header"
-        title={description}
-      >
+      <span className="battery-signal-header" title={description}>
         <span className="battery-signal-header-code">{code}</span>
         <span className="battery-signal-header-label">{label}</span>
         {description ? <span className="visually-hidden">{description}</span> : null}
@@ -1126,10 +1127,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
               ))}
             </select>
           </Field>
-          <Field
-            className="battery-form-grid__wide"
-            label="message_key"
-          >
+          <Field className="battery-form-grid__wide" label="message_key">
             <input
               value={selectedItem.name_key}
               onChange={(event) => updateBatteryItem(itemIndex, 'name_key', event.target.value)}
@@ -1618,9 +1616,7 @@ export function BatteryMonitorPage({ loadedProject, controller }: BatteryMonitor
         </article>
         <article>
           <span>{t('batteryMonitor.summary.translations')}</span>
-          <strong>
-            {`${localeOrder.length} ${t('batteryMonitor.summary.locales')}`}
-          </strong>
+          <strong>{`${localeOrder.length} ${t('batteryMonitor.summary.locales')}`}</strong>
         </article>
         <article className={batteryValidation.valid ? 'is-valid' : 'is-invalid'}>
           <span>{t('batteryMonitor.summary.validation')}</span>

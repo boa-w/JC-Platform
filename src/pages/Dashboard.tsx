@@ -1,15 +1,18 @@
 import { FolderOpen } from 'lucide-react';
-import { lazy, useEffect, useId, useRef, useState } from 'react';
+import { lazy, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { validateProjectDocument } from '../api/commands';
 import { Breadcrumb } from '../components/Breadcrumb';
+import type { LocalizationScope } from '../components/language/localizationAdapter';
 import {
+  localizationForScope,
+  localizationScopeId,
+  localizationScopeOptions,
   localizationToLanguageDocument,
-  updateLocalizationFromLanguageDocument,
+  updateLocalizationScopeFromLanguageDocument,
 } from '../components/language/localizationAdapter';
 import { ProjectManagementPage } from '../components/project';
 import { FeatureBoundary } from '../components/RecoveryBoundary';
-import { featureModules } from '../data/modules';
 import type { TestDataType } from '../data/test-data/metadata';
 import { useBatteryMonitorController } from '../features/battery-monitor/useBatteryMonitorController';
 import { DashboardActionBar, DashboardDialogs } from '../features/dashboard-shell';
@@ -27,6 +30,7 @@ import {
   useProjectLifecycleController,
 } from '../features/project-lifecycle';
 import { useProtocolEditor } from '../features/protocol-editor/useProtocolEditor';
+import { readProtocolProfiles } from '../features/protocol-profiles/protocolProfiles';
 import { PdoAdvancedReportPanel } from '../features/realtime-data/PdoAdvancedReportPanel';
 import { usePdoAdvancedReport } from '../features/realtime-data/usePdoAdvancedReport';
 import { usePdoEditor } from '../features/realtime-data/usePdoEditor';
@@ -37,6 +41,7 @@ import {
 } from '../features/ui-resource/useUiResourceController';
 import { useCanTestData } from '../hooks/useCanTestData';
 import { trackedDocumentSections } from '../modules/documentSections';
+import type { ModuleVisibilityController } from '../stores/moduleVisibility';
 import { useTranslationSettings } from '../stores/translationSettings';
 import type {
   BackendHealth,
@@ -135,6 +140,8 @@ function WorkspaceLoading() {
 
 interface DashboardProps {
   activeModule: FeatureModule;
+  moduleVisibility: ModuleVisibilityController;
+  visibleModules: FeatureModule[];
   workspaceId: string;
   health: BackendHealth | null;
   project: ProjectSummary | null;
@@ -152,6 +159,8 @@ const isTauriRuntime = () => typeof window !== 'undefined' && '__TAURI_INTERNALS
 
 export function Dashboard({
   activeModule,
+  moduleVisibility,
+  visibleModules,
   workspaceId,
   loadedProject,
   theme,
@@ -165,6 +174,7 @@ export function Dashboard({
   const { t } = useTranslation();
   const workspaceTitleId = useId();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [languageScope, setLanguageScope] = useState<LocalizationScope>({ kind: 'common' });
   const [generatingTestKey, setGeneratingTestKey] = useState<string | null>(null);
   const [confirmGenerateType, setConfirmGenerateType] = useState<TestDataType | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -203,10 +213,11 @@ export function Dashboard({
   const pdoAdvancedReport = usePdoAdvancedReport(loadedProject?.document ?? null);
   const jsonEditor = useProjectJsonEditor({
     activeModuleKey: activeModule.key,
-    applyLoadedProject,
+    canOpen: activeModule.key !== 'language' || languageScope.kind === 'common',
     loadedProject,
     realtimeMode: pdoEditor.mode,
     restoreProjectPaths,
+    updateProjectSections,
   });
   const protocolEditor = useProtocolEditor({
     activeModuleKey: activeModule.key,
@@ -226,7 +237,6 @@ export function Dashboard({
   const batteryMonitorController = useBatteryMonitorController({
     document: loadedProject?.document ?? null,
     projectPath: loadedProject?.summary.path,
-    updateProjectDocument,
     updateProjectSections,
     isModifiedPath,
     restoreModifiedPath,
@@ -234,7 +244,8 @@ export function Dashboard({
   const tableConfig = useTableConfigController({
     activeModuleKey: activeModule.key,
     loadedProject,
-    applyLoadedProject,
+    languageScope,
+    updateProjectSections,
   });
   const uiResource = useUiResourceController({ loadedProject, applyLoadedProject });
   const projectLifecycle = useProjectLifecycleController({
@@ -372,24 +383,76 @@ export function Dashboard({
     };
   }, [hasUnsavedChanges, isUpdateRelaunchAuthorized]);
 
-  function baselineLanguageDocument(): LanguageDocument | null {
-    if (!baselineDocument) return null;
-    const document = baselineDocument as Record<string, unknown>;
-    if (document.config_version === 'jc002') {
-      const localization = document.localization as LocalizationDocument | undefined;
-      return localization ? localizationToLanguageDocument(localization) : null;
+  const languageScopeOptionsFor = useCallback(
+    (document: unknown) => {
+      const root = document as Record<string, unknown> | null;
+      if (root?.config_version !== 'jc002') return [];
+      const profiles = readProtocolProfiles(root);
+      return localizationScopeOptions(profiles ?? undefined, {
+        common: t('language.scope.common'),
+        controller: (profile) =>
+          t('language.scope.controller', {
+            id: profile.profile_id,
+            family: profile.controller_family,
+          }),
+        battery: (profile) =>
+          t('language.scope.battery', {
+            id: profile.profile_id,
+            family: profile.battery_family,
+          }),
+        fault: (profile) =>
+          t('language.scope.fault', {
+            id: profile.profile_id,
+            family: profile.fault_family,
+          }),
+        commonDescription: t('language.scope.commonDescription'),
+        overlayDescription: (profileId) =>
+          t('language.scope.overlayDescription', { id: profileId }),
+      });
+    },
+    [t],
+  );
+
+  useEffect(() => {
+    const options = languageScopeOptionsFor(loadedProject?.document);
+    if (options.length === 0) {
+      if (languageScope.kind !== 'common') setLanguageScope({ kind: 'common' });
+      return;
     }
-    return (document.language_info as LanguageDocument | undefined) ?? null;
+    const currentId = localizationScopeId(languageScope);
+    if (!options.some((option) => option.id === currentId)) {
+      setLanguageScope(options[0].scope);
+    }
+  }, [languageScopeOptionsFor, loadedProject?.document, languageScope]);
+
+  function languageDocumentForScope(
+    sourceDocument: unknown,
+    scope: LocalizationScope,
+  ): LanguageDocument | null {
+    const document = sourceDocument as Record<string, unknown>;
+    if (document.config_version !== 'jc002') {
+      return (document.language_info as LanguageDocument | undefined) ?? null;
+    }
+    const localization = document.localization as LocalizationDocument | undefined;
+    if (!localization) return null;
+    const profiles = readProtocolProfiles(document) ?? undefined;
+    const effective = localizationForScope(localization, profiles, scope);
+    if (scope.kind === 'common') return localizationToLanguageDocument(effective);
+    const common = localizationToLanguageDocument(localization);
+    return localizationToLanguageDocument(effective, {
+      keyOrder: common.list_inner,
+      protectedKeys: common.list_inner,
+    });
   }
 
-  function languageDocument(): LanguageDocument | null {
+  function baselineLanguageDocument(scope: LocalizationScope): LanguageDocument | null {
+    if (!baselineDocument) return null;
+    return languageDocumentForScope(baselineDocument, scope);
+  }
+
+  function languageDocument(scope: LocalizationScope): LanguageDocument | null {
     if (!loadedProject) return null;
-    const document = loadedProject.document as Record<string, unknown>;
-    if (document.config_version === 'jc002') {
-      const localization = document.localization as LocalizationDocument | undefined;
-      return localization ? localizationToLanguageDocument(localization) : null;
-    }
-    return (document.language_info as LanguageDocument | undefined) ?? null;
+    return languageDocumentForScope(loadedProject.document, scope);
   }
 
   async function confirmGenerateTestData() {
@@ -413,12 +476,24 @@ export function Dashboard({
     const document = loadedProject?.document as Record<string, unknown> | undefined;
     if (document?.config_version === 'jc002') {
       const localization = document.localization as LocalizationDocument | undefined;
-      const previous = languageDocument();
+      const profiles = readProtocolProfiles(document) ?? undefined;
+      const previous = languageDocument(languageScope);
       if (localization && previous) {
-        updateProjectDocument(
-          'localization',
-          updateLocalizationFromLanguageDocument(localization, previous, next),
+        const updated = updateLocalizationScopeFromLanguageDocument(
+          localization,
+          profiles,
+          languageScope,
+          previous,
+          next,
         );
+        if (updated.protocolProfiles) {
+          updateProjectSections({
+            localization: updated.localization,
+            protocol_profiles: updated.protocolProfiles,
+          });
+        } else {
+          updateProjectDocument('localization', updated.localization);
+        }
       }
       return;
     }
@@ -430,7 +505,12 @@ export function Dashboard({
     onNavigate('realtime-data');
   }
 
-  const currentLanguageDocument = languageDocument();
+  const currentLanguageDocument = languageDocument(languageScope);
+  const currentLanguageScopeOptions = languageScopeOptionsFor(loadedProject?.document);
+  const currentLanguageScopeOption =
+    currentLanguageScopeOptions.find(
+      (option) => option.id === localizationScopeId(languageScope),
+    ) ?? currentLanguageScopeOptions[0];
 
   return (
     <main
@@ -466,6 +546,7 @@ export function Dashboard({
         generatingTestKey={generatingTestKey}
         pdoMode={pdoEditor.mode}
         showCanvasLabels={uiResource.showCanvasLabels}
+        jsonEditorAllowed={activeModule.key !== 'language' || languageScope.kind === 'common'}
         showJsonEditor={jsonEditor.open}
         gitStatus={projectGit.status}
         gitBusy={projectGit.busy}
@@ -563,7 +644,7 @@ export function Dashboard({
         {activeModule.key !== 'project' ? (
           <Breadcrumb
             activeKey={activeModule.key}
-            modules={featureModules}
+            modules={visibleModules}
             onNavigate={onNavigate}
           />
         ) : null}
@@ -660,7 +741,7 @@ export function Dashboard({
                   list_translate: {},
                 }
               }
-              baseline={baselineLanguageDocument()}
+              baseline={baselineLanguageDocument(languageScope)}
               loaded={!!loadedProject}
               translationConfigured={translationSettings.isConfigured}
               fullLanguageImportStatus={
@@ -669,8 +750,21 @@ export function Dashboard({
               }
               isImportingFullLanguage={tableConfig.isImporting}
               onUpdate={updateLanguageDocument}
-              onImportFullLanguage={() => tableConfig.importTable('language')}
-              supportsLegacyImport={true}
+              onImportFullLanguage={() =>
+                languageScope.kind === 'common'
+                  ? tableConfig.importTable('language')
+                  : Promise.resolve()
+              }
+              supportsLegacyImport={
+                languageScope.kind === 'common' ||
+                (loadedProject?.document as Record<string, unknown> | undefined)?.config_version !==
+                  'jc002'
+              }
+              scope={languageScope}
+              scopeOptions={currentLanguageScopeOptions}
+              scopeDescription={currentLanguageScopeOption?.description}
+              onScopeChange={setLanguageScope}
+              allowLanguageManagement={languageScope.kind === 'common'}
             />
           ) : null}
 
@@ -707,6 +801,7 @@ export function Dashboard({
           ) : null}
           {activeModule.key === 'settings' ? (
             <SettingsPage
+              moduleVisibility={moduleVisibility}
               translationController={translationSettings}
               theme={theme}
               onToggleTheme={onToggleTheme}

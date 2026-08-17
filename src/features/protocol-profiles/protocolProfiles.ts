@@ -1,13 +1,16 @@
-import { defaultBatteryMonitor } from '../project-document/projectDocumentDefaults.ts';
 import type {
   BatteryMonitorProtocol,
   BatteryProtocolProfile,
   CanOpenProjectDocument,
   ControllerProtocolProfile,
   ControllerProtocolSections,
+  FaultCodeInfo,
+  FaultCodeProfile,
+  LocalizationOverlayDocument,
   ProtocolProfilesDocument,
   SdoNodeDocument,
 } from '../../types/platform';
+import { defaultBatteryMonitor } from '../project-document/projectDocumentDefaults.ts';
 
 export { syncProtocolProfileSections } from './syncProtocolProfileSections.ts';
 
@@ -22,7 +25,9 @@ export const controllerProtocolSectionKeys = [
 
 export const batteryProtocolSectionKeys = ['battery_monitor'] as const;
 
-export type ProtocolProfileScope = 'controller' | 'battery';
+export const faultCodeProtocolSectionKeys = ['fault_code_info'] as const;
+
+export type ProtocolProfileScope = 'controller' | 'battery' | 'fault';
 
 const emptySdoInfo: SdoNodeDocument = {
   type: 0,
@@ -32,12 +37,46 @@ const emptySdoInfo: SdoNodeDocument = {
   children: [],
 };
 
+const emptyCanopen: CanOpenProjectDocument = {
+  schema_version: 1,
+  nodes: [],
+  pdos: [],
+};
+
+function emptyFaultCodeInfo(): FaultCodeInfo {
+  return {
+    schema_version: 2,
+    enabled: false,
+    version: 2,
+    sources: [],
+    definitions: [],
+    bindings: [],
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function emptyLocalizationOverlay(): LocalizationOverlayDocument {
+  return { locales: {} };
+}
+
+function faultCodeInfoFromRoot(document: unknown): FaultCodeInfo | undefined {
+  const root = isRecord(document) ? document : {};
+  return isRecord(root.fault_code_info) ? clone(root.fault_code_info as FaultCodeInfo) : undefined;
+}
+
+function localizationOverlayFromProfile(
+  value: Record<string, unknown>,
+): LocalizationOverlayDocument | undefined {
+  return isRecord(value.localization_overlay)
+    ? clone(value.localization_overlay as LocalizationOverlayDocument)
+    : undefined;
 }
 
 function normalizeControllerProtocol(
@@ -97,6 +136,9 @@ function normalizeControllerProfile(value: unknown): ControllerProtocolProfile |
     controller_revision:
       typeof value.controller_revision === 'string' ? value.controller_revision.trim() : '',
     ...(typeof value.description === 'string' ? { description: value.description } : {}),
+    ...(localizationOverlayFromProfile(value)
+      ? { localization_overlay: localizationOverlayFromProfile(value) }
+      : {}),
     protocol: normalizeControllerProtocol(value.protocol, {}),
   };
 }
@@ -115,7 +157,30 @@ function normalizeBatteryProfile(value: unknown): BatteryProtocolProfile | null 
     battery_revision:
       typeof value.battery_revision === 'string' ? value.battery_revision.trim() : '',
     ...(typeof value.description === 'string' ? { description: value.description } : {}),
+    ...(localizationOverlayFromProfile(value)
+      ? { localization_overlay: localizationOverlayFromProfile(value) }
+      : {}),
     protocol: { battery_monitor: batteryMonitor },
+  };
+}
+
+function normalizeFaultCodeProfile(value: unknown): FaultCodeProfile | null {
+  if (!isRecord(value)) return null;
+  const profileId = typeof value.profile_id === 'string' ? value.profile_id.trim() : '';
+  const faultCodeInfo = isRecord(value.protocol) ? value.protocol.fault_code_info : undefined;
+  if (!profileId || !isRecord(faultCodeInfo)) return null;
+  return {
+    profile_id: profileId,
+    fault_family:
+      typeof value.fault_family === 'string' && value.fault_family.trim()
+        ? value.fault_family.trim()
+        : 'generic',
+    fault_revision: typeof value.fault_revision === 'string' ? value.fault_revision.trim() : '',
+    ...(typeof value.description === 'string' ? { description: value.description } : {}),
+    ...(localizationOverlayFromProfile(value)
+      ? { localization_overlay: localizationOverlayFromProfile(value) }
+      : {}),
+    protocol: { fault_code_info: clone(faultCodeInfo as FaultCodeInfo) },
   };
 }
 
@@ -162,12 +227,47 @@ export function readProtocolProfiles(document: unknown): ProtocolProfilesDocumen
     ? requestedBatteryId
     : batteryProfiles[0]?.profile_id;
 
+  const rawFaultCodeProfiles = value.fault_code_profiles;
+  const hasFaultProfileArray = Array.isArray(rawFaultCodeProfiles);
+  const rawFaultCodeProfileList: unknown[] = hasFaultProfileArray ? rawFaultCodeProfiles : [];
+  let faultCodeProfiles = rawFaultCodeProfileList
+    .map(normalizeFaultCodeProfile)
+    .filter((profile): profile is FaultCodeProfile => profile !== null);
+  if (hasFaultProfileArray && faultCodeProfiles.length !== rawFaultCodeProfileList.length) {
+    return null;
+  }
+  const requestedFaultCodeId =
+    typeof value.active_fault_code_profile_id === 'string'
+      ? value.active_fault_code_profile_id
+      : '';
+  if (!hasFaultProfileArray) {
+    const rootFaultCodeInfo = faultCodeInfoFromRoot(document);
+    if (rootFaultCodeInfo) {
+      faultCodeProfiles = [
+        {
+          profile_id: 'fault.default',
+          fault_family: 'generic',
+          fault_revision: '',
+          localization_overlay: emptyLocalizationOverlay(),
+          protocol: { fault_code_info: rootFaultCodeInfo },
+        },
+      ];
+    }
+  }
+  const activeFaultCodeId = faultCodeProfiles.some(
+    (profile) => profile.profile_id === requestedFaultCodeId,
+  )
+    ? requestedFaultCodeId
+    : faultCodeProfiles[0]?.profile_id;
+
   return {
     schema_version: 2,
     active_controller_profile_id: activeControllerId,
     ...(activeBatteryId ? { active_battery_profile_id: activeBatteryId } : {}),
+    ...(activeFaultCodeId ? { active_fault_code_profile_id: activeFaultCodeId } : {}),
     controller_profiles: controllerProfiles,
     battery_profiles: batteryProfiles,
+    fault_code_profiles: faultCodeProfiles,
   };
 }
 
@@ -195,6 +295,16 @@ export function activeBatteryProtocolProfile(document: unknown): BatteryProtocol
   );
 }
 
+export function activeFaultCodeProtocolProfile(document: unknown): FaultCodeProfile | null {
+  const profiles = readProtocolProfiles(document);
+  if (!profiles?.active_fault_code_profile_id) return null;
+  return (
+    profiles.fault_code_profiles.find(
+      (profile) => profile.profile_id === profiles.active_fault_code_profile_id,
+    ) ?? null
+  );
+}
+
 function controllerProtocolFromRoot(document: unknown): ControllerProtocolSections {
   const root = isRecord(document) ? document : {};
   return normalizeControllerProtocol(root, root);
@@ -207,6 +317,10 @@ function batteryProtocolFromRoot(document: unknown): BatteryMonitorProtocol | nu
     : null;
 }
 
+function faultCodeProtocolFromRoot(document: unknown): FaultCodeInfo {
+  return faultCodeInfoFromRoot(document) ?? emptyFaultCodeInfo();
+}
+
 export function createProtocolProfilesDocument(document: unknown): ProtocolProfilesDocument {
   const batteryMonitor = batteryProtocolFromRoot(document);
   const batteryProfile = batteryMonitor
@@ -217,19 +331,31 @@ export function createProtocolProfilesDocument(document: unknown): ProtocolProfi
         protocol: { battery_monitor: batteryMonitor },
       }
     : null;
+  const faultCodeProfile = faultCodeInfoFromRoot(document)
+    ? {
+        profile_id: 'fault.default',
+        fault_family: 'generic',
+        fault_revision: '',
+        localization_overlay: emptyLocalizationOverlay(),
+        protocol: { fault_code_info: faultCodeProtocolFromRoot(document) },
+      }
+    : null;
   return {
     schema_version: 2,
     active_controller_profile_id: 'controller.default',
     ...(batteryProfile ? { active_battery_profile_id: batteryProfile.profile_id } : {}),
+    ...(faultCodeProfile ? { active_fault_code_profile_id: faultCodeProfile.profile_id } : {}),
     controller_profiles: [
       {
         profile_id: 'controller.default',
         controller_family: 'generic',
         controller_revision: '',
+        localization_overlay: emptyLocalizationOverlay(),
         protocol: controllerProtocolFromRoot(document),
       },
     ],
     battery_profiles: batteryProfile ? [batteryProfile] : [],
+    fault_code_profiles: faultCodeProfile ? [faultCodeProfile] : [],
   };
 }
 
@@ -247,9 +373,15 @@ function activeProtocolSections(profiles: ProtocolProfilesDocument): Record<stri
         (profile) => profile.profile_id === profiles.active_battery_profile_id,
       )
     : undefined;
+  const fault = profiles.active_fault_code_profile_id
+    ? profiles.fault_code_profiles.find(
+        (profile) => profile.profile_id === profiles.active_fault_code_profile_id,
+      )
+    : undefined;
   return {
     ...(controller ? clone(controller.protocol) : {}),
     ...(battery ? clone(battery.protocol) : {}),
+    ...(fault ? clone(fault.protocol) : {}),
   };
 }
 
@@ -262,13 +394,17 @@ export function protocolProfileSectionsForSelection(
   const selected =
     scope === 'controller'
       ? profiles.controller_profiles.some((profile) => profile.profile_id === profileId)
-      : profiles.battery_profiles.some((profile) => profile.profile_id === profileId);
+      : scope === 'battery'
+        ? profiles.battery_profiles.some((profile) => profile.profile_id === profileId)
+        : profiles.fault_code_profiles.some((profile) => profile.profile_id === profileId);
   if (!selected) return {};
   const nextProfiles: ProtocolProfilesDocument = {
     ...profiles,
     ...(scope === 'controller'
       ? { active_controller_profile_id: profileId }
-      : { active_battery_profile_id: profileId }),
+      : scope === 'battery'
+        ? { active_battery_profile_id: profileId }
+        : { active_fault_code_profile_id: profileId }),
   };
   return {
     protocol_profiles: nextProfiles,
@@ -295,6 +431,7 @@ export function initializeBatteryProtocolSections(document: unknown): Record<str
     profile_id: 'battery.default',
     battery_family: 'generic',
     battery_revision: '',
+    localization_overlay: emptyLocalizationOverlay(),
     protocol: {
       battery_monitor: batteryProtocolFromRoot(document) ?? clone(defaultBatteryMonitor),
     },
@@ -307,6 +444,26 @@ export function initializeBatteryProtocolSections(document: unknown): Record<str
   return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
 }
 
+export function initializeFaultCodeProtocolSections(document: unknown): Record<string, unknown> {
+  const profiles = normalizedProfiles(document);
+  if (profiles.fault_code_profiles.length > 0) {
+    return { protocol_profiles: profiles, ...activeProtocolSections(profiles) };
+  }
+  const faultProfile: FaultCodeProfile = {
+    profile_id: 'fault.default',
+    fault_family: 'generic',
+    fault_revision: '',
+    localization_overlay: emptyLocalizationOverlay(),
+    protocol: { fault_code_info: faultCodeProtocolFromRoot(document) },
+  };
+  const nextProfiles: ProtocolProfilesDocument = {
+    ...profiles,
+    active_fault_code_profile_id: faultProfile.profile_id,
+    fault_code_profiles: [faultProfile],
+  };
+  return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
+}
+
 function nextProfileId(ids: string[], baseId: string): string {
   const used = new Set(ids);
   let suffix = 2;
@@ -315,6 +472,83 @@ function nextProfileId(ids: string[], baseId: string): string {
   return profileId;
 }
 
+function availableProfileId(ids: string[], baseId: string): string {
+  return ids.includes(baseId) ? nextProfileId(ids, baseId) : baseId;
+}
+
+/** Create an independent blank profile; protocol payload is never copied from the active profile. */
+export function createNewProtocolProfileSections(
+  document: unknown,
+  scope: ProtocolProfileScope,
+): Record<string, unknown> {
+  const profiles = normalizedProfiles(document);
+  if (scope === 'controller') {
+    const profileId = availableProfileId(
+      profiles.controller_profiles.map((profile) => profile.profile_id),
+      'controller.new',
+    );
+    const nextProfile: ControllerProtocolProfile = {
+      profile_id: profileId,
+      controller_family: 'generic',
+      controller_revision: '',
+      localization_overlay: emptyLocalizationOverlay(),
+      protocol: {
+        pdo_global_param: [],
+        pdo_condition: [],
+        pdo_recv: [],
+        pdo_send: [],
+        sdo_info: clone(emptySdoInfo),
+        canopen: clone(emptyCanopen),
+      },
+    };
+    const nextProfiles: ProtocolProfilesDocument = {
+      ...profiles,
+      active_controller_profile_id: profileId,
+      controller_profiles: [...profiles.controller_profiles, nextProfile],
+    };
+    return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
+  }
+
+  if (scope === 'fault') {
+    const profileId = availableProfileId(
+      profiles.fault_code_profiles.map((profile) => profile.profile_id),
+      'fault.new',
+    );
+    const nextProfile: FaultCodeProfile = {
+      profile_id: profileId,
+      fault_family: 'generic',
+      fault_revision: '',
+      localization_overlay: emptyLocalizationOverlay(),
+      protocol: { fault_code_info: emptyFaultCodeInfo() },
+    };
+    const nextProfiles: ProtocolProfilesDocument = {
+      ...profiles,
+      active_fault_code_profile_id: profileId,
+      fault_code_profiles: [...profiles.fault_code_profiles, nextProfile],
+    };
+    return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
+  }
+
+  const profileId = availableProfileId(
+    profiles.battery_profiles.map((profile) => profile.profile_id),
+    'battery.new',
+  );
+  const nextProfile: BatteryProtocolProfile = {
+    profile_id: profileId,
+    battery_family: 'generic',
+    battery_revision: '',
+    localization_overlay: emptyLocalizationOverlay(),
+    protocol: { battery_monitor: clone(defaultBatteryMonitor) },
+  };
+  const nextProfiles: ProtocolProfilesDocument = {
+    ...profiles,
+    active_battery_profile_id: profileId,
+    battery_profiles: [...profiles.battery_profiles, nextProfile],
+  };
+  return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
+}
+
+/** Clone the active profile, preserving its protocol payload as a starting point. */
 export function addProtocolProfileSections(
   document: unknown,
   scope: ProtocolProfileScope,
@@ -336,6 +570,26 @@ export function addProtocolProfileSections(
       ...profiles,
       active_controller_profile_id: profileId,
       controller_profiles: [...profiles.controller_profiles, nextProfile],
+    };
+    return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
+  }
+
+  if (scope === 'fault') {
+    const current = activeFaultCodeProtocolProfile(document);
+    if (!current) return initializeFaultCodeProtocolSections(document);
+    const profileId = nextProfileId(
+      profiles.fault_code_profiles.map((profile) => profile.profile_id),
+      current.profile_id,
+    );
+    const nextProfile: FaultCodeProfile = {
+      ...clone(current),
+      profile_id: profileId,
+      description: current.description ? `${current.description} copy` : undefined,
+    };
+    const nextProfiles: ProtocolProfilesDocument = {
+      ...profiles,
+      active_fault_code_profile_id: profileId,
+      fault_code_profiles: [...profiles.fault_code_profiles, nextProfile],
     };
     return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
   }
@@ -380,6 +634,12 @@ export function updateProtocolProfileMetadataSections(
             profile.profile_id === profileId ? { ...profile, ...patch } : profile,
           )
         : profiles.battery_profiles,
+    fault_code_profiles:
+      scope === 'fault'
+        ? profiles.fault_code_profiles.map((profile) =>
+            profile.profile_id === profileId ? { ...profile, ...patch } : profile,
+          )
+        : profiles.fault_code_profiles,
   };
   return { protocol_profiles: nextProfiles };
 }
@@ -408,7 +668,11 @@ export function renameProtocolProfileSections(
 
   const profiles = normalizedProfiles(document);
   const collection =
-    scope === 'controller' ? profiles.controller_profiles : profiles.battery_profiles;
+    scope === 'controller'
+      ? profiles.controller_profiles
+      : scope === 'battery'
+        ? profiles.battery_profiles
+        : profiles.fault_code_profiles;
   if (
     collection.some(
       (profile) =>
@@ -432,17 +696,29 @@ export function renameProtocolProfileSections(
               : profile,
           ),
         }
-      : {
-          ...profiles,
-          ...(profiles.active_battery_profile_id === profileId
-            ? { active_battery_profile_id: nextProfileIdValueTrimmed }
-            : {}),
-          battery_profiles: profiles.battery_profiles.map((profile) =>
-            profile.profile_id === profileId
-              ? { ...profile, profile_id: nextProfileIdValueTrimmed }
-              : profile,
-          ),
-        };
+      : scope === 'battery'
+        ? {
+            ...profiles,
+            ...(profiles.active_battery_profile_id === profileId
+              ? { active_battery_profile_id: nextProfileIdValueTrimmed }
+              : {}),
+            battery_profiles: profiles.battery_profiles.map((profile) =>
+              profile.profile_id === profileId
+                ? { ...profile, profile_id: nextProfileIdValueTrimmed }
+                : profile,
+            ),
+          }
+        : {
+            ...profiles,
+            ...(profiles.active_fault_code_profile_id === profileId
+              ? { active_fault_code_profile_id: nextProfileIdValueTrimmed }
+              : {}),
+            fault_code_profiles: profiles.fault_code_profiles.map((profile) =>
+              profile.profile_id === profileId
+                ? { ...profile, profile_id: nextProfileIdValueTrimmed }
+                : profile,
+            ),
+          };
 
   return { sections: { protocol_profiles: nextProfiles } };
 }
@@ -471,6 +747,24 @@ export function removeProtocolProfileSections(
     return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
   }
 
+  if (scope === 'fault') {
+    const remaining = profiles.fault_code_profiles.filter(
+      (profile) => profile.profile_id !== profileId,
+    );
+    if (remaining.length === profiles.fault_code_profiles.length) return {};
+    const nextActive =
+      profiles.active_fault_code_profile_id === profileId
+        ? remaining[0]?.profile_id
+        : profiles.active_fault_code_profile_id;
+    const nextProfiles: ProtocolProfilesDocument = {
+      ...profiles,
+      ...(nextActive ? { active_fault_code_profile_id: nextActive } : {}),
+      fault_code_profiles: remaining,
+    };
+    if (!nextActive) delete nextProfiles.active_fault_code_profile_id;
+    return { protocol_profiles: nextProfiles, ...activeProtocolSections(nextProfiles) };
+  }
+
   const remaining = profiles.battery_profiles.filter((profile) => profile.profile_id !== profileId);
   if (remaining.length === profiles.battery_profiles.length) return {};
   const nextActive =
@@ -491,7 +785,11 @@ export function materializeActiveProtocolProfiles(document: unknown): Record<str
   const profiles = readProtocolProfiles(document);
   if (!profiles) return root;
   delete root.protocol_profiles;
-  for (const key of [...controllerProtocolSectionKeys, ...batteryProtocolSectionKeys]) {
+  for (const key of [
+    ...controllerProtocolSectionKeys,
+    ...batteryProtocolSectionKeys,
+    ...faultCodeProtocolSectionKeys,
+  ]) {
     delete root[key];
   }
   Object.assign(root, activeProtocolSections(profiles));

@@ -14,6 +14,7 @@ interface LanguageSidebarProps {
   onAddLanguage: (code: string, label: string) => void;
   onUpdateLanguage: (oldCode: string, newCode: string, newLabel: string) => void;
   onRemoveLanguage: (code: string) => void;
+  languageManagementEnabled?: boolean;
 }
 
 const commonLanguages = [
@@ -50,6 +51,7 @@ export function LanguageSidebar({
   onAddLanguage,
   onUpdateLanguage,
   onRemoveLanguage,
+  languageManagementEnabled = true,
 }: LanguageSidebarProps) {
   const { t } = useTranslation();
   const [newCode, setNewCode] = useState('');
@@ -131,17 +133,19 @@ export function LanguageSidebar({
     <aside className="lang-sidebar">
       <div className="lang-sidebar-header">
         <h3>{t('language.sidebar.title')}</h3>
-        <button
-          className="lang-btn lang-btn--icon"
-          onClick={() => setShowAdd(!showAdd)}
-          type="button"
-          title={t('language.sidebar.addLanguage')}
-        >
-          {showAdd ? '×' : '+'}
-        </button>
+        {languageManagementEnabled ? (
+          <button
+            className="lang-btn lang-btn--icon"
+            onClick={() => setShowAdd(!showAdd)}
+            type="button"
+            title={t('language.sidebar.addLanguage')}
+          >
+            {showAdd ? '×' : '+'}
+          </button>
+        ) : null}
       </div>
 
-      {showAdd ? (
+      {showAdd && languageManagementEnabled ? (
         <div className="lang-sidebar-add">
           <div className="lang-sidebar-add-common">
             <span className="lang-sidebar-add-label">{t('language.sidebar.common')}</span>
@@ -286,7 +290,7 @@ export function LanguageSidebar({
                       </span>
                     </div>
                   </button>
-                  {!isZh ? (
+                  {!isZh && languageManagementEnabled ? (
                     <div className="lang-sidebar-item-actions">
                       <button
                         aria-label={t('language.sidebar.editLanguage', { language: lang.label })}

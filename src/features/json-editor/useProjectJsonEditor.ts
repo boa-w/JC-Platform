@@ -12,18 +12,20 @@ import type { PdoEditorMode } from '../realtime-data/usePdoEditor';
 
 interface UseProjectJsonEditorOptions {
   activeModuleKey: NavigationKey;
-  applyLoadedProject: ProjectDocumentController['applyLoadedProject'];
+  canOpen: boolean;
   loadedProject: LoadedProject | null;
   realtimeMode: PdoEditorMode;
   restoreProjectPaths: ProjectDocumentController['restoreProjectPaths'];
+  updateProjectSections: ProjectDocumentController['updateProjectSections'];
 }
 
 export function useProjectJsonEditor({
   activeModuleKey,
-  applyLoadedProject,
+  canOpen,
   loadedProject,
   realtimeMode,
   restoreProjectPaths,
+  updateProjectSections,
 }: UseProjectJsonEditorOptions) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -39,13 +41,17 @@ export function useProjectJsonEditor({
   }, [activeModuleKey, loadedProject, realtimeMode]);
 
   useEffect(() => {
+    if (!canOpen) {
+      setOpen(false);
+      return;
+    }
     if (activeModuleKey === 'fault-code') {
       setOpen(false);
       return;
     }
     setText(JSON.stringify(currentSection(), null, 2));
     setError(null);
-  }, [activeModuleKey, currentSection]);
+  }, [activeModuleKey, canOpen, currentSection]);
 
   function format() {
     setText(JSON.stringify(currentSection(), null, 2));
@@ -70,20 +76,26 @@ export function useProjectJsonEditor({
 
     try {
       const parsed = JSON.parse(text);
-      const document = { ...(loadedProject.document as Record<string, unknown>) };
       const editorKey = jsonEditorKeyForModule(activeModuleKey, { realtimeMode });
-      if (editorKey === 'sdo') document.sdo_info = parsed;
-      if (editorKey === 'pdo-simple') document.pdo_simple_send_recv = parsed;
-      if (activeModuleKey === 'canopen-export') document.canopen = parsed;
-      if (activeModuleKey === 'language') document[languageSectionForDocument(document)] = parsed;
-      if (activeModuleKey === 'battery-monitor') document.battery_monitor = parsed;
-      if (activeModuleKey === 'signal-dictionary') document.signal_dictionary = parsed;
-      if (activeModuleKey === 'private-protocol') document.private_protocol = parsed;
-      if (activeModuleKey === 'protocol-mapping') document.protocol_mapping = parsed;
-      if (editorKey === 'pdo-advanced') {
-        for (const section of advancedConfigSections) document[section] = parsed?.[section];
+      const currentDocument = loadedProject.document as Record<string, unknown>;
+      const sections: Record<string, unknown> = {};
+      if (editorKey === 'sdo') sections.sdo_info = parsed;
+      if (editorKey === 'pdo-simple') sections.pdo_simple_send_recv = parsed;
+      if (activeModuleKey === 'canopen-export') sections.canopen = parsed;
+      if (activeModuleKey === 'language') {
+        sections[languageSectionForDocument(currentDocument)] = parsed;
       }
-      applyLoadedProject({ ...loadedProject, document });
+      if (activeModuleKey === 'battery-monitor') sections.battery_monitor = parsed;
+      if (activeModuleKey === 'signal-dictionary') sections.signal_dictionary = parsed;
+      if (activeModuleKey === 'private-protocol') sections.private_protocol = parsed;
+      if (activeModuleKey === 'protocol-mapping') sections.protocol_mapping = parsed;
+      if (editorKey === 'pdo-advanced') {
+        for (const section of advancedConfigSections) sections[section] = parsed?.[section];
+      }
+      if (Object.keys(sections).length === 0) {
+        throw new Error('当前页面没有可编辑的 JSON 配置段');
+      }
+      updateProjectSections(sections);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -99,6 +111,8 @@ export function useProjectJsonEditor({
     restore,
     setText,
     text,
-    toggle: () => setOpen((visible) => !visible),
+    toggle: () => {
+      if (canOpen) setOpen((visible) => !visible);
+    },
   };
 }

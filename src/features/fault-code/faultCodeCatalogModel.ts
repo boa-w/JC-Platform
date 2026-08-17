@@ -75,10 +75,6 @@ export function clampCatalogCode(value: unknown) {
   return Math.max(0, Math.min(255, Number.isFinite(parsed) ? Math.trunc(parsed) : 0));
 }
 
-export function faultKeyForBinding(sourceKey: string, code: number) {
-  return `fault.${sourceKey || 'source'}.${String(clampCatalogCode(code)).padStart(3, '0')}`;
-}
-
 export function validateFaultCatalog(catalog: FaultCodeInfo): FaultCatalogValidation {
   const sources = catalog.sources ?? [];
   const definitions = catalog.definitions ?? [];
@@ -148,29 +144,6 @@ export function localizationText(
 ) {
   const value = localization.locales[locale]?.translations[messageKey];
   return typeof value === 'string' ? value : '';
-}
-
-export function updateLocalizationText(
-  localization: LocalizationDocument,
-  locale: string,
-  messageKey: string,
-  text: string,
-): LocalizationDocument {
-  const currentLocale = localization.locales[locale];
-  if (!currentLocale || !messageKey.trim()) return localization;
-  return {
-    ...localization,
-    locales: {
-      ...localization.locales,
-      [locale]: {
-        ...currentLocale,
-        translations: {
-          ...currentLocale.translations,
-          [messageKey]: text,
-        },
-      },
-    },
-  };
 }
 
 export function createFaultDefinition(index: number): FaultCodeDefinition {

@@ -285,6 +285,62 @@
   position: relative;
 }
 
+.lang-scope-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-panel);
+}
+
+.lang-scope-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lang-scope-select select {
+  min-width: 250px;
+  height: 30px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 4px 28px 4px 9px;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.lang-scope-select select:focus {
+  outline: 2px solid var(--focus-ring-strong);
+  outline-offset: 1px;
+}
+
+.lang-scope-description {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lang-scope-badge {
+  flex: 0 0 auto;
+  border: 1px solid var(--action-primary-border);
+  border-radius: 4px;
+  padding: 3px 7px;
+  background: var(--action-primary-subtle);
+  color: var(--action-primary-hover);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .lang-toolbar {
   display: flex;
   align-items: center;
@@ -1140,6 +1196,27 @@
 .lang-editor-add input:focus {
   outline: none;
   border-color: var(--action-primary);
+}
+
+@media (max-width: 760px) {
+  .lang-scope-bar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lang-scope-select {
+    justify-content: space-between;
+  }
+
+  .lang-scope-select select {
+    min-width: 0;
+    width: min(70vw, 300px);
+  }
+
+  .lang-scope-description {
+    white-space: normal;
+  }
 }
 
 .lang-view-toggle-btn {

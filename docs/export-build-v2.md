@@ -25,12 +25,16 @@ v2 发布包必须由 `config_version: "jc002"` 项目单独构建。不要把 v
     "schema_version": 2,
     "active_controller_profile_id": "inmotion",
     "active_battery_profile_id": "bms-a",
+    "active_fault_code_profile_id": "fault.default",
     "controller_profiles": [
       { "profile_id": "acm", "controller_family": "ACM", "controller_revision": "1.x" },
       { "profile_id": "inmotion", "controller_family": "Inmotion", "controller_revision": "2.x" }
     ],
     "battery_profiles": [
       { "profile_id": "bms-a", "battery_family": "Lithium-A", "battery_revision": "1.x" }
+    ],
+    "fault_code_profiles": [
+      { "profile_id": "fault.default", "fault_family": "generic", "fault_revision": "2.x" }
     ]
   },
   "device": { "version": "jxc_7size_meter" },
@@ -53,44 +57,62 @@ v2 发布包必须由 `config_version: "jc002"` 项目单独构建。不要把 v
     "controller_profile_total": 2,
     "active_controller_profile_id": "inmotion",
     "battery_profile_total": 1,
-    "active_battery_profile_id": "bms-a"
+    "active_battery_profile_id": "bms-a",
+    "fault_code_profile_total": 1,
+    "active_fault_code_profile_id": "fault.default",
+    "protocol_bundle_version": 1,
+    "protocol_profile_payloads": [
+      {
+        "controller_profile_id": "inmotion",
+        "battery_profile_id": "bms-a",
+        "base_addr": 0,
+        "file_size": 0,
+        "crc": 0,
+        "description": { "file_size": 0, "crc": 0 }
+      }
+    ]
   }
 }
 ```
 
 `protocol_profiles` 只是一段升级身份元数据，不是协议定义。上位机从当前激活的控制器
-Profile 和锂电 Profile 组合构建 PDO、SDO 和可选 battery v2 段，写入 `data.bin`；清单
-分别记录两类 Profile 的版本、数量和激活 ID，避免把锂电帧、信号和显示项复制到 JSON。
-下位机在升级前和启动加载时都会校验两处身份一致。
+Profile、锂电 Profile 和故障码 Profile 的笛卡尔积构建多个自包含 PDO、SDO、i18n、fault
+和可选 battery v2 payload，顺序写入同一个 `data.bin`；清单只记录三类 Profile 的身份和 payload 索引，避免
+把锂电帧、信号和显示项复制到 JSON。即使编辑文档只有单套协议，导出器也会生成
+`controller.default` 的统一 Bundle。
+下位机在升级前和启动加载时校验整包 CRC、选中 payload CRC 和索引一致性。
 
-当前 ABI 每个发布包只有一套运行时表：
+当前 ABI 是一个包含多套自描述 payload 的发布包；选中 payload 重定位后仍是一套运行时表：
 
 ```text
-项目 controller_profiles[N] + battery_profiles[M]
-          ↓ 分别选择两个 active ID
-当前控制器协议 + 当前锂电协议组合
-          ↓
-ConfigUpdate.json 身份元数据 + data.bin 单套运行时表
-          ↓ 更新后重启
-下位机现有 jc002 动态 PDO/SDO/battery loader
+项目 controller_profiles[N] + battery_profiles[M] + fault_code_profiles[K]
+          ↓ 分别选择三个 active ID
+全部控制器 Profile × 全部锂电 Profile × 全部故障码 Profile 组合
+           ↓
+ConfigUpdate.json 身份/索引 + data.bin payload bundle
+           ↓ 更新后重启
+下位机按持久化选择重定位对应 jc002 payload
 ```
 
 因此切换 ACM/Inmotion 或不同锂电协议时，只需在对应页面选择目标 Profile，再重新导出
-并更新整包。当前下位机不在运行中切换协议，也不读取设备 JSON 中的完整 Profile 定义。
+并更新整包。当前下位机不在运行中切换协议；高级设置写入控制器选择后，重启读取对应
+payload，也不读取设备 JSON 中的完整 Profile 定义。
 
 上位机的 Profile 选择来自同一个 `.jcpro`：CANopen 页面只改变
-`active_controller_profile_id`，锂电页面只改变 `active_battery_profile_id`。复制或重命名
-Profile 会修改 `.jcpro` 中相应的 Profile 数组；协议编辑器的 PDO/SDO/battery 改动会写回
+`active_controller_profile_id`，锂电页面只改变 `active_battery_profile_id`，故障码页面只改变
+`active_fault_code_profile_id`。复制或重命名 Profile 会修改 `.jcpro` 中相应的 Profile 数组；协议编辑器的 PDO/SDO/battery/fault 改动会写回
 当前激活项。导出器不会根据顶层镜像猜测另一侧配置，也不会将未激活 Profile 混入运行时
-二进制。
+二进制；所有组合都会进入同一个 `data.bin`，激活 ID 只决定默认 payload（offset 0）。
 
 例如同一文件可以长期保存以下组合素材：
 
 ```text
 controller_profiles: [acm, inmotion6]
 battery_profiles: [default, bms-a]
+fault_code_profiles: [generic, inmotion]
 当前导出: active_controller_profile_id=inmotion6
           active_battery_profile_id=default
+          active_fault_code_profile_id=generic
 ```
 
 需要切换到 ACM 时，在上位机选择 `acm` 后重新导出即可；锂电仍为 `default`。需要切换

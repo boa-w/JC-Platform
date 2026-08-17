@@ -2,8 +2,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useTransition
 import { useTranslation } from 'react-i18next';
 import { getBackendHealth, getProjectSummary } from './api/commands';
 import { Sidebar } from './components/Sidebar';
-import { featureModules } from './data/modules';
 import { Dashboard } from './pages/Dashboard';
+import { resolveNavigationKey, useModuleVisibility } from './stores/moduleVisibility';
 import { defaultNavigationKey } from './stores/navigation';
 import { useTheme } from './stores/theme';
 import type { BackendHealth, LoadedProject, NavigationKey, ProjectSummary } from './types/platform';
@@ -26,6 +26,8 @@ export default function App() {
   const workspaceId = useId();
   const [, startNavigationTransition] = useTransition();
   const { theme, toggleTheme } = useTheme();
+  const moduleVisibility = useModuleVisibility();
+  const { hiddenKeys, visibleModules } = moduleVisibility;
 
   useEffect(() => {
     void getBackendHealth().then(setHealth);
@@ -33,12 +35,21 @@ export default function App() {
   }, []);
 
   const activeModule = useMemo(
-    () => featureModules.find((module) => module.key === activeKey) ?? featureModules[0],
-    [activeKey],
+    () => visibleModules.find((module) => module.key === activeKey) ?? visibleModules[0],
+    [activeKey, visibleModules],
   );
 
+  // 当前激活页被用户隐藏时，回退到第一个可见功能页。
+  useEffect(() => {
+    if (!hiddenKeys.has(activeKey)) return;
+    const target = resolveNavigationKey(activeKey, hiddenKeys);
+    if (target) setActiveKey(target);
+  }, [activeKey, hiddenKeys]);
+
   function navigate(key: NavigationKey) {
-    startNavigationTransition(() => setActiveKey(key));
+    const target = resolveNavigationKey(key, hiddenKeys);
+    if (!target) return;
+    startNavigationTransition(() => setActiveKey(target));
   }
 
   const authorizeUpdateRelaunch = useCallback(async () => {
@@ -65,7 +76,7 @@ export default function App() {
         {t('app.skipToMain')}
       </a>
       <Sidebar
-        modules={featureModules}
+        modules={visibleModules}
         activeKey={activeKey}
         onSelect={navigate}
         theme={theme}
@@ -80,6 +91,8 @@ export default function App() {
       />
       <Dashboard
         activeModule={activeModule}
+        moduleVisibility={moduleVisibility}
+        visibleModules={visibleModules}
         workspaceId={workspaceId}
         health={health}
         project={project}

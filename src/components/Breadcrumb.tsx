@@ -1,5 +1,5 @@
-import { findGroupForKey } from '../data/navigation';
 import { useTranslation } from 'react-i18next';
+import { findGroupForKey } from '../data/navigation';
 import type { FeatureModule, ModuleLifecycle, NavigationKey } from '../types/platform';
 
 interface BreadcrumbProps {
@@ -21,7 +21,8 @@ export function Breadcrumb({ activeKey, modules, onNavigate }: BreadcrumbProps) 
   if (!group) return null;
 
   const currentModule = modules.find((m) => m.key === activeKey);
-  const groupEntryKey = group.keys[0];
+  const groupEntryKey =
+    group.keys.find((key) => modules.some((m) => m.key === key)) ?? group.keys[0];
 
   return (
     <nav className="breadcrumb" aria-label={t('navigation.breadcrumbLabel')}>
@@ -43,7 +44,9 @@ export function Breadcrumb({ activeKey, modules, onNavigate }: BreadcrumbProps) 
       {lifecycleLabelKey(currentModule?.lifecycle) ? (
         <span
           className={`module-lifecycle-badge module-lifecycle-badge--${currentModule?.lifecycle}`}
-          title={currentModule?.lifecycleReasonKey ? t(currentModule.lifecycleReasonKey) : undefined}
+          title={
+            currentModule?.lifecycleReasonKey ? t(currentModule.lifecycleReasonKey) : undefined
+          }
         >
           {t(lifecycleLabelKey(currentModule?.lifecycle) ?? '')}
         </span>

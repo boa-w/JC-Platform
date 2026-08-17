@@ -8,6 +8,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '../../components/EmptyState';
 import { ProtocolProfileBar } from '../../components/protocol/ProtocolProfileBar';
@@ -19,6 +20,13 @@ import type {
   LoadedProject,
 } from '../../types/platform';
 import './canopen-export.css';
+import {
+  formatNodeId,
+  formatNodeIds,
+  type NodeIdDisplayBase,
+  parseNodeId,
+  parseNodeIds,
+} from './nodeIdDisplay';
 import { useCanopenExport } from './useCanopenExport';
 
 interface CanopenExportPageProps {
@@ -53,19 +61,17 @@ function cobIdText(value: number | undefined): string {
   return value === undefined ? '' : `0x${value.toString(16).toUpperCase()}`;
 }
 
-function nodeIdsText(value: number[]): string {
-  return value.join(', ');
-}
+const nodeIdDisplayStorageKey = 'jc-platform.canopen.node-id-display';
 
-function parseNodeIds(value: string): number[] {
-  return [
-    ...new Set(
-      value
-        .split(/[,，\s]+/)
-        .map(numeric)
-        .filter((id): id is number => id !== undefined),
-    ),
-  ];
+function readNodeIdDisplayBase(): NodeIdDisplayBase {
+  if (typeof window === 'undefined') return 'decimal';
+  try {
+    return window.localStorage.getItem(nodeIdDisplayStorageKey) === 'hexadecimal'
+      ? 'hexadecimal'
+      : 'decimal';
+  } catch {
+    return 'decimal';
+  }
 }
 
 function sourceValue(document: unknown, section: string | undefined, index: number | undefined) {
@@ -304,6 +310,21 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
   const isJc002 = record(document)?.config_version === 'jc002';
   const config = readCanopen(document);
   const errors = config ? validateCanopen(document, config) : [];
+  const [nodeIdDisplayBase, setNodeIdDisplayBase] =
+    useState<NodeIdDisplayBase>(readNodeIdDisplayBase);
+  const [nodeIdDrafts, setNodeIdDrafts] = useState<Record<number, string>>({});
+  const [consumerNodeIdsDrafts, setConsumerNodeIdsDrafts] = useState<Record<number, string>>({});
+
+  function changeNodeIdDisplayBase(nextBase: NodeIdDisplayBase) {
+    setNodeIdDisplayBase(nextBase);
+    setNodeIdDrafts({});
+    setConsumerNodeIdsDrafts({});
+    try {
+      window.localStorage.setItem(nodeIdDisplayStorageKey, nextBase);
+    } catch {
+      // Display preferences are optional when local storage is unavailable.
+    }
+  }
 
   function updateConfig(next: CanOpenProjectDocument) {
     if (!isJc002) return;
@@ -410,6 +431,7 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
 
   function removePdo(index: number) {
     if (!config) return;
+    setConsumerNodeIdsDrafts({});
     updateConfig({ ...config, pdos: config.pdos.filter((_, pdoIndex) => pdoIndex !== index) });
   }
 
@@ -559,10 +581,36 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
                 <strong>{t('canopenExport.nodeConfiguration')}</strong>
                 <p className="config-helper-text">{t('canopenExport.nodeConfigurationHint')}</p>
               </div>
-              <button onClick={addNode} type="button">
-                <Plus aria-hidden="true" size={15} />
-                {t('canopenExport.addNode')}
-              </button>
+              <div className="canopen-node-toolbar-actions">
+                <fieldset
+                  aria-label={t('canopenExport.nodeIdDisplay')}
+                  className="canopen-node-id-display"
+                >
+                  <legend>{t('canopenExport.nodeIdDisplay')}</legend>
+                  <div className="canopen-segmented-control">
+                    <button
+                      aria-pressed={nodeIdDisplayBase === 'decimal'}
+                      className={nodeIdDisplayBase === 'decimal' ? 'active' : ''}
+                      onClick={() => changeNodeIdDisplayBase('decimal')}
+                      type="button"
+                    >
+                      {t('canopenExport.nodeIdDecimal')}
+                    </button>
+                    <button
+                      aria-pressed={nodeIdDisplayBase === 'hexadecimal'}
+                      className={nodeIdDisplayBase === 'hexadecimal' ? 'active' : ''}
+                      onClick={() => changeNodeIdDisplayBase('hexadecimal')}
+                      type="button"
+                    >
+                      {t('canopenExport.nodeIdHexadecimal')}
+                    </button>
+                  </div>
+                </fieldset>
+                <button onClick={addNode} type="button">
+                  <Plus aria-hidden="true" size={15} />
+                  {t('canopenExport.addNode')}
+                </button>
+              </div>
             </div>
             {config.nodes.length === 0 ? (
               <EmptyState icon={FileArchive}>{t('canopenExport.noNodes')}</EmptyState>
@@ -572,7 +620,9 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
                   <article className="pdo-frame-card canopen-node-card" key={`${node.node_id}-${node.name}`}>
                     <div className="canopen-card-header">
                       <div>
-                        <span className="canopen-card-index">Node {index + 1}</span>
+                        <span className="canopen-card-index">
+                          Node {index + 1} · {formatNodeId(node.node_id, nodeIdDisplayBase)}
+                        </span>
                         <strong>{node.name || t('canopenExport.unnamedNode')}</strong>
                       </div>
                       <button
@@ -589,11 +639,32 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
                       <label>
                         {t('canopenExport.nodeId')}
                         <input
-                          max={127}
-                          min={1}
-                          onChange={(event) => updateNode(index, { node_id: numeric(event.target.value) ?? 0 })}
-                          type="number"
-                          value={node.node_id}
+                          inputMode={nodeIdDisplayBase === 'decimal' ? 'numeric' : 'text'}
+                          onBlur={() =>
+                            setNodeIdDrafts((drafts) => {
+                              const nextDrafts = { ...drafts };
+                              delete nextDrafts[index];
+                              return nextDrafts;
+                            })
+                          }
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setNodeIdDrafts((drafts) => ({ ...drafts, [index]: value }));
+                            const parsed = parseNodeId(value, nodeIdDisplayBase);
+                            if (parsed === undefined) return;
+                            updateNode(index, { node_id: parsed });
+                            setNodeIdDrafts((drafts) => ({
+                              ...drafts,
+                              [index]: formatNodeId(parsed, nodeIdDisplayBase),
+                            }));
+                          }}
+                          placeholder={
+                            nodeIdDisplayBase === 'hexadecimal'
+                              ? t('canopenExport.nodeIdHexadecimalPlaceholder')
+                              : t('canopenExport.nodeIdDecimalPlaceholder')
+                          }
+                          type="text"
+                          value={nodeIdDrafts[index] ?? formatNodeId(node.node_id, nodeIdDisplayBase)}
                         />
                       </label>
                       <label>
@@ -778,7 +849,8 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
                           <option value="">-</option>
                           {config.nodes.map((node) => (
                             <option key={node.node_id} value={node.node_id}>
-                              {node.node_id} · {node.name || t('canopenExport.unnamedNode')}
+                              {formatNodeId(node.node_id, nodeIdDisplayBase)} ·{' '}
+                              {node.name || t('canopenExport.unnamedNode')}
                             </option>
                           ))}
                         </select>
@@ -786,12 +858,30 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
                       <label className="canopen-field-wide">
                         {t('canopenExport.consumerNodes')}
                         <input
-                          onChange={(event) =>
-                            updatePdo(index, { consumer_node_ids: parseNodeIds(event.target.value) })
+                          onBlur={() =>
+                            setConsumerNodeIdsDrafts((drafts) => {
+                              const nextDrafts = { ...drafts };
+                              delete nextDrafts[index];
+                              return nextDrafts;
+                            })
                           }
-                          placeholder={t('canopenExport.consumerNodesPlaceholder')}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setConsumerNodeIdsDrafts((drafts) => ({ ...drafts, [index]: value }));
+                            updatePdo(index, {
+                              consumer_node_ids: parseNodeIds(value, nodeIdDisplayBase),
+                            });
+                          }}
+                          placeholder={
+                            nodeIdDisplayBase === 'hexadecimal'
+                              ? t('canopenExport.consumerNodesHexadecimalPlaceholder')
+                              : t('canopenExport.consumerNodesPlaceholder')
+                          }
                           type="text"
-                          value={nodeIdsText(pdo.consumer_node_ids)}
+                          value={
+                            consumerNodeIdsDrafts[index] ??
+                            formatNodeIds(pdo.consumer_node_ids, nodeIdDisplayBase)
+                          }
                         />
                       </label>
                       <label>

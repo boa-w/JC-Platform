@@ -28,6 +28,10 @@ import {
 import { TranslationTable } from './TranslationTable';
 import { TranslationToolbar } from './TranslationToolbar';
 import type { FilterMode, TranslationRow } from './types';
+import type {
+  LocalizationScope,
+  LocalizationScopeOption,
+} from './localizationAdapter';
 import { useLanguageIndex } from './useLanguageIndex';
 import './language.css';
 
@@ -41,6 +45,11 @@ interface LanguagePageProps {
   onUpdate: (document: LanguageDocument) => void;
   onImportFullLanguage: () => void | Promise<void>;
   supportsLegacyImport?: boolean;
+  scope?: LocalizationScope;
+  scopeOptions?: LocalizationScopeOption[];
+  scopeDescription?: string;
+  onScopeChange?: (scope: LocalizationScope) => void;
+  allowLanguageManagement?: boolean;
 }
 
 type ViewMode = 'editor' | 'comparison';
@@ -199,6 +208,11 @@ export function LanguagePage({
   onUpdate,
   onImportFullLanguage,
   supportsLegacyImport = true,
+  scope = { kind: 'common' },
+  scopeOptions = [],
+  scopeDescription,
+  onScopeChange,
+  allowLanguageManagement = true,
 }: LanguagePageProps) {
   const { t } = useTranslation();
   const langMainRef = useRef<HTMLDivElement | null>(null);
@@ -311,14 +325,21 @@ export function LanguagePage({
 
   const translationKeys = languageIndex.translationKeys;
   const visibleLanguageKeys = languageIndex.visibleLanguageKeys;
+  const protectedKeys = useMemo(
+    () => new Set(document.editor_protected_keys ?? []),
+    [document.editor_protected_keys],
+  );
 
   const selectedDeletableKeys = useMemo(() => {
     const minIndex = document.editor_locked_key_count ?? document.list_code_language.length;
-    return document.list_inner.slice(minIndex).filter((key) => selectedTranslationKeys.has(key));
+    return document.list_inner
+      .slice(minIndex)
+      .filter((key) => !protectedKeys.has(key) && selectedTranslationKeys.has(key));
   }, [
     document.editor_locked_key_count,
     document.list_code_language.length,
     document.list_inner,
+    protectedKeys,
     selectedTranslationKeys,
   ]);
 
@@ -342,6 +363,7 @@ export function LanguagePage({
       key,
       index: i,
       isConfigKey: i < (document.editor_locked_key_count ?? document.list_code_language.length),
+      isInheritedKey: protectedKeys.has(key),
       isExternalKey: i >= document.list_inner.length,
       translations: (document.list_translate[key] as Record<string, string>) ?? {},
     }));
@@ -378,6 +400,7 @@ export function LanguagePage({
     document.list_inner.length,
     document.list_translate,
     modifiedKeys,
+    protectedKeys,
     deferredSearchQuery,
     filterMode,
     selectedLanguage,
@@ -524,6 +547,7 @@ export function LanguagePage({
   }
 
   function handleUpdateKey(index: number, _oldKey: string, newKey: string) {
+    if (protectedKeys.has(_oldKey)) return;
     if (document.list_inner.includes(newKey) || document.list_translate[newKey] !== undefined)
       return;
     const nextInner = [...document.list_inner];
@@ -537,6 +561,7 @@ export function LanguagePage({
 
   function handleRemoveKey(index: number) {
     const key = document.list_inner[index];
+    if (protectedKeys.has(key)) return;
     const nextInner = document.list_inner.filter((_, i) => i !== index);
     const nextTranslate = { ...document.list_translate };
     delete nextTranslate[key];
@@ -572,7 +597,14 @@ export function LanguagePage({
     const translationKeys = document.list_inner.slice(minIndex);
     const movingKeySet = new Set(keys);
     const targetKey = document.list_inner[targetIndex];
-    if (!targetKey || movingKeySet.has(targetKey)) return;
+    if (
+      !targetKey ||
+      movingKeySet.has(targetKey) ||
+      protectedKeys.has(targetKey) ||
+      keys.some((key) => protectedKeys.has(key))
+    ) {
+      return;
+    }
 
     const movingKeys = translationKeys.filter((key) => movingKeySet.has(key));
     if (movingKeys.length === 0) return;
@@ -950,8 +982,50 @@ export function LanguagePage({
         onAddLanguage={handleAddLanguage}
         onUpdateLanguage={handleUpdateLanguage}
         onRemoveLanguage={handleRemoveLanguage}
+        languageManagementEnabled={allowLanguageManagement}
       />
       <div className="lang-main" ref={langMainRef}>
+        {scopeOptions.length > 1 ? (
+          <div className="lang-scope-bar">
+            <label className="lang-scope-select">
+              <span>{t('language.scope.title')}</span>
+              <select
+                value={
+                  scopeOptions.find((option) => {
+                    if (option.scope.kind === 'common' || scope.kind === 'common') {
+                      return option.scope.kind === scope.kind;
+                    }
+                    return (
+                      option.scope.kind === scope.kind &&
+                      option.scope.profileId === scope.profileId
+                    );
+                  })?.id
+                }
+                onChange={(event) => {
+                  const option = scopeOptions.find((item) => item.id === event.target.value);
+                  if (option) onScopeChange?.(option.scope);
+                }}
+              >
+                {scopeOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                    {option.overlayKeyCount > 0
+                      ? ' (' +
+                        t('language.scope.overlayCount', { count: option.overlayKeyCount }) +
+                        ')'
+                      : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="lang-scope-description">
+              {scopeDescription ?? t('language.scope.commonDescription')}
+            </span>
+            {scope.kind !== 'common' ? (
+              <span className="lang-scope-badge">{t('language.scope.overlayBadge')}</span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="lang-view-toggle">
           <div className="lang-view-toggle-tabs">
             <button

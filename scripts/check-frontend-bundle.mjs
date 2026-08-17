@@ -6,9 +6,9 @@ const distDir = join(process.cwd(), 'dist');
 const html = readFileSync(join(distDir, 'index.html'), 'utf8');
 const budgets = {
   // The application-level i18n runtime adds a predictable baseline to the entry chunk.
-  // Separate controller/battery Profile synchronization adds a small
-  // always-loaded document-state layer.
-  script: 128 * 1024,
+  // Profile-scoped localization selection adds a small always-loaded
+  // document-state layer on top of controller/battery synchronization.
+  script: 129.25 * 1024,
   stylesheet: 12.25 * 1024,
 };
 

@@ -41,12 +41,32 @@ test('migrates an Inmotion6-style fixture without positional UI-key drift', asyn
   assert.equal(zh['ui.brake'], '制动状态');
   assert.equal(project.sdo_info.children[0].message_key, 'sdo.parameter.menu.speed');
   assert.match(generatedKeys, /"ui\.speed",\n {4}"ui\.brake",/);
-  assert.equal(project.fault_code_info.definitions.length, 2);
-  assert.equal(
-    new Set(
-      project.fault_code_info.definitions.map((item: { message_key: string }) => item.message_key),
-    ).size,
-    1,
+  assert.equal(project.fault_code_info, undefined);
+});
+
+test('rejects the removed jc001 fault-code MVP instead of converting it', async () => {
+  const outputRoot = await mkdtemp(path.join(os.tmpdir(), 'jc002-fault-mvp-'));
+  const sourcePath = path.join(outputRoot, 'source.jcpro');
+  const projectOutput = path.join(outputRoot, 'project.jcpro');
+  const keysOutput = path.join(outputRoot, 'CommonLocalizationKeys.c');
+  const source = JSON.parse(await readFile(portableProjectPath, 'utf8'));
+  source.fault_code_info = {
+    schema_version: 1,
+    version: 1,
+    sources: [],
+    codes: [],
+  };
+  await writeFile(sourcePath, `${JSON.stringify(source, null, 2)}\n`, 'utf8');
+
+  await assert.rejects(
+    exec(process.execPath, [
+      'scripts/migrate-jc001-i18n-v2.mjs',
+      sourcePath,
+      projectOutput,
+      portableFirmwareHeaderPath,
+      keysOutput,
+    ]),
+    /故障码 MVP 不参与迁移/,
   );
 });
 
