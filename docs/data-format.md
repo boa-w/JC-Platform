@@ -1,10 +1,12 @@
 # jc001 数据格式与 `.jcpro` 架构
 
 > 本文只定义 `config_version: "jc001"`。`jc002` 不继承本文的 `language_info`、保存裁剪或语言索引规则。v2 请阅读 [jc002 项目数据格式](data-format-v2.md)，版本互斥规则见 [配置版本边界](configuration-versions.md)。
+>
+> 基于 jc001 的重构外挂 JSON（sidecar）机制已废弃，仅保留历史项目查看、迁移和兼容保存；新项目和新功能不得继续采用该机制。
 
 ## 格式定位
 
-`.jcpro` 是面向旧版设备工具和固件配置链路的 JSON 项目文件，不是一个新的二进制格式。应用在内存中会把 `.jcpro`、可选重构 sidecar 和迁移默认值合成为一个完整编辑文档；保存和导出分别使用不同的裁剪/构建规则。
+`.jcpro` 是面向旧版设备工具和固件配置链路的 JSON 项目文件，不是一个新的二进制格式。历史兼容流程会把 `.jcpro`、可选 v1 废弃重构 sidecar 和迁移默认值合成为一个完整编辑文档；保存和导出分别使用不同的裁剪/构建规则。
 
 ```text
 编辑态完整文档
@@ -36,9 +38,9 @@
 | `sdo_info` | object | SDO 菜单树和参数 | 二进制 SDO 段 |
 | `language_info` | object | 语言代码、内部键和翻译值 | 二进制语言块、表格交换 |
 | `fault_code_info` | object | 故障来源和故障码 | 可选二进制扩展段和清单描述 |
-| `signal_dictionary` | object | 统一业务信号字典 | 编辑态；`.jcpro` 保存到 sidecar |
-| `private_protocol` | object | 私有协议帧模型 | 编辑态；`.jcpro` 保存到 sidecar |
-| `protocol_mapping` | array | Signal 到传输协议的映射 | 编辑态；`.jcpro` 保存到 sidecar |
+| `signal_dictionary` | object | 历史统一业务信号字典 | 编辑态；`.jcpro` 保存到 v1 废弃 sidecar |
+| `private_protocol` | object | 私有协议帧模型 | 编辑态；`.jcpro` 保存到 v1 废弃 sidecar |
+| `protocol_mapping` | array | Signal 到传输协议的映射 | 编辑态；`.jcpro` 保存到 v1 废弃 sidecar |
 
 `history_ui` 等旧文件中可能存在的额外段会被保留；兼容格式化会优先按照已知字段排序，未知字段放在已知字段之后。
 
@@ -243,7 +245,7 @@ jc001 不再定义锂电监控解析段。锂电监控已统一使用 jc002 的 
 - `list_translate[key][code]` 保存每个键在各语言中的文本；
 - jc001 导出器只收集 SDO 和故障码的旧语言条目；锂电监控不属于 jc001 发布包。
 
-## 统一协议编辑段和 sidecar
+## 统一协议编辑段和 v1 废弃 sidecar
 
 ### `signal_dictionary`
 
@@ -277,7 +279,7 @@ Signal 描述“是什么数据”，不直接描述 CAN 位域；传输位置�
 
 统一协议解析优先使用显式映射；没有显式映射时，会从旧版 CANopen/私有协议段推导兼容映射。“拍平统一协议”只回写 `pdo_global_param`、`pdo_recv` 和 `pdo_send`，不会覆盖 SDO、简化 PDO 或私有协议段。
 
-### sidecar 文件
+### sidecar 文件（已废弃）
 
 标准 sidecar 名称为 `<项目名>.refactor-config.json`，结构如下：
 
@@ -292,7 +294,7 @@ Signal 描述“是什么数据”，不直接描述 CAN 位域；传输位置�
 }
 ```
 
-打开 `.jcpro` 时应用会自动查找同名 `.refactor-config.json`；兼容流程也会尝试同名 `.json`。合并时只覆盖上述三个重构专属段，sidecar 的 `project` 仅作为记录，不覆盖主项目元数据。保存 `.jcpro` 时，主文件只保留旧格式兼容字段，重构专属段写入已挂载 sidecar；若没有 sidecar，保存动作会提示创建一个。
+打开 `.jcpro` 时，历史兼容流程会自动查找同名 `.refactor-config.json`，也会尝试同名 `.json`。合并时只覆盖上述三个重构专属段，sidecar 的 `project` 仅作为记录，不覆盖主项目元数据。保存 `.jcpro` 时，主文件只保留旧格式兼容字段，重构专属段写入已挂载 sidecar；若没有 sidecar，兼容保存动作会提示创建一个。该路径已废弃，jc002 不读取、不创建也不写入 sidecar。
 
 ## 表格导入导出
 

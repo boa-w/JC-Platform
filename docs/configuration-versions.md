@@ -14,6 +14,8 @@
 | 固件入口 | `bin_generate()` | `bin_generate_jc002()` |
 | 缺失文本 | v1 兼容规则 | 严格返回缺失，不做运行时回退 |
 
+v1 的重构外挂 JSON（sidecar）机制已废弃，仅作为历史项目兼容路径保留；jc002 不读取、不创建也不写入该 sidecar。
+
 ## 强制规则
 
 1. `config_version` 必须是字符串，且只能为 `jc001` 或 `jc002`。

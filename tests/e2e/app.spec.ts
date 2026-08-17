@@ -77,6 +77,23 @@ test('shows the explicit jcpro schema in project management', async ({ page }) =
   await expect(page.getByText('JCPro V1 (jc001)', { exact: true })).toBeVisible();
 });
 
+test('marks deprecated v1 signal and sidecar features', async ({ page }) => {
+  await openRichProject(page);
+
+  await page.getByRole('button', { name: '协议', exact: true }).click();
+  const protocolNavigation = page.getByRole('navigation', { name: '协议 功能' });
+  const signalDictionary = protocolNavigation.locator(
+    '[data-navigation-key="signal-dictionary"]',
+  );
+  await expect(signalDictionary).toContainText('废弃');
+  await signalDictionary.click();
+  await expect(page.getByRole('main', { name: '业务信号字典' })).toBeVisible();
+
+  await page.getByRole('button', { name: '项目', exact: true }).click();
+  await expect(page.getByTestId('legacy-sidecar-deprecation')).toContainText('外挂 JSON');
+  await expect(page.getByTestId('legacy-sidecar-deprecation')).toContainText('废弃');
+});
+
 test('navigates core workspaces without runtime errors', async ({ page }) => {
   await page.getByRole('button', { name: '输出', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '输出 功能' })).toBeVisible();
@@ -85,7 +102,10 @@ test('navigates core workspaces without runtime errors', async ({ page }) => {
 
   await page.getByRole('button', { name: '协议', exact: true }).click();
   await expect(page.getByRole('navigation', { name: '协议 功能' })).toBeVisible();
-  await page.getByRole('button', { name: '业务信号字典', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '协议 功能' })
+    .locator('[data-navigation-key="signal-dictionary"]')
+    .click();
   await expect(page.getByRole('heading', { level: 2, name: '业务信号字典' })).toBeVisible();
 });
 

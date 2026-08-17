@@ -60,7 +60,8 @@
       },
       "signalDictionary": {
         "title": "业务信号字典",
-        "description": "负责统一维护 Signal、数据类型、单位、缩放比例和业务含义。"
+        "description": "历史统一业务 Signal 模型；已废弃，仅用于旧项目查看、迁移和兼容审阅。",
+        "lifecycleReason": "jc001 时代的统一 Signal 编辑扩展已废弃；仅保留历史项目查看与迁移用途，新开发请使用 jc002 内置协议配置。"
       },
       "privateProtocol": {
         "title": "私有协议",
@@ -173,8 +174,8 @@
       "save": {
         "title": "确认保存",
         "message": "将当前所有配置修改写入项目文件：",
-        "mountedSidecar": "检测到重构专属配置修改，将写回已挂载 JSON：{{path}}；原 .jcpro 只保存兼容字段。",
-        "newSidecar": "检测到重构专属配置修改，将创建独立 JSON sidecar；原 .jcpro 只保存兼容字段。",
+        "mountedSidecar": "检测到重构专属配置修改，将写回 v1 废弃兼容 JSON：{{path}}；原 .jcpro 只保存兼容字段。",
+        "newSidecar": "检测到重构专属配置修改，将创建 v1 废弃兼容 JSON sidecar；原 .jcpro 只保存兼容字段。",
         "confirm": "确认保存"
       },
       "testData": {
@@ -588,9 +589,9 @@
     },
     "parse": "解析",
     "completeStructure": "补齐结构",
-    "mountRefactorConfig": "挂载重构配置",
-    "saveRefactorConfig": "保存重构配置",
-    "createRefactorConfig": "创建重构配置",
+    "mountRefactorConfig": "挂载 v1 废弃兼容 JSON",
+    "saveRefactorConfig": "保存 v1 废弃兼容 JSON",
+    "createRefactorConfig": "创建 v1 废弃兼容 JSON",
     "saveUnsavedFirst": "请先保存未保存修改",
     "formatJcproTitle": "格式化当前 .jcpro JSON 文件",
     "formatting": "格式化中...",
@@ -600,10 +601,11 @@
     "validation": "校验",
     "compatibleValid": "兼容段通过",
     "compatibleMissing": "缺少兼容段",
-    "refactorConfig": "重构配置",
+    "refactorConfig": "v1 废弃兼容 JSON",
     "notMounted": "未挂载",
+    "legacySidecarDeprecated": "基于 JCPro V1 (jc001) 的外挂 JSON 重构配置机制已废弃，仅用于历史项目兼容、查看和迁移；新项目请使用 JCPro V2 (jc002) 内置配置区段。",
     "missingCompatibleSections": "缺少兼容段：{{sections}}",
-    "sidecarSectionsMissing": "重构专属段未在 .jcpro 中保存：{{sections}}。可通过“挂载重构配置”关联独立 JSON。",
+    "sidecarSectionsMissing": "重构专属段未在 .jcpro 中保存：{{sections}}。可通过“挂载 v1 废弃兼容 JSON”关联独立文件。",
     "warnings": "警告：{{warnings}}",
     "git": {
       "title": "Git 版本管理",
@@ -1630,11 +1632,11 @@
     },
     "filters": {
       "project": "项目文件",
-      "refactor": "重构配置 JSON"
+      "refactor": "重构配置 JSON（v1 废弃兼容）"
     },
     "status": {
-      "autoMounted": "已自动挂载：{{path}}",
-      "noRefactorConfig": "未挂载重构配置 JSON；修改重构专属配置时会提示创建 sidecar。",
+      "autoMounted": "已自动挂载 v1 废弃兼容 JSON：{{path}}",
+      "noRefactorConfig": "未挂载 v1 废弃兼容 JSON；修改重构专属配置时会提示创建 sidecar。",
       "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
       "desktopFilePickerOnly": "系统文件选择器只能在桌面应用中使用；也可以粘贴项目路径后打开。",
       "jcproOnly": "仅支持打开 .jcpro 项目文件。",
@@ -1643,11 +1645,11 @@
       "focusedExistingWindow": "项目已在其他窗口打开，已切换到该窗口。",
       "parseFailed": "项目解析存在问题",
       "migrated": "已规范化：{{version}}",
-      "refactorWritten": "已写回重构配置：{{path}}",
-      "refactorWrittenProject": "重构专属配置已写回：{{path}}；原 .jcpro 不会写入这些字段。",
-      "legacyRefactorSaveAs": "旧 .jcpro 的重构配置需要另存为 JSON；系统保存对话框只能在 Tauri 桌面应用中使用。",
-      "mounted": "已挂载：{{path}}",
-      "refactorSavedAs": "重构专属配置已另存为：{{path}}；原 .jcpro 不会写入这些字段。",
+      "refactorWritten": "已写回 v1 废弃兼容 JSON：{{path}}",
+      "refactorWrittenProject": "v1 废弃兼容配置已写回：{{path}}；原 .jcpro 不会写入这些字段。",
+      "legacyRefactorSaveAs": "旧 .jcpro 的 v1 废弃兼容配置需要另存为 JSON；系统保存对话框只能在 Tauri 桌面应用中使用。",
+      "mounted": "已挂载 v1 废弃兼容 JSON：{{path}}",
+      "refactorSavedAs": "v1 废弃兼容配置已另存为：{{path}}；原 .jcpro 不会写入这些字段。",
       "noFormatPath": "当前项目没有可格式化的文件路径。",
       "formatJcproOnly": "手动格式化仅支持 .jcpro JSON 配置文件。",
       "saveBeforeFormat": "请先保存当前项目配置，再格式化磁盘上的 .jcpro 文件。",

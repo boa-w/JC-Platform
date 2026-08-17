@@ -109,6 +109,7 @@ export function ProjectManagementPage({
   const projectBusy = isOpening || isFormattingJcpro;
   const loadedVersion = getJcproVersion(loadedProject?.document);
   const loadedVersionValue = getJcproVersionValue(loadedProject?.document);
+  const isJc001Project = loadedVersionValue === 'jc001';
   const versionLabel = (version: string | null | undefined) => {
     if (version === 'jc001' || version === 'jc002') {
       return t(`projectManagement.versionTypes.${version}`);
@@ -372,6 +373,19 @@ export function ProjectManagementPage({
               </strong>
             </div>
           </div>
+          {isJc001Project ? (
+            <p
+              aria-label={t('projectManagement.legacySidecarDeprecated')}
+              className="project-open-warning project-deprecation-notice"
+              data-testid="legacy-sidecar-deprecation"
+              role="note"
+            >
+              <span className="module-lifecycle-badge module-lifecycle-badge--deprecated">
+                {t('common.lifecycle.deprecated')}
+              </span>
+              {t('projectManagement.legacySidecarDeprecated')}
+            </p>
+          ) : null}
           {refactorConfigStatus ? (
             <p
               aria-live="polite"

@@ -15,7 +15,7 @@
 - **项目管理**：创建、打开、保存、另存为和迁移 `.jcpro`；执行结构校验，维护最近项目，保存异常退出恢复草稿，并按项目路径提供独立窗口。
 - **设置数据**：编辑 SDO 菜单树、参数权限、读写控制、默认值、上下限、数据类型和预处理。
 - **实时数据**：以简化表格或高级结构维护 PDO 接收/发送帧、全局变量、条件表和信号绑定。
-- **业务信号字典**：以稳定的 `signal_id` 管理业务含义、类型、默认值、范围、缩放和显示属性。
+- **业务信号字典（已废弃）**：历史统一 Signal 模型，仅用于旧项目查看、迁移和兼容审阅。
 - **私有协议**：维护自定义帧、周期、校验、字节序和载荷布局；当前主要用于重构协议模型和兼容迁移。
 - **协议映射**：将业务 Signal 映射到 CANopen SDO/PDO 或私有帧，并执行跨层校验。
 - **CANopen 导出**：从旧项目配置生成 CANopen EDS、厂商扩展、模型报告和 SDO/PDO 测试帧；这是协议交换工具，不等同于设备发布包导出。
@@ -28,7 +28,7 @@
 - **多国语言**：v1 维护 `language_info` 和索引语言块；v2 使用独立 `localization` schema、稳定消息 key 和 LVGL `lv_i18n` 风格动态语言包。两套格式不混用、不隐式回退。
 - **CAN 测试数据**：从 PDO、SDO 和锂电监控配置提取帧，生成冒烟、边界、故障和回归等测试场景，并导出 TXT、CSV 和说明 JSON。
 - **二进制检查**：预览二进制大小、CRC、段地址和语言数量，也可与旧版 `.bin` 逐字节比较并报告首个差异。
-- **Git 项目版本**：复用项目所在仓库，仅管理当前 `.jcpro` 和关联重构 sidecar，不会自动提交源码、图片或导出目录。详见 [项目版本管理](docs/project-version-management.md)。
+- **Git 项目版本**：复用项目所在仓库，仅管理当前 `.jcpro` 和关联的 v1 废弃兼容 sidecar，不会自动提交源码、图片或导出目录。详见 [项目版本管理](docs/project-version-management.md)。
 
 ### 发布导出
 
@@ -66,7 +66,7 @@ docs/                        项目文档
 
 - [架构设计](docs/architecture.md)：前端、Tauri Commands、领域层和基础设施层的职责，以及配置生命周期。
 - [配置版本边界](docs/configuration-versions.md)：`jc001`/`jc002` 的互斥字段、loader 和部署隔离规则。
-- [jc001 数据格式](docs/data-format.md)：旧版项目、sidecar、统一协议编辑态和兼容保存规则。
+- [jc001 数据格式](docs/data-format.md)：旧版项目、已废弃的 v1 sidecar、统一协议编辑态和兼容保存规则。
 - [jc001 导出机制](docs/export-build.md)：旧索引语言块和 v1 二进制布局。
 - [jc002 数据格式](docs/data-format-v2.md)：`localization`、稳定消息 key 和业务引用规则。
 - [jc002 发布包与 ABI](docs/export-build-v2.md)：`LVI2`、v2 SDO、battery 和 fault 记录布局。

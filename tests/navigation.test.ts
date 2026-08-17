@@ -15,3 +15,13 @@ test('keeps navigation groups and feature modules one-to-one', () => {
     'every feature module must be reachable from exactly one navigation group',
   );
 });
+
+test('marks the legacy signal dictionary as deprecated', () => {
+  const signalDictionary = featureModules.find((module) => module.key === 'signal-dictionary');
+
+  assert.equal(signalDictionary?.lifecycle, 'deprecated');
+  assert.equal(
+    signalDictionary?.lifecycleReasonKey,
+    'navigation.modules.signalDictionary.lifecycleReason',
+  );
+});

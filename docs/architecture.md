@@ -1,5 +1,7 @@
 # 架构设计
 
+> 维护边界：业务信号字典和基于 jc001 的重构外挂 JSON（sidecar）均已废弃。它们只保留历史项目查看、迁移和兼容保存路径；新功能应直接使用 jc002 的内置协议、Profile 和 localization 区段。
+
 ## 产品定位
 
 本项目是面向仪表设备配置的桌面工具。它同时承担三类工作：
@@ -10,8 +12,8 @@
 
 这里有三个需要区分的对象：
 
-- **编辑文档**：前端当前使用的完整 JSON，可能合并了 `.jcpro` 和重构 sidecar；
-- **项目文件**：落盘的 `.jcpro` 或独立 `.refactor-config.json`，用于继续编辑和版本管理；
+- **编辑文档**：前端当前使用的完整 JSON，可能合并了 `.jcpro` 和 v1 废弃 sidecar；
+- **项目文件**：落盘的 `.jcpro` 或独立的 v1 `.refactor-config.json`，用于历史项目继续编辑和版本管理；
 - **发布包**：导出目录中的 `ConfigUpdate.json`、`bin/*.bin` 和 `img/`，面向设备更新流程。
 
 发布包不是把编辑文档原样复制出去，而是经过兼容适配、二进制打包和资源路径转换。
@@ -33,11 +35,11 @@ Infrastructure 基础设施适配层
 跨层数据流可以概括为：
 
 ```text
-.jcpro / refactor sidecar
+.jcpro / v1 废弃 refactor sidecar
           ↓ 读取、补全、统一协议迁移
 完整编辑文档（前端状态）
           ↓ 保存时兼容裁剪       ↓ 导出时构建
-.jcpro + 可选 sidecar          jc_export/
+.jcpro + 可选 v1 sidecar       jc_export/
                                ├─ ConfigUpdate.json
                                ├─ bin/*.bin
                                └─ img/
@@ -66,17 +68,17 @@ Profile JSON 下发到设备。
 - 直接复制导出资源
 - 承载协议计算细节
 
-前端会把用户编辑合并到完整文档中，但 `.jcpro` 是否能保存这些字段由后端兼容策略决定。例如 `signal_dictionary`、`private_protocol` 和 `protocol_mapping` 在编辑态可用，保存为 `.jcpro` 时会写入 sidecar，而不是写入旧格式主文件。
+前端会把用户编辑合并到完整文档中，但 `.jcpro` 是否能保存这些字段由后端兼容策略决定。例如历史 v1 的 `signal_dictionary`、`private_protocol` 和 `protocol_mapping` 在编辑态可用，保存为 `.jcpro` 时会写入已废弃的 sidecar，而不是写入旧格式主文件。
 
 ## 功能模块边界
 
 | 模块 | 主要职责 | 主要文档段或产物 |
 | --- | --- | --- |
-| 项目管理 | 创建、打开、迁移、校验、保存、另存为、恢复草稿和项目窗口生命周期 | `.jcpro`、sidecar |
+| 项目管理 | 创建、打开、迁移、校验、保存、另存为、恢复草稿和项目窗口生命周期 | `.jcpro`、v1 废弃 sidecar |
 | 设置数据 | 编辑 SDO 参数树和参数元数据 | `sdo_info` |
 | 实时数据 | 编辑简化 PDO、高级 PDO 和 CANopen 节点/PDO 通信参数 | `pdo_simple_send_recv`、`pdo_*`、`canopen` |
 | 控制器协议 Profile | 维护 ACM/Inmotion 的 PDO、SDO 和 CANopen 协议 | `protocol_profiles.controller_profiles` |
-| 业务信号字典 | 维护业务 Signal 及显示语义 | `signal_dictionary` |
+| 业务信号字典（已废弃） | 维护历史业务 Signal 及显示语义 | `signal_dictionary` |
 | 私有协议 | 维护自定义传输帧和载荷 | `private_protocol` |
 | 协议映射 | 维护 Signal 到 CANopen/私有帧的映射 | `protocol_mapping` |
 | UI 资源 | 维护资源位置、选项和目标路径 | `ui_info`、`img/` |
@@ -87,7 +89,7 @@ Profile JSON 下发到设备。
 | 多国语言 v2 | 维护 locale、稳定消息 key 和复数形式 | `localization`、`LVI2` 动态包 |
 | 项目导出 | 构建发布目录和设备兼容格式 | `ConfigUpdate.json`、`bin/` |
 | CAN 测试数据 | 生成测试场景和纯帧文件 | TXT、CSV、说明 JSON |
-| Git 版本 | 只提交受管项目配置 | `.jcpro`、sidecar |
+| Git 版本 | 只提交受管项目配置 | `.jcpro`、v1 废弃 sidecar |
 
 统一协议页面用于维护更清晰的业务模型，但设备导出当前仍以旧版 PDO/SDO 兼容段为直接输入。用户需要通过“拍平统一协议”动作，把校验通过的 Signal/映射结果写回 `pdo_global_param`、`pdo_recv` 和 `pdo_send`，之后再按旧导出路径构建二进制。
 
@@ -152,7 +154,7 @@ config_version == jc002 -> localization  -> LVI2 动态语言包 -> bin_generate
 
 1. 解析路径并加载 JSON；
 2. 前端为编辑态补齐缺失的导出、锂电监控和故障码段；
-3. 对 `.jcpro` 自动查找同名 `.refactor-config.json`（兼容查找同名 `.json`）；
+3. 对 v1 `.jcpro` 自动查找同名 `.refactor-config.json`（兼容查找同名 `.json`）；该 sidecar 机制已废弃，仅用于历史兼容；
 4. 只把 sidecar 中的重构专属三段合并到编辑文档；
 5. 运行项目结构校验，并按需解析统一协议；完整迁移由用户显式执行“迁移项目”操作。
 
@@ -160,7 +162,7 @@ config_version == jc002 -> localization  -> LVI2 动态语言包 -> bin_generate
 
 - 保存为 `.jcpro` 时写入 `jc001` 兼容格式，刷新 `project.update_time`，并移除 `signal_dictionary`、`private_protocol`、`protocol_mapping`；
 - 保存 jc002 时保留 `config_version`、`localization` 和 `protocol_profiles`，不经过 jc001 清洗器；
-- 如果这些重构专属段有修改，则写入或更新独立 sidecar；
+- 如果这些 v1 重构专属段有修改，则写入或更新独立 sidecar；该路径仅用于历史兼容；
 - 保存为非 `.jcpro` JSON 时保留完整编辑文档；
 - 另存为项目时会复制 UI 图片，并把绝对资源路径转换为目标项目下的相对路径。
 

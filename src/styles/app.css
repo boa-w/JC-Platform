@@ -2365,6 +2365,15 @@ button.git-summary-row:disabled,
   font-size: 13px;
 }
 
+.project-deprecation-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  line-height: 1.5;
+}
+
 .export-message {
   max-height: 132px;
   overflow: auto;

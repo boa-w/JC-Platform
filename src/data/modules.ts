@@ -20,6 +20,8 @@ export const featureModules: FeatureModule[] = [
     key: 'signal-dictionary',
     titleKey: 'navigation.modules.signalDictionary.title',
     descriptionKey: 'navigation.modules.signalDictionary.description',
+    lifecycle: 'deprecated',
+    lifecycleReasonKey: 'navigation.modules.signalDictionary.lifecycleReason',
   },
   {
     key: 'private-protocol',

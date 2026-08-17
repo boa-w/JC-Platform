@@ -15,7 +15,9 @@ test('keeps jc001 and jc002 documentation contracts separate', async () => {
   ]);
 
   assert.match(boundary, /jc001.*jc002/s);
+  assert.match(boundary, /v1[\s\S]*sidecar[\s\S]*废弃/);
   assert.match(v1Data, /只定义 `config_version: "jc001"`/);
+  assert.match(v1Data, /sidecar[\s\S]*废弃/);
   assert.match(v1Export, /只定义 `config_version: "jc001"`/);
   assert.match(v2Data, /禁止字段[\s\S]*```text[\s\S]*language_info/);
   assert.match(v2Export, /v2 禁止字段[\s\S]*language_addr[\s\S]*language_code/);
