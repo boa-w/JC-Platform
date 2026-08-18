@@ -157,6 +157,25 @@ language_code
 
 其他 PDO、屏幕资源和可选段字段沿用公共导出名称，但记录中的文本字段按本页定义的 v2 ABI 编码。
 
+## PDO 构建输入
+
+`jc002` 的 `data.bin` 只从高级 PDO 四段读取：
+
+```text
+pdo_global_param + pdo_condition + pdo_recv + pdo_send
+```
+
+`pdo_simple_send_recv` 不属于 v2 项目文件，也不会作为构建 fallback。CSV/Excel 简化表只
+能通过上位机实时数据页的“导入并转换 PDO”入口使用；转换报告通过后，四段会写回当前激活
+的控制器 Profile，并同步顶层编辑镜像。构建请求若残留简单段会直接失败，防止生成空的或
+与页面显示不一致的 PDO payload。
+
+全局参数的 `inner` 在构建前还要通过 CommonCanPdo 固定 ABI 校验。`-1` 表示不绑定，
+`0..16` 必须对应上位机随附的
+[`common-can-pdo-inner-abi.json`](../src/data/common-can-pdo-inner-abi.json)；未知值或非
+整数值会使构建失败。通过校验的绑定才会写入全局参数索引表，记录格式仍为
+`param_index + inner_id`，下位机不读取参数名称。
+
 ## 总体布局
 
 ```text

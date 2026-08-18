@@ -9,6 +9,7 @@
 //! 项目文件为 JSON 格式，包含 `project`、`device`、`ui_info`、
 //! `pdo_*`、`sdo_info`、`language_info` 等段落。
 
+use crate::domain::pdo::{convert_pdo_simple_document, validate_v2_pdo_inner_bindings};
 use crate::domain::private_protocol::PrivateProtocolDocument;
 use crate::domain::protocol_manager::migrate_project_to_unified_protocol;
 use crate::domain::signal::SignalDictionary;
@@ -140,6 +141,13 @@ impl ProjectValidationReport {
                 schema_valid = false;
             }
             Some("jc002") => {
+                if value.get("pdo_simple_send_recv").is_some() {
+                    warnings.push(
+                        "jc002 只保存高级 PDO 四段；pdo_simple_send_recv 必须先转换后移除"
+                            .to_string(),
+                    );
+                    schema_valid = false;
+                }
                 if let Err(error) = crate::domain::localization::validate_localization(value) {
                     warnings.push(error);
                     schema_valid = false;
@@ -225,11 +233,17 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
         Some("jc002") if document.get("language_info").is_some() => {
             Err("jc002 项目禁止包含 jc001 language_info".to_string())
         }
+        Some("jc002") if document.get("pdo_simple_send_recv").is_some() => {
+            Err("jc002 项目只保存高级 PDO 四段；简单 PDO 只能通过导入流程转换".to_string())
+        }
         Some("jc002") => crate::domain::localization::validate_localization(document),
         Some(version) => Err(format!("不支持的 config_version：{version}")),
         None => Ok(()),
     };
     result?;
+    if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        validate_v2_pdo_inner_bindings(document)?;
+    }
     validate_protocol_profiles_contract(document)?;
     validate_fault_code_version_contract(document)?;
     validate_canopen_contract(document)?;
@@ -374,6 +388,11 @@ pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), Strin
             .ok_or_else(|| format!("{label}.protocol 必须为对象"))?;
         if protocol.contains_key("battery_monitor") {
             return Err(format!("{label}.protocol 不得包含 battery_monitor"));
+        }
+        if protocol.contains_key("pdo_simple_send_recv") {
+            return Err(format!(
+                "{label}.protocol 不得包含 pdo_simple_send_recv；请先转换为高级 PDO"
+            ));
         }
         for section in ["pdo_global_param", "pdo_condition", "pdo_recv", "pdo_send"] {
             if !protocol.get(section).is_some_and(Value::is_array) {
@@ -1273,8 +1292,8 @@ fn validate_canopen_pdo_source(document: &Value, pdo: &CanOpenPdoDocument) -> Re
         ));
     };
     let section_matches_direction = match pdo.direction.as_str() {
-        "receive" => matches!(section, "pdo_recv" | "pdo_simple_send_recv.pdo_recv"),
-        "send" => matches!(section, "pdo_send" | "pdo_simple_send_recv.pdo_send"),
+        "receive" => section == "pdo_recv",
+        "send" => section == "pdo_send",
         _ => false,
     };
     if !section_matches_direction {
@@ -1559,8 +1578,9 @@ pub fn save_project_as(request: SaveProjectAsRequest) -> Result<SaveProjectAsRep
     fs::create_dir_all(&target_dir)
         .map_err(|error| format!("创建目标目录失败 {}：{}", target_dir.display(), error))?;
 
-    validate_project_version_contract(&request.document)?;
-    let mut document = sanitize_document_for_target(&target_path, request.document);
+    let document = normalize_v2_pdo_document(request.document)?;
+    validate_project_version_contract(&document)?;
+    let mut document = sanitize_document_for_target(&target_path, document);
     let mut context = SaveAsResourceContext::new(source_dir, target_dir.clone());
     copy_project_resources(&mut document, &mut context);
 
@@ -1999,7 +2019,6 @@ fn required_v2_project_sections() -> &'static [&'static str] {
         "export_info",
         "device",
         "ui_info",
-        "pdo_simple_send_recv",
         "pdo_global_param",
         "pdo_condition",
         "pdo_recv",
@@ -2007,6 +2026,136 @@ fn required_v2_project_sections() -> &'static [&'static str] {
         "sdo_info",
         "localization",
     ]
+}
+
+/// Normalize the v2 PDO source so that simple PDO never remains a persisted
+/// or build-time input. A legacy v2 document may still contain the old table
+/// section; convert it into every controller profile whose advanced PDO is
+/// empty, then remove the table section from the returned document.
+pub fn normalize_v2_pdo_document(mut document: Value) -> Result<Value, String> {
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
+        return Ok(document);
+    }
+    let Some(simple) = document.get("pdo_simple_send_recv").cloned() else {
+        return Ok(document);
+    };
+
+    let has_profiles = document
+        .get("protocol_profiles")
+        .and_then(Value::as_object)
+        .is_some();
+    let needs_conversion = if has_profiles {
+        document
+            .get("protocol_profiles")
+            .and_then(|value| value.get("controller_profiles"))
+            .and_then(Value::as_array)
+            .map(|profiles| {
+                profiles.iter().any(|profile| {
+                    profile
+                        .get("protocol")
+                        .map(|protocol| !advanced_pdo_sections_have_content(protocol))
+                        .unwrap_or(true)
+                })
+            })
+            .unwrap_or(false)
+    } else {
+        !advanced_pdo_sections_have_content(&document)
+    };
+
+    let converted = if needs_conversion {
+        let report = convert_pdo_simple_document(&simple);
+        if !report.valid {
+            return Err(format!(
+                "jc002 简单 PDO 迁移失败：{}",
+                report.errors.join("；")
+            ));
+        }
+        Some(
+            serde_json::to_value(report.document.expect("valid conversion has document"))
+                .map_err(|error| format!("jc002 简单 PDO 迁移结果序列化失败：{error}"))?,
+        )
+    } else {
+        None
+    };
+
+    if has_profiles {
+        if let Some(converted) = converted.as_ref() {
+            if let Some(profiles) = document
+                .get_mut("protocol_profiles")
+                .and_then(|value| value.get_mut("controller_profiles"))
+                .and_then(Value::as_array_mut)
+            {
+                for profile in profiles {
+                    let Some(protocol) = profile.get_mut("protocol").and_then(Value::as_object_mut)
+                    else {
+                        continue;
+                    };
+                    if advanced_pdo_sections_have_content(&Value::Object(protocol.clone())) {
+                        continue;
+                    }
+                    copy_advanced_pdo_sections(protocol, converted);
+                }
+            }
+        }
+        mirror_active_controller_pdo_sections(&mut document);
+    } else if let Some(converted) = converted.as_ref() {
+        if let Some(root) = document.as_object_mut() {
+            copy_advanced_pdo_sections(root, converted);
+        }
+    }
+
+    document
+        .as_object_mut()
+        .expect("project document must be an object")
+        .remove("pdo_simple_send_recv");
+    Ok(document)
+}
+
+fn advanced_pdo_sections_have_content(value: &Value) -> bool {
+    ["pdo_global_param", "pdo_condition", "pdo_recv", "pdo_send"]
+        .iter()
+        .any(|section| {
+            value
+                .get(*section)
+                .and_then(Value::as_array)
+                .is_some_and(|items| !items.is_empty())
+        })
+}
+
+fn copy_advanced_pdo_sections(target: &mut Map<String, Value>, source: &Value) {
+    for section in ["pdo_global_param", "pdo_condition", "pdo_recv", "pdo_send"] {
+        if let Some(value) = source.get(section) {
+            target.insert(section.to_string(), value.clone());
+        }
+    }
+}
+
+fn mirror_active_controller_pdo_sections(document: &mut Value) {
+    let active_id = document
+        .get("protocol_profiles")
+        .and_then(|value| value.get("active_controller_profile_id"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let Some(active_id) = active_id else {
+        return;
+    };
+    let active_protocol = document
+        .get("protocol_profiles")
+        .and_then(|value| value.get("controller_profiles"))
+        .and_then(Value::as_array)
+        .and_then(|profiles| {
+            profiles.iter().find(|profile| {
+                profile.get("profile_id").and_then(Value::as_str) == Some(active_id.as_str())
+            })
+        })
+        .and_then(|profile| profile.get("protocol"))
+        .cloned();
+    let Some(active_protocol) = active_protocol else {
+        return;
+    };
+    if let Some(root) = document.as_object_mut() {
+        copy_advanced_pdo_sections(root, &active_protocol);
+    }
 }
 
 fn is_unified_protocol_section(section: &str) -> bool {
@@ -2097,7 +2246,7 @@ pub struct ProjectDocument {
     #[serde(default)]
     pub ui_info: UiInfoDocument,
     #[serde(default)]
-    pub pdo_simple_send_recv: PdoSimpleDocument,
+    pub pdo_simple_send_recv: Option<PdoSimpleDocument>,
     #[serde(default)]
     pub pdo_global_param: Vec<Value>,
     #[serde(default)]
@@ -2364,9 +2513,17 @@ pub struct LanguageDocument {
 /// 解析项目文档：先迁移补齐，再尝试反序列化为强类型 `ProjectDocument`。
 pub fn parse_legacy_project_document(path: Option<String>, value: Value) -> ProjectParseReport {
     if value.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        let mut errors = Vec::new();
+        let original = value.clone();
+        let value = match normalize_v2_pdo_document(value) {
+            Ok(value) => value,
+            Err(error) => {
+                errors.push(error);
+                original
+            }
+        };
         let summary = ProjectSummary::from_legacy_value(path, &value);
         let validation = ProjectValidationReport::from_legacy_value(&value);
-        let mut errors = Vec::new();
         let document = match serde_json::from_value::<ProjectDocument>(value) {
             Ok(document) => Some(document),
             Err(error) => {
@@ -2450,7 +2607,6 @@ mod tests {
             "export_info": {},
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": {},
-            "pdo_simple_send_recv": { "pdo_send": [], "pdo_recv": [] },
             "pdo_global_param": [],
             "pdo_condition": [],
             "pdo_recv": [],
@@ -2476,6 +2632,20 @@ mod tests {
     }
 
     #[test]
+    fn validation_rejects_a_residual_simple_pdo_section_in_v2() {
+        let mut document = valid_v2_document();
+        document["pdo_simple_send_recv"] = json!({ "pdo_recv": [], "pdo_send": [] });
+
+        let report = ProjectValidationReport::from_legacy_value(&document);
+
+        assert!(!report.valid);
+        assert!(report
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("pdo_simple_send_recv")));
+    }
+
+    #[test]
     fn parsing_v2_does_not_run_legacy_migration() {
         let report = parse_legacy_project_document(None, valid_v2_document());
 
@@ -2485,7 +2655,99 @@ mod tests {
         assert_eq!(document.config_version.as_deref(), Some("jc002"));
         assert!(document.localization.is_some());
         assert!(document.language_info.is_none());
+        assert!(document.pdo_simple_send_recv.is_none());
         assert!(document.battery_monitor.is_none());
+    }
+
+    #[test]
+    fn parsing_v2_converts_a_legacy_simple_pdo_once_and_drops_the_source_section() {
+        let mut source = valid_v2_document();
+        source["pdo_simple_send_recv"] = json!({
+            "pdo_recv": [{
+                "id": 0x181,
+                "type": 0,
+                "desc": "旧表",
+                "data": [{
+                    "pos": 0,
+                    "len": 8,
+                    "show_type": 0,
+                    "pdo_param_index": 0,
+                    "pdo_param_name": "车辆速度"
+                }]
+            }],
+            "pdo_send": []
+        });
+
+        let report = parse_legacy_project_document(None, source);
+
+        assert!(report.valid, "unexpected errors: {:?}", report.errors);
+        let document = report.document.unwrap();
+        assert!(document.pdo_simple_send_recv.is_none());
+        assert_eq!(document.pdo_global_param.len(), 1);
+        assert_eq!(document.pdo_recv.len(), 1);
+    }
+
+    #[test]
+    fn v2_simple_pdo_migration_populates_empty_controller_profiles() {
+        let mut source = valid_v2_document();
+        source["pdo_simple_send_recv"] = json!({
+            "pdo_recv": [{
+                "id": 0x294,
+                "type": 0,
+                "desc": "控制器状态",
+                "data": [{
+                    "pos": 8,
+                    "len": 8,
+                    "show_type": 0,
+                    "pdo_param_index": 3,
+                    "pdo_param_name": "电池电量"
+                }]
+            }],
+            "pdo_send": []
+        });
+        source["protocol_profiles"] = json!({
+            "schema_version": 2,
+            "active_controller_profile_id": "inmotion",
+            "controller_profiles": [
+                {
+                    "profile_id": "acm",
+                    "controller_family": "ACM",
+                    "controller_revision": "",
+                    "protocol": {
+                        "pdo_global_param": [],
+                        "pdo_condition": [],
+                        "pdo_recv": [],
+                        "pdo_send": [],
+                        "sdo_info": { "type": 0, "children": [] }
+                    }
+                },
+                {
+                    "profile_id": "inmotion",
+                    "controller_family": "Inmotion",
+                    "controller_revision": "",
+                    "protocol": {
+                        "pdo_global_param": [],
+                        "pdo_condition": [],
+                        "pdo_recv": [],
+                        "pdo_send": [],
+                        "sdo_info": { "type": 0, "children": [] }
+                    }
+                }
+            ],
+            "battery_profiles": [],
+            "fault_code_profiles": []
+        });
+
+        let normalized = normalize_v2_pdo_document(source).unwrap();
+
+        assert!(normalized.get("pdo_simple_send_recv").is_none());
+        for profile in normalized["protocol_profiles"]["controller_profiles"]
+            .as_array()
+            .unwrap()
+        {
+            assert_eq!(profile["protocol"]["pdo_recv"].as_array().unwrap().len(), 1);
+        }
+        assert_eq!(normalized["pdo_recv"].as_array().unwrap().len(), 1);
     }
 
     #[test]

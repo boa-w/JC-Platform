@@ -4,6 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
 import type { JsonPath } from '../../utils/projectDirty';
+import {
+  isKnownPdoInnerVariableId,
+  PDO_INNER_VARIABLES,
+  PDO_INNER_VARIABLE_UNBOUND_ID,
+} from './pdoInnerVariableAbi';
+import { pdoSignalLayout } from './pdoLayout';
 import { formatFrameId, formatFrameIdPadded, type PdoEditorController } from './usePdoEditor';
 import '../legacy-data.css';
 
@@ -26,6 +32,7 @@ export function RealtimeDataPage({
   const {
     simpleDocument: currentPdoSimpleDocument,
     advancedDocument: currentPdoAdvancedDocument,
+    supportsSimpleMode,
     selectedKind: selectedRealtimeKind,
     selectedSimpleFrameId: selectedRealtimeFrameId,
     selectedAdvancedFrameId,
@@ -65,6 +72,7 @@ export function RealtimeDataPage({
     updateAdvancedSignal: updatePdoAdvancedSignal,
     addAdvancedSignal: addPdoAdvancedSignal,
     removeAdvancedSignal: removePdoAdvancedSignal,
+    updateAdvancedDocument: updatePdoAdvancedDocument,
   } = controller;
   const [advancedPdoDrawerOpen, setAdvancedPdoDrawerOpen] = useState(false);
   const [advancedPdoDrawerTab, setAdvancedPdoDrawerTab] = useState<'global' | 'condition'>(
@@ -119,6 +127,145 @@ export function RealtimeDataPage({
     setAdvancedPdoDrawerOpen(false);
   }
 
+  function getPdoAdvancedSignalName(signal: { param_id: string }) {
+    return (
+      currentPdoAdvancedDocument?.pdo_global_param.find(
+        (param) => param.param_id === signal.param_id,
+      )?.name ?? signal.param_id
+    );
+  }
+
+  /**
+   * 普通编辑只需要维护协议名称；这里把名称映射回高级 PDO 的全局变量引用。
+   */
+  function updatePdoAdvancedSignalName(
+    kind: 'pdo_recv' | 'pdo_send',
+    frameIndex: number,
+    signalIndex: number,
+    value: string,
+  ) {
+    if (!currentPdoAdvancedDocument) return;
+    const frame = currentPdoAdvancedDocument[kind][frameIndex];
+    const signal = frame?.data[signalIndex];
+    if (!signal) return;
+
+    const currentParamIndex = currentPdoAdvancedDocument.pdo_global_param.findIndex(
+      (param) => param.param_id === signal.param_id,
+    );
+    const matchingParamIndex = currentPdoAdvancedDocument.pdo_global_param.findIndex(
+      (param) => param.name === value && param.param_id !== signal.param_id,
+    );
+
+    if (value && matchingParamIndex >= 0) {
+      updatePdoAdvancedDocument({
+        ...currentPdoAdvancedDocument,
+        [kind]: updateAdvancedFrameSignals(
+          currentPdoAdvancedDocument[kind],
+          frameIndex,
+          signalIndex,
+          currentPdoAdvancedDocument.pdo_global_param[matchingParamIndex].param_id,
+        ),
+      });
+      return;
+    }
+
+    if (currentParamIndex >= 0) {
+      updatePdoAdvancedDocument({
+        ...currentPdoAdvancedDocument,
+        pdo_global_param: currentPdoAdvancedDocument.pdo_global_param.map((param, index) =>
+          index === currentParamIndex ? { ...param, name: value } : param,
+        ),
+      });
+      return;
+    }
+
+    if (!value) return;
+    const paramId = nextPdoParamId(currentPdoAdvancedDocument.pdo_global_param);
+    updatePdoAdvancedDocument({
+      ...currentPdoAdvancedDocument,
+      pdo_global_param: [
+        ...currentPdoAdvancedDocument.pdo_global_param,
+        { param_id: paramId, name: value, def: '0', reserved: 0, type: 0, inner: -1 },
+      ],
+      [kind]: updateAdvancedFrameSignals(
+        currentPdoAdvancedDocument[kind],
+        frameIndex,
+        signalIndex,
+        paramId,
+      ),
+    });
+  }
+
+  function renderPdoPositionEditor(
+    signal: { show_type: number; pos: number; len: number },
+    ariaLabel: string,
+    onChange: (position: number) => void,
+  ) {
+    const layout = pdoSignalLayout(signal);
+    return (
+      <fieldset className="pdo-signal-position-editor" aria-label={ariaLabel}>
+        <label>
+          <span>{layout.positionUnit}</span>
+          <input
+            aria-label={`${ariaLabel} ${layout.positionUnit}`}
+            min={0}
+            type="number"
+            value={layout.position}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              const nextPosition =
+                layout.mode === 0
+                  ? value * 8
+                  : layout.mode === 1
+                    ? value * 8 + (layout.bit ?? 0)
+                    : value;
+              onChange(nextPosition);
+            }}
+          />
+        </label>
+        {layout.mode === 1 ? (
+          <label>
+            <span>bit</span>
+            <input
+              aria-label={`${ariaLabel} bit`}
+              max={7}
+              min={0}
+              type="number"
+              value={layout.bit ?? 0}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                onChange(layout.position * 8 + value);
+              }}
+            />
+          </label>
+        ) : null}
+      </fieldset>
+    );
+  }
+
+  function renderPdoLengthEditor(
+    signal: { show_type: number; pos: number; len: number },
+    ariaLabel: string,
+    onChange: (lengthInBits: number) => void,
+  ) {
+    const layout = pdoSignalLayout(signal);
+    return (
+      <fieldset className="pdo-signal-length-editor" aria-label={ariaLabel}>
+        <input
+          aria-label={`${ariaLabel} ${layout.lengthUnit}`}
+          min={1}
+          type="number"
+          value={layout.length}
+          onChange={(event) => {
+            const value = Number(event.target.value);
+            onChange(layout.lengthUnit === 'bytes' ? value * 8 : value);
+          }}
+        />
+        <span>{layout.lengthUnit}</span>
+      </fieldset>
+    );
+  }
+
   function renderAdvancedGlobalParamsPanel() {
     return (
       <section className="legacy-edit-panel legacy-edit-panel--drawer">
@@ -138,7 +285,7 @@ export function RealtimeDataPage({
                 <th>{t('protocol.signalDictionary.defaultValue')}</th>
                 <th>{t('realtimeData.reserved')}</th>
                 <th>{t('protocol.common.type')}</th>
-                <th>{t('realtimeData.internalVariable')}</th>
+                <th>{t('realtimeData.internalVariableBinding')}</th>
                 <th>{t('protocol.common.actions')}</th>
               </tr>
             </thead>
@@ -212,17 +359,33 @@ export function RealtimeDataPage({
                     />
                   </td>
                   <td>
-                    <input
+                    <select
                       aria-label={t('realtimeData.globalFieldAria', {
                         index: index + 1,
-                        field: t('realtimeData.internalVariable'),
+                        field: t('realtimeData.internalVariableBinding'),
                       })}
-                      type="number"
-                      value={item.inner}
+                      title={t('realtimeData.internalVariableDescription')}
+                      value={Number.isInteger(item.inner) ? item.inner : PDO_INNER_VARIABLE_UNBOUND_ID}
                       onChange={(event) =>
                         updatePdoGlobalParam(index, 'inner', Number(event.target.value))
                       }
-                    />
+                    >
+                      <option value={PDO_INNER_VARIABLE_UNBOUND_ID}>
+                        {t('realtimeData.internalVariableUnbound')}
+                      </option>
+                      {Number.isInteger(item.inner) &&
+                      item.inner !== PDO_INNER_VARIABLE_UNBOUND_ID &&
+                      !isKnownPdoInnerVariableId(item.inner) ? (
+                        <option value={item.inner}>
+                          {t('realtimeData.internalVariableUnknown', { id: item.inner })}
+                        </option>
+                      ) : null}
+                      {PDO_INNER_VARIABLES.map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {entry.id} · {entry.code} · {entry.label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>
                     <button
@@ -238,6 +401,9 @@ export function RealtimeDataPage({
             </tbody>
           </table>
         </div>
+        <p className="pdo-inner-variable-note">
+          {t('realtimeData.internalVariableDescription')}
+        </p>
       </section>
     );
   }
@@ -420,7 +586,9 @@ export function RealtimeDataPage({
                   size={14}
                   strokeWidth={1.8}
                 />
-                <span>{t(kind === 'pdo_recv' ? 'realtimeData.receiveTable' : 'realtimeData.sendTable')}</span>
+                <span>
+                  {t(kind === 'pdo_recv' ? 'realtimeData.receiveTable' : 'realtimeData.sendTable')}
+                </span>
               </button>
               {selectedRealtimeKind === kind
                 ? (realtimeMode === 'simple' ? realtimeFrames(kind) : advancedFrames(kind)).map(
@@ -501,22 +669,26 @@ export function RealtimeDataPage({
                 ),
               })}
             </strong>
-            <div className="legacy-mode-tabs-inline">
-              <button
-                className={realtimeMode === 'simple' ? 'active' : ''}
-                onClick={() => setRealtimeMode('simple')}
-                type="button"
-              >
-                {t('realtimeData.simpleConfiguration')}
-              </button>
-              <button
-                className={realtimeMode === 'advanced' ? 'active' : ''}
-                onClick={() => setRealtimeMode('advanced')}
-                type="button"
-              >
-                {t('realtimeData.advancedConfiguration')}
-              </button>
-            </div>
+            {supportsSimpleMode ? (
+              <div className="legacy-mode-tabs-inline">
+                <button
+                  className={realtimeMode === 'simple' ? 'active' : ''}
+                  onClick={() => setRealtimeMode('simple')}
+                  type="button"
+                >
+                  {t('realtimeData.simpleConfiguration')}
+                </button>
+                <button
+                  className={realtimeMode === 'advanced' ? 'active' : ''}
+                  onClick={() => setRealtimeMode('advanced')}
+                  type="button"
+                >
+                  {t('realtimeData.advancedConfiguration')}
+                </button>
+              </div>
+            ) : (
+              <span className="config-mode-note">{t('realtimeData.advancedOnlyNotice')}</span>
+            )}
           </div>
           <div className="legacy-data-actions">
             <button
@@ -568,7 +740,7 @@ export function RealtimeDataPage({
         <div className="legacy-data-table-wrap">
           {!currentPdoSimpleDocument && !currentPdoAdvancedDocument ? (
             <div className="legacy-data-empty">{t('language.page.openProjectFirst')}</div>
-          ) : realtimeMode === 'simple' ? (
+          ) : realtimeMode === 'simple' && supportsSimpleMode ? (
             selectedRealtimeFrameId === null ? (
               <table className="legacy-data-table">
                 <thead>
@@ -686,15 +858,14 @@ export function RealtimeDataPage({
                 </tbody>
               </table>
             ) : activeRealtimeFrame && activeRealtimeFrameIndex >= 0 ? (
-              <table className="legacy-data-table">
+              <table className="legacy-data-table legacy-data-table--pdo-signals">
                 <thead>
                   <tr>
                     <th />
-                    <th>{t('realtimeData.parameterName')}</th>
+                    <th>{t('realtimeData.protocolName')}</th>
                     <th>{t('realtimeData.readMethod')}</th>
-                    <th>{t('settingData.columns.bitStart')}</th>
-                    <th>{t('settingData.columns.bitLength')}</th>
-                    <th>{t('realtimeData.parameterIndex')}</th>
+                    <th>{t('realtimeData.startPosition')}</th>
+                    <th>{t('realtimeData.dataLength')}</th>
                     <th>{t('protocol.common.actions')}</th>
                   </tr>
                 </thead>
@@ -732,7 +903,7 @@ export function RealtimeDataPage({
                           <input
                             aria-label={t('realtimeData.signalFieldAria', {
                               index: index + 1,
-                              field: t('realtimeData.parameterName'),
+                              field: t('realtimeData.protocolName'),
                             })}
                             value={signal.pdo_param_name || ''}
                             onChange={(event) =>
@@ -752,7 +923,7 @@ export function RealtimeDataPage({
                               index: index + 1,
                               field: t('realtimeData.readMethod'),
                             })}
-                            value={signal.show_type}
+                            value={pdoSignalLayout(signal).mode}
                             onChange={(event) =>
                               updatePdoSignal(
                                 selectedRealtimeKind,
@@ -769,61 +940,38 @@ export function RealtimeDataPage({
                           </select>
                         </td>
                         <td>
-                          <input
-                            aria-label={t('realtimeData.signalFieldAria', {
+                          {renderPdoPositionEditor(
+                            signal,
+                            t('realtimeData.signalFieldAria', {
                               index: index + 1,
-                              field: t('settingData.columns.bitStart'),
-                            })}
-                            type="number"
-                            value={signal.pos}
-                            onChange={(event) =>
+                              field: t('realtimeData.startPosition'),
+                            }),
+                            (position) =>
                               updatePdoSignal(
                                 selectedRealtimeKind,
                                 activeRealtimeFrameIndex,
                                 index,
                                 'pos',
-                                Number(event.target.value),
-                              )
-                            }
-                          />
+                                position,
+                              ),
+                          )}
                         </td>
                         <td>
-                          <input
-                            aria-label={t('realtimeData.signalFieldAria', {
+                          {renderPdoLengthEditor(
+                            signal,
+                            t('realtimeData.signalFieldAria', {
                               index: index + 1,
-                              field: t('settingData.columns.bitLength'),
-                            })}
-                            type="number"
-                            value={signal.len}
-                            onChange={(event) =>
+                              field: t('realtimeData.dataLength'),
+                            }),
+                            (lengthInBits) =>
                               updatePdoSignal(
                                 selectedRealtimeKind,
                                 activeRealtimeFrameIndex,
                                 index,
                                 'len',
-                                Number(event.target.value),
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            aria-label={t('realtimeData.signalFieldAria', {
-                              index: index + 1,
-                              field: t('realtimeData.parameterIndex'),
-                            })}
-                            type="number"
-                            value={signal.pdo_param_index}
-                            onChange={(event) =>
-                              updatePdoSignal(
-                                selectedRealtimeKind,
-                                activeRealtimeFrameIndex,
-                                index,
-                                'pdo_param_index',
-                                Number(event.target.value),
-                              )
-                            }
-                          />
+                                lengthInBits,
+                              ),
+                          )}
                         </td>
                         <td>
                           {isModifiedPath(signalPath) ? (
@@ -992,16 +1140,14 @@ export function RealtimeDataPage({
                   </tbody>
                 </table>
               ) : activeAdvancedFrame && activeAdvancedFrameIndex >= 0 ? (
-                <table className="legacy-data-table">
+                <table className="legacy-data-table legacy-data-table--pdo-signals">
                   <thead>
                     <tr>
                       <th />
-                      <th>{t('realtimeData.parameterId')}</th>
-                      <th>{t('realtimeData.position')}</th>
-                      <th>{t('realtimeData.length')}</th>
-                      <th>{t('realtimeData.displayType')}</th>
-                      <th>{t('realtimeData.handler')}</th>
-                      <th>{t('realtimeData.handlerParameter')}</th>
+                      <th>{t('realtimeData.protocolName')}</th>
+                      <th>{t('realtimeData.readMethod')}</th>
+                      <th>{t('realtimeData.startPosition')}</th>
+                      <th>{t('realtimeData.dataLength')}</th>
                       <th>{t('protocol.common.actions')}</th>
                     </tr>
                   </thead>
@@ -1025,66 +1171,26 @@ export function RealtimeDataPage({
                           <input
                             aria-label={t('realtimeData.advancedSignalFieldAria', {
                               index: index + 1,
-                              field: t('realtimeData.parameterId'),
+                              field: t('realtimeData.protocolName'),
                             })}
-                            value={signal.param_id}
+                            value={getPdoAdvancedSignalName(signal)}
                             onChange={(event) =>
-                              updatePdoAdvancedSignal(
+                              updatePdoAdvancedSignalName(
                                 selectedRealtimeKind,
                                 activeAdvancedFrameIndex,
                                 index,
-                                'param_id',
                                 event.target.value,
                               )
                             }
                           />
                         </td>
                         <td>
-                          <input
+                          <select
                             aria-label={t('realtimeData.advancedSignalFieldAria', {
                               index: index + 1,
-                              field: t('settingData.columns.bitStart'),
+                              field: t('realtimeData.readMethod'),
                             })}
-                            type="number"
-                            value={signal.pos}
-                            onChange={(event) =>
-                              updatePdoAdvancedSignal(
-                                selectedRealtimeKind,
-                                activeAdvancedFrameIndex,
-                                index,
-                                'pos',
-                                Number(event.target.value),
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            aria-label={t('realtimeData.advancedSignalFieldAria', {
-                              index: index + 1,
-                              field: t('settingData.columns.bitLength'),
-                            })}
-                            type="number"
-                            value={signal.len}
-                            onChange={(event) =>
-                              updatePdoAdvancedSignal(
-                                selectedRealtimeKind,
-                                activeAdvancedFrameIndex,
-                                index,
-                                'len',
-                                Number(event.target.value),
-                              )
-                            }
-                          />
-                        </td>
-                        <td>
-                          <input
-                            aria-label={t('realtimeData.advancedSignalFieldAria', {
-                              index: index + 1,
-                              field: t('realtimeData.displayType'),
-                            })}
-                            type="number"
-                            value={signal.show_type}
+                            value={pdoSignalLayout(signal).mode}
                             onChange={(event) =>
                               updatePdoAdvancedSignal(
                                 selectedRealtimeKind,
@@ -1094,44 +1200,45 @@ export function RealtimeDataPage({
                                 Number(event.target.value),
                               )
                             }
-                          />
+                          >
+                            <option value={0}>{t('realtimeData.readMethods.bytes')}</option>
+                            <option value={1}>{t('realtimeData.readMethods.bytesBits')}</option>
+                            <option value={2}>{t('realtimeData.readMethods.bits')}</option>
+                          </select>
                         </td>
                         <td>
-                          <input
-                            aria-label={t('realtimeData.advancedSignalFieldAria', {
+                          {renderPdoPositionEditor(
+                            signal,
+                            t('realtimeData.advancedSignalFieldAria', {
                               index: index + 1,
-                              field: t('realtimeData.handler'),
-                            })}
-                            type="number"
-                            value={signal.handle}
-                            onChange={(event) =>
+                              field: t('realtimeData.startPosition'),
+                            }),
+                            (position) =>
                               updatePdoAdvancedSignal(
                                 selectedRealtimeKind,
                                 activeAdvancedFrameIndex,
                                 index,
-                                'handle',
-                                Number(event.target.value),
-                              )
-                            }
-                          />
+                                'pos',
+                                position,
+                              ),
+                          )}
                         </td>
                         <td>
-                          <input
-                            aria-label={t('realtimeData.advancedSignalFieldAria', {
+                          {renderPdoLengthEditor(
+                            signal,
+                            t('realtimeData.advancedSignalFieldAria', {
                               index: index + 1,
-                              field: t('realtimeData.handlerParameter'),
-                            })}
-                            value={signal.handle_param}
-                            onChange={(event) =>
+                              field: t('realtimeData.dataLength'),
+                            }),
+                            (lengthInBits) =>
                               updatePdoAdvancedSignal(
                                 selectedRealtimeKind,
                                 activeAdvancedFrameIndex,
                                 index,
-                                'handle_param',
-                                event.target.value,
-                              )
-                            }
-                          />
+                                'len',
+                                lengthInBits,
+                              ),
+                          )}
                         </td>
                         <td>
                           <button
@@ -1153,7 +1260,9 @@ export function RealtimeDataPage({
                   </tbody>
                 </table>
               ) : (
-                <div className="legacy-data-empty">{t('realtimeData.selectOrAddAdvancedFrame')}</div>
+                <div className="legacy-data-empty">
+                  {t('realtimeData.selectOrAddAdvancedFrame')}
+                </div>
               )}
               {renderAdvancedPdoDrawer()}
             </div>
@@ -1162,4 +1271,30 @@ export function RealtimeDataPage({
       </div>
     </section>
   );
+}
+
+function updateAdvancedFrameSignals<T extends { data: Array<{ param_id: string }> }>(
+  frames: T[],
+  frameIndex: number,
+  signalIndex: number,
+  paramId: string,
+) {
+  return frames.map((frame, currentFrameIndex) =>
+    currentFrameIndex === frameIndex
+      ? {
+          ...frame,
+          data: frame.data.map((signal, currentSignalIndex) =>
+            currentSignalIndex === signalIndex ? { ...signal, param_id: paramId } : signal,
+          ),
+        }
+      : frame,
+  );
+}
+
+function nextPdoParamId(params: Array<{ param_id: string }>) {
+  const base = 'PDO_PARAM';
+  const usedIds = new Set(params.map((param) => param.param_id));
+  let suffix = params.length + 1;
+  while (usedIds.has(`${base}_${suffix}`)) suffix += 1;
+  return `${base}_${suffix}`;
 }

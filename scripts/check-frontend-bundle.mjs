@@ -9,7 +9,10 @@ const budgets = {
   // Profile-scoped localization selection adds a small always-loaded
   // document-state layer on top of controller/battery synchronization.
   // Keep a measured margin for the stable entry chunk across supported Node/Vite builds.
-  script: 130 * 1024,
+  // jc002 PDO import/conversion status and version-aware editor routing add
+  // a small, intentional amount of always-loaded application code.
+  // The compact PDO signal editor also keeps its reference mapping in the editor controller.
+  script: 131 * 1024,
   stylesheet: 12.25 * 1024,
 };
 

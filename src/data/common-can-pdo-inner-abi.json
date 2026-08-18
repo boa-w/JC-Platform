@@ -1,0 +1,24 @@
+{
+  "abi_version": "common-can-pdo-v1",
+  "source": "CommonCanPdoConfig.h",
+  "unbound_id": -1,
+  "variables": [
+    { "id": 0, "code": "SPEED", "label": "速度" },
+    { "id": 1, "code": "SOC", "label": "SOC" },
+    { "id": 2, "code": "HOUR", "label": "小时计" },
+    { "id": 3, "code": "ERR", "label": "故障代码" },
+    { "id": 4, "code": "HANDBRAKE", "label": "手刹" },
+    { "id": 5, "code": "SEAT_SWITCH", "label": "座椅开关" },
+    { "id": 6, "code": "STEER_ANGLE", "label": "车轮转向角度" },
+    { "id": 7, "code": "SPE_MODE", "label": "SPE模式" },
+    { "id": 8, "code": "SPE_MODE_SET", "label": "SPE模式设置" },
+    { "id": 9, "code": "LOCK_CAR", "label": "锁车" },
+    { "id": 10, "code": "SEAT_BELT_SWITCH", "label": "安全带开关" },
+    { "id": 11, "code": "TURN_LEFT", "label": "左转向灯" },
+    { "id": 12, "code": "TURN_RIGHT", "label": "右转向灯" },
+    { "id": 13, "code": "LIFTING_LOCK", "label": "提升锁" },
+    { "id": 14, "code": "GEAR", "label": "档位" },
+    { "id": 15, "code": "LIMIT_SPEED", "label": "限速" },
+    { "id": 16, "code": "REMOTE_MANAGE", "label": "远程管理" }
+  ]
+}

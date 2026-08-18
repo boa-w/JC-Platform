@@ -37,6 +37,12 @@ v1 的重构外挂 JSON（sidecar）机制已废弃，仅作为历史项目兼�
 12. v2 的根级 localization 是公共语言目录；Profile overlay 只能复用公共 locale 集合，
     可以覆盖公共 key 或增加 Profile 专属 key。控制器、锂电和故障码 overlay 在同一组合中
     出现相同 key 且文案不一致时，项目校验和导出都会失败。
+13. jc002 的 PDO 构建输入固定为 `pdo_global_param`、`pdo_condition`、`pdo_recv` 和
+    `pdo_send`。`pdo_simple_send_recv` 只允许作为表格导入的临时输入；转换完成后必须
+    移除，保存、另存为和构建都不得保留或读取它。jc001 的简化 PDO 回退仅属于 v1 路径。
+14. jc002 PDO 的 `inner` 是 CommonCanPdo 固定 ABI 绑定：`-1` 表示不绑定，绑定值必须
+    来自上位机随附的版本化 ABI 清单。参数名称、`param_id` 和多语言文案不得推断或替代
+    这个数字；未知绑定值必须在打开/保存/构建时拒绝。
 
 ## 文件与部署隔离
 

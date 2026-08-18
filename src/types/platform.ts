@@ -164,7 +164,8 @@ export interface ProjectDocument {
   export_info: ProjectExportSettings;
   device: DeviceConfig;
   ui_info: UiInfoDocument;
-  pdo_simple_send_recv: PdoSimpleDocument;
+  /** v1 editing/import compatibility only; jc002 persists advanced PDO sections. */
+  pdo_simple_send_recv?: PdoSimpleDocument;
   pdo_global_param: unknown[];
   pdo_condition: unknown[];
   pdo_recv: unknown[];
@@ -945,6 +946,16 @@ export interface PdoSimpleImportReport {
   table: TableValidationReport;
   errors: string[];
   document: unknown | null;
+}
+
+export interface PdoSimpleConversionReport {
+  valid: boolean;
+  document: PdoAdvancedDocument | null;
+  errors: string[];
+  warnings: string[];
+  source_frame_total: number;
+  source_signal_total: number;
+  generated_param_total: number;
 }
 
 export interface PdoAdvancedParseReport {

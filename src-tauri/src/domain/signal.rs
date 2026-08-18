@@ -85,7 +85,9 @@ impl SignalDictionary {
 pub fn derive_signal_dictionary_from_legacy(document: &Value) -> SignalDictionary {
     let mut dictionary = SignalDictionary::default();
     collect_pdo_global_signals(document, &mut dictionary);
-    collect_simple_pdo_signals(document, &mut dictionary);
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
+        collect_simple_pdo_signals(document, &mut dictionary);
+    }
     collect_sdo_signals(document.get("sdo_info"), &mut dictionary);
     dictionary
         .signals

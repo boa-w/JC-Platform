@@ -137,6 +137,7 @@
       "importTitle": "从 CSV/XLS/XLSX/XML 文件导入",
       "importing": "导入中...",
       "import": "导入",
+      "importPdoAndConvert": "导入并转换 PDO",
       "exportCsvTitle": "导出为 CSV 格式",
       "exportExcelTitle": "导出为 Excel XML 格式",
       "generateTestDataTitle": "自动构建当前页面的 CAN 测试数据",
@@ -358,7 +359,7 @@
   "tableConfig": {
     "titles": {
       "sdo": "SDO 参数配置",
-      "pdoSimple": "PDO 简化配置",
+      "pdoSimple": "PDO 表导入",
       "language": "多国语言"
     },
     "importValidation": "导入校验",
@@ -366,6 +367,13 @@
     "hasIssues": "存在问题",
     "headerCount": "表头列数",
     "targetSection": "写回段落",
+    "convertedFrames": "转换帧数",
+    "convertedSignals": "转换信号数",
+    "generatedParameters": "生成参数数",
+    "conversionValidation": "转换校验",
+    "targets": {
+      "advancedPdo": "高级 PDO 四段"
+    },
     "filters": {
       "csv": "CSV 表格",
       "excelXml": "Excel XML 表格",
@@ -376,7 +384,9 @@
       "desktopSaveDialogOnly": "系统保存对话框只能在 Tauri 桌面应用中使用。",
       "desktopFilePickerOnly": "系统文件选择器只能在 Tauri 桌面应用中使用。",
       "exported": "已导出：{{path}}",
-      "importFailed": "表格导入失败"
+      "importFailed": "表格导入失败",
+      "pdoSimpleExportDisabled": "简单 PDO 仅支持导入；当前配置已保存为高级 PDO",
+      "pdoSimpleConversionFailed": "简单 PDO 转换为高级 PDO 失败"
     }
   },
   "pdoAdvancedReport": {
@@ -1024,7 +1034,11 @@
     "parameterId": "参数ID",
     "reserved": "保留",
     "reservedValue": "保留值",
-    "internalVariable": "内部变量",
+    "internalVariable": "下位机绑定",
+    "internalVariableBinding": "下位机内部变量 ID",
+    "internalVariableDescription": "仅用于写入 CommonCanPdo 的固定 ABI；参数名称不会自动绑定。",
+    "internalVariableUnbound": "不绑定（-1）",
+    "internalVariableUnknown": "未知 ABI ID {{id}}（请修正）",
     "globalFieldAria": "全局变量 {{index}} {{field}}",
     "conditions": "条件表",
     "processingMethod": "处理方式",
@@ -1045,6 +1059,7 @@
     "heading": "{{table}}（{{mode}}）",
     "simpleConfiguration": "简化配置",
     "advancedConfiguration": "高级配置",
+    "advancedOnlyNotice": "jc002 仅保存高级 PDO；CSV/Excel 简化表请使用顶部导入并转换",
     "addFrameId": "新增帧ID",
     "addProtocol": "新增协议",
     "addGlobalParameter": "新增全局变量",
@@ -1054,7 +1069,10 @@
     "dataItems": "数据项",
     "frameFieldAria": "{{direction}}帧 {{index}} {{field}}",
     "parameterName": "参数名称",
-    "readMethod": "读取方式",
+    "protocolName": "协议名称",
+    "readMethod": "取数方式",
+    "startPosition": "开始位置",
+    "dataLength": "数据长度",
     "parameterIndex": "参数索引",
     "signalFieldAria": "信号 {{index}} {{field}}",
     "readMethods": {

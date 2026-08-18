@@ -4,6 +4,7 @@ type JsonEditorMode = 'simple' | 'advanced';
 
 type JsonEditorContext = {
   realtimeMode: JsonEditorMode;
+  configVersion?: string;
 };
 
 export type DocumentSectionKey =
@@ -90,8 +91,11 @@ export function jsonEditorKeyForModule(
   context: JsonEditorContext,
 ): JsonEditorKey {
   if (key === 'setting-data') return 'sdo';
-  if (key === 'realtime-data')
-    return context.realtimeMode === 'simple' ? 'pdo-simple' : 'pdo-advanced';
+  if (key === 'realtime-data') {
+    return context.configVersion === 'jc002' || context.realtimeMode === 'advanced'
+      ? 'pdo-advanced'
+      : 'pdo-simple';
+  }
   return key;
 }
 

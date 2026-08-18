@@ -129,6 +129,8 @@ export function DashboardActionBar({
           version: projectVersionValue || t('projectManagement.versionTypes.notDetected'),
         })
       : t(`projectManagement.versionTypes.${projectVersion}`);
+  const isJc002 =
+    (loadedProject?.document as Record<string, unknown> | undefined)?.config_version === 'jc002';
   const gitSummaryId = useId();
   const [showGitSummary, setShowGitSummary] = useState(false);
   const gitSummaryRef = useRef<HTMLDivElement | null>(null);
@@ -179,7 +181,7 @@ export function DashboardActionBar({
 
   function handleRequestTestData() {
     const type: TestDataType =
-      activeModule.key === 'realtime-data' && pdoMode === 'simple'
+      activeModule.key === 'realtime-data' && !isJc002 && pdoMode === 'simple'
         ? 'pdo-simple'
         : activeModule.key === 'realtime-data'
           ? 'pdo-advanced'
@@ -340,28 +342,34 @@ export function DashboardActionBar({
                   {t(
                     isImportingTable
                       ? 'dashboard.actionBar.importing'
-                      : 'dashboard.actionBar.import',
+                      : currentLegacyTableKind === 'pdoSimple' && isJc002
+                        ? 'dashboard.actionBar.importPdoAndConvert'
+                        : 'dashboard.actionBar.import',
                   )}
                 </button>
               ) : null}
-              <button
-                className="action-bar-btn action-bar-btn--ghost"
-                disabled={!loadedProject || isExportingTable || isFormattingJcpro}
-                onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'csv')}
-                type="button"
-                title={t('dashboard.actionBar.exportCsvTitle')}
-              >
-                CSV
-              </button>
-              <button
-                className="action-bar-btn action-bar-btn--ghost"
-                disabled={!loadedProject || isExportingTable || isFormattingJcpro}
-                onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'xml')}
-                type="button"
-                title={t('dashboard.actionBar.exportExcelTitle')}
-              >
-                Excel
-              </button>
+              {currentLegacyTableKind !== 'pdoSimple' || !isJc002 ? (
+                <>
+                  <button
+                    className="action-bar-btn action-bar-btn--ghost"
+                    disabled={!loadedProject || isExportingTable || isFormattingJcpro}
+                    onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'csv')}
+                    type="button"
+                    title={t('dashboard.actionBar.exportCsvTitle')}
+                  >
+                    CSV
+                  </button>
+                  <button
+                    className="action-bar-btn action-bar-btn--ghost"
+                    disabled={!loadedProject || isExportingTable || isFormattingJcpro}
+                    onClick={() => void handleExportTableConfig(currentLegacyTableKind, 'xml')}
+                    type="button"
+                    title={t('dashboard.actionBar.exportExcelTitle')}
+                  >
+                    Excel
+                  </button>
+                </>
+              ) : null}
             </div>
           ) : null}
           {(['realtime-data', 'battery-monitor'] as string[]).includes(activeModule.key) ? (

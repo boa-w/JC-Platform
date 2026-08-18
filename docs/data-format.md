@@ -30,7 +30,7 @@
 | `export_info` | object | 发布目录和目标开关 | 控制导出路径、文件名和扩展段 |
 | `device` | object | 设备分辨率等设备信息 | 写入清单 |
 | `ui_info` | object | Logo、主页面和 UI 资源 | 生成 `screen_src` 并复制 `img/` |
-| `pdo_simple_send_recv` | object | 面向表格的简化 PDO | 无高级 PDO 内容时转换为导出输入 |
+| `pdo_simple_send_recv` | object | jc001 的表格型简化 PDO | jc001 兼容编辑/构建输入；jc002 禁止保存 |
 | `pdo_global_param` | array | 高级 PDO 全局参数 | 二进制全局参数表 |
 | `pdo_condition` | array | PDO 条件表达式 | 二进制条件表 |
 | `pdo_recv` | array | 高级 PDO 接收帧 | 二进制 PDO 接收段 |
@@ -135,7 +135,9 @@ config_version → device → project → export_info → ui_info → language_i
 
 ## pdo_simple_send_recv
 
-简化 PDO 配置，用于接收表/发送表和 UI 数据绑定。
+简化 PDO 配置，用于接收表/发送表和 UI 数据绑定。本节只适用于 jc001；jc002 的
+表格导入会在内存中经过转换命令生成高级四段，转换完成后不会写入
+`pdo_simple_send_recv`。
 
 ```json
 {
@@ -159,7 +161,10 @@ config_version → device → project → export_info → ui_info → language_i
 - `pdo_param_index`
 - 可选的 `pdo_param_name`
 
-简单 PDO 主要用于表格编辑和兼容旧版配置。构建二进制时，若高级 PDO 没有有效内容，导出器会收集所有 `pdo_param_index`，生成临时全局参数 ID（`SIMPLE...`），再转换成与高级 PDO 相同的内部文档。
+简单 PDO 主要用于表格编辑和 jc001 兼容配置。导入转换和 jc001 的临时构建路径共用同一套
+转换规则：有 `pdo_param_name` 时，名称和稳定参数 ID 来自该字段；没有名称时，才使用
+`pdo_param_index` 作为内部变量绑定，并生成中性的 `内部变量 N` 名称。上位机不再根据内部
+变量编号查找或生成业务中文名称，这条路径不属于 jc002。
 
 ## 高级 PDO
 
@@ -170,7 +175,10 @@ config_version → device → project → export_info → ui_info → language_i
 - `pdo_recv` / `pdo_send`：`id`、`type`、`desc` 和 `data[]`；
 - `data[]`：`pos`、`len`、`show_type`、`handle`、`handle_param`、`param_id`。
 
-`data[].param_id` 引用 `pdo_global_param[].param_id`。二进制构建会按全局参数、索引、条件、接收帧、发送帧的顺序写入，并用帧数据是否引用条件参数决定帧描述中的触发标志。
+`data[].param_id` 引用 `pdo_global_param[].param_id`。`name` 只属于项目元数据和语言资源；
+`inner = -1` 表示普通参数，`inner >= 0` 才会写入二进制全局索引表，交给下位机按其
+运行时变量 ABI 绑定。下位机不会从 `inner` 反推显示名称。二进制构建会按全局参数、索引、
+条件、接收帧、发送帧的顺序写入，并用帧数据是否引用条件参数决定帧描述中的触发标志。
 
 ## sdo_info
 
@@ -272,7 +280,7 @@ Signal 描述“是什么数据”，不直接描述 CAN 位域；传输位置�
 - `can_open_pdo`：方向、帧 ID、位偏移和位长度；
 - `private_frame`：帧 key、帧 ID、位偏移和位长度。
 
-统一协议解析优先使用显式映射；没有显式映射时，会从旧版 CANopen/私有协议段推导兼容映射。“拍平统一协议”只回写 `pdo_global_param`、`pdo_recv` 和 `pdo_send`，不会覆盖 SDO、简化 PDO 或私有协议段。
+统一协议解析优先使用显式映射；没有显式映射时，会从旧版 CANopen/私有协议段推导兼容映射。“拍平统一协议”只回写 `pdo_global_param`、`pdo_recv` 和 `pdo_send`，不会覆盖 SDO、简化 PDO 或私有协议段。jc002 构建不读取简化 PDO；简单表只能通过实时数据页顶部的导入转换入口进入高级四段。
 
 ### sidecar 文件（已废弃）
 

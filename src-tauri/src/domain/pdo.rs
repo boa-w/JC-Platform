@@ -1,17 +1,24 @@
 //! PDO（Process Data Object）领域模型。
 //!
-//! 支持两种格式：
-//! - **简单模式**（`pdo_simple_send_recv`）：表格导入/导出，面向调试人员
-//! - **高级模式**（`pdo_global_param` / `pdo_condition` / `pdo_recv` / `pdo_send`）：JSON 直接编辑，面向开发人员
+//! 支持两种交换格式：
+//! - **简单模式**（`pdo_simple_send_recv`）：CSV/Excel 导入输入，面向表格维护人员；
+//! - **高级模式**（`pdo_global_param` / `pdo_condition` / `pdo_recv` / `pdo_send`）：项目持久化和二进制打包的唯一 PDO 输入。
 //!
-//! 两种模式最终都转换为 [`PdoAdvancedDocument`] 用于二进制打包。
+//! jc002 只允许高级模式进入保存和构建链路。简单模式仍保留独立的导入解析器，
+//! 导入完成后必须显式转换为 [`PdoAdvancedDocument`]；jc001 的旧构建兼容路径由
+//! 导出模块单独维护，不在本模块和 jc002 之间共享隐式回退。
 
+use crate::domain::signal::normalize_signal_id;
 use crate::infrastructure::csv_excel::{
     validate_headers, TableDocument, TableValidationReport, PDO_SIMPLE_HEADERS,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
+
+const COMMON_CAN_PDO_INNER_ABI_JSON: &str =
+    include_str!("../../../src/data/common-can-pdo-inner-abi.json");
 
 /// CAN 帧类型：标准帧（11-bit ID）/ 扩展帧（29-bit ID）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +85,9 @@ pub struct PdoAdvancedDocument {
 }
 
 /// 全局参数定义 —— 可被 PDO 帧信号引用，也可参与条件运算。
+///
+/// `name` 是项目配置和语言资源使用的显示元数据；设备二进制只消费
+/// `type`、参数槽位和可选的 `inner` 运行时绑定，不会根据 `inner` 反推名称。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PdoGlobalParam {
     pub param_id: String,
@@ -131,6 +141,136 @@ pub struct PdoAdvancedParseReport {
     pub errors: Vec<String>,
 }
 
+/// 校验 jc002 使用的下位机内部变量绑定。
+///
+/// `inner` 是 CommonCanPdoConfig 的固定运行时 ABI，不是可自由编号的上位机
+/// 参数索引。`-1` 表示普通参数，其它值必须来自与下位机同步的 ABI 清单。
+/// 根级编辑镜像和控制器 Profile 都会校验，但不会校验电池或故障 Profile。
+pub fn validate_v2_pdo_inner_bindings(document: &Value) -> Result<(), String> {
+    let mut errors = Vec::new();
+    validate_inner_bindings_in_params(
+        document.get("pdo_global_param"),
+        "pdo_global_param",
+        &mut errors,
+    );
+
+    if let Some(profiles) = document
+        .get("protocol_profiles")
+        .and_then(|value| value.get("controller_profiles"))
+        .and_then(Value::as_array)
+    {
+        for (index, profile) in profiles.iter().enumerate() {
+            let profile_path = format!(
+                "protocol_profiles.controller_profiles[{}].protocol.pdo_global_param",
+                profile
+                    .get("profile_id")
+                    .and_then(Value::as_str)
+                    .filter(|value| !value.trim().is_empty())
+                    .unwrap_or_else(|| "#"),
+            );
+            validate_inner_bindings_in_params(
+                profile
+                    .get("protocol")
+                    .and_then(|value| value.get("pdo_global_param")),
+                &profile_path,
+                &mut errors,
+            );
+            if profile.is_object() && profile.get("protocol").is_none() {
+                errors.push(format!(
+                    "protocol_profiles.controller_profiles 第 {} 项缺少 protocol",
+                    index + 1
+                ));
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("；"))
+    }
+}
+
+fn validate_inner_bindings_in_params(value: Option<&Value>, path: &str, errors: &mut Vec<String>) {
+    let Some(items) = value.and_then(Value::as_array) else {
+        return;
+    };
+    for (index, item) in items.iter().enumerate() {
+        let Some(object) = item.as_object() else {
+            continue;
+        };
+        let Some(raw_inner) = object.get("inner") else {
+            continue;
+        };
+        let Some(inner) = raw_inner.as_i64() else {
+            errors.push(format!("{path}[{}].inner 必须是整数", index + 1));
+            continue;
+        };
+        if inner != -1 && !common_can_pdo_inner_variable_ids().contains(&inner) {
+            errors.push(format!(
+                "{path}[{}].inner={} 不是 {} 支持的内部变量 ID",
+                index + 1,
+                inner,
+                common_can_pdo_inner_abi_version()
+            ));
+        }
+    }
+}
+
+fn common_can_pdo_inner_variable_ids() -> &'static [i64] {
+    static IDS: OnceLock<Vec<i64>> = OnceLock::new();
+    IDS.get_or_init(|| {
+        let document: Value = serde_json::from_str(COMMON_CAN_PDO_INNER_ABI_JSON)
+            .expect("CommonCanPdo inner ABI catalog must be valid JSON");
+        document
+            .get("variables")
+            .and_then(Value::as_array)
+            .expect("CommonCanPdo inner ABI catalog must contain variables[]")
+            .iter()
+            .filter_map(|item| item.get("id").and_then(Value::as_i64))
+            .collect()
+    })
+}
+
+fn common_can_pdo_inner_abi_version() -> &'static str {
+    static VERSION: OnceLock<String> = OnceLock::new();
+    VERSION.get_or_init(|| {
+        let document: Value = serde_json::from_str(COMMON_CAN_PDO_INNER_ABI_JSON)
+            .expect("CommonCanPdo inner ABI catalog must be valid JSON");
+        document
+            .get("abi_version")
+            .and_then(Value::as_str)
+            .unwrap_or("common-can-pdo-unknown")
+            .to_string()
+    })
+}
+
+/// 简单 PDO 导入到高级 PDO 的转换报告。
+///
+/// 简单 PDO 只作为表格交换格式存在，转换成功后项目只保存高级 PDO
+/// 四个正式段，不再把简单文档交给导出器做隐式回退。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PdoSimpleConversionReport {
+    pub valid: bool,
+    pub document: Option<PdoAdvancedDocument>,
+    pub errors: Vec<String>,
+    pub warnings: Vec<String>,
+    pub source_frame_total: usize,
+    pub source_signal_total: usize,
+    pub generated_param_total: usize,
+}
+
+#[derive(Debug, Default)]
+struct SimplePdoConversionContext {
+    params: Vec<PdoGlobalParam>,
+    param_keys: HashMap<String, String>,
+    used_ids: HashMap<String, String>,
+    errors: Vec<String>,
+    warnings: Vec<String>,
+    source_frame_total: usize,
+    source_signal_total: usize,
+}
+
 /// 解析高级模式 PDO JSON 文档。
 ///
 /// 依次解析全局参数 → 条件表达式 → 接收帧 → 发送帧，
@@ -172,6 +312,258 @@ pub fn parse_pdo_advanced_document(document: &Value) -> PdoAdvancedParseReport {
         valid,
         document,
         errors,
+    }
+}
+
+/// 将表格化简单 PDO 转换为可持久化的高级 PDO 文档。
+///
+/// 有名称的简单信号以名称生成稳定 `param_id`，并使用 `inner = -1`，
+/// 因为表格中的旧 `pdo_param_index` 不足以表达业务变量身份。只有没有
+/// 名称的旧条目才按内部索引生成参数，避免导入表格时所有行被错误合并。
+pub fn convert_pdo_simple_document(document: &Value) -> PdoSimpleConversionReport {
+    let mut context = SimplePdoConversionContext::default();
+    let Some(simple) = document.as_object() else {
+        return PdoSimpleConversionReport {
+            valid: false,
+            document: None,
+            errors: vec!["简单 PDO 文档必须是对象".to_string()],
+            warnings: Vec::new(),
+            source_frame_total: 0,
+            source_signal_total: 0,
+            generated_param_total: 0,
+        };
+    };
+
+    let pdo_recv = convert_simple_pdo_frames(simple.get("pdo_recv"), "pdo_recv", &mut context);
+    let pdo_send = convert_simple_pdo_frames(simple.get("pdo_send"), "pdo_send", &mut context);
+    let valid = context.errors.is_empty();
+    let generated_param_total = context.params.len();
+    let document = valid.then_some(PdoAdvancedDocument {
+        pdo_global_param: context.params,
+        pdo_condition: Vec::new(),
+        pdo_recv,
+        pdo_send,
+    });
+
+    PdoSimpleConversionReport {
+        valid,
+        document,
+        errors: context.errors,
+        warnings: context.warnings,
+        source_frame_total: context.source_frame_total,
+        source_signal_total: context.source_signal_total,
+        generated_param_total,
+    }
+}
+
+fn convert_simple_pdo_frames(
+    value: Option<&Value>,
+    section: &str,
+    context: &mut SimplePdoConversionContext,
+) -> Vec<PdoAdvancedFrame> {
+    let Some(frames) = value.and_then(Value::as_array) else {
+        context.errors.push(format!("{section} 必须是数组"));
+        return Vec::new();
+    };
+
+    frames
+        .iter()
+        .enumerate()
+        .filter_map(|(frame_index, value)| {
+            let line = frame_index + 1;
+            let Some(object) = value.as_object() else {
+                context
+                    .errors
+                    .push(format!("{section} 第 {line} 项必须是对象"));
+                return None;
+            };
+            let Some(id) = object.get("id").and_then(Value::as_u64) else {
+                context
+                    .errors
+                    .push(format!("{section} 第 {line} 项 id 无效"));
+                return None;
+            };
+            let frame_type = object.get("type").and_then(Value::as_i64).unwrap_or(-1);
+            if !(0..=1).contains(&frame_type) {
+                context
+                    .errors
+                    .push(format!("{section} 第 {line} 项 type 无效"));
+            } else {
+                let max_id = if frame_type == 0 { 0x7ff } else { 0x1fff_ffff };
+                if id > max_id {
+                    context.errors.push(format!(
+                        "{section} 第 {line} 项 id 超出{}帧范围：0x{id:X}",
+                        if frame_type == 0 { "标准" } else { "扩展" }
+                    ));
+                }
+            }
+            if id > u64::from(u32::MAX) {
+                context
+                    .errors
+                    .push(format!("{section} 第 {line} 项 id 超出 u32 范围：{id}"));
+            }
+            let Some(signals) = object.get("data").and_then(Value::as_array) else {
+                context
+                    .errors
+                    .push(format!("{section} 第 {line} 项 data 必须是数组"));
+                return None;
+            };
+
+            context.source_frame_total += 1;
+            let data = signals
+                .iter()
+                .enumerate()
+                .filter_map(|(signal_index, signal)| {
+                    convert_simple_signal(signal, section, line, signal_index + 1, context)
+                })
+                .collect();
+
+            Some(PdoAdvancedFrame {
+                id: id as u32,
+                frame_type: frame_type.max(0) as u8,
+                desc: object_string(object.get("desc")),
+                data,
+            })
+        })
+        .collect()
+}
+
+fn convert_simple_signal(
+    value: &Value,
+    section: &str,
+    frame_line: usize,
+    signal_line: usize,
+    context: &mut SimplePdoConversionContext,
+) -> Option<PdoAdvancedSignal> {
+    let Some(object) = value.as_object() else {
+        context.errors.push(format!(
+            "{section} 第 {frame_line} 项第 {signal_line} 个 data 必须是对象"
+        ));
+        return None;
+    };
+    let pos = object_u32(object.get("pos"), 0);
+    let len = object_u32(object.get("len"), 0);
+    if len == 0 || pos.saturating_add(len) > 64 {
+        context.errors.push(format!(
+            "{section} 第 {frame_line} 项第 {signal_line} 个 data 位范围无效：pos={pos}, len={len}"
+        ));
+    }
+    let show_type = object_u32(object.get("show_type"), 0);
+    if show_type > 2 {
+        context.errors.push(format!(
+            "{section} 第 {frame_line} 项第 {signal_line} 个 data show_type 无效"
+        ));
+    }
+
+    let name = object_string(object.get("pdo_param_name"));
+    let inner = object_i64(object.get("pdo_param_index"), -1);
+    if name.trim().is_empty() && inner < 0 {
+        context.errors.push(format!(
+            "{section} 第 {frame_line} 项第 {signal_line} 个 data 缺少 pdo_param_index"
+        ));
+    }
+    let param_id = ensure_simple_param(&name, inner, context);
+    context.source_signal_total += 1;
+
+    Some(PdoAdvancedSignal {
+        pos,
+        len,
+        show_type: show_type.min(2) as u8,
+        handle: 0,
+        handle_param: String::new(),
+        param_id,
+    })
+}
+
+fn ensure_simple_param(name: &str, inner: i64, context: &mut SimplePdoConversionContext) -> String {
+    let name = name.trim();
+    let (key, display_name, inner, data_type, candidate) = if name.is_empty() {
+        let inner = inner.max(0);
+        (
+            format!("inner:{inner}"),
+            format!("内部变量 {inner}"),
+            inner,
+            simple_inner_data_type(inner),
+            format!("INNER_{inner:04X}"),
+        )
+    } else {
+        let candidate = normalize_signal_id(name);
+        let candidate = if candidate == "UNNAMED_SIGNAL" {
+            format!("PDO_{:08X}", stable_name_hash(name))
+        } else {
+            candidate
+        };
+        (format!("name:{name}"), name.to_string(), -1, 0, candidate)
+    };
+
+    if let Some(param_id) = context.param_keys.get(&key) {
+        return param_id.clone();
+    }
+
+    let param_id = unique_simple_param_id(&candidate, name, &context.used_ids);
+    context.param_keys.insert(key, param_id.clone());
+    context.used_ids.insert(
+        param_id.clone(),
+        if name.is_empty() {
+            format!("inner:{inner}")
+        } else {
+            name.to_string()
+        },
+    );
+    context.params.push(PdoGlobalParam {
+        param_id: param_id.clone(),
+        name: display_name,
+        def: "0".to_string(),
+        reserved: 0,
+        data_type,
+        inner,
+    });
+    param_id
+}
+
+fn unique_simple_param_id(
+    candidate: &str,
+    source_name: &str,
+    used_ids: &HashMap<String, String>,
+) -> String {
+    let source_key = if source_name.is_empty() {
+        candidate.to_string()
+    } else {
+        source_name.to_string()
+    };
+    if match used_ids.get(candidate) {
+        None => true,
+        Some(current) => current == &source_key,
+    } {
+        return candidate.to_string();
+    }
+
+    let base = format!("{candidate}_{:08X}", stable_name_hash(&source_key));
+    if !used_ids.contains_key(&base) {
+        return base;
+    }
+    let mut suffix = 2;
+    loop {
+        let next = format!("{base}_{suffix}");
+        if !used_ids.contains_key(&next) {
+            return next;
+        }
+        suffix += 1;
+    }
+}
+
+fn stable_name_hash(value: &str) -> u32 {
+    value.as_bytes().iter().fold(0x811C9DC5_u32, |hash, byte| {
+        (hash ^ u32::from(*byte)).wrapping_mul(0x01000193)
+    })
+}
+
+fn simple_inner_data_type(inner: i64) -> i64 {
+    match inner {
+        0 => 10,
+        2 => 20,
+        6 => 1,
+        _ => 0,
     }
 }
 
@@ -335,6 +727,16 @@ fn parse_global_params(value: Option<&Value>, errors: &mut Vec<String>) -> Vec<P
             }
             if param.data_type < 0 {
                 errors.push(format!("pdo_global_param 第 {} 项 type 无效", line));
+            }
+            if object.get("inner").is_some()
+                && object.get("inner").and_then(Value::as_i64).is_none()
+            {
+                errors.push(format!("pdo_global_param 第 {} 项 inner 必须是整数", line));
+            } else if param.inner < -1 || param.inner > u16::MAX as i64 {
+                errors.push(format!(
+                    "pdo_global_param 第 {} 项 inner 超出有效范围：{}",
+                    line, param.inner
+                ));
             }
             Some(param)
         })
@@ -713,6 +1115,148 @@ impl PdoSimpleRow {
                 errors.push(format!("开始位置或数据长度无效 行:{}", line));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn v2_inner_binding_contract_accepts_unbound_and_known_ids() {
+        let document = json!({
+            "pdo_global_param": [
+                { "inner": -1 },
+                { "inner": 0 },
+                { "inner": 16 }
+            ],
+            "protocol_profiles": {
+                "controller_profiles": [{
+                    "profile_id": "inmotion6",
+                    "protocol": {
+                        "pdo_global_param": [{ "inner": 14 }]
+                    }
+                }]
+            }
+        });
+
+        assert!(validate_v2_pdo_inner_bindings(&document).is_ok());
+    }
+
+    #[test]
+    fn v2_inner_binding_contract_rejects_unknown_ids_and_non_integer_values() {
+        let document = json!({
+            "pdo_global_param": [
+                { "inner": 17 },
+                { "inner": "速度" }
+            ]
+        });
+
+        let error = validate_v2_pdo_inner_bindings(&document).unwrap_err();
+
+        assert!(error.contains("inner=17"));
+        assert!(error.contains("必须是整数"));
+    }
+
+    #[test]
+    fn converts_named_simple_signals_without_using_legacy_indexes() {
+        let document = json!({
+            "pdo_recv": [{
+                "id": 0x181,
+                "type": 0,
+                "desc": "状态",
+                "data": [
+                    { "pos": 0, "len": 16, "show_type": 0, "pdo_param_index": 0, "pdo_param_name": "车辆速度" },
+                    { "pos": 16, "len": 8, "show_type": 0, "pdo_param_index": 0, "pdo_param_name": "电机温度" },
+                    { "pos": 24, "len": 1, "show_type": 1, "pdo_param_index": 0, "pdo_param_name": "车辆速度" }
+                ]
+            }],
+            "pdo_send": []
+        });
+
+        let report = convert_pdo_simple_document(&document);
+
+        assert!(
+            report.valid,
+            "unexpected conversion errors: {:?}",
+            report.errors
+        );
+        let converted = report.document.unwrap();
+        assert_eq!(report.source_frame_total, 1);
+        assert_eq!(report.source_signal_total, 3);
+        assert_eq!(report.generated_param_total, 2);
+        assert_eq!(converted.pdo_global_param.len(), 2);
+        assert!(converted
+            .pdo_global_param
+            .iter()
+            .all(|param| param.inner == -1));
+        assert_eq!(
+            converted.pdo_recv[0].data[0].param_id,
+            converted.pdo_recv[0].data[2].param_id
+        );
+        assert_ne!(
+            converted.pdo_recv[0].data[0].param_id,
+            converted.pdo_recv[0].data[1].param_id
+        );
+        assert!(converted
+            .pdo_recv
+            .iter()
+            .flat_map(|frame| frame.data.iter())
+            .all(|signal| signal.handle == 0 && signal.handle_param.is_empty()));
+    }
+
+    #[test]
+    fn converts_unnamed_legacy_indexes_to_separate_internal_parameters() {
+        let document = json!({
+            "pdo_recv": [{
+                "id": 1,
+                "type": 0,
+                "desc": "旧表",
+                "data": [
+                    { "pos": 0, "len": 8, "show_type": 0, "pdo_param_index": 2 },
+                    { "pos": 8, "len": 8, "show_type": 0, "pdo_param_index": 3 }
+                ]
+            }],
+            "pdo_send": []
+        });
+
+        let report = convert_pdo_simple_document(&document);
+
+        assert!(
+            report.valid,
+            "unexpected conversion errors: {:?}",
+            report.errors
+        );
+        let converted = report.document.unwrap();
+        assert_eq!(converted.pdo_global_param.len(), 2);
+        assert_eq!(converted.pdo_global_param[0].inner, 2);
+        assert_eq!(converted.pdo_global_param[1].inner, 3);
+        assert_ne!(
+            converted.pdo_recv[0].data[0].param_id,
+            converted.pdo_recv[0].data[1].param_id
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_simple_signal_ranges() {
+        let document = json!({
+            "pdo_recv": [{
+                "id": 1,
+                "type": 0,
+                "desc": "错误",
+                "data": [{ "pos": 63, "len": 2, "show_type": 0, "pdo_param_index": 0, "pdo_param_name": "a" }]
+            }],
+            "pdo_send": []
+        });
+
+        let report = convert_pdo_simple_document(&document);
+
+        assert!(!report.valid);
+        assert!(report.document.is_none());
+        assert!(report
+            .errors
+            .iter()
+            .any(|error| error.contains("位范围无效")));
     }
 }
 

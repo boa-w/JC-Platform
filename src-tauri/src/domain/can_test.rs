@@ -489,16 +489,18 @@ fn collect_pdo_frames(
 ) -> Vec<FrameSpec> {
     let mut frames = Vec::new();
 
-    if let Some(simple) = document.get("pdo_simple_send_recv") {
-        for kind in ["pdo_recv", "pdo_send"] {
-            let label = if kind == "pdo_recv" {
-                "PDO接收"
-            } else {
-                "PDO发送"
-            };
-            if let Some(arr) = simple.get(kind).and_then(|v| v.as_array()) {
-                for frame in arr {
-                    frames.push(extract_pdo_frame(frame, label, dictionary, warnings));
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
+        if let Some(simple) = document.get("pdo_simple_send_recv") {
+            for kind in ["pdo_recv", "pdo_send"] {
+                let label = if kind == "pdo_recv" {
+                    "PDO接收"
+                } else {
+                    "PDO发送"
+                };
+                if let Some(arr) = simple.get(kind).and_then(|v| v.as_array()) {
+                    for frame in arr {
+                        frames.push(extract_pdo_frame(frame, label, dictionary, warnings));
+                    }
                 }
             }
         }

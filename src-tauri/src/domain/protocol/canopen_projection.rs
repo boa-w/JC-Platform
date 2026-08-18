@@ -11,7 +11,10 @@ pub(crate) fn derive_canopen_transport(document: &Value) -> CanOpenTransport {
     let mut transport = CanOpenTransport::default();
     collect_sdo_objects(document.get("sdo_info"), &mut transport.sdo_objects);
     collect_advanced_pdo(document, &mut transport);
-    if transport.pdo_recv.is_empty() && transport.pdo_send.is_empty() {
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002")
+        && transport.pdo_recv.is_empty()
+        && transport.pdo_send.is_empty()
+    {
         collect_simple_pdo(document, &mut transport);
     }
     transport

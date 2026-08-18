@@ -15,8 +15,8 @@
 
 use crate::domain::localization::{build_dynamic_language_pack, DynamicLanguagePackBuild};
 use crate::domain::pdo::{
-    parse_pdo_advanced_document, PdoAdvancedDocument, PdoAdvancedFrame, PdoAdvancedSignal,
-    PdoGlobalParam,
+    convert_pdo_simple_document, parse_pdo_advanced_document, validate_v2_pdo_inner_bindings,
+    PdoAdvancedDocument, PdoAdvancedFrame, PdoGlobalParam,
 };
 use crate::domain::project::{
     materialize_active_protocol_profiles, materialize_protocol_profiles_for_selection,
@@ -616,6 +616,30 @@ pub fn compare_project_binary(request: BinaryCompareRequest) -> BinaryCompareRep
 pub fn build_project_binary(document: &Value) -> BinaryBuildReport {
     let export_settings = project_export_settings(document);
     if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        if document.get("pdo_simple_send_recv").is_some() {
+            return BinaryBuildReport {
+                valid: false,
+                file_size: 0,
+                crc: 0,
+                data_description: DataDescriptionPlan::empty(Vec::new()),
+                bytes: Vec::new(),
+                warnings: Vec::new(),
+                errors: vec![
+                    "jc002 构建只接受高级 PDO 四段；请先通过表格导入完成简单 PDO 转换".to_string(),
+                ],
+            };
+        }
+        if let Err(error) = validate_v2_pdo_inner_bindings(document) {
+            return BinaryBuildReport {
+                valid: false,
+                file_size: 0,
+                crc: 0,
+                data_description: DataDescriptionPlan::empty(Vec::new()),
+                bytes: Vec::new(),
+                warnings: Vec::new(),
+                errors: vec![error],
+            };
+        }
         let normalized = match normalize_protocol_profiles_for_export(document) {
             Ok(document) => document,
             Err(error) => {
@@ -938,7 +962,7 @@ fn build_project_binary_from_settings(
     }
 
     if let Some(pdo_document) = pdo_report.document.as_ref() {
-        if battery_enabled || pdo_document_has_content(pdo_document) {
+        if config_version == "jc002" || battery_enabled || pdo_document_has_content(pdo_document) {
             let pdo_document = pdo_document.clone();
             let mut report = build_binary_from_pdo(
                 document,
@@ -953,17 +977,25 @@ fn build_project_binary_from_settings(
         }
     }
 
-    if let Some(pdo_document) = build_pdo_document_from_simple(document) {
-        let mut report = build_binary_from_pdo(
-            document,
-            &pdo_document,
-            language_code,
-            export_settings,
-            config_version,
-        );
-        report.errors.extend(errors);
-        report.valid = report.errors.is_empty();
-        return report;
+    if config_version != "jc002" {
+        if let Some(simple) = document.get("pdo_simple_send_recv") {
+            let conversion = convert_pdo_simple_document(simple);
+            if !conversion.valid {
+                errors.extend(conversion.errors);
+            } else if let Some(pdo_document) = conversion.document {
+                let mut report = build_binary_from_pdo(
+                    document,
+                    &pdo_document,
+                    language_code,
+                    export_settings,
+                    config_version,
+                );
+                report.warnings.extend(conversion.warnings);
+                report.errors.extend(errors);
+                report.valid = report.errors.is_empty();
+                return report;
+            }
+        }
     }
 
     BinaryBuildReport {
@@ -1268,133 +1300,6 @@ fn battery_monitor_enabled(document: &Value) -> bool {
         .and_then(|value| value.get("enabled"))
         .and_then(Value::as_bool)
         .unwrap_or(false)
-}
-
-fn build_pdo_document_from_simple(document: &Value) -> Option<PdoAdvancedDocument> {
-    let simple = document.get("pdo_simple_send_recv")?;
-    let mut param_indexes = Vec::new();
-    collect_simple_param_indexes(simple.get("pdo_recv"), &mut param_indexes);
-    collect_simple_param_indexes(simple.get("pdo_send"), &mut param_indexes);
-    let param_map = param_indexes
-        .iter()
-        .enumerate()
-        .map(|(index, inner)| (*inner, generated_simple_param_id(*inner, index)))
-        .collect::<HashMap<_, _>>();
-
-    Some(PdoAdvancedDocument {
-        pdo_global_param: param_indexes
-            .iter()
-            .enumerate()
-            .map(|(index, inner)| {
-                simple_global_param(*inner, generated_simple_param_id(*inner, index))
-            })
-            .collect(),
-        pdo_condition: Vec::new(),
-        pdo_recv: simple_frames_to_advanced(simple.get("pdo_recv"), &param_map),
-        pdo_send: simple_frames_to_advanced(simple.get("pdo_send"), &param_map),
-    })
-}
-
-fn collect_simple_param_indexes(frames: Option<&Value>, indexes: &mut Vec<i64>) {
-    let Some(frames) = frames.and_then(Value::as_array) else {
-        return;
-    };
-    for frame in frames {
-        let Some(signals) = frame.get("data").and_then(Value::as_array) else {
-            continue;
-        };
-        for signal in signals {
-            let index = object_i64(signal, "pdo_param_index", -1);
-            if index >= 0 && !indexes.contains(&index) {
-                indexes.push(index);
-            }
-        }
-    }
-}
-
-fn simple_global_param(inner: i64, param_id: String) -> PdoGlobalParam {
-    PdoGlobalParam {
-        param_id,
-        name: system_inner_param_name(inner).to_string(),
-        def: String::new(),
-        reserved: 0,
-        data_type: system_inner_param_data_type(inner),
-        inner,
-    }
-}
-
-fn simple_frames_to_advanced(
-    frames: Option<&Value>,
-    param_map: &HashMap<i64, String>,
-) -> Vec<PdoAdvancedFrame> {
-    let Some(frames) = frames.and_then(Value::as_array) else {
-        return Vec::new();
-    };
-    frames
-        .iter()
-        .map(|frame| PdoAdvancedFrame {
-            id: object_i64(frame, "id", 0) as u32,
-            frame_type: object_i64(frame, "type", 0) as u8,
-            desc: object_string(frame, "desc"),
-            data: frame
-                .get("data")
-                .and_then(Value::as_array)
-                .map(|signals| {
-                    signals
-                        .iter()
-                        .map(|signal| {
-                            let inner = object_i64(signal, "pdo_param_index", -1);
-                            PdoAdvancedSignal {
-                                pos: object_i64(signal, "pos", 0) as u32,
-                                len: object_i64(signal, "len", 0) as u32,
-                                show_type: object_i64(signal, "show_type", 0) as u8,
-                                handle: 0,
-                                handle_param: String::new(),
-                                param_id: param_map.get(&inner).cloned().unwrap_or_default(),
-                            }
-                        })
-                        .collect()
-                })
-                .unwrap_or_default(),
-        })
-        .collect()
-}
-
-fn generated_simple_param_id(inner: i64, index: usize) -> String {
-    format!("SIMPLE{:04X}{:04X}", inner.max(0), index)
-}
-
-fn system_inner_param_name(index: i64) -> &'static str {
-    match index {
-        -1 => "无效",
-        0 => "速度",
-        1 => "SOC",
-        2 => "小时计",
-        3 => "故障代码",
-        4 => "手刹",
-        5 => "座椅开关",
-        6 => "车轮转向角度",
-        7 => "工作模式",
-        8 => "SPE设置值",
-        9 => "锁车信号",
-        10 => "安全带开关",
-        11 => "左转向灯",
-        12 => "右转向灯",
-        13 => "提升锁止",
-        14 => "档位",
-        15 => "限速",
-        16 => "远程管理",
-        _ => "未知内部变量",
-    }
-}
-
-fn system_inner_param_data_type(index: i64) -> i64 {
-    match index {
-        0 => 10,
-        2 => 20,
-        6 => 1,
-        _ => 0,
-    }
 }
 
 fn build_binary_from_pdo(
@@ -3294,6 +3199,9 @@ mod tests {
 
     fn jc002(mut document: Value, keys: &[&str]) -> Value {
         document["config_version"] = json!("jc002");
+        if let Some(object) = document.as_object_mut() {
+            object.remove("pdo_simple_send_recv");
+        }
         let translations = keys
             .iter()
             .map(|key| ((*key).to_string(), json!(format!("text:{key}"))))
@@ -4572,7 +4480,7 @@ mod tests {
     }
 
     #[test]
-    fn build_project_binary_uses_simple_pdo_when_advanced_sections_are_empty() {
+    fn build_project_binary_uses_simple_pdo_converter_for_jc001() {
         let mut document = empty_pdo_advanced_sections();
         let object = document.as_object_mut().unwrap();
         object.insert(
@@ -4604,7 +4512,7 @@ mod tests {
             report.errors
         );
         assert_eq!(report.data_description.global_param_total, 1);
-        assert_eq!(report.data_description.global_param_index_total, 1);
+        assert_eq!(report.data_description.global_param_index_total, 0);
         assert_eq!(report.data_description.pdo_recv_total, 1);
         let recv_base = report.data_description.pdo_recv_base_addr as usize;
         assert_eq!(
@@ -4618,6 +4526,67 @@ mod tests {
         ) as usize;
         assert_eq!(report.bytes[data_base], 8);
         assert_eq!(report.bytes[data_base + 1], 8);
+    }
+
+    #[test]
+    fn simple_pdo_conversion_keeps_unnamed_inner_binding_without_a_name_catalog() {
+        let report = convert_pdo_simple_document(&json!({
+            "pdo_recv": [{
+                "id": 0x321,
+                "type": 0,
+                "desc": "内部变量",
+                "data": [{
+                    "pos": 0,
+                    "len": 8,
+                    "show_type": 0,
+                    "pdo_param_index": 7
+                }]
+            }],
+            "pdo_send": []
+        }));
+
+        assert!(
+            report.valid,
+            "unexpected conversion errors: {:?}",
+            report.errors
+        );
+        let document = report
+            .document
+            .expect("valid conversion must produce a document");
+        assert_eq!(document.pdo_global_param.len(), 1);
+        assert_eq!(document.pdo_global_param[0].inner, 7);
+        assert_eq!(document.pdo_global_param[0].name, "内部变量 7");
+    }
+
+    #[test]
+    fn build_project_binary_rejects_a_residual_simple_pdo_section_in_jc002() {
+        let mut document = jc002(
+            json!({
+                "sdo_info": { "type": 0, "user_auth": 0, "message_key": "menu.root", "children": [] },
+                "pdo_global_param": [],
+                "pdo_condition": [],
+                "pdo_recv": [],
+                "pdo_send": []
+            }),
+            &["menu.root"],
+        );
+        document["pdo_simple_send_recv"] = json!({
+            "pdo_recv": [{
+                "id": 0x321,
+                "type": 0,
+                "desc": "禁止隐式构建",
+                "data": [{ "pos": 0, "len": 8, "show_type": 0, "pdo_param_index": 0 }]
+            }],
+            "pdo_send": []
+        });
+
+        let report = build_project_binary(&document);
+
+        assert!(!report.valid);
+        assert!(report
+            .errors
+            .iter()
+            .any(|error| error.contains("高级 PDO 四段")));
     }
 
     #[test]

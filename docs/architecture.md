@@ -83,7 +83,7 @@ locale 集合、default_locale 和 locale_order；控制器、锂电和故障码
 | --- | --- | --- |
 | 项目管理 | 创建、打开、迁移、校验、保存、另存为、恢复草稿和项目窗口生命周期 | `.jcpro`、v1 废弃 sidecar |
 | 设置数据 | 编辑 SDO 参数树和参数元数据 | `sdo_info` |
-| 实时数据 | 编辑简化 PDO、高级 PDO 和 CANopen 节点/PDO 通信参数 | `pdo_simple_send_recv`、`pdo_*`、`canopen` |
+| 实时数据 | 导入简化 PDO 表并转换为高级 PDO，编辑高级 PDO 和 CANopen 节点/PDO 通信参数 | jc001 的 `pdo_simple_send_recv`、jc002 的 `pdo_*`、`canopen` |
 | 控制器协议 Profile | 维护 ACM/Inmotion 的 PDO、SDO 和 CANopen 协议 | `protocol_profiles.controller_profiles` |
 | 业务信号字典（已废弃） | 维护历史业务 Signal 及显示语义 | `signal_dictionary` |
 | 私有协议 | 维护自定义传输帧和载荷 | `private_protocol` |
@@ -98,7 +98,10 @@ locale 集合、default_locale 和 locale_order；控制器、锂电和故障码
 | CAN 测试数据 | 生成测试场景和纯帧文件 | TXT、CSV、说明 JSON |
 | Git 版本 | 只提交受管项目配置 | `.jcpro`、v1 废弃 sidecar |
 
-统一协议页面用于维护更清晰的业务模型，但设备导出当前仍以旧版 PDO/SDO 兼容段为直接输入。用户需要通过“拍平统一协议”动作，把校验通过的 Signal/映射结果写回 `pdo_global_param`、`pdo_recv` 和 `pdo_send`，之后再按旧导出路径构建二进制。
+统一协议页面用于维护更清晰的业务模型。jc001 仍以旧版 PDO/SDO 兼容段为直接输入；jc002
+则把高级 PDO 四段作为唯一构建输入。用户需要通过“拍平统一协议”动作，把校验通过的
+Signal/映射结果写回 `pdo_global_param`、`pdo_recv` 和 `pdo_send`，之后按当前配置版本的
+导出路径构建二进制。
 
 ## Tauri Commands
 
@@ -106,7 +109,7 @@ locale 集合、default_locale 和 locale_order；控制器、锂电和故障码
 
 - 项目生命周期：`create_project`、`load_project`、`save_project`、`save_project_as`、`migrate_project_document`、`parse_project_document`；
 - 项目窗口：`open_project_window`、`create_project_window`、`release_project_window`；
-- 表格交换：SDO、简化 PDO 和语言表的校验、导入和导出；
+- 表格交换：SDO、简化 PDO 和语言表的校验与导入；简化 PDO 导入后转换为高级四段，jc002 不提供简化 PDO 导出；
 - 协议模型：统一协议解析、迁移、校验和拍平；
 - 导出：`build_project_export_plan`、`build_project_binary_report`、`copy_ui_resource_images`、`export_project_package_command`；
 - 文件和版本：JSON/文本文件读写、Git 工作树状态、版本审阅和恢复。
@@ -115,10 +118,10 @@ Command 层不重新实现领域规则，主要把前端请求转换为领域请
 
 ## Domain 领域核心
 
-领域核心只表达业务概念，不依赖 UI。协议编辑模型包含两条兼容路径：
+领域核心只表达业务概念，不依赖 UI。协议编辑模型包含两条明确隔离的版本路径：
 
-1. **旧格式路径**：保证现有 `.jcpro`、PDO/SDO 导出和设备二进制布局稳定；
-2. **统一协议路径**：以 Signal、传输模型和显式映射表达协议，并在需要时拍平回旧字段。
+1. **jc001 旧格式路径**：保证现有 `.jcpro`、PDO/SDO 导出和设备二进制布局稳定，保留简化 PDO 的历史兼容回退；
+2. **jc002 高级路径**：以高级 PDO 四段作为唯一构建输入，简化 PDO 只作为表格导入的临时格式；统一协议模型在需要时拍平回高级字段。
 
 主要模型：
 

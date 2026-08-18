@@ -31,6 +31,7 @@ import type {
   MigratedProject,
   NewProjectRequest,
   PdoAdvancedParseReport,
+  PdoSimpleConversionReport,
   PdoSimpleImportReport,
   ProjectExportReport,
   ProjectParseReport,
@@ -277,6 +278,12 @@ export async function importPdoSimpleTable(
   document: TableDocument,
 ): Promise<PdoSimpleImportReport> {
   return invoke<PdoSimpleImportReport>('import_pdo_simple_table', { document });
+}
+
+export async function convertPdoSimpleProject(
+  document: unknown,
+): Promise<PdoSimpleConversionReport> {
+  return invoke<PdoSimpleConversionReport>('convert_pdo_simple_project', { document });
 }
 
 export async function parsePdoAdvancedProject(document: unknown): Promise<PdoAdvancedParseReport> {

@@ -133,11 +133,19 @@
 
 ## 二进制输入选择
 
-导出器按以下规则取得 PDO 输入：
+本文描述 jc001 兼容导出器的输入选择。jc002 不使用本节的简化 PDO 回退，
+其规则见 [jc002 发布包与二进制 ABI](export-build-v2.md)。
+
+导出器按以下规则取得 jc001 PDO 输入：
 
 1. 解析高级段 `pdo_global_param`、`pdo_condition`、`pdo_recv`、`pdo_send`；
 2. 高级段有内容时使用高级 PDO 文档；
-3. 高级段没有有效内容时，从 `pdo_simple_send_recv` 收集 `pdo_param_index`，生成临时全局参数和高级帧结构，再使用同一套打包器。
+3. 高级段没有有效内容时，才从 `pdo_simple_send_recv` 收集 `pdo_param_index`，生成临时全局参数和高级帧结构，再使用同一套打包器。
+
+简单 PDO 不是 jc002 的持久化或构建输入。jc002 表格导入必须先调用简单 PDO
+转换器，产生 `pdo_global_param`、`pdo_condition`、`pdo_recv`、`pdo_send` 四段；
+如果构建请求仍携带 `pdo_simple_send_recv`，构建器会直接返回错误，避免静默生成错误的
+空 PDO 包。
 
 统一协议段不会在二进制构建时自动替代旧 PDO 段。统一协议编辑完成后，需要先执行“拍平统一协议”，把合法映射写回高级 PDO 段；否则设备导出可能仍使用旧的 PDO 配置。
 

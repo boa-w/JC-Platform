@@ -40,14 +40,17 @@ export function usePdoEditor({
   updateProjectDocument,
   updateProjectSections,
 }: UsePdoEditorOptions) {
+  const source = document as Record<string, unknown> | null;
+  const supportsSimpleMode = source?.config_version !== 'jc002';
   const [jumpTarget, setJumpTarget] = useState<number | null>(null);
   const [selectedKind, setSelectedKind] = useState<PdoDirection>('pdo_recv');
   const [selectedSimpleFrameId, setSelectedSimpleFrameId] = useState<number | null>(null);
-  const [mode, setMode] = useState<PdoEditorMode>('simple');
+  const [mode, setMode] = useState<PdoEditorMode>(() =>
+    supportsSimpleMode ? 'simple' : 'advanced',
+  );
   const [selectedAdvancedFrameId, setSelectedAdvancedFrameId] = useState<number | null>(null);
   const jumpRowRef = useRef<HTMLTableRowElement | null>(null);
 
-  const source = document as Record<string, unknown> | null;
   const simpleDocument = (source?.pdo_simple_send_recv as PdoSimpleDocument | undefined) ?? null;
   const advancedDocument: PdoAdvancedDocument | null = source
     ? {
@@ -74,12 +77,19 @@ export function usePdoEditor({
     activeAdvancedFrameIndex < 0 ? null : advancedFrames(selectedKind)[activeAdvancedFrameIndex];
 
   useEffect(() => {
+    setMode(supportsSimpleMode ? 'simple' : 'advanced');
+    setSelectedSimpleFrameId(null);
+    setSelectedAdvancedFrameId(null);
+  }, [supportsSimpleMode]);
+
+  useEffect(() => {
     if (isActive && mode === 'simple' && jumpTarget !== null) {
       jumpRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [isActive, jumpTarget, mode]);
 
   function updateSimpleDocument(next: PdoSimpleDocument) {
+    if (!supportsSimpleMode) return;
     updateProjectDocument('pdo_simple_send_recv', next);
   }
 
@@ -94,6 +104,7 @@ export function usePdoEditor({
   }
 
   function focusPdoParam(pdoParamIndex: number) {
+    if (!supportsSimpleMode) return;
     setJumpTarget(pdoParamIndex);
     setMode('simple');
     setSelectedSimpleFrameId(null);
@@ -150,7 +161,18 @@ export function usePdoEditor({
           ? {
               ...frame,
               data: frame.data.map((signal, currentSignalIndex) =>
-                currentSignalIndex === signalIndex ? { ...signal, [field]: value } : signal,
+                currentSignalIndex === signalIndex
+                  ? field === 'show_type' || field === 'pos' || field === 'len'
+                    ? {
+                        ...signal,
+                        ...normalizePdoSignalFields(
+                          field === 'show_type' ? Number(value) : signal.show_type,
+                          field === 'pos' ? Number(value) : signal.pos,
+                          field === 'len' ? Number(value) : signal.len,
+                        ),
+                      }
+                    : { ...signal, [field]: value }
+                  : signal,
               ),
             }
           : frame,
@@ -209,7 +231,7 @@ export function usePdoEditor({
       ...advancedDocument,
       pdo_global_param: [
         ...advancedDocument.pdo_global_param,
-        { param_id: '', name: '新全局变量', def: '0', reserved: 0, type: 0, inner: 0 },
+        { param_id: '', name: '新全局变量', def: '0', reserved: 0, type: 0, inner: -1 },
       ],
     });
   }
@@ -349,7 +371,18 @@ export function usePdoEditor({
           ? {
               ...frame,
               data: frame.data.map((signal, currentSignalIndex) =>
-                currentSignalIndex === signalIndex ? { ...signal, [field]: value } : signal,
+                currentSignalIndex === signalIndex
+                  ? field === 'show_type' || field === 'pos' || field === 'len'
+                    ? {
+                        ...signal,
+                        ...normalizePdoSignalFields(
+                          field === 'show_type' ? Number(value) : signal.show_type,
+                          field === 'pos' ? Number(value) : signal.pos,
+                          field === 'len' ? Number(value) : signal.len,
+                        ),
+                      }
+                    : { ...signal, [field]: value }
+                  : signal,
               ),
             }
           : frame,
@@ -359,15 +392,21 @@ export function usePdoEditor({
 
   function addAdvancedSignal(kind: PdoDirection, frameIndex: number) {
     if (!advancedDocument) return;
+    const name = '新协议项';
+    const paramId = nextPdoParamId(advancedDocument.pdo_global_param);
     updateAdvancedDocument({
       ...advancedDocument,
+      pdo_global_param: [
+        ...advancedDocument.pdo_global_param,
+        { param_id: paramId, name, def: '0', reserved: 0, type: 0, inner: -1 },
+      ],
       [kind]: advancedDocument[kind].map((frame, currentFrameIndex) =>
         currentFrameIndex === frameIndex
           ? {
               ...frame,
               data: [
                 ...frame.data,
-                { pos: 0, len: 1, show_type: 0, handle: 0, handle_param: '', param_id: '' },
+                { pos: 0, len: 8, show_type: 0, handle: 0, handle_param: '', param_id: paramId },
               ],
             }
           : frame,
@@ -393,6 +432,7 @@ export function usePdoEditor({
   }
 
   return {
+    supportsSimpleMode,
     simpleDocument,
     advancedDocument,
     selectedKind,
@@ -442,3 +482,25 @@ export function usePdoEditor({
 }
 
 export type PdoEditorController = ReturnType<typeof usePdoEditor>;
+
+function normalizePdoSignalFields(showType: number, pos: number, len: number) {
+  const mode = showType === 1 || showType === 2 ? showType : 0;
+  let normalizedPos = Math.min(63, Math.max(0, Math.floor(Number.isFinite(pos) ? pos : 0)));
+  let normalizedLen = Math.max(1, Math.floor(Number.isFinite(len) ? len : 1));
+  if (mode === 0) {
+    normalizedPos = Math.floor(normalizedPos / 8) * 8;
+    const maxBytes = Math.max(1, Math.floor((64 - normalizedPos) / 8));
+    normalizedLen = Math.min(maxBytes, Math.max(1, Math.ceil(normalizedLen / 8))) * 8;
+  } else {
+    normalizedLen = Math.min(64 - normalizedPos, normalizedLen);
+  }
+  return { show_type: mode, pos: normalizedPos, len: normalizedLen };
+}
+
+function nextPdoParamId(params: PdoGlobalParam[]) {
+  const base = 'PDO_PARAM';
+  const usedIds = new Set(params.map((param) => param.param_id));
+  let suffix = params.length + 1;
+  while (usedIds.has(`${base}_${suffix}`)) suffix += 1;
+  return `${base}_${suffix}`;
+}

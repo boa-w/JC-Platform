@@ -34,7 +34,8 @@
 | `device` | 必填 | 固件型号和屏幕信息 |
 | `ui_info` | 完整发布包必填 | 构建 `screen_src` |
 | `localization` | 必填 | v2 唯一语言来源 |
-| `pdo_*` | 按项目需要 | 基础 PDO 数据 |
+| `pdo_global_param`、`pdo_condition`、`pdo_recv`、`pdo_send` | 按项目需要 | 高级 PDO 的唯一持久化和构建输入 |
+| `pdo_simple_send_recv` | 禁止 | 仅作为 CSV/Excel 导入的临时输入，转换后不得写回 jc002 |
 | `sdo_info` | 当前固件部署必填 | v2 loader 当前要求 `sdo_version=2` |
 | `battery_monitor` | 可选 | 当前激活锂电 Profile 的编辑镜像；导出为二进制协议段 |
 | `fault_code_info` | 可选 | 当前激活故障码 Profile 的编辑镜像；文案必须引用消息 key |
@@ -47,6 +48,43 @@ language_info
 ```
 
 检测到禁止字段时构建立即失败，不忽略、不迁移、不回落。
+
+### PDO 导入边界
+
+实时数据页的“导入并转换 PDO”入口可以读取简化表头：
+
+```text
+主目录,帧ID,帧类型,帧描述,绑定变量名称,取数方式,开始位置,数据长度
+```
+
+导入过程先校验表格，再调用简单 PDO 转换器生成四个高级段：
+`pdo_global_param`、`pdo_condition`、`pdo_recv`、`pdo_send`。有名称的变量按稳定名称生成
+`param_id`，同名变量复用同一个全局参数；没有名称的旧行按 `pdo_param_index` 生成独立内部
+参数。转换不会根据 `pdo_param_index` 反推业务名称：高级参数的 `name` 来自用户配置，
+`inner` 只表示是否绑定下位机内部变量。转换报告会返回帧数、信号数、生成参数数和警告，
+只有转换成功后才更新项目。
+
+jc002 保存、另存为和构建都会拒绝残留的 `pdo_simple_send_recv`。打开历史上带有该字段的
+jc002 文档时，项目加载阶段只执行一次显式迁移，成功后移除该字段；保存结果和
+`data.bin` 均只使用高级四段。jc001 的简化 PDO 回退仅在 v1 导出路径中保留。
+
+### 下位机内部变量绑定 ABI
+
+高级 PDO 全局参数中的 `inner` 是下位机 `CommonCanPdoConfig` 的运行时绑定，不是上位机
+参数索引，也不能从 `name` 或多语言文案推断：
+
+| 值 | 含义 |
+| --- | --- |
+| `-1` | 不绑定下位机内部变量；该参数不会进入内部变量索引表 |
+| `0..16` | 使用 `CommonCanPdoConfig.h` 定义的固定内部变量 ID |
+
+当前 ABI 的代码、数字和显示标签维护在
+[`common-can-pdo-inner-abi.json`](../src/data/common-can-pdo-inner-abi.json) 中。上位机页面
+只允许从这份清单选择绑定值，并保留 `param_id`、`name` 与 `inner` 三种独立含义。构建会
+拒绝清单之外的 ID，避免把一个看似合法的数字写入 bin 后被下位机解释成错误的运行时变量。
+
+控制器 Profile 各自维护自己的 `pdo_global_param[].inner`；切换控制器时，PDO 信号和其
+内部变量绑定一起切换。Profile overlay 只管理文案，不改变这个运行时绑定。
 
 ## 独立协议 Profile
 

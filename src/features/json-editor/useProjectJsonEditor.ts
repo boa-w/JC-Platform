@@ -33,10 +33,14 @@ export function useProjectJsonEditor({
 
   const currentSection = useCallback(() => {
     if (!loadedProject) return null;
+    const source = loadedProject.document as Record<string, unknown>;
     return configSectionForEditor(
-      loadedProject.document as Record<string, unknown>,
+      source,
       activeModuleKey,
-      { realtimeMode },
+      {
+        realtimeMode,
+        configVersion: typeof source.config_version === 'string' ? source.config_version : undefined,
+      },
     );
   }, [activeModuleKey, loadedProject, realtimeMode]);
 
@@ -60,12 +64,22 @@ export function useProjectJsonEditor({
 
   function restore() {
     const currentDocument = loadedProject?.document as Record<string, unknown> | undefined;
+    const context = {
+      realtimeMode,
+      configVersion:
+        typeof currentDocument?.config_version === 'string'
+          ? currentDocument.config_version
+          : undefined,
+    };
     const document = restoreProjectPaths(
-      restorePathsForEditor(activeModuleKey, { realtimeMode }, currentDocument),
+      restorePathsForEditor(activeModuleKey, context, currentDocument),
     );
     if (!document) return;
-    const section = configSectionForEditor(document as Record<string, unknown>, activeModuleKey, {
-      realtimeMode,
+    const nextDocument = document as Record<string, unknown>;
+    const section = configSectionForEditor(nextDocument, activeModuleKey, {
+      ...context,
+      configVersion:
+        typeof nextDocument.config_version === 'string' ? nextDocument.config_version : undefined,
     });
     setText(JSON.stringify(section, null, 2));
     setError(null);
@@ -76,8 +90,14 @@ export function useProjectJsonEditor({
 
     try {
       const parsed = JSON.parse(text);
-      const editorKey = jsonEditorKeyForModule(activeModuleKey, { realtimeMode });
       const currentDocument = loadedProject.document as Record<string, unknown>;
+      const editorKey = jsonEditorKeyForModule(activeModuleKey, {
+        realtimeMode,
+        configVersion:
+          typeof currentDocument.config_version === 'string'
+            ? currentDocument.config_version
+            : undefined,
+      });
       const sections: Record<string, unknown> = {};
       if (editorKey === 'sdo') sections.sdo_info = parsed;
       if (editorKey === 'pdo-simple') sections.pdo_simple_send_recv = parsed;

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   exportTableCsv,
   exportTableWorkbook,
+  convertPdoSimpleProject,
   importLanguageCsv,
   importLanguageWorkbook,
   importPdoSimpleCsv,
@@ -29,6 +30,7 @@ import type {
   LoadedProject,
   LocalizationDocument,
   NavigationKey,
+  PdoSimpleConversionReport,
   PdoSimpleImportReport,
   SdoImportReport,
 } from '../../types/platform';
@@ -67,17 +69,22 @@ export function useTableConfigController({
 }: UseTableConfigControllerOptions) {
   const { t } = useTranslation();
   const [importReport, setImportReport] = useState<TableImportReport | null>(null);
+  const [pdoConversionReport, setPdoConversionReport] =
+    useState<PdoSimpleConversionReport | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const currentKind = legacyTableKindForModule(activeModuleKey) as TableConfigKind | null;
   const projectDocument = loadedProject?.document ?? null;
+  const isJc002 =
+    (projectDocument as Record<string, unknown> | null)?.config_version === 'jc002';
   const operationGuard = useOperationGuard(projectDocument);
 
   useEffect(() => {
     if (!projectDocument) {
       setImportReport(null);
+      setPdoConversionReport(null);
       setImportError(null);
       setExportStatus(null);
     }
@@ -95,6 +102,13 @@ export function useTableConfigController({
     setExportStatus(null);
     if (!loadedProject) {
       setExportStatus(t('tableConfig.status.openProjectFirst'));
+      return;
+    }
+    if (
+      kind === 'pdoSimple' &&
+      (loadedProject.document as Record<string, unknown>).config_version === 'jc002'
+    ) {
+      setExportStatus(t('tableConfig.status.pdoSimpleExportDisabled'));
       return;
     }
     if (!isTauriRuntime()) {
@@ -158,6 +172,7 @@ export function useTableConfigController({
   async function importTable(kind: TableConfigKind) {
     setImportError(null);
     setImportReport(null);
+    setPdoConversionReport(null);
     if (!loadedProject) {
       setImportError(t('tableConfig.status.openProjectFirst'));
       return;
@@ -197,6 +212,29 @@ export function useTableConfigController({
       }
 
       const root = targetProject.document as Record<string, unknown>;
+      if (kind === 'pdoSimple') {
+        if (root.config_version !== 'jc002') {
+          updateProjectSections({ pdo_simple_send_recv: report.document });
+          return;
+        }
+        const conversion = await convertPdoSimpleProject(report.document);
+        if (!operationGuard.isCurrent(operation)) return;
+        setPdoConversionReport(conversion);
+        if (!conversion.valid || !conversion.document) {
+          setImportError(
+            conversion.errors.join(t('common.punctuation.semicolon')) ||
+              t('tableConfig.status.pdoSimpleConversionFailed'),
+          );
+          return;
+        }
+        updateProjectSections({
+          pdo_global_param: conversion.document.pdo_global_param,
+          pdo_condition: conversion.document.pdo_condition,
+          pdo_recv: conversion.document.pdo_recv,
+          pdo_send: conversion.document.pdo_send,
+        });
+        return;
+      }
       let section = tableConfigSections[kind];
       let nextDocument: unknown = report.document;
       if (kind === 'language' && root.config_version === 'jc002') {
@@ -220,9 +258,11 @@ export function useTableConfigController({
 
   return {
     currentKind,
+    pdoUsesAdvancedTarget: isJc002,
     exportStatus,
     importError,
     importReport,
+    pdoConversionReport,
     isExporting,
     isImporting,
     exportTable,

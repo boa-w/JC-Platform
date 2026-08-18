@@ -14,14 +14,16 @@ use crate::domain::language::{
     LanguageImportReport, SingleLanguageImportReport,
 };
 use crate::domain::pdo::{
-    parse_pdo_advanced_document, parse_pdo_simple_table, pdo_simple_document_to_table,
-    PdoAdvancedParseReport, PdoSimpleImportReport,
+    convert_pdo_simple_document, parse_pdo_advanced_document, parse_pdo_simple_table,
+    pdo_simple_document_to_table, PdoAdvancedParseReport, PdoSimpleConversionReport,
+    PdoSimpleImportReport,
 };
 use crate::domain::project::{
-    create_legacy_project_document, migrate_legacy_project_document, parse_legacy_project_document,
-    save_project_as as save_project_as_document, validate_project_version_contract, LoadedProject,
-    MigratedProject, NewProjectRequest, ProjectParseReport, ProjectSummary,
-    ProjectValidationReport, SaveProjectAsReport, SaveProjectAsRequest, SaveProjectRequest,
+    create_legacy_project_document, migrate_legacy_project_document, normalize_v2_pdo_document,
+    parse_legacy_project_document, save_project_as as save_project_as_document,
+    validate_project_version_contract, LoadedProject, MigratedProject, NewProjectRequest,
+    ProjectParseReport, ProjectSummary, ProjectValidationReport, SaveProjectAsReport,
+    SaveProjectAsRequest, SaveProjectRequest,
 };
 use crate::domain::project_compat::sanitize_document_for_target;
 use crate::domain::protocol_manager::{
@@ -666,8 +668,9 @@ pub fn create_project(request: NewProjectRequest) -> Result<LoadedProject, Strin
 /// 将项目 JSON 写回磁盘并返回更新后的加载结果。
 #[tauri::command]
 pub fn save_project(request: SaveProjectRequest) -> Result<LoadedProject, String> {
-    validate_project_version_contract(&request.document)?;
-    let document = sanitize_document_for_target(&request.path, request.document);
+    let document = normalize_v2_pdo_document(request.document)?;
+    validate_project_version_contract(&document)?;
+    let document = sanitize_document_for_target(&request.path, document);
     json_store::write_json(&request.path, &document).map_err(|error| error.to_string())?;
     load_project_from_document(request.path, document)
 }
@@ -812,6 +815,7 @@ pub fn remove_ui_resource_option_document(
 
 /// 从已解析的 JSON 文档构建 `LoadedProject`（摘要 + 校验 + 原始文档）。
 fn load_project_from_document(path: String, document: Value) -> Result<LoadedProject, String> {
+    let document = normalize_v2_pdo_document(document)?;
     let summary = ProjectSummary::from_legacy_value(Some(path), &document);
     let validation = ProjectValidationReport::from_legacy_value(&document);
 
@@ -937,6 +941,12 @@ pub fn import_sdo_workbook(request: TableFileRequest) -> Result<SdoImportReport,
 #[tauri::command]
 pub fn import_pdo_simple_table(document: TableDocument) -> PdoSimpleImportReport {
     parse_pdo_simple_table(document)
+}
+
+/// 将已导入的简单 PDO 表转换为正式高级 PDO 配置。
+#[tauri::command]
+pub fn convert_pdo_simple_project(document: Value) -> PdoSimpleConversionReport {
+    convert_pdo_simple_document(&document)
 }
 
 #[tauri::command]

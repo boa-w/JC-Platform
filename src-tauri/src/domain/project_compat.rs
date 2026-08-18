@@ -37,7 +37,6 @@ const V2_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "canopen",
     "protocol_profiles",
     "fault_code_info",
-    "pdo_simple_send_recv",
     "pdo_global_param",
     "pdo_condition",
     "pdo_recv",
@@ -154,7 +153,6 @@ const LANGUAGE_INFO_FIELD_ORDER: &[&str] = &[
     "list_inner",
     "list_translate",
 ];
-const PDO_SIMPLE_FIELD_ORDER: &[&str] = &["pdo_send", "pdo_recv"];
 const SDO_FIELD_ORDER: &[&str] = &["type", "user_auth", "name_index", "name", "children"];
 const FAULT_CODE_V2_INFO_FIELD_ORDER: &[&str] = &[
     "schema_version",
@@ -194,6 +192,11 @@ pub fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
     }
     match document.get("config_version").and_then(Value::as_str) {
         Some(V2_CONFIG_VERSION) => {
+            if let Some(object) = document.as_object_mut() {
+                // jc002 stores only advanced PDO sections. The project layer
+                // performs any legacy table conversion before this boundary.
+                object.remove("pdo_simple_send_recv");
+            }
             update_project_update_time(&mut document, &current_legacy_timestamp());
             order_v2_jcpro_document(document)
         }
@@ -255,11 +258,6 @@ fn order_legacy_jcpro_document(mut document: Value) -> Value {
     order_child_object(&mut document, "device", DEVICE_FIELD_ORDER);
     order_ui_info(&mut document);
     order_language_info(&mut document);
-    order_child_object(
-        &mut document,
-        "pdo_simple_send_recv",
-        PDO_SIMPLE_FIELD_ORDER,
-    );
     order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
     order_object_value(document, LEGACY_JCPRO_TOP_LEVEL_ORDER)
 }
@@ -269,11 +267,6 @@ fn order_v2_jcpro_document(mut document: Value) -> Value {
     order_export_info(&mut document);
     order_child_object(&mut document, "device", DEVICE_FIELD_ORDER);
     order_ui_info(&mut document);
-    order_child_object(
-        &mut document,
-        "pdo_simple_send_recv",
-        PDO_SIMPLE_FIELD_ORDER,
-    );
     order_child_object(&mut document, "sdo_info", SDO_FIELD_ORDER);
     order_fault_code_info(&mut document);
     order_canopen(&mut document);
