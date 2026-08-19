@@ -23,6 +23,7 @@ use crate::domain::project::{
     normalize_protocol_profiles_for_export, protocol_profiles_manifest, validate_canopen_contract,
     validate_protocol_profiles_contract, ProjectExportSettings,
 };
+use crate::domain::project_compat::legacy_language_entries;
 use crate::domain::protocol::battery_monitor::{
     BatteryByteOrder, BatteryMonitorProtocol, BatteryRawType, BatteryValueType,
     BATTERY_MONITOR_BINARY_VERSION, BATTERY_MONITOR_SCHEMA_VERSION,
@@ -1516,63 +1517,7 @@ fn collect_language_entries(
     document: &Value,
     export_settings: &ProjectExportSettings,
 ) -> Vec<String> {
-    let mut entries = Vec::new();
-    if let Some(language_info) = document.get("language_info") {
-        if let Some(items) = language_info.get("list_inner").and_then(Value::as_array) {
-            for item in items.iter().filter_map(Value::as_str) {
-                entries.push(item.to_string());
-            }
-        }
-    }
-    if let Some(sdo_info) = document.get("sdo_info") {
-        collect_sdo_names(sdo_info, &mut entries);
-    }
-    if export_settings.fault_code_info.bin {
-        collect_fault_code_language_entries(document, &mut entries);
-    }
-    entries.push(String::new());
-    entries
-}
-
-fn collect_sdo_names(value: &Value, entries: &mut Vec<String>) {
-    if let Some(name) = value.get("name").and_then(Value::as_str) {
-        push_unique(entries, name);
-    }
-    if let Some(children) = value.get("children").and_then(Value::as_array) {
-        for child in children {
-            collect_sdo_names(child, entries);
-        }
-    }
-}
-
-fn collect_fault_code_language_entries(document: &Value, entries: &mut Vec<String>) {
-    let Some(root) = document.get("fault_code_info") else {
-        return;
-    };
-    if !root.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
-        return;
-    }
-    if let Some(definitions) = root.get("definitions").and_then(Value::as_array) {
-        for definition in definitions {
-            if !definition
-                .get("enabled")
-                .and_then(Value::as_bool)
-                .unwrap_or(true)
-            {
-                continue;
-            }
-            let key = object_string(definition, "message_key");
-            if !key.is_empty() {
-                push_unique(entries, &key);
-            }
-        }
-    }
-}
-
-fn push_unique(entries: &mut Vec<String>, value: &str) {
-    if !entries.iter().any(|item| item == value) {
-        entries.push(value.to_string());
-    }
+    legacy_language_entries(document, export_settings.fault_code_info.bin)
 }
 
 fn build_battery_monitor_bytes(

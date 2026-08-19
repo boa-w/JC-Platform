@@ -520,6 +520,7 @@ fn order_ui_info(root: &mut Value) {
 }
 
 fn order_language_info(root: &mut Value) {
+    let runtime_keys = legacy_language_entries(root, false);
     let Some(language_info) = root.get_mut("language_info") else {
         return;
     };
@@ -529,12 +530,6 @@ fn order_language_info(root: &mut Value) {
         .and_then(Value::as_array)
         .map(|items| string_array_values(items))
         .unwrap_or_default();
-    let inner_keys = language_info
-        .get("list_inner")
-        .and_then(Value::as_array)
-        .map(|items| string_array_values(items))
-        .unwrap_or_default();
-
     if let Some(labels) = language_info.get_mut("language_labels") {
         let value = std::mem::take(labels);
         *labels = order_object_by_primary_keys(value, &language_codes);
@@ -542,7 +537,7 @@ fn order_language_info(root: &mut Value) {
 
     if let Some(translations) = language_info.get_mut("list_translate") {
         let value = std::mem::take(translations);
-        *translations = order_list_translate_value(value, &inner_keys, &language_codes);
+        *translations = order_list_translate_value(value, &runtime_keys, &language_codes);
     }
 
     let value = std::mem::take(language_info);
@@ -557,9 +552,72 @@ fn string_array_values(items: &[Value]) -> Vec<String> {
         .collect()
 }
 
+/// Returns the legacy language index order used by the jc001 binary writer.
+///
+/// Keep this sequence shared with formatting so object insertion order cannot
+/// drift away from the indices consumed by the firmware.
+pub(crate) fn legacy_language_entries(document: &Value, include_fault_code: bool) -> Vec<String> {
+    let mut entries = Vec::new();
+    if let Some(language_info) = document.get("language_info") {
+        if let Some(items) = language_info.get("list_inner").and_then(Value::as_array) {
+            for item in items.iter().filter_map(Value::as_str) {
+                entries.push(item.to_string());
+            }
+        }
+    }
+    if let Some(sdo_info) = document.get("sdo_info") {
+        collect_legacy_sdo_names(sdo_info, &mut entries);
+    }
+    if include_fault_code {
+        collect_legacy_fault_code_language_entries(document, &mut entries);
+    }
+    entries.push(String::new());
+    entries
+}
+
+fn collect_legacy_sdo_names(value: &Value, entries: &mut Vec<String>) {
+    if let Some(name) = value.get("name").and_then(Value::as_str) {
+        push_unique_language_entry(entries, name);
+    }
+    if let Some(children) = value.get("children").and_then(Value::as_array) {
+        for child in children {
+            collect_legacy_sdo_names(child, entries);
+        }
+    }
+}
+
+fn collect_legacy_fault_code_language_entries(document: &Value, entries: &mut Vec<String>) {
+    let Some(root) = document.get("fault_code_info") else {
+        return;
+    };
+    if !root.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
+        return;
+    }
+    if let Some(definitions) = root.get("definitions").and_then(Value::as_array) {
+        for definition in definitions {
+            if !definition
+                .get("enabled")
+                .and_then(Value::as_bool)
+                .unwrap_or(true)
+            {
+                continue;
+            }
+            if let Some(key) = definition.get("message_key").and_then(Value::as_str) {
+                push_unique_language_entry(entries, key);
+            }
+        }
+    }
+}
+
+fn push_unique_language_entry(entries: &mut Vec<String>, value: &str) {
+    if !entries.iter().any(|item| item == value) {
+        entries.push(value.to_string());
+    }
+}
+
 fn order_list_translate_value(
     value: Value,
-    inner_keys: &[String],
+    runtime_keys: &[String],
     language_codes: &[String],
 ) -> Value {
     let Value::Object(mut object) = value else {
@@ -567,7 +625,7 @@ fn order_list_translate_value(
     };
 
     let mut ordered = Map::new();
-    for key in inner_keys {
+    for key in runtime_keys {
         if let Some(value) = object.remove(key) {
             ordered.insert(
                 key.clone(),
@@ -796,11 +854,24 @@ mod tests {
                     "z_external": { "ja": "外部 Z", "en": "External Z", "zh": "外部Z" },
                     "key_b": { "ja": "B日", "extra": "B+", "zh": "B中", "en": "B英" },
                     "a_external": { "zh": "外部A", "en": "External A" },
-                    "key_a": { "en": "A英", "zh": "A中", "ja": "A日" }
+                    "key_a": { "en": "A英", "zh": "A中", "ja": "A日" },
+                    "sdo.root": { "en": "Root", "zh": "根" },
+                    "sdo.z": { "en": "Z", "zh": "Z" },
+                    "sdo.a": { "en": "A", "zh": "A" },
+                    "": { "en": "", "zh": "" }
                 },
                 "list_inner": ["中文", "English", "key_a", "key_b"],
                 "language_labels": { "ja": "日语", "zh": "中文", "en": "English" },
                 "list_code_language": ["zh", "en", "ja"]
+            },
+            "sdo_info": {
+                "name": "sdo.root",
+                "children": [
+                    {
+                        "name": "sdo.z",
+                        "children": [{ "name": "sdo.a", "children": [] }]
+                    }
+                ]
             }
         });
 
@@ -833,7 +904,16 @@ mod tests {
             .unwrap();
         assert_eq!(
             translations.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec!["key_a", "key_b", "a_external", "z_external"]
+            vec![
+                "key_a",
+                "key_b",
+                "sdo.root",
+                "sdo.z",
+                "sdo.a",
+                "",
+                "a_external",
+                "z_external"
+            ]
         );
 
         let key_b = translations.get("key_b").unwrap().as_object().unwrap();
