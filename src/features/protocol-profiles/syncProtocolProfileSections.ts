@@ -13,6 +13,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function profileIdFromBundle(
+  bundle: Record<string, unknown> | null,
+  collection: string,
+  activeKey: string,
+): string {
+  if (!bundle) return '';
+  const profiles = Array.isArray(bundle[collection]) ? bundle[collection] : [];
+  const activeId = typeof bundle[activeKey] === 'string' ? bundle[activeKey] : '';
+  if (
+    activeId &&
+    profiles.some((profile) => isRecord(profile) && profile.profile_id === activeId)
+  ) {
+    return activeId;
+  }
+  const first = profiles.find((profile) => isRecord(profile) && typeof profile.profile_id === 'string');
+  return isRecord(first) ? (first.profile_id as string) : '';
+}
+
 function mergeActiveProfileProtocolPatch(
   profiles: unknown,
   activeProfileId: unknown,
@@ -36,10 +54,11 @@ function activeProfiles(document: unknown): {
   const bundle = isRecord(root.protocol_profiles) ? root.protocol_profiles : null;
   const controllerProfiles =
     bundle && Array.isArray(bundle.controller_profiles) ? bundle.controller_profiles : [];
-  const activeControllerId =
-    bundle && typeof bundle.active_controller_profile_id === 'string'
-      ? bundle.active_controller_profile_id
-      : '';
+  const activeControllerId = profileIdFromBundle(
+    bundle,
+    'controller_profiles',
+    'active_controller_profile_id',
+  );
   const controller = controllerProfiles.find(
     (candidate) =>
       isRecord(candidate) &&
@@ -48,10 +67,11 @@ function activeProfiles(document: unknown): {
   );
   const batteryProfiles =
     bundle && Array.isArray(bundle.battery_profiles) ? bundle.battery_profiles : [];
-  const activeBatteryId =
-    bundle && typeof bundle.active_battery_profile_id === 'string'
-      ? bundle.active_battery_profile_id
-      : '';
+  const activeBatteryId = profileIdFromBundle(
+    bundle,
+    'battery_profiles',
+    'active_battery_profile_id',
+  );
   const battery = batteryProfiles.find(
     (candidate) =>
       isRecord(candidate) &&
@@ -61,9 +81,8 @@ function activeProfiles(document: unknown): {
   const faultProfiles =
     bundle && Array.isArray(bundle.fault_code_profiles) ? bundle.fault_code_profiles : [];
   const activeFaultId =
-    bundle && typeof bundle.active_fault_code_profile_id === 'string'
-      ? bundle.active_fault_code_profile_id
-      : 'fault.default';
+    profileIdFromBundle(bundle, 'fault_code_profiles', 'active_fault_code_profile_id') ||
+    'fault.default';
   const fault = faultProfiles.find(
     (candidate) =>
       isRecord(candidate) && candidate.profile_id === activeFaultId && isRecord(candidate.protocol),
@@ -123,17 +142,17 @@ export function syncProtocolProfileSections(
         ...bundle,
         controller_profiles: mergeActiveProfileProtocolPatch(
           bundle.controller_profiles,
-          bundle.active_controller_profile_id,
+          profileIdFromBundle(bundle, 'controller_profiles', 'active_controller_profile_id'),
           controllerPatch,
         ),
         battery_profiles: mergeActiveProfileProtocolPatch(
           bundle.battery_profiles,
-          bundle.active_battery_profile_id,
+          profileIdFromBundle(bundle, 'battery_profiles', 'active_battery_profile_id'),
           batteryPatch,
         ),
         fault_code_profiles: mergeActiveProfileProtocolPatch(
           bundle.fault_code_profiles,
-          bundle.active_fault_code_profile_id,
+          profileIdFromBundle(bundle, 'fault_code_profiles', 'active_fault_code_profile_id'),
           faultPatch,
         ),
       };

@@ -74,9 +74,6 @@ const CANOPEN_PDO_FIELD_ORDER: &[&str] = &[
 ];
 const PROTOCOL_PROFILES_FIELD_ORDER: &[&str] = &[
     "schema_version",
-    "active_controller_profile_id",
-    "active_battery_profile_id",
-    "active_fault_code_profile_id",
     "controller_profiles",
     "battery_profiles",
     "fault_code_profiles",
@@ -196,6 +193,16 @@ pub fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
                 // jc002 stores only advanced PDO sections. The project layer
                 // performs any legacy table conversion before this boundary.
                 object.remove("pdo_simple_send_recv");
+                // Profile activation belongs to the device. Keep any
+                // editor-only selection out of the persisted jcpro file.
+                if let Some(profiles) = object
+                    .get_mut("protocol_profiles")
+                    .and_then(Value::as_object_mut)
+                {
+                    profiles.remove("active_controller_profile_id");
+                    profiles.remove("active_battery_profile_id");
+                    profiles.remove("active_fault_code_profile_id");
+                }
             }
             update_project_update_time(&mut document, &current_legacy_timestamp());
             order_v2_jcpro_document(document)
@@ -913,10 +920,10 @@ mod tests {
 
         assert_eq!(sanitized["config_version"], "jc002");
         assert!(sanitized.get("localization").is_some());
-        assert_eq!(
-            sanitized["protocol_profiles"]["active_controller_profile_id"],
-            "inmotion"
-        );
+        let sanitized_profiles = sanitized["protocol_profiles"].as_object().unwrap();
+        assert!(!sanitized_profiles.contains_key("active_controller_profile_id"));
+        assert!(!sanitized_profiles.contains_key("active_battery_profile_id"));
+        assert!(!sanitized_profiles.contains_key("active_fault_code_profile_id"));
         assert_eq!(
             sanitized["protocol_profiles"]["controller_profiles"][0]["profile_id"],
             "acm"

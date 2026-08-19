@@ -19,7 +19,7 @@ use crate::domain::pdo::{
     PdoAdvancedDocument, PdoAdvancedFrame, PdoGlobalParam,
 };
 use crate::domain::project::{
-    materialize_active_protocol_profiles, materialize_protocol_profiles_for_selection,
+    materialize_active_protocol_profiles, materialize_protocol_profile_scope,
     normalize_protocol_profiles_for_export, protocol_profiles_manifest, validate_canopen_contract,
     validate_protocol_profiles_contract, ProjectExportSettings,
 };
@@ -170,17 +170,14 @@ pub struct ScreenItemPlan {
     pub p_num: Option<usize>,
 }
 
-/// One self-contained jc002 runtime payload inside the shared data.bin.
+/// One independent jc002 runtime Profile payload inside the shared data.bin.
 /// Offsets in `description` are relative to `base_addr`, not to the whole
-/// bundle. This lets the firmware select a payload by rebasing its data
-/// pointer without changing the existing table ABI.
+/// bundle. The three scopes are intentionally indexed independently; the
+/// firmware does not receive or validate a controller/battery/fault tuple.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolProfilePayloadPlan {
-    pub controller_profile_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub battery_profile_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fault_code_profile_id: Option<String>,
+    pub scope: String,
+    pub profile_id: String,
     pub base_addr: usize,
     pub file_size: usize,
     pub crc: u16,
@@ -237,16 +234,10 @@ pub struct DataDescriptionPlan {
     pub protocol_profile_version: usize,
     #[serde(skip_serializing_if = "is_zero_usize")]
     pub controller_profile_total: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_controller_profile_id: Option<String>,
     #[serde(skip_serializing_if = "is_zero_usize")]
     pub battery_profile_total: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_battery_profile_id: Option<String>,
     #[serde(skip_serializing_if = "is_zero_usize", default)]
     pub fault_code_profile_total: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_fault_code_profile_id: Option<String>,
     #[serde(skip_serializing_if = "is_zero_usize", default)]
     pub protocol_bundle_version: usize,
     #[serde(skip_serializing_if = "is_empty_payloads", default)]
@@ -293,11 +284,8 @@ impl DataDescriptionPlan {
             i18n_message_total: 0,
             protocol_profile_version: 0,
             controller_profile_total: 0,
-            active_controller_profile_id: None,
             battery_profile_total: 0,
-            active_battery_profile_id: None,
             fault_code_profile_total: 0,
-            active_fault_code_profile_id: None,
             protocol_bundle_version: 0,
             protocol_profile_payloads: Vec::new(),
         }
@@ -675,33 +663,6 @@ fn build_project_binary_from_protocol_profiles(
         };
     }
     let profile_root = document.get("protocol_profiles");
-    let active_controller_id = profile_root
-        .and_then(|root| root.get("active_controller_profile_id"))
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .ok_or_else(|| "protocol_profiles.active_controller_profile_id 不能为空".to_string());
-    let active_controller_id = match active_controller_id {
-        Ok(value) => value,
-        Err(error) => {
-            return BinaryBuildReport {
-                valid: false,
-                file_size: 0,
-                crc: 0,
-                data_description: DataDescriptionPlan::empty(Vec::new()),
-                bytes: Vec::new(),
-                warnings: Vec::new(),
-                errors: vec![error],
-            };
-        }
-    };
-    let active_battery_id = profile_root
-        .and_then(|root| root.get("active_battery_profile_id"))
-        .and_then(Value::as_str)
-        .map(str::to_string);
-    let active_fault_code_id = profile_root
-        .and_then(|root| root.get("active_fault_code_profile_id"))
-        .and_then(Value::as_str)
-        .map(str::to_string);
     let controller_ids = profile_root
         .and_then(|root| root.get("controller_profiles"))
         .and_then(Value::as_array)
@@ -735,38 +696,16 @@ fn build_project_binary_from_protocol_profiles(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    let battery_selections = if battery_ids.is_empty() {
-        vec![None]
-    } else {
-        battery_ids.into_iter().map(Some).collect::<Vec<_>>()
-    };
-    let fault_code_selections = if fault_code_ids.is_empty() {
-        vec![None]
-    } else {
-        fault_code_ids.into_iter().map(Some).collect::<Vec<_>>()
-    };
-
-    // Keep the configured default at offset zero. This preserves the active
-    // payload as the default while making every controller/battery/fault
-    // combination independently addressable inside one data.bin.
-    let mut combinations = vec![(
-        active_controller_id.clone(),
-        active_battery_id.clone(),
-        active_fault_code_id.clone(),
-    )];
-    for controller_id in &controller_ids {
-        for battery_id in &battery_selections {
-            for fault_code_id in &fault_code_selections {
-                let combination = (
-                    controller_id.clone(),
-                    battery_id.clone(),
-                    fault_code_id.clone(),
-                );
-                if !combinations.contains(&combination) {
-                    combinations.push(combination);
-                }
-            }
-        }
+    if controller_ids.is_empty() {
+        return BinaryBuildReport {
+            valid: false,
+            file_size: 0,
+            crc: 0,
+            data_description: DataDescriptionPlan::empty(Vec::new()),
+            bytes: Vec::new(),
+            warnings: Vec::new(),
+            errors: vec!["protocol_profiles.controller_profiles 不能为空".to_string()],
+        };
     }
 
     let mut bytes = Vec::new();
@@ -775,32 +714,27 @@ fn build_project_binary_from_protocol_profiles(
     let mut payloads = Vec::new();
     let mut default_description = None;
 
-    for (controller_id, battery_id, fault_code_id) in combinations {
-        let materialized = match materialize_protocol_profiles_for_selection(
-            document,
-            &controller_id,
-            battery_id.as_deref(),
-            fault_code_id.as_deref(),
-        ) {
+    let mut build_payload = |scope: &str, profile_id: &str| {
+        let materialized = match materialize_protocol_profile_scope(document, scope, profile_id) {
             Ok(document) => document,
             Err(error) => {
                 errors.push(format!(
-                    "构建协议组合 controller={controller_id}, battery={battery_id:?}, fault={fault_code_id:?} 失败：{error}"
+                    "构建 Profile scope={scope}, id={profile_id} 失败：{error}"
                 ));
-                continue;
+                return;
             }
         };
         let report = build_project_binary_from_settings(&materialized, export_settings);
         warnings.extend(report.warnings);
         if !report.valid {
-            errors.extend(report.errors.into_iter().map(|error| {
-                format!(
-                    "构建协议组合 controller={controller_id}, battery={battery_id:?}, fault={fault_code_id:?} 失败：{error}"
-                )
-            }));
-            continue;
+            errors.extend(
+                report.errors.into_iter().map(|error| {
+                    format!("构建 Profile scope={scope}, id={profile_id} 失败：{error}")
+                }),
+            );
+            return;
         }
-        if default_description.is_none() {
+        if scope == "controller" && default_description.is_none() {
             default_description = Some(report.data_description.clone());
         }
         let base_addr = bytes.len();
@@ -810,21 +744,30 @@ fn build_project_binary_from_protocol_profiles(
             Ok(value) => value,
             Err(error) => {
                 errors.push(format!(
-                    "协议组合 controller={controller_id}, battery={battery_id:?}, fault={fault_code_id:?} 的描述序列化失败：{error}"
+                    "Profile scope={scope}, id={profile_id} 的描述序列化失败：{error}"
                 ));
-                continue;
+                return;
             }
         };
         bytes.extend(report.bytes);
         payloads.push(ProtocolProfilePayloadPlan {
-            controller_profile_id: controller_id,
-            battery_profile_id: battery_id,
-            fault_code_profile_id: fault_code_id,
+            scope: scope.to_string(),
+            profile_id: profile_id.to_string(),
             base_addr,
             file_size,
             crc,
             description,
         });
+    };
+
+    for profile_id in &controller_ids {
+        build_payload("controller", profile_id);
+    }
+    for profile_id in &battery_ids {
+        build_payload("battery", profile_id);
+    }
+    for profile_id in &fault_code_ids {
+        build_payload("fault", profile_id);
     }
 
     if !errors.is_empty() || payloads.is_empty() {
@@ -840,26 +783,13 @@ fn build_project_binary_from_protocol_profiles(
     }
 
     let mut description =
-        default_description.expect("valid profile build must have a default payload");
+        default_description.expect("valid profile build must have a controller payload");
     description.file_size = bytes.len();
     description.crc = crc16_ccitt_false(&bytes);
     description.protocol_profile_version = 2;
     description.controller_profile_total = controller_ids.len();
-    description.active_controller_profile_id = Some(active_controller_id);
-    description.battery_profile_total =
-        if battery_selections.len() == 1 && battery_selections[0].is_none() {
-            0
-        } else {
-            battery_selections.len()
-        };
-    description.active_battery_profile_id = active_battery_id;
-    description.fault_code_profile_total =
-        if fault_code_selections.len() == 1 && fault_code_selections[0].is_none() {
-            0
-        } else {
-            fault_code_selections.len()
-        };
-    description.active_fault_code_profile_id = active_fault_code_id;
+    description.battery_profile_total = battery_ids.len();
+    description.fault_code_profile_total = fault_code_ids.len();
     description.protocol_bundle_version = 1;
     description.protocol_profile_payloads = payloads;
 
@@ -1093,11 +1023,25 @@ fn build_config_update_manifest(
                 description.remove("language_addr");
                 description.remove("language_code");
                 let materialized = materialize_active_protocol_profiles(&request.document).ok();
+                let has_profile_canopen = request
+                    .document
+                    .get("protocol_profiles")
+                    .and_then(|value| value.get("controller_profiles"))
+                    .and_then(Value::as_array)
+                    .is_some_and(|profiles| {
+                        profiles.iter().any(|profile| {
+                            profile
+                                .get("protocol")
+                                .and_then(|protocol| protocol.get("canopen"))
+                                .is_some()
+                        })
+                    });
                 let has_canopen = request.document.get("canopen").is_some()
                     || materialized
                         .as_ref()
                         .and_then(|value| value.get("canopen"))
-                        .is_some();
+                        .is_some()
+                    || has_profile_canopen;
                 if has_canopen {
                     description.insert("canopen_version".to_string(), json!(1));
                 } else {
@@ -3192,6 +3136,34 @@ mod tests {
         manifest
     }
 
+    fn profile_payload<'a>(
+        report: &'a BinaryBuildReport,
+        scope: &str,
+        profile_id: &str,
+    ) -> &'a ProtocolProfilePayloadPlan {
+        report
+            .data_description
+            .protocol_profile_payloads
+            .iter()
+            .find(|payload| payload.scope == scope && payload.profile_id == profile_id)
+            .unwrap_or_else(|| panic!("missing profile payload {scope}:{profile_id}"))
+    }
+
+    fn manifest_profile_payload<'a>(
+        manifest: &'a Value,
+        scope: &str,
+        profile_id: &str,
+    ) -> &'a Value {
+        manifest["data_description"]["protocol_profile_payloads"]
+            .as_array()
+            .and_then(|payloads| {
+                payloads.iter().find(|payload| {
+                    payload["scope"] == scope && payload["profile_id"] == profile_id
+                })
+            })
+            .unwrap_or_else(|| panic!("missing manifest profile payload {scope}:{profile_id}"))
+    }
+
     fn jc001(mut document: Value) -> Value {
         document["config_version"] = json!("jc001");
         document
@@ -3407,10 +3379,10 @@ mod tests {
         assert_eq!(v2_description["i18n_locale_total"], 2);
         assert_eq!(v2_description["sdo_version"], 2);
         assert_eq!(v2_manifest["protocol_profiles"]["schema_version"], 2);
-        assert_eq!(
-            v2_manifest["protocol_profiles"]["active_controller_profile_id"],
-            "controller.default"
-        );
+        let v2_profiles = v2_manifest["protocol_profiles"].as_object().unwrap();
+        assert!(!v2_profiles.contains_key("active_controller_profile_id"));
+        assert!(!v2_profiles.contains_key("active_battery_profile_id"));
+        assert!(!v2_profiles.contains_key("active_fault_code_profile_id"));
         assert_eq!(
             v2_manifest["data_description"]["protocol_bundle_version"],
             1
@@ -3604,35 +3576,41 @@ mod tests {
         );
         assert_eq!(binary.data_description.protocol_profile_version, 2);
         assert_eq!(binary.data_description.controller_profile_total, 2);
-        assert_eq!(
-            binary
-                .data_description
-                .active_controller_profile_id
-                .as_deref(),
-            Some("inmotion")
-        );
         assert_eq!(binary.data_description.battery_profile_total, 2);
-        assert_eq!(
-            binary.data_description.active_battery_profile_id.as_deref(),
-            Some("battery_b")
-        );
         assert_eq!(binary.data_description.fault_code_profile_total, 2);
-        assert_eq!(
-            binary
-                .data_description
-                .active_fault_code_profile_id
-                .as_deref(),
-            Some("fault.default")
-        );
         assert_eq!(binary.data_description.protocol_bundle_version, 1);
         let payloads = &binary.data_description.protocol_profile_payloads;
-        assert_eq!(payloads.len(), 8);
-        assert_eq!(payloads[0].controller_profile_id, "inmotion");
-        assert_eq!(payloads[0].battery_profile_id.as_deref(), Some("battery_b"));
+        assert_eq!(payloads.len(), 6);
         assert_eq!(
-            payloads[0].fault_code_profile_id.as_deref(),
-            Some("fault.default")
+            payloads
+                .iter()
+                .filter(|payload| payload.scope == "controller")
+                .count(),
+            2
         );
+        assert_eq!(
+            payloads
+                .iter()
+                .filter(|payload| payload.scope == "battery")
+                .count(),
+            2
+        );
+        assert_eq!(
+            payloads
+                .iter()
+                .filter(|payload| payload.scope == "fault")
+                .count(),
+            2
+        );
+        assert!(payloads
+            .iter()
+            .any(|payload| payload.scope == "controller" && payload.profile_id == "inmotion"));
+        assert!(payloads
+            .iter()
+            .any(|payload| payload.scope == "battery" && payload.profile_id == "battery_b"));
+        assert!(payloads
+            .iter()
+            .any(|payload| payload.scope == "fault" && payload.profile_id == "fault.default"));
         assert_eq!(payloads[0].base_addr, 0);
         for payload in payloads {
             let end = payload.base_addr + payload.file_size;
@@ -3649,18 +3627,10 @@ mod tests {
         assert_eq!(binary.crc, crc16_ccitt_false(&binary.bytes));
 
         let manifest = fixture_manifest(document, &binary);
-        assert_eq!(
-            manifest["protocol_profiles"]["active_controller_profile_id"],
-            "inmotion"
-        );
-        assert_eq!(
-            manifest["protocol_profiles"]["active_battery_profile_id"],
-            "battery_b"
-        );
-        assert_eq!(
-            manifest["protocol_profiles"]["active_fault_code_profile_id"],
-            "fault.default"
-        );
+        let manifest_profiles = manifest["protocol_profiles"].as_object().unwrap();
+        assert!(!manifest_profiles.contains_key("active_controller_profile_id"));
+        assert!(!manifest_profiles.contains_key("active_battery_profile_id"));
+        assert!(!manifest_profiles.contains_key("active_fault_code_profile_id"));
         assert_eq!(
             manifest["protocol_profiles"]["controller_profiles"]
                 .as_array()
@@ -3682,21 +3652,17 @@ mod tests {
                 .len(),
             2
         );
-        assert_eq!(
-            manifest["data_description"]["active_controller_profile_id"],
-            "inmotion"
-        );
-        assert_eq!(
-            manifest["data_description"]["active_battery_profile_id"],
-            "battery_b"
-        );
+        let manifest_description = manifest["data_description"].as_object().unwrap();
+        assert!(!manifest_description.contains_key("active_controller_profile_id"));
+        assert!(!manifest_description.contains_key("active_battery_profile_id"));
+        assert!(!manifest_description.contains_key("active_fault_code_profile_id"));
         assert_eq!(manifest["data_description"]["canopen_version"], 1);
         assert_eq!(
             manifest["data_description"]["protocol_profile_payloads"]
                 .as_array()
                 .unwrap()
                 .len(),
-            8
+            6
         );
         for payload in manifest["data_description"]["protocol_profile_payloads"]
             .as_array()
@@ -3707,11 +3673,11 @@ mod tests {
         }
         let acm_payload = payloads
             .iter()
-            .find(|payload| payload.controller_profile_id == "acm")
+            .find(|payload| payload.scope == "controller" && payload.profile_id == "acm")
             .unwrap();
         let inmotion_payload = payloads
             .iter()
-            .find(|payload| payload.controller_profile_id == "inmotion")
+            .find(|payload| payload.scope == "controller" && payload.profile_id == "inmotion")
             .unwrap();
         assert_ne!(
             &binary.bytes[acm_payload.base_addr..acm_payload.base_addr + acm_payload.file_size],
@@ -3763,16 +3729,24 @@ mod tests {
         let report = build_project_binary(&document);
 
         assert!(report.valid, "{:?}", report.errors);
-        assert_eq!(report.data_description.fault_code_version, 2);
-        assert_eq!(report.data_description.fault_source_total, 1);
-        assert_eq!(report.data_description.fault_code_total, 1);
-        assert!(report.data_description.fault_code_base_addr >= 0);
+        let fault_payload = report
+            .data_description
+            .protocol_profile_payloads
+            .iter()
+            .find(|payload| payload.scope == "fault" && payload.profile_id == "fault.default")
+            .expect("fault payload must be present");
+        assert_eq!(fault_payload.description["fault_code_version"], 2);
+        assert_eq!(fault_payload.description["fault_source_total"], 1);
+        assert_eq!(fault_payload.description["fault_code_total"], 1);
 
-        let base = report.data_description.fault_code_base_addr as usize;
-        let source_table_addr =
-            u32::from_le_bytes(report.bytes[base + 8..base + 12].try_into().unwrap()) as usize;
-        let code_table_addr =
-            u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
+        let base = fault_payload.base_addr
+            + fault_payload.description["fault_code_base_addr"]
+                .as_u64()
+                .expect("fault address must be non-negative") as usize;
+        let source_table_addr = fault_payload.base_addr
+            + u32::from_le_bytes(report.bytes[base + 8..base + 12].try_into().unwrap()) as usize;
+        let code_table_addr = fault_payload.base_addr
+            + u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
 
         assert_eq!(
             u16::from_le_bytes(report.bytes[base..base + 2].try_into().unwrap()),
@@ -3808,7 +3782,15 @@ mod tests {
             "fault_code_info": { "config": false, "bin": true }
         });
         let config_off_report = build_project_binary(&config_off);
-        assert!(config_off_report.data_description.fault_code_base_addr >= 0);
+        let config_off_fault_payload = config_off_report
+            .data_description
+            .protocol_profile_payloads
+            .iter()
+            .find(|payload| payload.scope == "fault" && payload.profile_id == "fault.default")
+            .expect("fault payload must be present");
+        assert!(config_off_fault_payload.description["fault_code_base_addr"]
+            .as_i64()
+            .is_some_and(|value| value >= 0));
         let config_off_manifest = manifest_data_description(
             &config_off_report.data_description,
             &project_export_settings(&config_off),
@@ -3840,9 +3822,18 @@ mod tests {
             "fault_code_info": { "config": true, "bin": false }
         });
         let bin_off_report = build_project_binary(&bin_off);
-        assert_eq!(bin_off_report.data_description.fault_code_base_addr, -1);
-        assert_eq!(bin_off_report.data_description.fault_source_total, 0);
-        assert_eq!(bin_off_report.data_description.fault_code_total, 0);
+        let bin_off_fault_payload = bin_off_report
+            .data_description
+            .protocol_profile_payloads
+            .iter()
+            .find(|payload| payload.scope == "fault" && payload.profile_id == "fault.default")
+            .expect("fault payload must be present");
+        assert_eq!(
+            bin_off_fault_payload.description["fault_code_base_addr"],
+            -1
+        );
+        assert_eq!(bin_off_fault_payload.description["fault_source_total"], 0);
+        assert_eq!(bin_off_fault_payload.description["fault_code_total"], 0);
     }
 
     #[test]
@@ -3882,11 +3873,20 @@ mod tests {
 
         let report = build_project_binary(&document);
         assert!(report.valid, "{:?}", report.errors);
-        assert_eq!(report.data_description.fault_code_version, 2);
-        assert_eq!(report.data_description.fault_source_total, 2);
-        assert_eq!(report.data_description.fault_code_total, 2);
+        let fault_payload = report
+            .data_description
+            .protocol_profile_payloads
+            .iter()
+            .find(|payload| payload.scope == "fault" && payload.profile_id == "fault.default")
+            .expect("fault payload must be present");
+        assert_eq!(fault_payload.description["fault_code_version"], 2);
+        assert_eq!(fault_payload.description["fault_source_total"], 2);
+        assert_eq!(fault_payload.description["fault_code_total"], 2);
 
-        let base = report.data_description.fault_code_base_addr as usize;
+        let base = fault_payload.base_addr
+            + fault_payload.description["fault_code_base_addr"]
+                .as_u64()
+                .unwrap() as usize;
         let first = base + 20 + 2 * 16;
         let second = first + 12;
         assert_ne!(report.bytes[first], report.bytes[second]);
@@ -3967,12 +3967,21 @@ mod tests {
         let report = build_project_binary(&document);
 
         assert!(report.valid, "{:?}", report.errors);
-        assert_eq!(report.data_description.fault_source_total, 2);
-        assert_eq!(report.data_description.fault_code_total, 2);
+        let fault_payload = report
+            .data_description
+            .protocol_profile_payloads
+            .iter()
+            .find(|payload| payload.scope == "fault" && payload.profile_id == "fault.default")
+            .expect("fault payload must be present");
+        assert_eq!(fault_payload.description["fault_source_total"], 2);
+        assert_eq!(fault_payload.description["fault_code_total"], 2);
 
-        let base = report.data_description.fault_code_base_addr as usize;
-        let code_table_addr =
-            u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
+        let base = fault_payload.base_addr
+            + fault_payload.description["fault_code_base_addr"]
+                .as_u64()
+                .unwrap() as usize;
+        let code_table_addr = fault_payload.base_addr
+            + u32::from_le_bytes(report.bytes[base + 12..base + 16].try_into().unwrap()) as usize;
         let first = &report.bytes[code_table_addr..code_table_addr + 12];
         let second = &report.bytes[code_table_addr + 12..code_table_addr + 24];
 
@@ -4617,22 +4626,34 @@ mod tests {
             "unexpected export errors: {:?}",
             report.errors
         );
-        assert_eq!(report.data_description.global_param_total, 0);
-        assert_eq!(report.data_description.pdo_recv_total, 0);
-        assert_eq!(report.data_description.battery_monitor_item_total, 1);
-        assert_eq!(report.data_description.battery_monitor_frame_total, 1);
-        assert_eq!(report.data_description.battery_monitor_version, 2);
+        let battery_payload = report
+            .data_description
+            .protocol_profile_payloads
+            .iter()
+            .find(|payload| payload.scope == "battery" && payload.profile_id == "battery.default")
+            .expect("battery payload must be present");
+        assert_eq!(battery_payload.description["global_param_total"], 0);
+        assert_eq!(battery_payload.description["pdo_recv_total"], 0);
+        assert_eq!(battery_payload.description["battery_monitor_item_total"], 1);
+        assert_eq!(
+            battery_payload.description["battery_monitor_frame_total"],
+            1
+        );
+        assert_eq!(battery_payload.description["battery_monitor_version"], 2);
 
-        let base = report.data_description.battery_monitor_base_addr as usize;
+        let base = battery_payload.base_addr
+            + battery_payload.description["battery_monitor_base_addr"]
+                .as_u64()
+                .unwrap() as usize;
         let read_u16 = |offset: usize| {
             u16::from_le_bytes(report.bytes[offset..offset + 2].try_into().unwrap())
         };
         let read_u32 = |offset: usize| {
             u32::from_le_bytes(report.bytes[offset..offset + 4].try_into().unwrap())
         };
-        let frame_table_addr = read_u32(base + 20) as usize;
-        let signal_table_addr = read_u32(base + 24) as usize;
-        let item_table_addr = read_u32(base + 28) as usize;
+        let frame_table_addr = battery_payload.base_addr + read_u32(base + 20) as usize;
+        let signal_table_addr = battery_payload.base_addr + read_u32(base + 24) as usize;
+        let item_table_addr = battery_payload.base_addr + read_u32(base + 28) as usize;
 
         assert_eq!(read_u16(base), 2);
         assert_eq!(read_u16(base + 2), 2);
@@ -4673,20 +4694,25 @@ mod tests {
             "unexpected export errors: {:?}",
             report.errors
         );
-        assert_eq!(report.data_description.global_param_total, 1);
-        assert_eq!(report.data_description.pdo_recv_total, 1);
-        assert_eq!(report.data_description.battery_monitor_base_addr, -1);
-        assert_eq!(report.data_description.battery_monitor_item_total, 0);
+        let controller_payload = profile_payload(&report, "controller", "controller.default");
+        let battery_payload = profile_payload(&report, "battery", "battery.default");
+        assert_eq!(controller_payload.description["global_param_total"], 1);
+        assert_eq!(controller_payload.description["pdo_recv_total"], 1);
+        assert_eq!(battery_payload.description["battery_monitor_base_addr"], -1);
+        assert_eq!(battery_payload.description["battery_monitor_item_total"], 0);
     }
 
     #[test]
     fn battery_monitor_config_and_bin_flags_control_manifest_independently() {
         for (config, bin) in [(false, false), (false, true), (true, false)] {
             let (binary, manifest) = build_battery_monitor_manifest(config, bin);
-            let data_description = manifest
-                .get("data_description")
-                .and_then(Value::as_object)
-                .expect("manifest data_description");
+            let data_description =
+                manifest_profile_payload(&manifest, "battery", "battery.default")
+                    .get("description")
+                    .and_then(Value::as_object)
+                    .expect("battery payload description");
+            let binary_description =
+                &profile_payload(&binary, "battery", "battery.default").description;
 
             assert!(manifest.get("battery_monitor").is_none());
             if config {
@@ -4695,7 +4721,9 @@ mod tests {
                         .get("battery_monitor_base_addr")
                         .and_then(Value::as_i64),
                     Some(if bin {
-                        binary.data_description.battery_monitor_base_addr as i64
+                        binary_description["battery_monitor_base_addr"]
+                            .as_i64()
+                            .unwrap()
                     } else {
                         -1
                     })
@@ -4705,7 +4733,9 @@ mod tests {
                         .get("battery_monitor_frame_total")
                         .and_then(Value::as_u64),
                     Some(if bin {
-                        binary.data_description.battery_monitor_frame_total as u64
+                        binary_description["battery_monitor_frame_total"]
+                            .as_u64()
+                            .unwrap()
                     } else {
                         0
                     })
@@ -4715,7 +4745,9 @@ mod tests {
                         .get("battery_monitor_item_total")
                         .and_then(Value::as_u64),
                     Some(if bin {
-                        binary.data_description.battery_monitor_item_total as u64
+                        binary_description["battery_monitor_item_total"]
+                            .as_u64()
+                            .unwrap()
                     } else {
                         0
                     })
@@ -4725,7 +4757,9 @@ mod tests {
                         .get("battery_monitor_version")
                         .and_then(Value::as_u64),
                     Some(if bin {
-                        binary.data_description.battery_monitor_version as u64
+                        binary_description["battery_monitor_version"]
+                            .as_u64()
+                            .unwrap()
                     } else {
                         0
                     })
@@ -4779,21 +4813,27 @@ mod tests {
 
         assert!(errors.is_empty(), "unexpected manifest errors: {errors:?}");
         assert!(manifest.get("battery_monitor").is_none());
+        let manifest_battery_description =
+            manifest_profile_payload(&manifest, "battery", "battery.default")
+                .get("description")
+                .expect("battery payload description");
+        let binary_battery_description =
+            &profile_payload(&binary, "battery", "battery.default").description;
         assert_eq!(
-            manifest["data_description"]["battery_monitor_base_addr"],
-            json!(binary.data_description.battery_monitor_base_addr)
+            manifest_battery_description["battery_monitor_base_addr"],
+            binary_battery_description["battery_monitor_base_addr"]
         );
         assert_eq!(
-            manifest["data_description"]["battery_monitor_item_total"],
-            json!(binary.data_description.battery_monitor_item_total)
+            manifest_battery_description["battery_monitor_item_total"],
+            binary_battery_description["battery_monitor_item_total"]
         );
         assert_eq!(
-            manifest["data_description"]["battery_monitor_frame_total"],
-            json!(binary.data_description.battery_monitor_frame_total)
+            manifest_battery_description["battery_monitor_frame_total"],
+            binary_battery_description["battery_monitor_frame_total"]
         );
         assert_eq!(
-            manifest["data_description"]["battery_monitor_version"],
-            json!(binary.data_description.battery_monitor_version)
+            manifest_battery_description["battery_monitor_version"],
+            binary_battery_description["battery_monitor_version"]
         );
     }
 
