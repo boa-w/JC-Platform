@@ -28,15 +28,17 @@ v1 的重构外挂 JSON（sidecar）机制已废弃，仅作为历史项目兼�
 8. 不允许通过中文原文、数组位置或旧宏名称自动生成稳定消息 key。
 9. `jc001` 不包含故障码管理，也不接受根级 `fault_code_info`；`jc002` 故障码必须在
     `fault_code_profiles[]` 中使用 `definitions[]` 和 `bindings[]`，禁止使用历史 `codes[]`。
-10. `jc002.protocol_profiles` 若存在，必须使用 `schema_version=2`；控制器、锂电和故障码
-    Profile 分别在 `controller_profiles`、`battery_profiles`、`fault_code_profiles` 中管理，
-    各自 ID 不得重复，激活 ID 必须存在，且禁止跨集合嵌套协议段。导出时即使编辑文档没有
-    该字段，也会生成统一的 Profile Bundle。
-11. 三类 Profile 在同一个 `data.bin` 中按笛卡尔积生成多个自包含 payload；下位机通过
-    清单的 payload 索引、整包 CRC 和局部 CRC 选择一个 payload，重启后加载其运行时表。
+10. `jc002` 必须包含唯一的 `protocol_profiles`，且使用 `schema_version=2`；控制器、锂电和
+    故障码 Profile 分别在 `controller_profiles`、`battery_profiles`、`fault_code_profiles`
+    中管理，各自 ID 不得重复，禁止跨集合嵌套协议段。缺少该字段或出现根级协议字段时
+    直接拒绝，不自动包装、迁移或 fallback。`active_*_profile_id` 只属于上位机内存选择，
+    不写入 canonical `.jcpro`、清单或 bin。
+11. 三类 Profile 在同一个 `data.bin` 中按 scope 分别生成自包含 payload；下位机通过清单的
+    payload 索引、整包 CRC 和局部 CRC 选择各自 payload，重启后加载其运行时表。上位机不
+    构建控制器、锂电和故障码的笛卡尔积，也不判断三者是否能搭配。
 12. v2 的根级 localization 是公共语言目录；Profile overlay 只能复用公共 locale 集合，
-    可以覆盖公共 key 或增加 Profile 专属 key。控制器、锂电和故障码 overlay 在同一组合中
-    出现相同 key 且文案不一致时，项目校验和导出都会失败。
+    可以覆盖公共 key 或增加 Profile 专属 key。每个 scope 独立合并自己的 overlay，不做
+    跨 Profile 的隐式覆盖。
 13. jc002 的 PDO 构建输入固定为 `pdo_global_param`、`pdo_condition`、`pdo_recv` 和
     `pdo_send`。`pdo_simple_send_recv` 只允许作为表格导入的临时输入；转换完成后必须
     移除，保存、另存为和构建都不得保留或读取它。jc001 的简化 PDO 回退仅属于 v1 路径。

@@ -75,6 +75,8 @@ function localization(): LocalizationDocument {
       'zh-CN': {
         enabled: true,
         translations: {
+          'language.name.zh-CN': '中文',
+          'language.name.en-US': '英文',
           'battery.soc.signal': '电量信号',
           'battery.soc': '电量',
           'battery.soc.fallback': '电量',
@@ -85,6 +87,8 @@ function localization(): LocalizationDocument {
       'en-US': {
         enabled: true,
         translations: {
+          'language.name.zh-CN': 'Chinese',
+          'language.name.en-US': 'English',
           'battery.soc.signal': 'Battery SOC',
           'battery.soc': 'SOC',
           'battery.soc.fallback': 'Battery SOC',

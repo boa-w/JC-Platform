@@ -10,19 +10,6 @@ import type {
   ProtocolProfilesDocument,
 } from '../../types/platform';
 
-const localeLabels: Record<string, string> = {
-  zh: '中文',
-  en: 'English',
-  ja: '日本語',
-  ko: '한국어',
-  de: 'Deutsch',
-  fr: 'Français',
-  es: 'Español',
-  pt: 'Português',
-  ru: 'Русский',
-  ar: 'العربية',
-};
-
 export type LocalizationScope =
   | { kind: 'common' }
   | { kind: 'controller'; profileId: string }
@@ -40,6 +27,31 @@ export interface LocalizationScopeOption {
 export interface LocalizationScopeUpdate {
   localization: LocalizationDocument;
   protocolProfiles?: ProtocolProfilesDocument;
+}
+
+export const LOCALE_NAME_KEY_PREFIX = 'language.name.';
+
+/** Return the reserved, deterministic message key for one locale's display name. */
+export function localeNameKey(locale: string): string {
+  return `${LOCALE_NAME_KEY_PREFIX}${locale}`;
+}
+
+/** Return whether a key belongs to the v2 language-name namespace. */
+export function isLocaleNameKey(key: string): boolean {
+  return key.startsWith(LOCALE_NAME_KEY_PREFIX);
+}
+
+/** Resolve a language document label through the same v2 message catalog as other text. */
+export function getLanguageDocumentLabel(document: LanguageDocument, code: string): string {
+  const nameKey = document.language_name_keys?.[code];
+  const displayLocale = document.default_locale ?? document.list_code_language[0];
+  if (nameKey && displayLocale) {
+    const values = document.list_translate[nameKey] as Record<string, string> | undefined;
+    const text = values?.[displayLocale]?.trim();
+    if (text) return text;
+  }
+  if (document.language_name_keys) return code;
+  return document.language_labels?.[code] ?? code;
 }
 
 function messageText(value: LocalizationMessage | undefined): string {
@@ -104,11 +116,16 @@ export function applyLocalizationOverlay(
     const sourceLocale = localization.locales[locale];
     const overlayLocale = overlay.locales[locale];
     if (!overlayLocale) continue;
+    const overlayTranslations = Object.fromEntries(
+      Object.entries(overlayLocale.translations ?? {}).filter(
+        ([key]) => !isLocaleNameKey(key),
+      ),
+    );
     locales[locale] = {
       ...(sourceLocale ?? { translations: {} }),
       translations: {
         ...(sourceLocale?.translations ?? {}),
-        ...(overlayLocale.translations ?? {}),
+        ...overlayTranslations,
       },
     };
   }
@@ -185,10 +202,13 @@ export function localizationToLanguageDocument(
   options: { keyOrder?: string[]; lockedKeys?: string[]; protectedKeys?: string[] } = {},
 ): LanguageDocument {
   const availableKeys = new Set(localizationKeys(localization));
+  const languageNameKeys = Object.fromEntries(
+    localization.locale_order.map((locale) => [locale, localeNameKey(locale)]),
+  );
   const keys: string[] = [];
   const seen = new Set<string>();
   const append = (key: string) => {
-    if (availableKeys.has(key) && !seen.has(key)) {
+    if (availableKeys.has(key) && !isLocaleNameKey(key) && !seen.has(key)) {
       seen.add(key);
       keys.push(key);
     }
@@ -201,15 +221,18 @@ export function localizationToLanguageDocument(
   const orderedLockedKeys = keys.filter((key) => lockedKeySet.has(key));
   const orderedEditableKeys = keys.filter((key) => !lockedKeySet.has(key));
   const orderedKeys = [...orderedLockedKeys, ...orderedEditableKeys];
+  const orderedMessageKeys = [
+    ...Object.values(languageNameKeys).filter((key) => availableKeys.has(key)),
+    ...orderedKeys,
+  ];
 
   return {
     list_code_language: [...localization.locale_order],
-    language_labels: Object.fromEntries(
-      localization.locale_order.map((locale) => [locale, localeLabels[locale] ?? locale]),
-    ),
+    default_locale: localization.default_locale,
+    language_name_keys: languageNameKeys,
     list_inner: orderedKeys,
     list_translate: Object.fromEntries(
-      orderedKeys.map((key) => [
+      orderedMessageKeys.map((key) => [
         key,
         Object.fromEntries(
           localization.locale_order.map((locale) => [
@@ -231,6 +254,11 @@ function nextLanguageKeys(next: LanguageDocument): string[] {
   ].filter((key, index, keys) => keys.indexOf(key) === index);
 }
 
+function languageNameKeysForUpdate(previous: LanguageDocument, next: LanguageDocument): string[] {
+  if (!previous.language_name_keys && !next.language_name_keys) return [];
+  return next.list_code_language.map(localeNameKey);
+}
+
 export function updateLocalizationFromLanguageDocument(
   localization: LocalizationDocument,
   previous: LanguageDocument,
@@ -238,7 +266,13 @@ export function updateLocalizationFromLanguageDocument(
 ): LocalizationDocument {
   const previousCodes = previous.list_code_language;
   const previousKeys = previous.list_inner;
-  const nextKeys = nextLanguageKeys(next);
+  const reservedNameKeys = languageNameKeysForUpdate(previous, next);
+  const nextKeys = [
+    ...nextLanguageKeys(next).filter(
+      (key) => !isLocaleNameKey(key) || reservedNameKeys.includes(key),
+    ),
+    ...reservedNameKeys,
+  ].filter((key, index, keys) => keys.indexOf(key) === index);
   const locales = Object.fromEntries(
     next.list_code_language.map((code, localeIndex) => {
       const sourceCode = localization.locales[code]
@@ -249,15 +283,30 @@ export function updateLocalizationFromLanguageDocument(
       const sourceLocale = sourceCode ? localization.locales[sourceCode] : undefined;
       const translations = Object.fromEntries(
         nextKeys.map((key, keyIndex) => {
-          const sourceKey =
+          let sourceKey =
             sourceLocale?.translations[key] !== undefined
               ? key
               : previousKeys[keyIndex] &&
                   sourceLocale?.translations[previousKeys[keyIndex]] !== undefined
                 ? previousKeys[keyIndex]
                 : key;
+          if (
+            isLocaleNameKey(key) &&
+            sourceLocale?.translations[sourceKey] === undefined
+          ) {
+            const previousCode = previousCodes[localeIndex];
+            if (previousCode) {
+              const previousNameKey = localeNameKey(previousCode);
+              if (sourceLocale?.translations[previousNameKey] !== undefined) {
+                sourceKey = previousNameKey;
+              }
+            }
+          }
           const row = next.list_translate[key] as Record<string, string> | undefined;
-          return [key, updatedMessage(sourceLocale?.translations[sourceKey], row?.[code] ?? '')];
+          const text =
+            row?.[code] ??
+            (isLocaleNameKey(key) ? messageText(sourceLocale?.translations[sourceKey]) : '');
+          return [key, updatedMessage(sourceLocale?.translations[sourceKey], text)];
         }),
       );
       return [
@@ -359,7 +408,7 @@ function updateProfileOverlay(
   next: LanguageDocument,
 ): LocalizationOverlayDocument {
   const commonKeys = new Set(localizationKeys(localization));
-  const nextKeys = nextLanguageKeys(next);
+  const nextKeys = nextLanguageKeys(next).filter((key) => !isLocaleNameKey(key));
   const previousOverlay = profile.localization_overlay ?? { locales: {} };
   const locales: Record<string, LocalizationOverlayLocale> = {};
 
@@ -487,6 +536,7 @@ export function updateLocalizationScopeText(
 
   const profile = profileForScope(profiles, scope);
   if (!profile) return { localization, protocolProfiles: profiles };
+  if (isLocaleNameKey(key)) return { localization, protocolProfiles: profiles };
   const baseText = messageText(localization.locales[locale]?.translations[key]);
   const previousOverlay = profile.localization_overlay ?? { locales: {} };
   const previousLocale = overlayLocale(previousOverlay, locale);

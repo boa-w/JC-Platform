@@ -814,6 +814,70 @@
   overflow: auto;
 }
 
+.lang-name-table-wrap {
+  margin: 0 0 12px;
+  border: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+
+.lang-name-table-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lang-name-table-header h3,
+.lang-name-table-header p {
+  margin: 0;
+}
+
+.lang-name-table-header h3 {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.lang-name-table-header p {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.lang-name-table-badge {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.lang-name-table-scroll {
+  overflow-x: auto;
+}
+
+.lang-name-table {
+  min-width: 620px;
+}
+
+.lang-name-table th small,
+.lang-name-table td small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.lang-name-key {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  word-break: break-word;
+}
+
 .lang-table-bulkbar {
   display: flex;
   align-items: center;

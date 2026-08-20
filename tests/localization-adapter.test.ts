@@ -19,6 +19,8 @@ function localization(): LocalizationDocument {
         enabled: true,
         direction: 'ltr',
         translations: {
+          'language.name.zh': '中文',
+          'language.name.en': '英文',
           'menu.root': '菜单',
           'fault.count': { one: '%d 个故障', other: '%d 个故障' },
         },
@@ -27,6 +29,8 @@ function localization(): LocalizationDocument {
         enabled: true,
         direction: 'ltr',
         translations: {
+          'language.name.zh': 'Chinese',
+          'language.name.en': 'English',
           'menu.root': 'Menu',
           'fault.count': { one: '%d fault', other: '%d faults' },
         },
@@ -40,6 +44,8 @@ test('adapts jc002 localization without v1 placeholder rows', () => {
 
   assert.deepEqual(view.list_code_language, ['zh', 'en']);
   assert.deepEqual(view.list_inner, ['menu.root', 'fault.count']);
+  assert.deepEqual(view.language_name_keys, { zh: 'language.name.zh', en: 'language.name.en' });
+  assert.equal(view.list_translate['language.name.en']?.en, 'English');
   assert.equal(view.editor_locked_key_count, 0);
   assert.deepEqual(view.list_translate['fault.count'], {
     zh: '%d 个故障',
@@ -66,12 +72,59 @@ test('writes language edits back to jc002 and preserves plural forms', () => {
   assert.equal(updated.default_locale, 'zh-CN');
   assert.deepEqual(updated.locale_order, ['zh-CN', 'en']);
   assert.equal(updated.locales.zh, undefined);
+  assert.equal(updated.locales['zh-CN'].translations['language.name.zh-CN'], '中文');
+  assert.equal(updated.locales['zh-CN'].translations['language.name.en'], '英文');
+  assert.equal(updated.locales.en.translations['language.name.en'], 'English');
   assert.equal(updated.locales['zh-CN'].translations['menu.home'], '首页');
   assert.deepEqual(updated.locales.en.translations['fault.count'], {
     one: '%d fault',
     other: '%d total faults',
   });
   assert.equal(updated.locales.en.translations['menu.root'], undefined);
+});
+
+test('keeps language name keys aligned when removing a middle locale', () => {
+  const base = localization();
+  const source: LocalizationDocument = {
+    ...base,
+    locale_order: ['zh', 'en', 'ru'],
+    locales: {
+      ...base.locales,
+      ru: {
+        enabled: true,
+        direction: 'ltr',
+        translations: {
+          'language.name.zh': 'Китайский',
+          'language.name.en': 'Английский',
+          'language.name.ru': 'Русский',
+          'menu.root': 'Меню',
+        },
+      },
+    },
+  };
+  source.locales.zh.translations['language.name.ru'] = '俄语';
+  source.locales.en.translations['language.name.ru'] = 'Russian';
+
+  const previous = localizationToLanguageDocument(source);
+  const nextTranslate = Object.fromEntries(
+    Object.entries(previous.list_translate)
+      .filter(([key]) => key !== 'language.name.en')
+      .map(([key, value]) => {
+        const values = value as Record<string, string>;
+        return [key, { zh: values.zh ?? '', ru: values.ru ?? '' }];
+      }),
+  );
+  const updated = updateLocalizationFromLanguageDocument(source, previous, {
+    ...previous,
+    list_code_language: ['zh', 'ru'],
+    language_name_keys: { zh: 'language.name.zh', ru: 'language.name.ru' },
+    list_translate: nextTranslate,
+  });
+
+  assert.deepEqual(updated.locale_order, ['zh', 'ru']);
+  assert.equal(updated.locales.zh.translations['language.name.ru'], '俄语');
+  assert.equal(updated.locales.ru.translations['language.name.ru'], 'Русский');
+  assert.equal(updated.locales.zh.translations['language.name.en'], undefined);
 });
 
 test('merges common catalog and Profile overlay while keeping common keys locked', () => {
@@ -119,6 +172,7 @@ test('merges common catalog and Profile overlay while keeping common keys locked
   });
   assert.equal(effective.locales.zh.translations['menu.root'], 'ACM 菜单');
   assert.equal(effective.locales.en.translations['controller.acm.only'], 'ACM only');
+  assert.equal(effective.locales.zh.translations['language.name.en'], '英文');
 
   const commonView = localizationToLanguageDocument(source);
   const profileView = localizationToLanguageDocument(effective, {

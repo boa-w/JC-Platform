@@ -460,6 +460,11 @@
     "comparison": {
       "languageNameKeyTitle": "语言名称配置键，不可编辑 key"
     },
+    "names": {
+      "title": "语言名称翻译",
+      "description": "语言名称使用 language.name.<locale> key，并随当前界面语言显示。",
+      "locked": "系统 key"
+    },
     "toolbar": {
       "searchPlaceholder": "搜索翻译键或内容...",
       "filters": {

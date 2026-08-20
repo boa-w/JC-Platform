@@ -9,7 +9,7 @@
 //! 项目文件为 JSON 格式，包含 `project`、`device`、`ui_info`、
 //! `pdo_*`、`sdo_info`、`language_info` 等段落。
 
-use crate::domain::pdo::{convert_pdo_simple_document, validate_v2_pdo_inner_bindings};
+use crate::domain::pdo::validate_v2_pdo_inner_bindings;
 use crate::domain::private_protocol::PrivateProtocolDocument;
 use crate::domain::protocol_manager::migrate_project_to_unified_protocol;
 use crate::domain::signal::SignalDictionary;
@@ -141,11 +141,8 @@ impl ProjectValidationReport {
                 schema_valid = false;
             }
             Some("jc002") => {
-                if value.get("pdo_simple_send_recv").is_some() {
-                    warnings.push(
-                        "jc002 只保存高级 PDO 四段；pdo_simple_send_recv 必须先转换后移除"
-                            .to_string(),
-                    );
+                if let Err(error) = validate_v2_document_layout(value) {
+                    warnings.push(error);
                     schema_valid = false;
                 }
                 if let Err(error) = crate::domain::localization::validate_localization(value) {
@@ -233,10 +230,10 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
         Some("jc002") if document.get("language_info").is_some() => {
             Err("jc002 项目禁止包含 jc001 language_info".to_string())
         }
-        Some("jc002") if document.get("pdo_simple_send_recv").is_some() => {
-            Err("jc002 项目只保存高级 PDO 四段；简单 PDO 只能通过导入流程转换".to_string())
+        Some("jc002") => {
+            validate_v2_document_layout(document)?;
+            crate::domain::localization::validate_localization(document)
         }
-        Some("jc002") => crate::domain::localization::validate_localization(document),
         Some(version) => Err(format!("不支持的 config_version：{version}")),
         None => Ok(()),
     };
@@ -250,6 +247,39 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
     validate_battery_monitor_version_contract(document)
 }
 
+const V2_ROOT_PROTOCOL_SECTIONS: &[&str] = &[
+    "pdo_simple_send_recv",
+    "pdo_global_param",
+    "pdo_condition",
+    "pdo_recv",
+    "pdo_send",
+    "sdo_info",
+    "canopen",
+    "battery_monitor",
+    "fault_code_info",
+];
+
+/// Validate the persisted jc002 shape before any editor projection is built.
+///
+/// jc002 has one source of truth: protocol payloads live under the three
+/// Profile collections. Root-level protocol sections belong to jc001 or to an
+/// old v2 editor projection and are rejected rather than migrated.
+fn validate_v2_document_layout(document: &Value) -> Result<(), String> {
+    if document.get("protocol_profiles").is_none() {
+        return Err(
+            "jc002 项目必须包含 protocol_profiles；不再从根级协议段生成 Profile".to_string(),
+        );
+    }
+    for section in V2_ROOT_PROTOCOL_SECTIONS {
+        if document.get(*section).is_some() {
+            return Err(format!(
+                "jc002 项目禁止根级 {section}；协议数据必须位于 protocol_profiles"
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Validate the jc002 controller, battery, and fault-code protocol registries.
 ///
 /// These protocol families intentionally have independent identity
@@ -257,7 +287,11 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
 /// sections only after the exporter combines them into the existing ABI.
 pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), String> {
     let Some(root) = document.get("protocol_profiles") else {
-        return Ok(());
+        return if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+            Err("jc002 项目必须包含 protocol_profiles".to_string())
+        } else {
+            Ok(())
+        };
     };
     if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
         return Err("protocol_profiles 仅支持 jc002 项目".to_string());
@@ -283,11 +317,10 @@ pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), Strin
         .get("battery_profiles")
         .and_then(Value::as_array)
         .ok_or_else(|| "protocol_profiles.battery_profiles 必须为数组".to_string())?;
-    let fault_code_profiles: &[Value] = root
+    let fault_code_profiles = root
         .get("fault_code_profiles")
         .and_then(Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or(&[]);
+        .ok_or_else(|| "protocol_profiles.fault_code_profiles 必须为数组".to_string())?;
 
     let mut controller_profile_ids = HashSet::new();
     for (index, profile) in controller_profiles.iter().enumerate() {
@@ -507,6 +540,8 @@ pub fn validate_protocol_profiles_contract(document: &Value) -> Result<(), Strin
             )?;
         }
     }
+    crate::domain::pdo::validate_v2_pdo_inner_bindings(document)?;
+
     // Each Profile owns an independent overlay. Compatibility between
     // controller, battery, and fault selections is a firmware concern and is
     // deliberately outside the project validator.
@@ -763,25 +798,36 @@ pub fn materialize_active_protocol_profiles(document: &Value) -> Result<Value, S
     let Some(root) = document.get("protocol_profiles") else {
         return Ok(document.clone());
     };
-    let controller_profile_id = root
-        .get("controller_profiles")
-        .and_then(Value::as_array)
-        .and_then(|profiles| profiles.first())
-        .and_then(|profile| profile.get("profile_id"))
-        .and_then(Value::as_str)
-        .ok_or_else(|| "protocol_profiles.controller_profiles 不能为空".to_string())?;
-    let battery_profile_id = root
-        .get("battery_profiles")
-        .and_then(Value::as_array)
-        .and_then(|profiles| profiles.first())
-        .and_then(|profile| profile.get("profile_id"))
-        .and_then(Value::as_str);
-    let fault_code_profile_id = root
-        .get("fault_code_profiles")
-        .and_then(Value::as_array)
-        .and_then(|profiles| profiles.first())
-        .and_then(|profile| profile.get("profile_id"))
-        .and_then(Value::as_str);
+    validate_protocol_profiles_contract(document)?;
+
+    fn selected_or_first<'a>(
+        root: &'a Value,
+        collection: &str,
+        active_key: &str,
+    ) -> Option<&'a str> {
+        let profiles = root.get(collection)?.as_array()?;
+        let requested = root.get(active_key).and_then(Value::as_str);
+        requested
+            .filter(|requested| {
+                profiles.iter().any(|profile| {
+                    profile.get("profile_id").and_then(Value::as_str) == Some(*requested)
+                })
+            })
+            .or_else(|| {
+                profiles
+                    .first()
+                    .and_then(|profile| profile.get("profile_id"))
+                    .and_then(Value::as_str)
+            })
+    }
+
+    let controller_profile_id =
+        selected_or_first(root, "controller_profiles", "active_controller_profile_id")
+            .ok_or_else(|| "protocol_profiles.controller_profiles 不能为空".to_string())?;
+    let battery_profile_id =
+        selected_or_first(root, "battery_profiles", "active_battery_profile_id");
+    let fault_code_profile_id =
+        selected_or_first(root, "fault_code_profiles", "active_fault_code_profile_id");
     materialize_protocol_profiles_for_selection(
         document,
         controller_profile_id,
@@ -790,136 +836,18 @@ pub fn materialize_active_protocol_profiles(document: &Value) -> Result<Value, S
     )
 }
 
-/// Normalize every jc002 export to the multi-profile document shape.
+/// Validate the canonical jc002 Profile document used by every exporter.
 ///
-/// Existing v2 editing documents may still have their single controller and
-/// battery sections at the root. Export must not create a second runtime ABI
-/// for that case, so it wraps those sections in stable default Profile IDs
-/// before building the shared payload bundle. The normalized value is an
-/// export-only view and is never written back implicitly.
+/// There is deliberately no v2 migration here. A project either already has
+/// the complete `protocol_profiles` registry or the build fails with the
+/// schema error returned by the validator.
 pub fn normalize_protocol_profiles_for_export(document: &Value) -> Result<Value, String> {
     if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
         return Ok(document.clone());
     }
-    if document.get("protocol_profiles").is_some() {
-        validate_protocol_profiles_contract(document)?;
-        let mut normalized = document.clone();
-        let root_fault_code_info = normalized.get("fault_code_info").cloned();
-        let profile_root = normalized
-            .get_mut("protocol_profiles")
-            .and_then(Value::as_object_mut)
-            .ok_or_else(|| "jc002 protocol_profiles 必须为对象".to_string())?;
-        for collection in [
-            "controller_profiles",
-            "battery_profiles",
-            "fault_code_profiles",
-        ] {
-            if let Some(profiles) = profile_root
-                .get_mut(collection)
-                .and_then(Value::as_array_mut)
-            {
-                for profile in profiles {
-                    if let Some(object) = profile.as_object_mut() {
-                        object
-                            .entry("localization_overlay".to_string())
-                            .or_insert_with(|| json!({ "locales": {} }));
-                    }
-                }
-            }
-        }
-        if !profile_root.contains_key("fault_code_profiles") {
-            if let Some(fault_code_info) = root_fault_code_info {
-                profile_root.insert(
-                    "fault_code_profiles".to_string(),
-                    json!([{
-                        "profile_id": "fault.default",
-                        "fault_family": "generic",
-                        "fault_revision": "",
-                        "localization_overlay": { "locales": {} },
-                        "protocol": { "fault_code_info": fault_code_info }
-                    }]),
-                );
-            }
-        }
-        return Ok(normalized);
-    }
-
-    let mut normalized = document.clone();
-    let root = normalized
-        .as_object_mut()
-        .ok_or_else(|| "jc002 项目根节点必须为对象".to_string())?;
-    let mut controller_protocol = Map::new();
-    for section in ["pdo_global_param", "pdo_condition", "pdo_recv", "pdo_send"] {
-        controller_protocol.insert(
-            section.to_string(),
-            document.get(section).cloned().unwrap_or_else(|| json!([])),
-        );
-    }
-    controller_protocol.insert(
-        "sdo_info".to_string(),
-        document.get("sdo_info").cloned().unwrap_or_else(|| {
-            json!({
-                "type": 0,
-                "user_auth": 0,
-                "name_index": 0,
-                "name": "",
-                "children": []
-            })
-        }),
-    );
-    if let Some(canopen) = document.get("canopen") {
-        controller_protocol.insert("canopen".to_string(), canopen.clone());
-    }
-
-    let mut controller_profile = Map::new();
-    controller_profile.insert("profile_id".to_string(), json!("controller.default"));
-    controller_profile.insert("controller_family".to_string(), json!("generic"));
-    controller_profile.insert("controller_revision".to_string(), json!(""));
-    controller_profile.insert("localization_overlay".to_string(), json!({ "locales": {} }));
-    controller_profile.insert("protocol".to_string(), Value::Object(controller_protocol));
-
-    let battery_profile = document
-        .get("battery_monitor")
-        .filter(|value| value.is_object())
-        .map(|battery_monitor| {
-            json!({
-                "profile_id": "battery.default",
-                "battery_family": "generic",
-                "battery_revision": "",
-                "localization_overlay": { "locales": {} },
-                "protocol": { "battery_monitor": battery_monitor }
-            })
-        });
-    let mut profile_root = Map::new();
-    profile_root.insert(
-        "schema_version".to_string(),
-        json!(PROTOCOL_PROFILE_SCHEMA_VERSION),
-    );
-    profile_root.insert(
-        "controller_profiles".to_string(),
-        Value::Array(vec![Value::Object(controller_profile)]),
-    );
-    profile_root.insert(
-        "battery_profiles".to_string(),
-        Value::Array(battery_profile.into_iter().collect()),
-    );
-    if let Some(fault_code_info) = document.get("fault_code_info") {
-        profile_root.insert(
-            "fault_code_profiles".to_string(),
-            json!([{
-                "profile_id": "fault.default",
-                "fault_family": "generic",
-                "fault_revision": "",
-                "localization_overlay": { "locales": {} },
-                "protocol": { "fault_code_info": fault_code_info }
-            }]),
-        );
-    } else {
-        profile_root.insert("fault_code_profiles".to_string(), Value::Array(Vec::new()));
-    }
-    root.insert("protocol_profiles".to_string(), Value::Object(profile_root));
-    validate_protocol_profiles_contract(&normalized)?;
-    Ok(normalized)
+    validate_v2_document_layout(document)?;
+    validate_protocol_profiles_contract(document)?;
+    Ok(document.clone())
 }
 
 /// Build the manifest-only identity block. Controller and battery payloads
@@ -1439,6 +1367,18 @@ pub fn create_legacy_project_document(name: &str, resolution_w: u32, resolution_
 ///
 /// 遍历所有必要段落，缺失的用默认值补齐，并更新 `config_version`。
 pub fn migrate_legacy_project_document(path: Option<String>, value: Value) -> MigratedProject {
+    if value.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        let summary = ProjectSummary::from_legacy_value(path, &value);
+        let validation = ProjectValidationReport::from_legacy_value(&value);
+        return MigratedProject {
+            summary,
+            validation,
+            document: value,
+            added_sections: Vec::new(),
+            migrated_version: "jc002".to_string(),
+        };
+    }
+
     let mut document = match value {
         Value::Object(map) => map,
         _ => Map::new(),
@@ -1504,9 +1444,8 @@ pub fn save_project_as(request: SaveProjectAsRequest) -> Result<SaveProjectAsRep
     fs::create_dir_all(&target_dir)
         .map_err(|error| format!("创建目标目录失败 {}：{}", target_dir.display(), error))?;
 
-    let document = normalize_v2_pdo_document(request.document)?;
-    validate_project_version_contract(&document)?;
-    let mut document = sanitize_document_for_target(&target_path, document);
+    validate_project_version_contract(&request.document)?;
+    let mut document = sanitize_document_for_target(&target_path, request.document);
     let mut context = SaveAsResourceContext::new(source_dir, target_dir.clone());
     copy_project_resources(&mut document, &mut context);
 
@@ -1945,143 +1884,9 @@ fn required_v2_project_sections() -> &'static [&'static str] {
         "export_info",
         "device",
         "ui_info",
-        "pdo_global_param",
-        "pdo_condition",
-        "pdo_recv",
-        "pdo_send",
-        "sdo_info",
         "localization",
+        "protocol_profiles",
     ]
-}
-
-/// Normalize the v2 PDO source so that simple PDO never remains a persisted
-/// or build-time input. A legacy v2 document may still contain the old table
-/// section; convert it into every controller profile whose advanced PDO is
-/// empty, then remove the table section from the returned document.
-pub fn normalize_v2_pdo_document(mut document: Value) -> Result<Value, String> {
-    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
-        return Ok(document);
-    }
-    let Some(simple) = document.get("pdo_simple_send_recv").cloned() else {
-        return Ok(document);
-    };
-
-    let has_profiles = document
-        .get("protocol_profiles")
-        .and_then(Value::as_object)
-        .is_some();
-    let needs_conversion = if has_profiles {
-        document
-            .get("protocol_profiles")
-            .and_then(|value| value.get("controller_profiles"))
-            .and_then(Value::as_array)
-            .map(|profiles| {
-                profiles.iter().any(|profile| {
-                    profile
-                        .get("protocol")
-                        .map(|protocol| !advanced_pdo_sections_have_content(protocol))
-                        .unwrap_or(true)
-                })
-            })
-            .unwrap_or(false)
-    } else {
-        !advanced_pdo_sections_have_content(&document)
-    };
-
-    let converted = if needs_conversion {
-        let report = convert_pdo_simple_document(&simple);
-        if !report.valid {
-            return Err(format!(
-                "jc002 简单 PDO 迁移失败：{}",
-                report.errors.join("；")
-            ));
-        }
-        Some(
-            serde_json::to_value(report.document.expect("valid conversion has document"))
-                .map_err(|error| format!("jc002 简单 PDO 迁移结果序列化失败：{error}"))?,
-        )
-    } else {
-        None
-    };
-
-    if has_profiles {
-        if let Some(converted) = converted.as_ref() {
-            if let Some(profiles) = document
-                .get_mut("protocol_profiles")
-                .and_then(|value| value.get_mut("controller_profiles"))
-                .and_then(Value::as_array_mut)
-            {
-                for profile in profiles {
-                    let Some(protocol) = profile.get_mut("protocol").and_then(Value::as_object_mut)
-                    else {
-                        continue;
-                    };
-                    if advanced_pdo_sections_have_content(&Value::Object(protocol.clone())) {
-                        continue;
-                    }
-                    copy_advanced_pdo_sections(protocol, converted);
-                }
-            }
-        }
-        mirror_active_controller_pdo_sections(&mut document);
-    } else if let Some(converted) = converted.as_ref() {
-        if let Some(root) = document.as_object_mut() {
-            copy_advanced_pdo_sections(root, converted);
-        }
-    }
-
-    document
-        .as_object_mut()
-        .expect("project document must be an object")
-        .remove("pdo_simple_send_recv");
-    Ok(document)
-}
-
-fn advanced_pdo_sections_have_content(value: &Value) -> bool {
-    ["pdo_global_param", "pdo_condition", "pdo_recv", "pdo_send"]
-        .iter()
-        .any(|section| {
-            value
-                .get(*section)
-                .and_then(Value::as_array)
-                .is_some_and(|items| !items.is_empty())
-        })
-}
-
-fn copy_advanced_pdo_sections(target: &mut Map<String, Value>, source: &Value) {
-    for section in ["pdo_global_param", "pdo_condition", "pdo_recv", "pdo_send"] {
-        if let Some(value) = source.get(section) {
-            target.insert(section.to_string(), value.clone());
-        }
-    }
-}
-
-fn mirror_active_controller_pdo_sections(document: &mut Value) {
-    let active_id = document
-        .get("protocol_profiles")
-        .and_then(|value| value.get("active_controller_profile_id"))
-        .and_then(Value::as_str)
-        .map(str::to_string);
-    let Some(active_id) = active_id else {
-        return;
-    };
-    let active_protocol = document
-        .get("protocol_profiles")
-        .and_then(|value| value.get("controller_profiles"))
-        .and_then(Value::as_array)
-        .and_then(|profiles| {
-            profiles.iter().find(|profile| {
-                profile.get("profile_id").and_then(Value::as_str) == Some(active_id.as_str())
-            })
-        })
-        .and_then(|profile| profile.get("protocol"))
-        .cloned();
-    let Some(active_protocol) = active_protocol else {
-        return;
-    };
-    if let Some(root) = document.as_object_mut() {
-        copy_advanced_pdo_sections(root, &active_protocol);
-    }
 }
 
 fn is_unified_protocol_section(section: &str) -> bool {
@@ -2171,6 +1976,8 @@ pub struct ProjectDocument {
     pub device: DeviceConfig,
     #[serde(default)]
     pub ui_info: UiInfoDocument,
+    #[serde(default)]
+    pub protocol_profiles: Option<Value>,
     #[serde(default)]
     pub pdo_simple_send_recv: Option<PdoSimpleDocument>,
     #[serde(default)]
@@ -2440,14 +2247,7 @@ pub struct LanguageDocument {
 pub fn parse_legacy_project_document(path: Option<String>, value: Value) -> ProjectParseReport {
     if value.get("config_version").and_then(Value::as_str) == Some("jc002") {
         let mut errors = Vec::new();
-        let original = value.clone();
-        let value = match normalize_v2_pdo_document(value) {
-            Ok(value) => value,
-            Err(error) => {
-                errors.push(error);
-                original
-            }
-        };
+        let value = value;
         let summary = ProjectSummary::from_legacy_value(path, &value);
         let validation = ProjectValidationReport::from_legacy_value(&value);
         let document = match serde_json::from_value::<ProjectDocument>(value) {
@@ -2533,18 +2333,38 @@ mod tests {
             "export_info": {},
             "device": { "resolution_w": 800, "resolution_h": 480 },
             "ui_info": {},
-            "pdo_global_param": [],
-            "pdo_condition": [],
-            "pdo_recv": [],
-            "pdo_send": [],
-            "sdo_info": { "type": 0, "user_auth": 0, "name_index": 0, "name": "", "children": [] },
             "localization": {
                 "default_locale": "zh",
                 "locale_order": ["zh", "en"],
                 "locales": {
-                    "zh": { "translations": { "menu.root": "菜单" } },
-                    "en": { "translations": { "menu.root": "Menu" } }
+                    "zh": { "translations": {
+                        "language.name.zh": "中文",
+                        "language.name.en": "英文",
+                        "menu.root": "菜单"
+                    } },
+                    "en": { "translations": {
+                        "language.name.zh": "Chinese",
+                        "language.name.en": "English",
+                        "menu.root": "Menu"
+                    } }
                 }
+            },
+            "protocol_profiles": {
+                "schema_version": 2,
+                "controller_profiles": [{
+                    "profile_id": "controller.default",
+                    "controller_family": "generic",
+                    "controller_revision": "",
+                    "protocol": {
+                        "pdo_global_param": [],
+                        "pdo_condition": [],
+                        "pdo_recv": [],
+                        "pdo_send": [],
+                        "sdo_info": { "type": 0, "user_auth": 0, "name_index": 0, "name": "", "children": [] }
+                    }
+                }],
+                "battery_profiles": [],
+                "fault_code_profiles": []
             }
         })
     }
@@ -2586,7 +2406,17 @@ mod tests {
     }
 
     #[test]
-    fn parsing_v2_converts_a_legacy_simple_pdo_once_and_drops_the_source_section() {
+    fn explicit_v2_migration_is_a_noop() {
+        let source = valid_v2_document();
+        let migrated = migrate_legacy_project_document(None, source.clone());
+
+        assert_eq!(migrated.document, source);
+        assert!(migrated.added_sections.is_empty());
+        assert_eq!(migrated.migrated_version, "jc002");
+    }
+
+    #[test]
+    fn parsing_v2_rejects_a_legacy_simple_pdo_without_conversion() {
         let mut source = valid_v2_document();
         source["pdo_simple_send_recv"] = json!({
             "pdo_recv": [{
@@ -2606,15 +2436,16 @@ mod tests {
 
         let report = parse_legacy_project_document(None, source);
 
-        assert!(report.valid, "unexpected errors: {:?}", report.errors);
-        let document = report.document.unwrap();
-        assert!(document.pdo_simple_send_recv.is_none());
-        assert_eq!(document.pdo_global_param.len(), 1);
-        assert_eq!(document.pdo_recv.len(), 1);
+        assert!(!report.valid);
+        assert!(report
+            .validation
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("pdo_simple_send_recv")));
     }
 
     #[test]
-    fn v2_simple_pdo_migration_populates_empty_controller_profiles() {
+    fn v2_rejects_a_legacy_simple_pdo_instead_of_migrating_it() {
         let mut source = valid_v2_document();
         source["pdo_simple_send_recv"] = json!({
             "pdo_recv": [{
@@ -2664,16 +2495,8 @@ mod tests {
             "fault_code_profiles": []
         });
 
-        let normalized = normalize_v2_pdo_document(source).unwrap();
-
-        assert!(normalized.get("pdo_simple_send_recv").is_none());
-        for profile in normalized["protocol_profiles"]["controller_profiles"]
-            .as_array()
-            .unwrap()
-        {
-            assert_eq!(profile["protocol"]["pdo_recv"].as_array().unwrap().len(), 1);
-        }
-        assert_eq!(normalized["pdo_recv"].as_array().unwrap().len(), 1);
+        let error = validate_project_version_contract(&source).unwrap_err();
+        assert!(error.contains("pdo_simple_send_recv"));
     }
 
     #[test]
@@ -2768,7 +2591,10 @@ mod tests {
         let materialized = materialize_active_protocol_profiles(&document).unwrap();
 
         assert!(materialized.get("protocol_profiles").is_none());
-        assert_eq!(materialized["pdo_global_param"][0]["name"], "acm.speed");
+        assert_eq!(
+            materialized["pdo_global_param"][0]["name"],
+            "inmotion.speed"
+        );
         assert_eq!(materialized["battery_monitor"]["version"], 2);
         assert_eq!(materialized["config_version"], "jc002");
     }

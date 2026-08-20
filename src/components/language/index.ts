@@ -1,5 +1,6 @@
 export { ConfirmDialog } from '../ConfirmDialog';
 export { LanguageComparisonView } from './LanguageComparisonView';
+export { LanguageNameTable } from './LanguageNameTable';
 export { LanguagePage } from './LanguagePage';
 export { LanguageSidebar } from './LanguageSidebar';
 export { TranslationTable } from './TranslationTable';

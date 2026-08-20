@@ -27,6 +27,7 @@ import type { JsonPath } from '../../utils/projectDirty';
 import { runSystemDialog } from '../../utils/systemDialog';
 import { defaultBatteryMonitor } from '../project-document/projectDocumentDefaults';
 import {
+  activeBatteryProtocolProfile,
   initializeBatteryProtocolSections,
   readProtocolProfiles,
 } from '../protocol-profiles/protocolProfiles';
@@ -167,7 +168,12 @@ export function useBatteryMonitorController({
   function batteryMonitorDocument(): BatteryMonitorProtocol {
     if (!loadedProject) return cloneDefaultBatteryMonitor();
     const source = loadedProject.document as Record<string, unknown>;
-    return normalizeBatteryMonitor(source.battery_monitor);
+    const profile = activeBatteryProtocolProfile(source);
+    return normalizeBatteryMonitor(
+      source.config_version === 'jc002'
+        ? profile?.protocol.battery_monitor
+        : source.battery_monitor,
+    );
   }
 
   function initializeBatteryMonitor() {
@@ -235,7 +241,9 @@ export function useBatteryMonitorController({
     const normalized = normalizeBatteryMonitor(next);
     const existingProfiles = readProtocolProfiles(source);
     const profileSections =
-      existingProfiles && !existingProfiles.active_battery_profile_id
+      existingProfiles &&
+      (existingProfiles.battery_profiles.length === 0 ||
+        !existingProfiles.active_battery_profile_id)
         ? initializeBatteryProtocolSections(source)
         : {};
     const profileDocument =

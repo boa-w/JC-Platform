@@ -138,6 +138,13 @@ export const richProjectDocument = {
 
 const {
   language_info: _legacyLanguageInfo,
+  sdo_info: _legacySdoInfo,
+  pdo_simple_send_recv: _legacySimplePdo,
+  pdo_global_param: _legacyPdoGlobalParam,
+  pdo_condition: _legacyPdoCondition,
+  pdo_recv: _legacyPdoReceive,
+  pdo_send: _legacyPdoSend,
+  fault_code_info: _legacyFaultCodeInfo,
   ...richProjectWithoutLegacyLanguage
 } = richProjectDocument;
 
@@ -204,6 +211,8 @@ export const v2FaultProjectDocument = {
         enabled: true,
         direction: 'ltr',
         translations: {
+          'language.name.zh': '中文',
+          'language.name.en': '英文',
           'fault.message.dc_bus_low': '直流母线电压低',
         },
       },
@@ -211,12 +220,13 @@ export const v2FaultProjectDocument = {
         enabled: true,
         direction: 'ltr',
         translations: {
+          'language.name.zh': 'Chinese',
+          'language.name.en': 'English',
           'fault.message.dc_bus_low': 'DC bus voltage low',
         },
       },
     },
   },
-  fault_code_info: v2FaultCatalog,
   protocol_profiles: {
     schema_version: 2,
     active_controller_profile_id: 'controller.default',

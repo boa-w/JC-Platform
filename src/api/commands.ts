@@ -547,7 +547,7 @@ export async function importPdoSimpleWorkbook(
 }
 
 /**
- * 调用后端命令 `import_language_table`,将二维表格转换为 v1 语言文档。
+ * 调用后端命令 `import_language_table`，将二维表格转换为语言编辑器投影。
  * @param document - 表格文档
  * @returns 语言导入报告
  */
@@ -603,7 +603,7 @@ export async function exportTableWorkbook(request: ExportTableRequest): Promise<
 }
 
 /**
- * 调用后端命令 `language_document_table`,将 v1 语言文档投影为二维表格。
+ * 调用后端命令 `language_document_table`，将语言编辑器投影为二维表格。
  * @param document - 语言文档
  * @returns 表格文档
  */

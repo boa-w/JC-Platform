@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { LanguageDocument } from '../../types/platform';
+import { getLanguageDocumentLabel } from './localizationAdapter';
 import { TranslationValueInput } from './TranslationValueInput';
 import type { TranslationRow } from './types';
 
@@ -31,7 +32,7 @@ interface TranslationTableProps {
 }
 
 function getLabel(document: LanguageDocument, code: string): string {
-  return document.language_labels?.[code] ?? code;
+  return getLanguageDocumentLabel(document, code);
 }
 
 export function TranslationTable({

@@ -8,6 +8,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { LanguageDocument } from '../../types/platform';
+import { getLanguageDocumentLabel } from './localizationAdapter';
 import type { LanguageIndex } from './useLanguageIndex';
 
 interface LanguageComparisonViewProps {
@@ -17,7 +18,7 @@ interface LanguageComparisonViewProps {
 }
 
 function getLabel(document: LanguageDocument, code: string): string {
-  return document.language_labels?.[code] ?? code;
+  return getLanguageDocumentLabel(document, code);
 }
 
 export function LanguageComparisonView({

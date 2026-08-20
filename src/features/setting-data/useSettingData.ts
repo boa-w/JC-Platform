@@ -5,6 +5,7 @@ import type { JsonPath } from '../../utils/projectDirty';
 import { removeStorageItem } from '../../utils/safeStorage';
 import { settingColumnWidthStorageKey, settingEditorSections } from './config';
 import type { SdoNodeField, SettingEditorField, SettingParameterColumn } from './types';
+import { activeControllerProtocolProfile } from '../protocol-profiles/protocolProfiles';
 import {
   settingDataTypeIsDefaultWrite,
   settingDataTypeUsesBitRange,
@@ -57,8 +58,13 @@ export function useSettingData({
   const [settingColumnWidths, setSettingColumnWidths] =
     useState<Record<string, number>>(loadSettingColumnWidths);
 
+  const controllerProtocol = loadedDocument
+    ? activeControllerProtocolProfile(loadedDocument)?.protocol
+    : undefined;
   const sdoDocument = loadedDocument
-    ? ((loadedDocument.sdo_info as SdoNodeDocument | undefined) ?? null)
+    ? ((loadedDocument.config_version === 'jc002'
+        ? controllerProtocol?.sdo_info
+        : loadedDocument.sdo_info) as SdoNodeDocument | undefined) ?? null
     : null;
 
   function updateSdoDocument(next: SdoNodeDocument) {

@@ -45,18 +45,18 @@ Infrastructure 基础设施适配层
                                └─ img/
 ```
 
-对于 jc002，编辑文档中的 `protocol_profiles` 分别保存控制器、锂电和故障码协议集合，
-`active_controller_profile_id`、`active_battery_profile_id` 与
-`active_fault_code_profile_id` 独立决定各自页面编辑内容和发布包默认生成的 Profile Bundle。
-单套编辑文档在导出时自动包装为默认 Profile，所有组合进入同一个 data.bin；下位机选择后
-仍以单套 PDO/SDO/battery/fault 二进制 ABI 运行，不把完整 Profile JSON 下发到设备。
+对于 jc002，落盘编辑文档中的 `protocol_profiles` 是控制器、锂电和故障码协议集合的唯一
+来源。上位机只在内存中维护各页面的当前 Profile 选择，不把 `active_*_profile_id` 写入
+`.jcpro`、发布清单或 bin。单协议项目也必须显式保存一个 Profile；导出器为每个 scope
+生成独立 payload 并写入同一个 data.bin，下位机根据自身设置选择并加载，不接收完整 Profile
+JSON。
 
 ## React 表现层
 
 jc002 多国语言采用“公共语言目录 + Profile overlay”：根级 localization 统一维护
 locale 集合、default_locale 和 locale_order；控制器、锂电和故障码 Profile 分别维护局部 overlay。
-导出每个控制器 × 锂电 × 故障码组合时独立合并并生成 LVI2，因此不同 Profile 可以拥有不同文案，
-同时保持固件语言索引一致。多国语言页的 Profile 作用域只编辑 overlay，公共作用域负责
+每个 Profile payload 独立合并并生成 LVI2，因此不同 Profile 可以拥有不同文案，同时保持
+固件语言索引一致。多国语言页的 Profile 作用域只编辑 overlay，公共作用域负责
 语言集合和顺序。
 
 负责：
@@ -177,7 +177,8 @@ config_version == jc002 -> localization  -> LVI2 动态语言包 -> bin_generate
 - 另存为项目时会复制 UI 图片，并把绝对资源路径转换为目标项目下的相对路径。
 
 上述兼容保存流程只属于 v1 `.jcpro` 生命周期。v2 文件必须保留 `config_version: "jc002"`、
-`localization` 和可选的 `protocol_profiles`，不得经过会强制生成 `jc001` 或剥离 v2 字段的兼容保存函数。
+`localization` 和完整的 `protocol_profiles`，不得经过会强制生成 `jc001`、自动包装 Profile
+或剥离 v2 字段的兼容保存函数。
 
 ### 导出项目
 

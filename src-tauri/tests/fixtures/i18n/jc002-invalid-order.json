@@ -4,8 +4,16 @@
     "default_locale": "en-US",
     "locale_order": ["en-US", "en-US"],
     "locales": {
-      "en-US": { "enabled": true, "translations": { "menu.root": "Menu" } },
-      "ru-RU": { "enabled": true, "translations": { "menu.root": "Меню" } }
+      "en-US": { "enabled": true, "translations": {
+        "language.name.en-US": "English",
+        "language.name.ru-RU": "Russian",
+        "menu.root": "Menu"
+      } },
+      "ru-RU": { "enabled": true, "translations": {
+        "language.name.en-US": "Английский",
+        "language.name.ru-RU": "Русский",
+        "menu.root": "Меню"
+      } }
     }
   }
 }

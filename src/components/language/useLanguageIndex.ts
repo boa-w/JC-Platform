@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { LanguageDocument } from '../../types/platform';
+import { isLocaleNameKey } from './localizationAdapter.ts';
 
 export interface LanguageIndex {
   externalKeys: string[];
@@ -15,7 +16,10 @@ function translationValues(document: LanguageDocument, key: string): Record<stri
 
 export function buildLanguageIndex(document: LanguageDocument): LanguageIndex {
   const indexedKeys = new Set(document.list_inner);
-  const externalKeys = Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
+  const languageNameKeys = new Set(Object.values(document.language_name_keys ?? {}));
+  const externalKeys = Object.keys(document.list_translate).filter(
+    (key) => !indexedKeys.has(key) && !languageNameKeys.has(key) && !isLocaleNameKey(key),
+  );
   const visibleLanguageKeys = [...document.list_inner, ...externalKeys];
   const lockedKeyCount = document.editor_locked_key_count ?? document.list_code_language.length;
   const translationKeys = [...document.list_inner.slice(lockedKeyCount), ...externalKeys];

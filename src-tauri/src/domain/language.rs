@@ -1,8 +1,9 @@
 //! 多语言翻译领域模型。
 //!
-//! 翻译数据存储在项目文件的 `language_info` 段落中：
+//! 旧版表格接口使用 `language_info` 投影；jc002 页面通过同一投影读写
+//! `localization`，并保留 `language.name.<locale>` 语言名称消息：
 //! - `list_code_language`：语言代码列表（如 `["zh", "en"]`）
-//! - `list_inner`：内部键列表（含语言名称前缀 + 翻译条目）
+//! - `list_inner`：普通翻译条目列表（v2 不包含语言名称 key）
 //! - `list_translate`：翻译映射表（`key → {code → text}`）
 //!
 //! 表格导入时，表头格式为 `{语言名}_{语言代码}`（如 `中文_zh`）。
@@ -17,6 +18,7 @@ use std::collections::{BTreeMap, HashSet};
 const LANGUAGE_TYPE_NAME: &str = "语言名称";
 const LANGUAGE_TYPE_NORMAL: &str = "普通";
 const LANGUAGE_TYPE_EXTERNAL: &str = "外部引用";
+const LOCALE_NAME_KEY_PREFIX: &str = "language.name.";
 
 /// 多语言配置的强类型表示。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,27 +80,50 @@ pub fn language_document_to_table(document: &Value) -> TableDocument {
         .unwrap_or_default();
     let translations = document.get("list_translate").and_then(Value::as_object);
     let labels = language_labels_from_document(document, &codes, &keys);
-    let config_prefix_len = codes.len();
+    let is_v2 = document
+        .get("language_name_keys")
+        .and_then(Value::as_object)
+        .is_some();
     let mut headers = vec!["序号".to_string(), "类型".to_string(), "auto".to_string()];
     headers.extend(codes.iter().map(|code| {
         let label = labels.get(code).map(String::as_str).unwrap_or("语言");
         format!("{}_{}", label, code)
     }));
 
-    let mut export_keys = keys
-        .iter()
-        .enumerate()
-        .map(|(index, key)| {
-            let row_type = if index < config_prefix_len {
-                LANGUAGE_TYPE_NAME
-            } else {
-                LANGUAGE_TYPE_NORMAL
-            };
-            (key.clone(), row_type.to_string())
-        })
-        .collect::<Vec<_>>();
+    let mut export_keys = if is_v2 {
+        codes
+            .iter()
+            .map(|code| {
+                let key = locale_name_key(code);
+                (key, LANGUAGE_TYPE_NAME.to_string())
+            })
+            .collect::<Vec<_>>()
+    } else {
+        keys.iter()
+            .enumerate()
+            .map(|(index, key)| {
+                let row_type = if index < codes.len() {
+                    LANGUAGE_TYPE_NAME
+                } else {
+                    LANGUAGE_TYPE_NORMAL
+                };
+                (key.clone(), row_type.to_string())
+            })
+            .collect::<Vec<_>>()
+    };
 
-    let indexed_keys = keys.iter().cloned().collect::<HashSet<_>>();
+    if is_v2 {
+        export_keys.extend(
+            keys.iter()
+                .filter(|key| !is_locale_name_key(key))
+                .map(|key| (key.clone(), LANGUAGE_TYPE_NORMAL.to_string())),
+        );
+    }
+
+    let indexed_keys = export_keys
+        .iter()
+        .map(|(key, _)| key.clone())
+        .collect::<HashSet<_>>();
     if let Some(items) = translations {
         export_keys.extend(
             items
@@ -149,11 +174,21 @@ pub fn parse_language_table(document: TableDocument) -> LanguageImportReport {
         .iter()
         .map(|(label, code)| (code.clone(), Value::String(label.clone())))
         .collect::<Map<_, _>>();
-    let mut inner_keys = language_headers
-        .iter()
-        .map(|(label, _)| label.clone())
-        .collect::<Vec<_>>();
+    let is_v2_name_table = has_type_column
+        && document.rows.iter().any(|row| {
+            cell(row, 1) == LANGUAGE_TYPE_NAME
+                && cell(row, key_column).starts_with(LOCALE_NAME_KEY_PREFIX)
+        });
+    let mut inner_keys = if is_v2_name_table {
+        Vec::new()
+    } else {
+        language_headers
+            .iter()
+            .map(|(label, _)| label.clone())
+            .collect::<Vec<_>>()
+    };
     let mut translations = Map::new();
+    let mut language_name_keys = Map::new();
 
     if table.valid && errors.is_empty() {
         for (index, row) in document.rows.iter().enumerate() {
@@ -173,7 +208,36 @@ pub fn parse_language_table(document: TableDocument) -> LanguageImportReport {
             }
             let is_language_name = row_type == LANGUAGE_TYPE_NAME;
             let is_external = row_type == LANGUAGE_TYPE_EXTERNAL;
-            if !is_language_name && !is_external && inner_keys.contains(&key) {
+            if is_v2_name_table && is_language_name {
+                let Some(code) = key.strip_prefix(LOCALE_NAME_KEY_PREFIX) else {
+                    errors.push(format!("语言名称 key 无效：{}", key));
+                    continue;
+                };
+                if !language_codes.iter().any(|item| item == code) {
+                    errors.push(format!("语言名称 key 引用了未配置语言：{}", key));
+                    continue;
+                }
+                if key != locale_name_key(code) {
+                    errors.push(format!(
+                        "语言名称 key 必须精确为：{}",
+                        locale_name_key(code)
+                    ));
+                    continue;
+                }
+                if language_name_keys
+                    .insert(code.to_string(), Value::String(key.clone()))
+                    .is_some()
+                {
+                    errors.push(format!("语言名称 key 重复：{}", key));
+                    continue;
+                }
+            } else if is_v2_name_table && is_locale_name_key(&key) {
+                errors.push(format!(
+                    "v2 语言名称 key 必须使用 `{}` 类型：{}",
+                    LANGUAGE_TYPE_NAME, key
+                ));
+                continue;
+            } else if !is_language_name && !is_external && inner_keys.contains(&key) {
                 errors.push(format!("auto 重复：{}", key));
                 continue;
             }
@@ -183,7 +247,11 @@ pub fn parse_language_table(document: TableDocument) -> LanguageImportReport {
                 let value = cell(row, language_index + language_column_start);
                 values.insert(code.clone(), Value::String(value));
             }
-            if !is_language_name && !is_external && language_codes.iter().any(|code| code == "zh") {
+            if !is_v2_name_table
+                && !is_language_name
+                && !is_external
+                && language_codes.iter().any(|code| code == "zh")
+            {
                 values.insert("zh".to_string(), Value::String(key.clone()));
             }
             if !is_language_name && !is_external {
@@ -193,14 +261,33 @@ pub fn parse_language_table(document: TableDocument) -> LanguageImportReport {
         }
     }
 
+    if is_v2_name_table {
+        for code in &language_codes {
+            let key = locale_name_key(code);
+            if language_name_keys.get(code).is_none() {
+                errors.push(format!("v2 表格缺少语言名称行：{}", key));
+            }
+        }
+    }
+
     let valid = errors.is_empty();
     let document = if valid {
-        Some(json!({
-            "list_code_language": language_codes,
-            "language_labels": language_labels,
-            "list_inner": inner_keys,
-            "list_translate": translations
-        }))
+        if is_v2_name_table {
+            Some(json!({
+                "list_code_language": language_codes,
+                "default_locale": language_headers.first().map(|(_, code)| code).cloned().unwrap_or_default(),
+                "language_name_keys": language_name_keys,
+                "list_inner": inner_keys,
+                "list_translate": translations
+            }))
+        } else {
+            Some(json!({
+                "list_code_language": language_codes,
+                "language_labels": language_labels,
+                "list_inner": inner_keys,
+                "list_translate": translations
+            }))
+        }
     } else {
         None
     };
@@ -392,6 +479,41 @@ fn language_labels_from_document(
     codes: &[String],
     keys: &[String],
 ) -> BTreeMap<String, String> {
+    if document
+        .get("language_name_keys")
+        .and_then(Value::as_object)
+        .is_some()
+    {
+        let display_locale = document
+            .get("default_locale")
+            .and_then(Value::as_str)
+            .or_else(|| codes.first().map(String::as_str));
+        return codes
+            .iter()
+            .map(|code| {
+                let key = document
+                    .get("language_name_keys")
+                    .and_then(Value::as_object)
+                    .and_then(|items| items.get(code))
+                    .and_then(Value::as_str)
+                    .unwrap_or_else(|| "");
+                let label = display_locale
+                    .and_then(|locale| {
+                        document
+                            .get("list_translate")
+                            .and_then(Value::as_object)
+                            .and_then(|items| items.get(key))
+                            .and_then(Value::as_object)
+                            .and_then(|items| items.get(locale))
+                    })
+                    .and_then(Value::as_str)
+                    .filter(|item| !item.trim().is_empty())
+                    .unwrap_or(code)
+                    .to_string();
+                (code.clone(), label)
+            })
+            .collect();
+    }
     let configured = document.get("language_labels").and_then(Value::as_object);
     codes
         .iter()
@@ -407,6 +529,14 @@ fn language_labels_from_document(
             (code.clone(), label)
         })
         .collect()
+}
+
+fn locale_name_key(locale: &str) -> String {
+    format!("{LOCALE_NAME_KEY_PREFIX}{locale}")
+}
+
+fn is_locale_name_key(key: &str) -> bool {
+    key.starts_with(LOCALE_NAME_KEY_PREFIX)
 }
 
 fn language_headers_from_headers(
@@ -477,6 +607,45 @@ mod tests {
         assert_eq!(table.rows[2][2], "开启");
         assert_eq!(table.rows[3][1], LANGUAGE_TYPE_EXTERNAL);
         assert_eq!(table.rows[3][2], "菜单");
+    }
+
+    #[test]
+    fn v2_language_table_round_trip_keeps_locale_name_keys_out_of_list_inner() {
+        let document = json!({
+            "list_code_language": ["zh-CN", "en-US"],
+            "default_locale": "zh-CN",
+            "language_name_keys": {
+                "zh-CN": "language.name.zh-CN",
+                "en-US": "language.name.en-US"
+            },
+            "list_inner": ["menu.root"],
+            "list_translate": {
+                "language.name.zh-CN": { "zh-CN": "中文", "en-US": "Chinese" },
+                "language.name.en-US": { "zh-CN": "英文", "en-US": "English" },
+                "menu.root": { "zh-CN": "菜单", "en-US": "Menu" }
+            }
+        });
+
+        let table = language_document_to_table(&document);
+        assert_eq!(
+            table.headers,
+            vec!["序号", "类型", "auto", "中文_zh-CN", "英文_en-US"]
+        );
+        assert_eq!(table.rows[0][1], LANGUAGE_TYPE_NAME);
+        assert_eq!(table.rows[0][2], "language.name.zh-CN");
+        assert_eq!(table.rows[1][2], "language.name.en-US");
+        assert_eq!(table.rows[2][1], LANGUAGE_TYPE_NORMAL);
+
+        let imported = parse_language_table(table).document.unwrap();
+        assert_eq!(
+            imported["language_name_keys"]["en-US"],
+            "language.name.en-US"
+        );
+        assert_eq!(imported["list_inner"], json!(["menu.root"]));
+        assert_eq!(
+            imported["list_translate"]["language.name.en-US"]["en-US"],
+            "English"
+        );
     }
 
     #[test]

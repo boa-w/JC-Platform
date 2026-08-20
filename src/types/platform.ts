@@ -848,16 +848,20 @@ export interface SdoNodeDocument {
   [key: string]: unknown;
 }
 
-/** v1 语言文档(language_info 段,qv. v2 localization)。 */
+/** 语言编辑器投影：v1 使用 language_labels，jc002 使用 language.name.* 消息。 */
 export interface LanguageDocument {
   /** 语言编码列表(索引语言块用)。 */
   list_code_language: string[];
+  /** v2 默认 locale，用于编辑器显示语言名称。 */
+  default_locale?: string;
   /** 语言内部名列表,与 list_code_language 一一对应。 */
   list_inner: string[];
   /** 多语言翻译数据。 */
   list_translate: Record<string, unknown>;
   /** 语言编码 → 显示名映射。 */
   language_labels?: Record<string, string>;
+  /** jc002 语言名称 key:locale code → language.name.<locale>。 */
+  language_name_keys?: Record<string, string>;
   /** 编辑器锁定键数量(合并/导出提示用)。 */
   editor_locked_key_count?: number;
   /** UI 受保护键仅用于编辑 UI(Profile 叠加视图保留编辑器但不允许改动)。 */

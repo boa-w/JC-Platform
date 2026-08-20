@@ -9,6 +9,7 @@ import type {
   PdoSimpleFrameDocument,
   PdoSimpleSignalDocument,
 } from '../../types/platform';
+import { activeControllerProtocolProfile } from '../protocol-profiles/protocolProfiles';
 
 export type PdoDirection = 'pdo_recv' | 'pdo_send';
 export type PdoEditorMode = 'simple' | 'advanced';
@@ -52,12 +53,17 @@ export function usePdoEditor({
   const jumpRowRef = useRef<HTMLTableRowElement | null>(null);
 
   const simpleDocument = (source?.pdo_simple_send_recv as PdoSimpleDocument | undefined) ?? null;
+  const controllerProtocol = source
+    ? activeControllerProtocolProfile(source)?.protocol
+    : undefined;
+  const advancedSource = source?.config_version === 'jc002' ? controllerProtocol : source;
   const advancedDocument: PdoAdvancedDocument | null = source
     ? {
-        pdo_global_param: (source.pdo_global_param as PdoGlobalParam[] | undefined) ?? [],
-        pdo_condition: (source.pdo_condition as PdoCondition[] | undefined) ?? [],
-        pdo_recv: (source.pdo_recv as PdoAdvancedFrame[] | undefined) ?? [],
-        pdo_send: (source.pdo_send as PdoAdvancedFrame[] | undefined) ?? [],
+        pdo_global_param:
+          (advancedSource?.pdo_global_param as PdoGlobalParam[] | undefined) ?? [],
+        pdo_condition: (advancedSource?.pdo_condition as PdoCondition[] | undefined) ?? [],
+        pdo_recv: (advancedSource?.pdo_recv as PdoAdvancedFrame[] | undefined) ?? [],
+        pdo_send: (advancedSource?.pdo_send as PdoAdvancedFrame[] | undefined) ?? [],
       }
     : null;
 

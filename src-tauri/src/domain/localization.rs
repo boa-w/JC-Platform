@@ -9,6 +9,8 @@ use std::collections::{BTreeMap, HashMap};
 
 pub const I18N_MAGIC: u32 = u32::from_le_bytes(*b"LVI2");
 pub const I18N_SCHEMA_VERSION: u16 = 2;
+pub const I18N_FLAG_LOCALE_NAME_KEYS: u16 = 1;
+pub const LOCALE_NAME_KEY_PREFIX: &str = "language.name.";
 pub const I18N_PLURAL_FORM_COUNT: usize = 6;
 const HEADER_SIZE: usize = 40;
 const LOCALE_RECORD_SIZE: usize = 16;
@@ -48,6 +50,10 @@ struct SourcePack {
     default_locale: String,
     locales: Vec<String>,
     messages: Messages,
+}
+
+pub fn locale_name_key(locale: &str) -> String {
+    format!("{LOCALE_NAME_KEY_PREFIX}{locale}")
 }
 
 pub fn build_dynamic_language_pack(document: &Value) -> Result<DynamicLanguagePackBuild, String> {
@@ -95,6 +101,21 @@ pub fn build_dynamic_language_pack(document: &Value) -> Result<DynamicLanguagePa
         .iter()
         .map(|locale| intern(locale))
         .collect::<Result<Vec<_>, _>>()?;
+    let message_indexes = message_keys
+        .iter()
+        .enumerate()
+        .map(|(index, key)| (key.clone(), index as u32))
+        .collect::<HashMap<_, _>>();
+    let locale_name_message_indexes = source
+        .locales
+        .iter()
+        .map(|locale| {
+            message_indexes
+                .get(&locale_name_key(locale))
+                .copied()
+                .ok_or_else(|| format!("jc002 语言 {locale} 缺少语言名称 key"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let key_offsets = message_keys
         .iter()
         .map(|key| intern(key))
@@ -126,13 +147,15 @@ pub fn build_dynamic_language_pack(document: &Value) -> Result<DynamicLanguagePa
         }
     }
 
+    let flags = I18N_FLAG_LOCALE_NAME_KEYS;
+
     let total_size = string_pool_offset
         .checked_add(string_pool.len())
         .ok_or_else(|| "jc002 动态语言包总大小溢出".to_string())?;
     let mut bytes = Vec::with_capacity(total_size);
     write_u32(&mut bytes, I18N_MAGIC);
     write_u16(&mut bytes, I18N_SCHEMA_VERSION);
-    write_u16(&mut bytes, 0);
+    write_u16(&mut bytes, flags);
     write_u32(&mut bytes, total_size as u32);
     write_u16(&mut bytes, locale_count as u16);
     write_u16(&mut bytes, default_locale_index as u16);
@@ -150,7 +173,7 @@ pub fn build_dynamic_language_pack(document: &Value) -> Result<DynamicLanguagePa
         write_u32(&mut bytes, table_offset as u32);
         write_u16(&mut bytes, plural_rule_id(locale));
         write_u16(&mut bytes, locale_direction(document, locale));
-        write_u32(&mut bytes, 0);
+        write_u32(&mut bytes, locale_name_message_indexes[locale_index]);
     }
     for (message_index, key) in message_keys.iter().enumerate() {
         let forms_mask = source.messages[key].values().fold(0u8, |mask, forms| {
@@ -170,11 +193,6 @@ pub fn build_dynamic_language_pack(document: &Value) -> Result<DynamicLanguagePa
     let checksum = crc32_with_zeroed_checksum(&bytes);
     bytes[36..40].copy_from_slice(&checksum.to_le_bytes());
 
-    let message_indexes = message_keys
-        .iter()
-        .enumerate()
-        .map(|(index, key)| (key.clone(), index as u32))
-        .collect();
     Ok(DynamicLanguagePackBuild {
         summary: DynamicLanguagePackSummary {
             schema_version: I18N_SCHEMA_VERSION,
@@ -253,6 +271,11 @@ pub fn validate_localization_overlay(
             if key.trim().is_empty() {
                 return Err(format!("{label}.locales.{locale} 存在空消息 key"));
             }
+            if key.starts_with(LOCALE_NAME_KEY_PREFIX) {
+                return Err(format!(
+                    "{label}.locales.{locale} 不得覆盖语言名称 key {key}"
+                ));
+            }
             parse_forms(message).map_err(|error| {
                 format!("{label}.locales.{locale}.translations.{key} 无效：{error}")
             })?;
@@ -300,6 +323,11 @@ pub fn merge_localization_overlays(
                 .as_object_mut()
                 .ok_or_else(|| format!("公共语言目录 {locale}.translations 必须为对象"))?;
             for (key, value) in translations {
+                if key.starts_with(LOCALE_NAME_KEY_PREFIX) {
+                    return Err(format!(
+                        "{label}.locales.{locale} 不得覆盖语言名称 key {key}"
+                    ));
+                }
                 let identity = (locale.clone(), key.clone());
                 if let Some(previous) = applied.get(&identity) {
                     if previous != value {
@@ -324,6 +352,10 @@ pub fn decode_dynamic_language_pack(bytes: &[u8]) -> Result<DynamicLanguagePackS
     let schema_version = read_u16(bytes, 4)?;
     if schema_version != I18N_SCHEMA_VERSION {
         return Err(format!("不支持的 jc002 动态语言包版本：{schema_version}"));
+    }
+    let flags = read_u16(bytes, 6)?;
+    if flags != I18N_FLAG_LOCALE_NAME_KEYS {
+        return Err("jc002 动态语言包必须包含语言名称 message_index 扩展".to_string());
     }
     let total_size = read_u32(bytes, 8)? as usize;
     if total_size != bytes.len() {
@@ -372,13 +404,26 @@ pub fn decode_dynamic_language_pack(bytes: &[u8]) -> Result<DynamicLanguagePackS
     let mut locales = Vec::with_capacity(locale_count);
     for index in 0..locale_count {
         let record = locale_offset + index * LOCALE_RECORD_SIZE;
-        locales.push(read_c_string(bytes, read_u32(bytes, record)? as usize)?.to_string());
+        locales.push(
+            read_pool_string(bytes, string_pool_offset, read_u32(bytes, record)?)?.to_string(),
+        );
     }
+    let mut message_keys = Vec::with_capacity(message_count);
     for index in 0..message_count {
         let record = message_offset + index * MESSAGE_RECORD_SIZE;
-        let key = read_c_string(bytes, read_u32(bytes, record + 4)? as usize)?;
+        let key = read_pool_string(bytes, string_pool_offset, read_u32(bytes, record + 4)?)?;
         if fnv1a32(key.as_bytes()) != read_u32(bytes, record)? {
             return Err(format!("消息 {key} 的 hash 校验失败"));
+        }
+        message_keys.push(key);
+    }
+    for (locale_index, locale) in locales.iter().enumerate() {
+        let record = locale_offset + locale_index * LOCALE_RECORD_SIZE;
+        let name_message_index = read_u32(bytes, record + 12)? as usize;
+        if name_message_index >= message_count
+            || message_keys[name_message_index] != locale_name_key(locale)
+        {
+            return Err(format!("语言 {locale} 的名称 message_index 无效"));
         }
     }
     Ok(DynamicLanguagePackSummary {
@@ -405,6 +450,11 @@ fn source_pack(document: &Value) -> Result<SourcePack, String> {
     let localization = document
         .get("localization")
         .ok_or_else(|| "jc002 项目缺少 localization".to_string())?;
+    if localization.get("locale_labels").is_some() {
+        return Err(
+            "jc002 localization 禁止 locale_labels，请使用 language.name.<locale> key".to_string(),
+        );
+    }
     let locales_object = localization
         .get("locales")
         .and_then(Value::as_object)
@@ -456,6 +506,27 @@ fn source_pack(document: &Value) -> Result<SourcePack, String> {
                 .entry(key.clone())
                 .or_default()
                 .insert(locale.clone(), parse_forms(value)?);
+        }
+    }
+    for display_locale in &locales {
+        let translations = locales_object
+            .get(display_locale)
+            .and_then(|item| item.get("translations"))
+            .and_then(Value::as_object)
+            .ok_or_else(|| format!("jc002 语言 {display_locale} 缺少 translations"))?;
+        for target_locale in &locales {
+            let key = locale_name_key(target_locale);
+            let value = translations
+                .get(&key)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+                .ok_or_else(|| {
+                    format!("jc002 语言 {display_locale} 缺少非空语言名称翻译 key {key}")
+                })?;
+            if value.is_empty() {
+                return Err(format!("jc002 语言名称翻译 key {key} 不能为空"));
+            }
         }
     }
     if messages.is_empty() {
@@ -565,6 +636,13 @@ fn read_c_string(bytes: &[u8], offset: usize) -> Result<&str, String> {
     std::str::from_utf8(&bytes[offset..end]).map_err(|_| "jc002 语言包字符串不是 UTF-8".to_string())
 }
 
+fn read_pool_string(bytes: &[u8], string_pool_offset: usize, offset: u32) -> Result<&str, String> {
+    if offset == MISSING_OFFSET || (offset as usize) < string_pool_offset {
+        return Err("字符串偏移不在 jc002 字符串池中".to_string());
+    }
+    read_c_string(bytes, offset as usize)
+}
+
 fn read_u16(bytes: &[u8], offset: usize) -> Result<u16, String> {
     let value = bytes
         .get(offset..offset + 2)
@@ -619,9 +697,13 @@ mod tests {
                 "locale_order": ["en-US", "ru-RU"],
                 "locales": {
                     "en-US": { "enabled": true, "translations": {
+                        "language.name.en-US": "English",
+                        "language.name.ru-RU": "Russian",
                         "fault.count": { "one": "%d fault", "other": "%d faults" }
                     }},
                     "ru-RU": { "enabled": true, "translations": {
+                        "language.name.en-US": "Английский",
+                        "language.name.ru-RU": "Русский",
                         "fault.count": { "one": "%d ошибка", "few": "%d ошибки", "many": "%d ошибок", "other": "%d ошибки" }
                     }}
                 }
@@ -631,7 +713,7 @@ mod tests {
         let summary = decode_dynamic_language_pack(&bytes).unwrap();
         assert_eq!(summary.default_locale, "en-US");
         assert_eq!(summary.locales, vec!["en-US", "ru-RU"]);
-        assert_eq!(summary.message_count, 1);
+        assert_eq!(summary.message_count, 3);
         let last = bytes.len() - 1;
         bytes[last] ^= 1;
         assert!(decode_dynamic_language_pack(&bytes)
@@ -643,5 +725,32 @@ mod tests {
     fn rejects_incomplete_or_duplicate_locale_order() {
         let error = build_dynamic_language_pack(&invalid_order_fixture()).unwrap_err();
         assert!(error.contains("locale_order 必须无重复"));
+    }
+
+    #[test]
+    fn requires_complete_locale_name_keys_in_v2() {
+        let mut document = serde_json::from_str::<Value>(include_str!(
+            "../../tests/fixtures/i18n/jc002-valid.json"
+        ))
+        .unwrap();
+        document["localization"]["locales"]["ru-RU"]["translations"]
+            .as_object_mut()
+            .unwrap()
+            .remove("language.name.en-US");
+        assert!(build_dynamic_language_pack(&document)
+            .unwrap_err()
+            .contains("language.name.en-US"));
+
+        let mut bytes = build_dynamic_language_pack(
+            &serde_json::from_str(include_str!("../../tests/fixtures/i18n/jc002-valid.json"))
+                .unwrap(),
+        )
+        .unwrap()
+        .bytes;
+        bytes[6] = 0;
+        bytes[7] = 0;
+        assert!(decode_dynamic_language_pack(&bytes)
+            .unwrap_err()
+            .contains("语言名称 message_index 扩展"));
     }
 }

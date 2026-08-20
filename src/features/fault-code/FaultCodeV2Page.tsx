@@ -61,10 +61,8 @@ export function FaultCodeV2Page({ loadedProject, onUpdateSections }: FaultCodeV2
     : undefined;
   const catalog = useMemo(
     () =>
-      normalizeFaultCatalog(
-        document.fault_code_info ?? activeFaultProfile?.protocol.fault_code_info,
-      ),
-    [activeFaultProfile, document.fault_code_info],
+      normalizeFaultCatalog(activeFaultProfile?.protocol.fault_code_info),
+    [activeFaultProfile],
   );
   const localization = document.localization as LocalizationDocument | undefined;
   const effectiveLocalization =

@@ -15,8 +15,8 @@
 
 use crate::domain::localization::{build_dynamic_language_pack, DynamicLanguagePackBuild};
 use crate::domain::pdo::{
-    convert_pdo_simple_document, parse_pdo_advanced_document, validate_v2_pdo_inner_bindings,
-    PdoAdvancedDocument, PdoAdvancedFrame, PdoGlobalParam,
+    convert_pdo_simple_document, parse_pdo_advanced_document, PdoAdvancedDocument,
+    PdoAdvancedFrame, PdoGlobalParam,
 };
 use crate::domain::project::{
     materialize_active_protocol_profiles, materialize_protocol_profile_scope,
@@ -616,17 +616,6 @@ pub fn build_project_binary(document: &Value) -> BinaryBuildReport {
                 errors: vec![
                     "jc002 构建只接受高级 PDO 四段；请先通过表格导入完成简单 PDO 转换".to_string(),
                 ],
-            };
-        }
-        if let Err(error) = validate_v2_pdo_inner_bindings(document) {
-            return BinaryBuildReport {
-                valid: false,
-                file_size: 0,
-                crc: 0,
-                data_description: DataDescriptionPlan::empty(Vec::new()),
-                bytes: Vec::new(),
-                warnings: Vec::new(),
-                errors: vec![error],
             };
         }
         let normalized = match normalize_protocol_profiles_for_export(document) {
@@ -3116,18 +3105,79 @@ mod tests {
 
     fn jc002(mut document: Value, keys: &[&str]) -> Value {
         document["config_version"] = json!("jc002");
-        if let Some(object) = document.as_object_mut() {
-            object.remove("pdo_simple_send_recv");
+        let mut controller_protocol = json!({
+            "pdo_global_param": document.get("pdo_global_param").cloned().unwrap_or_else(|| json!([])),
+            "pdo_condition": document.get("pdo_condition").cloned().unwrap_or_else(|| json!([])),
+            "pdo_recv": document.get("pdo_recv").cloned().unwrap_or_else(|| json!([])),
+            "pdo_send": document.get("pdo_send").cloned().unwrap_or_else(|| json!([])),
+            "sdo_info": document.get("sdo_info").cloned().unwrap_or_else(|| json!({
+                "type": 0,
+                "user_auth": 0,
+                "name_index": 0,
+                "name": "",
+                "children": []
+            })),
+            "canopen": document.get("canopen").cloned()
+        });
+        if document.get("canopen").is_none() {
+            controller_protocol
+                .as_object_mut()
+                .expect("controller protocol object")
+                .remove("canopen");
         }
-        let translations = keys
+        let mut protocol_profiles = json!({
+            "schema_version": 2,
+            "controller_profiles": [{
+                "profile_id": "controller.default",
+                "controller_family": "generic",
+                "controller_revision": "",
+                "protocol": controller_protocol
+            }],
+            "battery_profiles": [],
+            "fault_code_profiles": []
+        });
+        if let Some(battery_monitor) = document.get("battery_monitor").cloned() {
+            protocol_profiles["battery_profiles"] = json!([{
+                "profile_id": "battery.default",
+                "battery_family": "generic",
+                "battery_revision": "",
+                "protocol": { "battery_monitor": battery_monitor }
+            }]);
+        }
+        if let Some(fault_code_info) = document.get("fault_code_info").cloned() {
+            protocol_profiles["fault_code_profiles"] = json!([{
+                "profile_id": "fault.default",
+                "fault_family": "generic",
+                "fault_revision": "",
+                "protocol": { "fault_code_info": fault_code_info }
+            }]);
+        }
+        if let Some(object) = document.as_object_mut() {
+            for section in [
+                "pdo_simple_send_recv",
+                "pdo_global_param",
+                "pdo_condition",
+                "pdo_recv",
+                "pdo_send",
+                "sdo_info",
+                "canopen",
+                "battery_monitor",
+                "fault_code_info",
+            ] {
+                object.remove(section);
+            }
+            object.insert("protocol_profiles".to_string(), protocol_profiles);
+        }
+        let mut translations = keys
             .iter()
             .map(|key| ((*key).to_string(), json!(format!("text:{key}"))))
             .collect::<Map<_, _>>();
+        translations.insert("language.name.en-US".to_string(), json!("English"));
         document["localization"] = json!({
             "default_locale": "en-US",
             "locale_order": ["en-US"],
             "locales": {
-                "en-US": { "enabled": true, "translations": translations }
+                "en-US": { "enabled": true, "translations": Value::Object(translations) }
             }
         });
         document
@@ -3381,12 +3431,14 @@ mod tests {
     #[test]
     fn jc002_profile_builds_all_controller_battery_payloads_and_manifest_identity() {
         let mut document = i18n_fixture("jc002-valid");
+        let base_controller_protocol =
+            document["protocol_profiles"]["controller_profiles"][0]["protocol"].clone();
         let mut acm_protocol = json!({
-            "pdo_global_param": document["pdo_global_param"].clone(),
-            "pdo_condition": document["pdo_condition"].clone(),
-            "pdo_recv": document["pdo_recv"].clone(),
-            "pdo_send": document["pdo_send"].clone(),
-            "sdo_info": document["sdo_info"].clone()
+            "pdo_global_param": base_controller_protocol["pdo_global_param"].clone(),
+            "pdo_condition": base_controller_protocol["pdo_condition"].clone(),
+            "pdo_recv": base_controller_protocol["pdo_recv"].clone(),
+            "pdo_send": base_controller_protocol["pdo_send"].clone(),
+            "sdo_info": base_controller_protocol["sdo_info"].clone()
         });
         let mut inmotion_protocol = acm_protocol.clone();
         inmotion_protocol["pdo_global_param"][0]["name"] = json!("inmotion.speed");
@@ -3717,7 +3769,7 @@ mod tests {
                     .try_into()
                     .unwrap()
             ),
-            0
+            1
         );
         assert_eq!(report.bytes[code_table_addr + 6], 2);
 
@@ -4306,9 +4358,10 @@ mod tests {
             }
         });
         let document = jc002(base.clone(), &["menu.root"]);
-        let pdo = parse_pdo_advanced_document(&document).document.unwrap();
+        let materialized = materialize_active_protocol_profiles(&document).unwrap();
+        let pdo = parse_pdo_advanced_document(&materialized).document.unwrap();
         let report = build_binary_from_pdo(
-            &document,
+            &materialized,
             &pdo,
             Vec::new(),
             &ProjectExportSettings::default(),
@@ -4321,13 +4374,16 @@ mod tests {
         let sdo = report.data_description.sdo_base_addr as usize;
         assert_eq!(
             u32::from_le_bytes(report.bytes[sdo + 2..sdo + 6].try_into().unwrap()),
-            0
+            1
         );
 
         let missing = jc002(base, &["different.key"]);
-        let pdo = parse_pdo_advanced_document(&missing).document.unwrap();
+        let materialized_missing = materialize_active_protocol_profiles(&missing).unwrap();
+        let pdo = parse_pdo_advanced_document(&materialized_missing)
+            .document
+            .unwrap();
         let report = build_binary_from_pdo(
-            &missing,
+            &materialized_missing,
             &pdo,
             Vec::new(),
             &ProjectExportSettings::default(),

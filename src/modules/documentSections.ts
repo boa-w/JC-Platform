@@ -1,4 +1,9 @@
 import type { LegacyTableKind, NavigationKey } from '../types/platform';
+import {
+  activeBatteryProtocolProfile,
+  activeControllerProtocolProfile,
+  activeFaultCodeProtocolProfile,
+} from '../features/protocol-profiles/protocolProfiles';
 
 type JsonEditorMode = 'simple' | 'advanced';
 
@@ -109,22 +114,51 @@ export function languageSectionForDocument(
   return document.config_version === 'jc002' ? 'localization' : 'language_info';
 }
 
+function protocolSectionForV2(
+  document: Record<string, unknown>,
+  section: DocumentSectionKey,
+): unknown {
+  if (document.config_version !== 'jc002') return document[section];
+  if (
+    section === 'canopen' ||
+    section === 'sdo_info' ||
+    advancedConfigSections.includes(section as (typeof advancedConfigSections)[number])
+  ) {
+    const protocol = activeControllerProtocolProfile(document)?.protocol;
+    if (section === 'sdo_info') return protocol?.sdo_info;
+    if (section === 'canopen') return protocol?.canopen;
+    return protocol?.[
+      section as 'pdo_global_param' | 'pdo_condition' | 'pdo_recv' | 'pdo_send'
+    ];
+  }
+  if (section === 'battery_monitor') {
+    return activeBatteryProtocolProfile(document)?.protocol.battery_monitor;
+  }
+  if (section === 'fault_code_info') {
+    return activeFaultCodeProtocolProfile(document)?.protocol.fault_code_info;
+  }
+  return document[section];
+}
+
 export function configSectionForEditor(
   document: Record<string, unknown>,
   key: NavigationKey,
   context: JsonEditorContext,
 ) {
   const jsonEditorKey = jsonEditorKeyForModule(key, context);
-  if (jsonEditorKey === 'sdo') return document.sdo_info;
+  if (jsonEditorKey === 'sdo') return protocolSectionForV2(document, 'sdo_info');
   if (jsonEditorKey === 'pdo-simple') return document.pdo_simple_send_recv;
   if (jsonEditorKey === 'pdo-advanced') {
+    const source = context.configVersion === 'jc002'
+      ? activeControllerProtocolProfile(document)?.protocol
+      : document;
     return Object.fromEntries(
-      advancedConfigSections.map((section) => [section, document[section]]),
+      advancedConfigSections.map((section) => [section, source?.[section]]),
     );
   }
   if (key === 'language') return document[languageSectionForDocument(document)];
   const section = documentSectionForModule(key);
-  return section ? document[section] : null;
+  return section ? protocolSectionForV2(document, section) : null;
 }
 
 export function restorePathsForEditor(
@@ -133,6 +167,15 @@ export function restorePathsForEditor(
   document?: Record<string, unknown>,
 ) {
   const jsonEditorKey = jsonEditorKeyForModule(key, context);
+  if (
+    context.configVersion === 'jc002' &&
+    (jsonEditorKey === 'sdo' ||
+      jsonEditorKey === 'pdo-advanced' ||
+      key === 'canopen-export' ||
+      key === 'battery-monitor')
+  ) {
+    return [['protocol_profiles']];
+  }
   if (jsonEditorKey === 'sdo') return [['sdo_info']];
   if (jsonEditorKey === 'pdo-simple') return [['pdo_simple_send_recv']];
   if (jsonEditorKey === 'pdo-advanced') return advancedConfigSections.map((section) => [section]);

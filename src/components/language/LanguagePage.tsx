@@ -17,6 +17,7 @@ import { runSystemDialog } from '../../utils/systemDialog';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { EmptyState } from '../EmptyState';
 import { LanguageComparisonView } from './LanguageComparisonView';
+import { LanguageNameTable } from './LanguageNameTable';
 import { LanguageSidebar } from './LanguageSidebar';
 import {
   type TranslateLogEntry,
@@ -28,9 +29,12 @@ import {
 import { TranslationTable } from './TranslationTable';
 import { TranslationToolbar } from './TranslationToolbar';
 import type { FilterMode, TranslationRow } from './types';
-import type {
-  LocalizationScope,
-  LocalizationScopeOption,
+import {
+  getLanguageDocumentLabel,
+  isLocaleNameKey,
+  localeNameKey,
+  type LocalizationScope,
+  type LocalizationScopeOption,
 } from './localizationAdapter';
 import { useLanguageIndex } from './useLanguageIndex';
 import './language.css';
@@ -156,12 +160,7 @@ function readSavedTranslateOptions(): SavedTranslateOptions {
 }
 
 function getLabel(document: LanguageDocument, code: string): string {
-  return document.language_labels?.[code] ?? code;
-}
-
-function externalTranslationKeys(document: LanguageDocument) {
-  const indexedKeys = new Set(document.list_inner);
-  return Object.keys(document.list_translate).filter((key) => !indexedKeys.has(key));
+  return getLanguageDocumentLabel(document, code);
 }
 
 function normalizeDocument(
@@ -169,33 +168,53 @@ function normalizeDocument(
   codes: string[],
   labels?: Record<string, string>,
 ): LanguageDocument {
-  const nextLabels = labels ?? document.language_labels ?? {};
-  const nextTranslate: Record<string, unknown> = {};
-  for (let i = 0; i < codes.length; i++) {
-    const code = codes[i];
-    const oldCode = document.list_code_language[i];
-    if (oldCode && oldCode !== code) {
-      const oldTranslations = document.list_translate[oldCode] as
-        | Record<string, string>
-        | undefined;
-      if (oldTranslations) {
-        nextLabels[code] = nextLabels[code] ?? nextLabels[oldCode] ?? code;
-        delete nextLabels[oldCode];
-      }
+  const isV2 = Boolean(document.language_name_keys);
+  const nextLabels = { ...(labels ?? document.language_labels ?? {}) };
+  const nextTranslate: Record<string, unknown> = { ...document.list_translate };
+  if (isV2) {
+    const nextNameKeys = Object.fromEntries(codes.map((code) => [code, localeNameKey(code)]));
+    const requiredNameKeys = new Set(Object.values(nextNameKeys));
+    for (const key of Object.keys(nextTranslate)) {
+      if (isLocaleNameKey(key) && !requiredNameKeys.has(key)) delete nextTranslate[key];
+    }
+    for (const code of codes) {
+      const key = nextNameKeys[code];
+      nextTranslate[key] = Object.fromEntries(
+        codes.map((locale) => [
+          locale,
+          ((nextTranslate[key] as Record<string, string> | undefined)?.[locale] ?? ''),
+        ]),
+      );
     }
   }
-  for (const key of document.list_inner) {
-    nextTranslate[key] = document.list_translate[key] ?? {};
+  for (const [key, value] of Object.entries(nextTranslate)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const translations = value as Record<string, string>;
+      nextTranslate[key] = Object.fromEntries(
+        codes.map((code) => [code, translations[code] ?? '']),
+      );
+    }
   }
-  for (const key of externalTranslationKeys(document)) {
-    nextTranslate[key] = document.list_translate[key] ?? {};
-  }
-  return {
+  const normalized: LanguageDocument = {
+    ...document,
     list_code_language: codes,
     list_inner: document.list_inner,
     list_translate: nextTranslate,
-    language_labels: nextLabels,
   };
+  if (isV2) {
+    normalized.default_locale =
+      document.default_locale && codes.includes(document.default_locale)
+        ? document.default_locale
+        : (codes[0] ?? '');
+    normalized.language_name_keys = Object.fromEntries(
+      codes.map((code) => [code, localeNameKey(code)]),
+    );
+    delete normalized.language_labels;
+  } else {
+    normalized.language_labels = nextLabels;
+    delete normalized.language_name_keys;
+  }
+  return normalized;
 }
 
 export function LanguagePage({
@@ -409,19 +428,44 @@ export function LanguagePage({
   function handleAddLanguage(code: string, label: string) {
     if (document.list_code_language.includes(code)) return;
     setSingleLanguageImportStatus(null);
+    const isV2 = Boolean(document.language_name_keys);
+    const nextCodes = [...document.list_code_language, code];
     const nextTranslate: Record<string, unknown> = { ...document.list_translate };
-    for (const key of visibleLanguageKeys) {
+    for (const key of Object.keys(nextTranslate)) {
       const existing = (nextTranslate[key] as Record<string, string>) ?? {};
       nextTranslate[key] = { ...existing, [code]: '' };
     }
+    if (isV2) {
+      const displayLocale = document.default_locale ?? document.list_code_language[0] ?? code;
+      for (const existingCode of document.list_code_language) {
+        const nameKey = document.language_name_keys?.[existingCode] ?? localeNameKey(existingCode);
+        const values = (nextTranslate[nameKey] as Record<string, string> | undefined) ?? {};
+        nextTranslate[nameKey] = {
+          ...values,
+          [code]: values[displayLocale]?.trim() || existingCode,
+        };
+      }
+      const key = localeNameKey(code);
+      nextTranslate[key] = Object.fromEntries(
+        nextCodes.map((locale) => [locale, label]),
+      );
+      onUpdate(
+        normalizeDocument(
+          {
+            ...document,
+            list_translate: nextTranslate,
+            language_name_keys: {
+              ...(document.language_name_keys ?? {}),
+              [code]: key,
+            },
+          },
+          nextCodes,
+        ),
+      );
+      return;
+    }
     const nextLabels = { ...(document.language_labels ?? {}), [code]: label };
-    onUpdate(
-      normalizeDocument(
-        { ...document, list_translate: nextTranslate, language_labels: nextLabels },
-        [...document.list_code_language, code],
-        nextLabels,
-      ),
-    );
+    onUpdate(normalizeDocument({ ...document, list_translate: nextTranslate }, nextCodes, nextLabels));
   }
 
   function handleSelectLanguage(code: string | null) {
@@ -430,13 +474,28 @@ export function LanguagePage({
   }
 
   function handleRemoveLanguage(code: string) {
-    if (code === 'zh' || document.list_code_language.length <= 1) return;
+    if (document.list_code_language.length <= 1) return;
     setSingleLanguageImportStatus(null);
     const nextCodes = document.list_code_language.filter((c) => c !== code);
+    const nextTranslate = { ...document.list_translate };
+    if (document.language_name_keys) {
+      delete nextTranslate[document.language_name_keys[code] ?? localeNameKey(code)];
+    }
     const nextLabels = { ...(document.language_labels ?? {}) };
     delete nextLabels[code];
+    const nextDocument: LanguageDocument = {
+      ...document,
+      list_translate: nextTranslate,
+      language_labels: nextLabels,
+    };
+    if (document.language_name_keys) {
+      const nextNameKeys = { ...document.language_name_keys };
+      delete nextNameKeys[code];
+      nextDocument.language_name_keys = nextNameKeys;
+      delete nextDocument.language_labels;
+    }
     onUpdate(
-      normalizeDocument({ ...document, language_labels: nextLabels }, nextCodes, nextLabels),
+      normalizeDocument(nextDocument, nextCodes, nextLabels),
     );
   }
 
@@ -445,15 +504,14 @@ export function LanguagePage({
     if (oldCode !== newCode && document.list_code_language.includes(newCode)) return;
     setSingleLanguageImportStatus(null);
     const nextCodes = document.list_code_language.map((c) => (c === oldCode ? newCode : c));
+    const nextTranslate = { ...document.list_translate };
+    const isV2 = Boolean(document.language_name_keys);
     const nextLabels = { ...(document.language_labels ?? {}) };
     if (oldCode !== newCode) {
-      delete nextLabels[oldCode];
-    }
-    nextLabels[newCode] = newLabel;
-    const nextTranslate = { ...document.list_translate };
-    if (oldCode !== newCode) {
-      for (const key of visibleLanguageKeys) {
-        const translations = (nextTranslate[key] as Record<string, string>) ?? {};
+      for (const key of Object.keys(nextTranslate)) {
+        const translations = {
+          ...((nextTranslate[key] as Record<string, string> | undefined) ?? {}),
+        };
         if (oldCode in translations) {
           const value = translations[oldCode];
           delete translations[oldCode];
@@ -461,7 +519,44 @@ export function LanguagePage({
           nextTranslate[key] = translations;
         }
       }
+      if (isV2) {
+        const oldNameKey = document.language_name_keys?.[oldCode] ?? localeNameKey(oldCode);
+        const newNameKey = localeNameKey(newCode);
+        if (nextTranslate[oldNameKey] !== undefined) {
+          nextTranslate[newNameKey] = nextTranslate[oldNameKey];
+          delete nextTranslate[oldNameKey];
+        }
+      } else {
+        delete nextLabels[oldCode];
+      }
     }
+    if (isV2) {
+      const nameKey = localeNameKey(newCode);
+      const nextDefaultLocale =
+        document.default_locale === oldCode
+          ? newCode
+          : document.default_locale && nextCodes.includes(document.default_locale)
+            ? document.default_locale
+            : (nextCodes[0] ?? newCode);
+      const displayLocale = nextDefaultLocale;
+      const values = (nextTranslate[nameKey] as Record<string, string>) ?? {};
+      nextTranslate[nameKey] = { ...values, [displayLocale]: newLabel };
+      onUpdate(
+        normalizeDocument(
+          {
+            ...document,
+            default_locale: nextDefaultLocale,
+            list_translate: nextTranslate,
+            language_name_keys: Object.fromEntries(
+              nextCodes.map((code) => [code, localeNameKey(code)]),
+            ),
+          },
+          nextCodes,
+        ),
+      );
+      return;
+    }
+    nextLabels[newCode] = newLabel;
     onUpdate(
       normalizeDocument(
         { ...document, list_translate: nextTranslate, language_labels: nextLabels },
@@ -547,7 +642,7 @@ export function LanguagePage({
   }
 
   function handleUpdateKey(index: number, _oldKey: string, newKey: string) {
-    if (protectedKeys.has(_oldKey)) return;
+    if (protectedKeys.has(_oldKey) || isLocaleNameKey(_oldKey) || isLocaleNameKey(newKey)) return;
     if (document.list_inner.includes(newKey) || document.list_translate[newKey] !== undefined)
       return;
     const nextInner = [...document.list_inner];
@@ -625,7 +720,12 @@ export function LanguagePage({
 
   function handleAddKey() {
     const key = newKeyInput.trim();
-    if (!key || document.list_inner.includes(key) || document.list_translate[key] !== undefined)
+    if (
+      !key ||
+      isLocaleNameKey(key) ||
+      document.list_inner.includes(key) ||
+      document.list_translate[key] !== undefined
+    )
       return;
     const translations: Record<string, string> = {};
     for (const code of document.list_code_language) {
@@ -1113,6 +1213,9 @@ export function LanguagePage({
               onToggleLogs={() => setShowTranslateLogs((current) => !current)}
               onClearLogs={() => setTranslateLogs([])}
             />
+            {scope.kind === 'common' && document.language_name_keys ? (
+              <LanguageNameTable document={document} onUpdateValue={handleUpdateValue} />
+            ) : null}
             <TranslationTable
               document={document}
               sourceLanguage={translateSourceLanguage}

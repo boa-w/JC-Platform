@@ -19,11 +19,11 @@ use crate::domain::pdo::{
     PdoSimpleImportReport,
 };
 use crate::domain::project::{
-    create_legacy_project_document, migrate_legacy_project_document, normalize_v2_pdo_document,
-    parse_legacy_project_document, save_project_as as save_project_as_document,
-    validate_project_version_contract, LoadedProject, MigratedProject, NewProjectRequest,
-    ProjectParseReport, ProjectSummary, ProjectValidationReport, SaveProjectAsReport,
-    SaveProjectAsRequest, SaveProjectRequest,
+    create_legacy_project_document, materialize_active_protocol_profiles,
+    migrate_legacy_project_document, parse_legacy_project_document,
+    save_project_as as save_project_as_document, validate_project_version_contract, LoadedProject,
+    MigratedProject, NewProjectRequest, ProjectParseReport, ProjectSummary,
+    ProjectValidationReport, SaveProjectAsReport, SaveProjectAsRequest, SaveProjectRequest,
 };
 use crate::domain::project_compat::sanitize_document_for_target;
 use crate::domain::protocol_manager::{
@@ -668,9 +668,8 @@ pub fn create_project(request: NewProjectRequest) -> Result<LoadedProject, Strin
 /// 将项目 JSON 写回磁盘并返回更新后的加载结果。
 #[tauri::command]
 pub fn save_project(request: SaveProjectRequest) -> Result<LoadedProject, String> {
-    let document = normalize_v2_pdo_document(request.document)?;
-    validate_project_version_contract(&document)?;
-    let document = sanitize_document_for_target(&request.path, document);
+    validate_project_version_contract(&request.document)?;
+    let document = sanitize_document_for_target(&request.path, request.document);
     json_store::write_json(&request.path, &document).map_err(|error| error.to_string())?;
     load_project_from_document(request.path, document)
 }
@@ -815,7 +814,6 @@ pub fn remove_ui_resource_option_document(
 
 /// 从已解析的 JSON 文档构建 `LoadedProject`（摘要 + 校验 + 原始文档）。
 fn load_project_from_document(path: String, document: Value) -> Result<LoadedProject, String> {
-    let document = normalize_v2_pdo_document(document)?;
     let summary = ProjectSummary::from_legacy_value(Some(path), &document);
     let validation = ProjectValidationReport::from_legacy_value(&document);
 
@@ -951,13 +949,23 @@ pub fn convert_pdo_simple_project(document: Value) -> PdoSimpleConversionReport 
 
 #[tauri::command]
 pub fn parse_pdo_advanced_project(document: Value) -> PdoAdvancedParseReport {
+    let document = match materialize_active_controller_profile(document) {
+        Ok(document) => document,
+        Err(error) => {
+            return PdoAdvancedParseReport {
+                valid: false,
+                document: None,
+                errors: vec![error],
+            }
+        }
+    };
     parse_pdo_advanced_document(&document)
 }
 
 #[tauri::command]
 pub fn parse_pdo_advanced_file(path: String) -> Result<PdoAdvancedParseReport, String> {
     let document = json_store::read_json::<Value>(&path).map_err(|error| error.to_string())?;
-    Ok(parse_pdo_advanced_document(&document))
+    Ok(parse_pdo_advanced_project(document))
 }
 
 #[tauri::command]
@@ -1157,6 +1165,18 @@ pub fn generate_can_test_data(
 /// 分析旧项目并生成 CANopen 兼容转换报告。
 #[tauri::command]
 pub fn analyze_canopen_conversion(document: Value) -> canopen_convert::CanopenConversionReport {
+    let document = match materialize_active_controller_profile(document) {
+        Ok(document) => document,
+        Err(error) => {
+            return canopen_convert::CanopenConversionReport {
+                valid: false,
+                nodes: Vec::new(),
+                files: Vec::new(),
+                warnings: vec![error],
+                model: Value::Object(Default::default()),
+            }
+        }
+    };
     canopen_convert::convert_canopen_document(&document)
 }
 
@@ -1166,7 +1186,16 @@ pub fn export_canopen_package(
     output_dir: String,
     document: Value,
 ) -> Result<canopen_convert::CanopenConversionReport, String> {
+    let document = materialize_active_controller_profile(document)?;
     canopen_convert::export_canopen_package(&output_dir, &document)
+}
+
+fn materialize_active_controller_profile(document: Value) -> Result<Value, String> {
+    if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        materialize_active_protocol_profiles(&document)
+    } else {
+        Ok(document)
+    }
 }
 
 /// 将文本内容写入到指定文件路径。

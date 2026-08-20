@@ -4,6 +4,7 @@ import { Check, X } from 'lucide-react';
 import type { LanguageDocument } from '../../types/platform';
 import { ConfirmDialog } from '../ConfirmDialog';
 import type { LanguageProgress } from './types';
+import { getLanguageDocumentLabel } from './localizationAdapter';
 import type { LanguageIndex } from './useLanguageIndex';
 
 interface LanguageSidebarProps {
@@ -40,7 +41,7 @@ const commonLanguages = [
 ];
 
 function getLabel(document: LanguageDocument, code: string): string {
-  return document.language_labels?.[code] ?? code;
+  return getLanguageDocumentLabel(document, code);
 }
 
 export function LanguageSidebar({
@@ -77,7 +78,7 @@ export function LanguageSidebar({
   );
 
   function handleAdd() {
-    const code = newCode.trim().toLowerCase();
+    const code = newCode.trim();
     const label = newLabel.trim();
     if (!code || !label) return;
     if (document.list_code_language.includes(code)) return;
@@ -114,7 +115,7 @@ export function LanguageSidebar({
 
   function commitEditLang() {
     if (!editingLang) return;
-    const newCode = editCode.trim().toLowerCase();
+    const newCode = editCode.trim();
     const newLabel = editLabel.trim();
     if (!newCode || !newLabel) return;
     if (newCode !== editingLang && document.list_code_language.includes(newCode)) return;
@@ -197,9 +198,8 @@ export function LanguageSidebar({
         {progressList.map((lang) => {
           const pct = lang.total > 0 ? Math.round((lang.translated / lang.total) * 100) : 0;
           const isSelected = selectedLanguage === lang.code;
-          const isZh = lang.code === 'zh';
           const isEditing = editingLang === lang.code;
-          const normalizedEditCode = editCode.trim().toLowerCase();
+          const normalizedEditCode = editCode.trim();
           const editCodeExists =
             isEditing &&
             normalizedEditCode !== lang.code &&
@@ -207,7 +207,7 @@ export function LanguageSidebar({
           const canCommitEdit = Boolean(editCode.trim() && editLabel.trim()) && !editCodeExists;
           return (
             <div
-              className={`lang-sidebar-item ${isSelected ? 'active' : ''} ${isZh ? 'lang-sidebar-item--zh' : ''}`}
+              className={`lang-sidebar-item ${isSelected ? 'active' : ''}`}
               key={lang.code}
             >
               {isEditing ? (
@@ -223,7 +223,6 @@ export function LanguageSidebar({
                         if (e.key === 'Enter') commitEditLang();
                         if (e.key === 'Escape') cancelEditLang();
                       }}
-                      disabled={isZh}
                     />
                     <input
                       aria-label={t('language.sidebar.editName', { code: lang.code })}
@@ -290,7 +289,7 @@ export function LanguageSidebar({
                       </span>
                     </div>
                   </button>
-                  {!isZh && languageManagementEnabled ? (
+                  {languageManagementEnabled ? (
                     <div className="lang-sidebar-item-actions">
                       <button
                         aria-label={t('language.sidebar.editLanguage', { language: lang.label })}

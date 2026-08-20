@@ -2,6 +2,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
+use crate::domain::project::materialize_active_protocol_profiles;
 use crate::domain::protocol::battery_monitor::{
     BATTERY_MONITOR_BINARY_VERSION, BATTERY_MONITOR_SCHEMA_VERSION,
 };
@@ -1185,9 +1186,34 @@ fn fault_cases(specs: &[FrameSpec]) -> Vec<CanTestCase> {
 
 pub fn generate_can_test_data(document: &Value, profile: Option<&str>) -> CanTestGenerateResponse {
     let selected = GenerateProfile::from_label(profile);
+    let document = if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        match materialize_active_protocol_profiles(document) {
+            Ok(document) => document,
+            Err(error) => {
+                return CanTestGenerateResponse {
+                    frames: Vec::new(),
+                    setting_entries: Vec::new(),
+                    frame_count: 0,
+                    cases: Vec::new(),
+                    coverage: CanTestCoverage {
+                        frame_count: 0,
+                        signal_count: 0,
+                        setting_entry_count: 0,
+                        case_count: 0,
+                        generated_frame_count: 0,
+                        generated_setting_entry_count: 0,
+                        covered_scenarios: Vec::new(),
+                    },
+                    warnings: vec![error],
+                }
+            }
+        }
+    } else {
+        document.clone()
+    };
     let mut warnings = Vec::new();
-    let specs = collect_frame_specs(document, &mut warnings);
-    let setting_specs = collect_setting_specs(document, &mut warnings);
+    let specs = collect_frame_specs(&document, &mut warnings);
+    let setting_specs = collect_setting_specs(&document, &mut warnings);
     let mut cases = vec![nominal_case(&specs, &setting_specs)];
 
     if matches!(

@@ -23,9 +23,6 @@ v2 发布包必须由 `config_version: "jc002"` 项目单独构建。不要把 v
   "config_version": "jc002",
   "protocol_profiles": {
     "schema_version": 2,
-    "active_controller_profile_id": "inmotion",
-    "active_battery_profile_id": "bms-a",
-    "active_fault_code_profile_id": "fault.default",
     "controller_profiles": [
       { "profile_id": "acm", "controller_family": "ACM", "controller_revision": "1.x" },
       { "profile_id": "inmotion", "controller_family": "Inmotion", "controller_revision": "2.x" }
@@ -55,16 +52,13 @@ v2 发布包必须由 `config_version: "jc002"` 项目单独构建。不要把 v
     "i18n_message_total": 0,
     "protocol_profile_version": 2,
     "controller_profile_total": 2,
-    "active_controller_profile_id": "inmotion",
     "battery_profile_total": 1,
-    "active_battery_profile_id": "bms-a",
     "fault_code_profile_total": 1,
-    "active_fault_code_profile_id": "fault.default",
     "protocol_bundle_version": 1,
     "protocol_profile_payloads": [
       {
-        "controller_profile_id": "inmotion",
-        "battery_profile_id": "bms-a",
+        "scope": "controller",
+        "profile_id": "inmotion",
         "base_addr": 0,
         "file_size": 0,
         "crc": 0,
@@ -75,34 +69,33 @@ v2 发布包必须由 `config_version: "jc002"` 项目单独构建。不要把 v
 }
 ```
 
-`protocol_profiles` 只是一段升级身份元数据，不是协议定义。上位机从当前激活的控制器
-Profile、锂电 Profile 和故障码 Profile 的笛卡尔积构建多个自包含 PDO、SDO、i18n、fault
-和可选 battery v2 payload，顺序写入同一个 `data.bin`；清单只记录三类 Profile 的身份和 payload 索引，避免
-把锂电帧、信号和显示项复制到 JSON。即使编辑文档只有单套协议，导出器也会生成
-`controller.default` 的统一 Bundle。
+`protocol_profiles` 只是一段升级身份元数据，不是协议定义。上位机从项目中的控制器
+Profile、锂电 Profile 和故障码 Profile 分别构建多个自包含 PDO、SDO、i18n、fault 和
+可选 battery v2 payload，顺序写入同一个 `data.bin`；清单只记录三类 Profile 的身份和
+payload 索引，避免把锂电帧、信号和显示项复制到 JSON。即使只有单套协议，也必须显式
+提供一个 Profile，使用同一套 Bundle ABI。
 下位机在升级前和启动加载时校验整包 CRC、选中 payload CRC 和索引一致性。
 
 当前 ABI 是一个包含多套自描述 payload 的发布包；选中 payload 重定位后仍是一套运行时表：
 
 ```text
 项目 controller_profiles[N] + battery_profiles[M] + fault_code_profiles[K]
-          ↓ 分别选择三个 active ID
-全部控制器 Profile × 全部锂电 Profile × 全部故障码 Profile 组合
+          ↓ 分别生成独立 scope payload
+controller payloads + battery payloads + fault payloads
            ↓
 ConfigUpdate.json 身份/索引 + data.bin payload bundle
            ↓ 更新后重启
-下位机按持久化选择重定位对应 jc002 payload
+下位机按自身保存的各 scope 选择重定位对应 jc002 payload
 ```
 
-因此切换 ACM/Inmotion 或不同锂电协议时，只需在对应页面选择目标 Profile，再重新导出
-并更新整包。当前下位机不在运行中切换协议；高级设置写入控制器选择后，重启读取对应
-payload，也不读取设备 JSON 中的完整 Profile 定义。
+因此切换 ACM/Inmotion 或不同锂电协议时，上位机只需在对应页面维护 Profile 并重新导出
+整包；最终选择由下位机高级设置完成。当前下位机不在运行中切换协议，选择写入持久化设置
+后重启读取对应 payload，也不读取设备 JSON 中的完整 Profile 定义。
 
-上位机的 Profile 选择来自同一个 `.jcpro`：CANopen 页面只改变
-`active_controller_profile_id`，锂电页面只改变 `active_battery_profile_id`，故障码页面只改变
-`active_fault_code_profile_id`。复制或重命名 Profile 会修改 `.jcpro` 中相应的 Profile 数组；协议编辑器的 PDO/SDO/battery/fault 改动会写回
-当前激活项。导出器不会根据顶层镜像猜测另一侧配置，也不会将未激活 Profile 混入运行时
-二进制；所有组合都会进入同一个 `data.bin`，激活 ID 只决定默认 payload（offset 0）。
+上位机的 Profile 选择只存在于编辑器内存：CANopen 页面选择控制器 Profile，锂电页面选择
+锂电 Profile，故障码页面选择故障码 Profile。复制或重命名 Profile 会修改 `.jcpro` 中相应
+数组；协议编辑器的 PDO/SDO/battery/fault 改动会写回当前数组项。保存 `.jcpro` 时不会
+写入 `active_*_profile_id`，导出器也不会把选择写入 manifest 或 `data.bin`。
 
 例如同一文件可以长期保存以下组合素材：
 
@@ -110,14 +103,11 @@ payload，也不读取设备 JSON 中的完整 Profile 定义。
 controller_profiles: [acm, inmotion6]
 battery_profiles: [default, bms-a]
 fault_code_profiles: [generic, inmotion]
-当前导出: active_controller_profile_id=inmotion6
-          active_battery_profile_id=default
-          active_fault_code_profile_id=generic
 ```
 
-需要切换到 ACM 时，在上位机选择 `acm` 后重新导出即可；锂电仍为 `default`。需要切换
-锂电时只在锂电页面选择目标项，控制器选择不会被覆盖。每次选择变化都必须重新生成
-`ConfigUpdate.json` 与 `data.bin`，设备更新后重启生效。
+需要切换到 ACM 时，设备在高级设置中选择 `acm`，无需修改 jcpro 的格式；上位机只需确保
+`acm` Profile 已包含在本次发布包中。锂电和故障码同理，三个 scope 可以独立选择，是否能
+搭配由下位机策略决定。
 
 v2 禁止字段：
 
@@ -128,8 +118,8 @@ language_code
 
 ### battery v2 的清单边界
 
-`.jcpro` 中的 `battery_monitor` 是上位机编辑模型，包含完整的帧、信号、显示项和
-格式化定义。导出时这些内容只写入 `data.bin` 的 battery v2 段。
+`.jcpro` 中 `battery_profiles[].protocol.battery_monitor` 是上位机编辑模型，包含完整的
+帧、信号、显示项和格式化定义。导出时这些内容只写入 `data.bin` 的 battery v2 段。
 
 因此，jc002 的 `ConfigUpdate.json` 不包含顶层 `battery_monitor` 大对象，只在
 `data_description` 中提供以下运行时索引：
@@ -166,9 +156,8 @@ pdo_global_param + pdo_condition + pdo_recv + pdo_send
 ```
 
 `pdo_simple_send_recv` 不属于 v2 项目文件，也不会作为构建 fallback。CSV/Excel 简化表只
-能通过上位机实时数据页的“导入并转换 PDO”入口使用；转换报告通过后，四段会写回当前激活
-的控制器 Profile，并同步顶层编辑镜像。构建请求若残留简单段会直接失败，防止生成空的或
-与页面显示不一致的 PDO payload。
+能通过上位机实时数据页的“导入并转换 PDO”入口使用；转换报告通过后，四段会写回当前控制器
+Profile。构建请求若残留简单段或任何根级协议字段会直接失败。
 
 全局参数的 `inner` 在构建前还要通过 CommonCanPdo 固定 ABI 校验。`-1` 表示不绑定，
 `0..16` 必须对应上位机随附的
@@ -220,7 +209,7 @@ FNV-1a 32-bit hash 升序 -> 原始 UTF-8 key 字典序
 | ---: | --- | --- |
 | 0 | `u32` | magic，字节为 `LVI2` |
 | 4 | `u16` | schema version，固定 2 |
-| 6 | `u16` | reserved |
+| 6 | `u16` | flags，固定为 `I18N_FLAG_LOCALE_NAME_KEYS = 1` |
 | 8 | `u32` | total size |
 | 12 | `u16` | locale count |
 | 14 | `u16` | default locale index |
@@ -241,7 +230,7 @@ CRC32 使用多项式 `0xEDB88320`。计算时把 header 的 36..39 字节视为
 | 4 | `u32` | 本 locale 翻译表偏移 |
 | 8 | `u16` | plural rule ID |
 | 10 | `u16` | direction：0 LTR，1 RTL |
-| 12 | `u32` | reserved |
+| 12 | `u32` | 目标 locale 的语言名称 `message_index` |
 
 plural rule ID：0 中日韩等无复数；1 英语型；2 俄语型；3 阿拉伯语型；4 法语/葡萄牙语型。
 
@@ -255,7 +244,8 @@ plural rule ID：0 中日韩等无复数；1 英语型；2 俄语型；3 阿拉�
 | 9 | 3 bytes | reserved |
 | 12 | `u32` | reserved |
 
-运行时先按 hash 二分，再比较原始 key，不能只依赖 hash。
+运行时先按 hash 二分，再比较原始 key，不能只依赖 hash。语言名称记录必须精确指向
+`language.name.<locale>`，并通过当前 locale 的普通翻译表读取显示文本。
 
 ### Translation table
 

@@ -34,16 +34,8 @@ const V2_JCPRO_TOP_LEVEL_ORDER: &[&str] = &[
     "project",
     "export_info",
     "ui_info",
-    "canopen",
     "protocol_profiles",
-    "fault_code_info",
-    "pdo_global_param",
-    "pdo_condition",
-    "pdo_recv",
-    "pdo_send",
-    "sdo_info",
     "history_ui",
-    "battery_monitor",
     "localization",
 ];
 const LOCALIZATION_FIELD_ORDER: &[&str] = &["default_locale", "locale_order", "locales"];
@@ -190,9 +182,22 @@ pub fn sanitize_document_for_target(path: &str, mut document: Value) -> Value {
     match document.get("config_version").and_then(Value::as_str) {
         Some(V2_CONFIG_VERSION) => {
             if let Some(object) = document.as_object_mut() {
-                // jc002 stores only advanced PDO sections. The project layer
-                // performs any legacy table conversion before this boundary.
-                object.remove("pdo_simple_send_recv");
+                // jc002 persists protocol data only inside protocol_profiles.
+                // These root keys are editor projections or obsolete v2 input;
+                // never let them leak into the canonical jcpro file.
+                for section in [
+                    "pdo_simple_send_recv",
+                    "pdo_global_param",
+                    "pdo_condition",
+                    "pdo_recv",
+                    "pdo_send",
+                    "sdo_info",
+                    "canopen",
+                    "battery_monitor",
+                    "fault_code_info",
+                ] {
+                    object.remove(section);
+                }
                 // Profile activation belongs to the device. Keep any
                 // editor-only selection out of the persisted jcpro file.
                 if let Some(profiles) = object
@@ -925,13 +930,21 @@ mod tests {
 
     #[test]
     fn sanitize_jc002_preserves_version_and_localization_schema() {
-        let document = json!({
+        let mut document = json!({
             "localization": {
-                "locales": {
-                    "en": { "translations": { "z.key": "Z", "a.key": "A" }, "enabled": true },
-                    "zh": { "translations": { "z.key": "中Z", "a.key": "中A" }, "enabled": true }
-                },
                 "locale_order": ["zh", "en"],
+                "locales": {
+                    "zh": { "translations": {
+                        "language.name.zh": "中文",
+                        "language.name.en": "英文",
+                        "z.key": "中Z",
+                        "a.key": "中A"
+                    }, "enabled": true },
+                    "en": { "translations": {
+                        "language.name.zh": "Chinese",
+                        "language.name.en": "English"
+                    }, "enabled": true }
+                },
                 "default_locale": "zh"
             },
             "fault_code_info": {
@@ -996,6 +1009,15 @@ mod tests {
             "config_version": "jc002"
         });
 
+        let fault_code_info = document["fault_code_info"].take();
+        document.as_object_mut().unwrap().remove("fault_code_info");
+        document["protocol_profiles"]["fault_code_profiles"] = json!([{
+            "profile_id": "fault.default",
+            "fault_family": "generic",
+            "fault_revision": "2",
+            "protocol": { "fault_code_info": fault_code_info }
+        }]);
+
         let sanitized = sanitize_document_for_target("demo.jcpro", document);
 
         assert_eq!(sanitized["config_version"], "jc002");
@@ -1028,9 +1050,11 @@ mod tests {
             "battery_a"
         );
         assert!(sanitized.get("language_info").is_none());
-        assert!(sanitized["fault_code_info"].get("codes").is_none());
+        let sanitized_fault_code_info = &sanitized["protocol_profiles"]["fault_code_profiles"][0]
+            ["protocol"]["fault_code_info"];
+        assert!(sanitized_fault_code_info.get("codes").is_none());
         assert_eq!(
-            sanitized["fault_code_info"]
+            sanitized_fault_code_info
                 .as_object()
                 .unwrap()
                 .keys()
@@ -1046,11 +1070,11 @@ mod tests {
             ]
         );
         assert_eq!(
-            sanitized["fault_code_info"]["sources"][0]["source_key"],
+            sanitized_fault_code_info["sources"][0]["source_key"],
             "traction"
         );
         assert_eq!(
-            sanitized["fault_code_info"]["bindings"][0]["source_key"],
+            sanitized_fault_code_info["bindings"][0]["source_key"],
             "pump"
         );
         assert_eq!(
@@ -1069,7 +1093,7 @@ mod tests {
                 .keys()
                 .map(String::as_str)
                 .collect::<Vec<_>>(),
-            vec!["a.key", "z.key"]
+            vec!["a.key", "language.name.en", "language.name.zh", "z.key"]
         );
     }
 }

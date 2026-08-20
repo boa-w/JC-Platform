@@ -19,6 +19,7 @@ import type {
   CanOpenSdoChannelDocument,
   LoadedProject,
 } from '../../types/platform';
+import { activeControllerProtocolProfile } from '../protocol-profiles/protocolProfiles';
 import './canopen-export.css';
 import {
   formatNodeId,
@@ -308,8 +309,11 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
   const report = canopenExport.report;
   const document = loadedProject?.document;
   const isJc002 = record(document)?.config_version === 'jc002';
-  const config = readCanopen(document);
-  const errors = config ? validateCanopen(document, config) : [];
+  const controllerProtocol = isJc002
+    ? activeControllerProtocolProfile(document)?.protocol
+    : record(document);
+  const config = readCanopen(controllerProtocol);
+  const errors = config ? validateCanopen(controllerProtocol, config) : [];
   const [nodeIdDisplayBase, setNodeIdDisplayBase] =
     useState<NodeIdDisplayBase>(readNodeIdDisplayBase);
   const [nodeIdDrafts, setNodeIdDrafts] = useState<Record<number, string>>({});
@@ -440,8 +444,8 @@ export function CanopenExportPage({ loadedProject, onUpdateDocument, onUpdateSec
     const usedKeys = new Set(config.pdos.map((pdo) => pdo.key));
     let suffix = config.pdos.length + 1;
     while (usedKeys.has(`pdo_${suffix}`)) suffix += 1;
-    const sourceSection = sourceCount(document, 'pdo_recv') > 0 ? 'pdo_recv' : 'pdo_send';
-    const source = sourceValue(document, sourceSection, 0);
+    const sourceSection = sourceCount(controllerProtocol, 'pdo_recv') > 0 ? 'pdo_recv' : 'pdo_send';
+    const source = sourceValue(controllerProtocol, sourceSection, 0);
     updateConfig({
       ...config,
       pdos: [

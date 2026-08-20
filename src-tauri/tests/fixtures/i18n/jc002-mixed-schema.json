@@ -1,9 +1,35 @@
 {
   "config_version": "jc002",
+  "project": { "name": "jc002 mixed schema fixture" },
+  "export_info": {},
+  "device": { "version": "jxc_7size_meter", "resolution_w": 800, "resolution_h": 480 },
+  "ui_info": {},
   "language_info": { "list_code_language": ["zh"], "list_inner": [], "list_translate": {} },
   "localization": {
     "default_locale": "en-US",
     "locale_order": ["en-US"],
-    "locales": { "en-US": { "enabled": true, "translations": { "menu.root": "Menu" } } }
+    "locales": { "en-US": { "enabled": true, "translations": {
+      "language.name.en-US": "English",
+      "menu.root": "Menu"
+    } } }
+  },
+  "protocol_profiles": {
+    "schema_version": 2,
+    "controller_profiles": [
+      {
+        "profile_id": "controller.default",
+        "controller_family": "generic",
+        "controller_revision": "",
+        "protocol": {
+          "pdo_global_param": [],
+          "pdo_condition": [],
+          "pdo_recv": [],
+          "pdo_send": [],
+          "sdo_info": { "type": 0, "user_auth": 0, "name_index": 0, "message_key": "menu.root", "children": [] }
+        }
+      }
+    ],
+    "battery_profiles": [],
+    "fault_code_profiles": []
   }
 }
