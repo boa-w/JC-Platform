@@ -19,6 +19,7 @@ use std::collections::{HashMap, HashSet};
 
 const PROTOCOL_PROFILE_SCHEMA_VERSION: u64 = 2;
 const PROTOCOL_PROFILE_ID_MAX_BYTES: usize = 63;
+const DISPLAY_DATA_SCHEMA_VERSION: u8 = 1;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -161,6 +162,10 @@ impl ProjectValidationReport {
                     warnings.push(error);
                     schema_valid = false;
                 }
+                if let Err(error) = validate_display_data_contract(value) {
+                    warnings.push(error);
+                    schema_valid = false;
+                }
             }
             Some(version) if version != "jc001" => {
                 warnings.push(format!("不支持的 config_version：{version}"));
@@ -242,6 +247,7 @@ pub fn validate_project_version_contract(document: &Value) -> Result<(), String>
         validate_v2_pdo_inner_bindings(document)?;
     }
     validate_protocol_profiles_contract(document)?;
+    validate_display_data_contract(document)?;
     validate_fault_code_version_contract(document)?;
     validate_canopen_contract(document)?;
     validate_battery_monitor_version_contract(document)
@@ -278,6 +284,232 @@ fn validate_v2_document_layout(document: &Value) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// 校验 jc002 的逻辑显示数据契约。
+///
+/// 该段位于现有固定 SDO 40 字节记录之外，用于描述一个业务显示值的
+/// 请求、多个响应变体以及由稳定设置参数选择的显示格式。
+pub fn validate_display_data_contract(document: &Value) -> Result<(), String> {
+    let Some(value) = document.get("display_data") else {
+        return Ok(());
+    };
+    if document.get("config_version").and_then(Value::as_str) != Some("jc002") {
+        return Err("display_data 仅支持 jc002 项目".to_string());
+    }
+    let display_data = serde_json::from_value::<DisplayDataDocument>(value.clone())
+        .map_err(|error| format!("jc002 display_data 配置格式无效：{error}"))?;
+    if display_data.schema_version != DISPLAY_DATA_SCHEMA_VERSION {
+        return Err(format!(
+            "jc002 display_data 必须使用 schema_version={}，当前为 {}",
+            DISPLAY_DATA_SCHEMA_VERSION, display_data.schema_version
+        ));
+    }
+
+    let mut data_ids = HashSet::new();
+    let mut parameter_refs = Vec::new();
+    for (signal_index, signal) in display_data.signals.iter().enumerate() {
+        let signal_label = format!("display_data.signals[{}]", signal_index);
+        let data_id = signal.data_id.trim();
+        if data_id.is_empty() || !data_ids.insert(data_id.to_string()) {
+            return Err(format!("{signal_label}.data_id 必须非空且唯一"));
+        }
+        if signal.sources.is_empty() {
+            return Err(format!("{signal_label}.sources 不能为空"));
+        }
+        if signal.format_profiles.is_empty() {
+            return Err(format!("{signal_label}.format_profiles 不能为空"));
+        }
+        for (profile_name, profile) in &signal.format_profiles {
+            if profile_name.trim().is_empty() {
+                return Err(format!("{signal_label}.format_profiles 存在空名称"));
+            }
+            if profile.decimals > 6 {
+                return Err(format!(
+                    "{signal_label}.format_profiles.{profile_name}.decimals 不能大于6"
+                ));
+            }
+            if !matches!(profile.rounding.as_str(), "truncate" | "nearest") {
+                return Err(format!(
+                    "{signal_label}.format_profiles.{profile_name}.rounding 仅支持 truncate 或 nearest"
+                ));
+            }
+        }
+
+        let selector = signal.format_selector.as_ref().ok_or_else(|| {
+            format!("{signal_label}.format_selector 必须声明，以绑定下位机设置参数")
+        })?;
+        let parameter_ref = selector.parameter_ref.trim();
+        if parameter_ref.is_empty() {
+            return Err(format!(
+                "{signal_label}.format_selector.parameter_ref 不能为空"
+            ));
+        }
+        parameter_refs.push(parameter_ref.to_string());
+        validate_display_format_reference(
+            &signal_label,
+            &signal.format_profiles,
+            &selector.fallback,
+            "fallback",
+        )?;
+        if selector.value_map.is_empty() {
+            return Err(format!("{signal_label}.format_selector.value_map 不能为空"));
+        }
+        for (value, profile_name) in &selector.value_map {
+            if value.trim().is_empty() {
+                return Err(format!(
+                    "{signal_label}.format_selector.value_map 存在空参数值"
+                ));
+            }
+            validate_display_format_reference(
+                &signal_label,
+                &signal.format_profiles,
+                profile_name,
+                &format!("value_map[{value}]"),
+            )?;
+        }
+
+        let mut source_ids = HashSet::new();
+        for (source_index, source) in signal.sources.iter().enumerate() {
+            let source_label = format!("{signal_label}.sources[{source_index}]");
+            let source_id = source.source_id.trim();
+            if source_id.is_empty() || !source_ids.insert(source_id.to_string()) {
+                return Err(format!("{source_label}.source_id 必须非空且唯一"));
+            }
+            if source.kind != "canopen_sdo" {
+                return Err(format!("{source_label}.kind 当前仅支持 canopen_sdo"));
+            }
+            if source.channel_ref.trim().is_empty() {
+                return Err(format!("{source_label}.channel_ref 不能为空"));
+            }
+            if source.request.command != 0x40 {
+                return Err(format!(
+                    "{source_label}.request.command 必须为0x40（CANopen上传请求）"
+                ));
+            }
+            if source.request.data.len() != 4 {
+                return Err(format!(
+                    "{source_label}.request.data 必须为4字节CANopen expedited数据"
+                ));
+            }
+            if source.response_variants.is_empty() {
+                return Err(format!("{source_label}.response_variants 不能为空"));
+            }
+            let mut variant_keys = HashSet::new();
+            for (variant_index, variant) in source.response_variants.iter().enumerate() {
+                let variant_label = format!("{source_label}.response_variants[{variant_index}]");
+                let width = display_data_raw_width(&variant.raw_type).ok_or_else(|| {
+                    format!("{variant_label}.raw_type 不支持：{}", variant.raw_type)
+                })?;
+                if let Some(expected_type) = display_data_response_type(variant.command) {
+                    if expected_type != variant.raw_type {
+                        return Err(format!(
+                            "{variant_label}.command=0x{:02X} 必须匹配 raw_type={}，当前为 {}",
+                            variant.command, expected_type, variant.raw_type
+                        ));
+                    }
+                } else {
+                    return Err(format!(
+                        "{variant_label}.command 仅支持0x4B(U16)或0x43(U32)，当前为0x{:02X}",
+                        variant.command
+                    ));
+                }
+                if usize::from(variant.raw_offset) + width > 8 {
+                    return Err(format!(
+                        "{variant_label}.raw_offset={} 与{}字节宽度超出CAN数据区",
+                        variant.raw_offset, width
+                    ));
+                }
+                if variant.scale_den <= 0 {
+                    return Err(format!("{variant_label}.scale_den 必须大于0"));
+                }
+                if !variant_keys.insert((
+                    variant.command,
+                    variant.raw_offset,
+                    variant.raw_type.clone(),
+                )) {
+                    return Err(format!("{variant_label} 响应变体重复"));
+                }
+                validate_display_format_reference(
+                    &variant_label,
+                    &signal.format_profiles,
+                    &variant.default_format,
+                    "default_format",
+                )?;
+            }
+        }
+    }
+
+    let mut known_parameter_ids = HashSet::new();
+    if let Some(protocol_profiles) = document
+        .get("protocol_profiles")
+        .and_then(Value::as_object)
+        .and_then(|root| root.get("controller_profiles"))
+        .and_then(Value::as_array)
+    {
+        for profile in protocol_profiles {
+            if let Some(sdo_info) = profile
+                .get("protocol")
+                .and_then(|protocol| protocol.get("sdo_info"))
+            {
+                collect_display_data_parameter_ids(sdo_info, &mut known_parameter_ids);
+            }
+        }
+    }
+    for parameter_ref in parameter_refs {
+        if !known_parameter_ids.contains(&parameter_ref) {
+            return Err(format!(
+                "display_data.format_selector.parameter_ref 未找到对应的sdo_info.parameter_id：{parameter_ref}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_display_format_reference(
+    signal_label: &str,
+    format_profiles: &HashMap<String, DisplayDataFormatProfileDocument>,
+    reference: &str,
+    field_label: &str,
+) -> Result<(), String> {
+    if reference == "variant_default" || format_profiles.contains_key(reference) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{signal_label}.format_selector.{field_label} 引用不存在的格式：{reference}"
+        ))
+    }
+}
+
+fn display_data_raw_width(raw_type: &str) -> Option<usize> {
+    match raw_type {
+        "u8" | "i8" => Some(1),
+        "u16" | "i16" => Some(2),
+        "u32" | "i32" => Some(4),
+        _ => None,
+    }
+}
+
+fn display_data_response_type(command: u8) -> Option<&'static str> {
+    match command {
+        0x4B => Some("u16"),
+        0x43 => Some("u32"),
+        _ => None,
+    }
+}
+
+fn collect_display_data_parameter_ids(value: &Value, ids: &mut HashSet<String>) {
+    if let Some(parameter_id) = value.get("parameter_id").and_then(Value::as_str) {
+        let parameter_id = parameter_id.trim();
+        if !parameter_id.is_empty() {
+            ids.insert(parameter_id.to_string());
+        }
+    }
+    if let Some(children) = value.get("children").and_then(Value::as_array) {
+        for child in children {
+            collect_display_data_parameter_ids(child, ids);
+        }
+    }
 }
 
 /// Validate the jc002 controller, battery, and fault-code protocol registries.
@@ -1999,8 +2231,76 @@ pub struct ProjectDocument {
     pub protocol_mapping: Vec<Value>,
     pub language_info: Option<LanguageDocument>,
     pub localization: Option<Value>,
+    #[serde(default)]
+    pub display_data: Option<DisplayDataDocument>,
     pub battery_monitor: Option<Value>,
     pub fault_code_info: Option<Value>,
+}
+
+/// jc002 逻辑显示数据描述。它不改变现有 PDO/SDO 二进制记录。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DisplayDataDocument {
+    #[serde(default)]
+    pub schema_version: u8,
+    #[serde(default)]
+    pub signals: Vec<DisplayDataSignalDocument>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DisplayDataSignalDocument {
+    pub data_id: String,
+    #[serde(default)]
+    pub sources: Vec<DisplayDataSourceDocument>,
+    #[serde(default)]
+    pub format_profiles: HashMap<String, DisplayDataFormatProfileDocument>,
+    #[serde(default)]
+    pub format_selector: Option<DisplayDataFormatSelectorDocument>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DisplayDataSourceDocument {
+    pub source_id: String,
+    pub kind: String,
+    #[serde(default)]
+    pub channel_ref: String,
+    pub request: DisplayDataRequestDocument,
+    #[serde(default)]
+    pub response_variants: Vec<DisplayDataResponseVariantDocument>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DisplayDataRequestDocument {
+    pub command: u8,
+    pub index: u16,
+    pub subindex: u8,
+    #[serde(default)]
+    pub data: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DisplayDataResponseVariantDocument {
+    pub command: u8,
+    pub raw_type: String,
+    pub raw_offset: u8,
+    pub scale_num: i64,
+    pub scale_den: i64,
+    pub default_format: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DisplayDataFormatProfileDocument {
+    #[serde(default)]
+    pub decimals: u8,
+    #[serde(default)]
+    pub rounding: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DisplayDataFormatSelectorDocument {
+    pub parameter_ref: String,
+    #[serde(default)]
+    pub value_map: HashMap<String, String>,
+    pub fallback: String,
 }
 
 /// jc002 CANopen 拓扑描述。该段是项目的协议语义层，不替代现有 PDO 二进制表。
@@ -2215,6 +2515,9 @@ pub struct SdoNodeDocument {
     pub handle: Option<u8>,
     pub handle_name: Option<String>,
     pub handle_param: Option<String>,
+    /// 跨页面引用的稳定设置参数标识，不参与现有40字节SDO记录编码。
+    #[serde(default)]
+    pub parameter_id: Option<String>,
     pub fid: Option<u32>,
     pub mid: Option<u32>,
     pub sid: Option<u32>,
@@ -2369,12 +2672,99 @@ mod tests {
         })
     }
 
+    fn v2_document_with_hour_display_data() -> Value {
+        let mut document = valid_v2_document();
+        document["protocol_profiles"]["controller_profiles"][0]["protocol"]["sdo_info"] = json!({
+            "type": 0,
+            "children": [{
+                "type": 1,
+                "parameter_id": "hour_display_mode",
+                "mid": 8194,
+                "sid": 122
+            }]
+        });
+        document["display_data"] = json!({
+            "schema_version": 1,
+            "signals": [{
+                "data_id": "hour_meter",
+                "sources": [{
+                    "source_id": "hour_meter_sdo",
+                    "kind": "canopen_sdo",
+                    "channel_ref": "controller_node_8",
+                    "request": {
+                        "command": 64,
+                        "index": 8227,
+                        "subindex": 15,
+                        "data": [0, 0, 0, 0]
+                    },
+                    "response_variants": [
+                        {
+                            "command": 75,
+                            "raw_type": "u16",
+                            "raw_offset": 4,
+                            "scale_num": 1,
+                            "scale_den": 1,
+                            "default_format": "integer"
+                        },
+                        {
+                            "command": 67,
+                            "raw_type": "u32",
+                            "raw_offset": 4,
+                            "scale_num": 1,
+                            "scale_den": 10,
+                            "default_format": "decimal"
+                        }
+                    ]
+                }],
+                "format_profiles": {
+                    "integer": { "decimals": 0, "rounding": "truncate" },
+                    "decimal": { "decimals": 1, "rounding": "nearest" }
+                },
+                "format_selector": {
+                    "parameter_ref": "hour_display_mode",
+                    "value_map": { "0": "integer", "1": "decimal" },
+                    "fallback": "variant_default"
+                }
+            }]
+        });
+        document
+    }
+
     #[test]
     fn validation_accepts_v2_without_v1_or_optional_sections() {
         let report = ProjectValidationReport::from_legacy_value(&valid_v2_document());
 
         assert!(report.valid, "{:?}", report.warnings);
         assert!(report.missing_sections.is_empty());
+    }
+
+    #[test]
+    fn display_data_accepts_u16_and_u32_hour_variants() {
+        let document = v2_document_with_hour_display_data();
+
+        assert!(validate_display_data_contract(&document).is_ok());
+    }
+
+    #[test]
+    fn display_data_rejects_response_command_and_raw_type_mismatch() {
+        let mut document = v2_document_with_hour_display_data();
+        document["display_data"]["signals"][0]["sources"][0]["response_variants"][0]["raw_type"] =
+            json!("u32");
+
+        let error = validate_display_data_contract(&document).unwrap_err();
+
+        assert!(error.contains("必须匹配 raw_type"), "{error}");
+    }
+
+    #[test]
+    fn display_data_rejects_zero_scale_denominator() {
+        let mut document = v2_document_with_hour_display_data();
+        document["display_data"]["signals"][0]["sources"][0]["response_variants"][1]["scale_den"] =
+            json!(0);
+
+        let error = validate_display_data_contract(&document).unwrap_err();
+
+        assert!(error.contains("scale_den 必须大于0"), "{error}");
     }
 
     #[test]

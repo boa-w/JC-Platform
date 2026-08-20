@@ -21,7 +21,7 @@ use crate::domain::pdo::{
 use crate::domain::project::{
     materialize_active_protocol_profiles, materialize_protocol_profile_scope,
     normalize_protocol_profiles_for_export, protocol_profiles_manifest, validate_canopen_contract,
-    validate_protocol_profiles_contract, ProjectExportSettings,
+    validate_display_data_contract, validate_protocol_profiles_contract, ProjectExportSettings,
 };
 use crate::domain::project_compat::legacy_language_entries;
 use crate::domain::protocol::battery_monitor::{
@@ -605,6 +605,17 @@ pub fn compare_project_binary(request: BinaryCompareRequest) -> BinaryCompareRep
 pub fn build_project_binary(document: &Value) -> BinaryBuildReport {
     let export_settings = project_export_settings(document);
     if document.get("config_version").and_then(Value::as_str) == Some("jc002") {
+        if let Err(error) = validate_display_data_contract(document) {
+            return BinaryBuildReport {
+                valid: false,
+                file_size: 0,
+                crc: 0,
+                data_description: DataDescriptionPlan::empty(Vec::new()),
+                bytes: Vec::new(),
+                warnings: Vec::new(),
+                errors: vec![error],
+            };
+        }
         if document.get("pdo_simple_send_recv").is_some() {
             return BinaryBuildReport {
                 valid: false,
@@ -966,6 +977,13 @@ fn build_config_update_manifest(
     }
     if let Some(protocol_profiles) = protocol_profiles_manifest(&request.document) {
         manifest.insert("protocol_profiles".to_string(), protocol_profiles);
+    }
+    if let Some(display_data) = request.document.get("display_data") {
+        if let Err(error) = validate_display_data_contract(&request.document) {
+            errors.push(format!("导出 display_data 失败：{error}"));
+        } else {
+            manifest.insert("display_data".to_string(), display_data.clone());
+        }
     }
     manifest.insert(
         "screen_src".to_string(),
@@ -3388,6 +3406,70 @@ mod tests {
                 .unwrap()
                 .len(),
             1
+        );
+    }
+
+    #[test]
+    fn jc002_manifest_includes_display_data_description() {
+        let mut document = i18n_fixture("jc002-valid");
+        document["protocol_profiles"]["controller_profiles"][0]["protocol"]["sdo_info"]
+            ["children"] = json!([{ "type": 1, "parameter_id": "hour_display_mode" }]);
+        document["display_data"] = json!({
+            "schema_version": 1,
+            "signals": [{
+                "data_id": "hour_meter",
+                "sources": [{
+                    "source_id": "hour_meter_sdo",
+                    "kind": "canopen_sdo",
+                    "channel_ref": "controller_node_8",
+                    "request": {
+                        "command": 64,
+                        "index": 8227,
+                        "subindex": 15,
+                        "data": [0, 0, 0, 0]
+                    },
+                    "response_variants": [
+                        {
+                            "command": 75,
+                            "raw_type": "u16",
+                            "raw_offset": 4,
+                            "scale_num": 1,
+                            "scale_den": 1,
+                            "default_format": "integer"
+                        },
+                        {
+                            "command": 67,
+                            "raw_type": "u32",
+                            "raw_offset": 4,
+                            "scale_num": 1,
+                            "scale_den": 10,
+                            "default_format": "decimal"
+                        }
+                    ]
+                }],
+                "format_profiles": {
+                    "integer": { "decimals": 0, "rounding": "truncate" },
+                    "decimal": { "decimals": 1, "rounding": "nearest" }
+                },
+                "format_selector": {
+                    "parameter_ref": "hour_display_mode",
+                    "value_map": { "0": "integer", "1": "decimal" },
+                    "fallback": "variant_default"
+                }
+            }]
+        });
+
+        let binary = build_project_binary(&document);
+        assert!(
+            binary.valid,
+            "unexpected binary errors: {:?}",
+            binary.errors
+        );
+        let manifest = fixture_manifest(document, &binary);
+
+        assert_eq!(
+            manifest["display_data"]["signals"][0]["data_id"],
+            "hour_meter"
         );
     }
 

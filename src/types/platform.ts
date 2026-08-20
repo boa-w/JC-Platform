@@ -257,8 +257,59 @@ export interface ProjectDocument {
   language_info?: LanguageDocument;
   /** v2 语言数据(jc002);与 v1 `language_info` 互斥。 */
   localization?: LocalizationDocument;
+  /** jc002 逻辑显示数据：一个业务值可绑定多个 CANopen 响应变体。 */
+  display_data?: DisplayDataDocument;
   battery_monitor?: BatteryMonitorProtocol;
   fault_code_info?: FaultCodeInfo;
+}
+
+/** jc002 逻辑显示数据段；独立于固定40字节 SDO v2记录。 */
+export interface DisplayDataDocument {
+  schema_version: 1;
+  signals: DisplayDataSignalDocument[];
+}
+
+export interface DisplayDataSignalDocument {
+  data_id: string;
+  sources: DisplayDataSourceDocument[];
+  format_profiles: Record<string, DisplayDataFormatProfileDocument>;
+  format_selector: DisplayDataFormatSelectorDocument;
+}
+
+export interface DisplayDataSourceDocument {
+  source_id: string;
+  kind: 'canopen_sdo' | string;
+  channel_ref: string;
+  request: DisplayDataRequestDocument;
+  response_variants: DisplayDataResponseVariantDocument[];
+}
+
+export interface DisplayDataRequestDocument {
+  command: number;
+  index: number;
+  subindex: number;
+  data: number[];
+}
+
+export interface DisplayDataResponseVariantDocument {
+  command: number;
+  raw_type: 'u16' | 'u32' | string;
+  raw_offset: number;
+  scale_num: number;
+  scale_den: number;
+  default_format: string;
+}
+
+export interface DisplayDataFormatProfileDocument {
+  decimals: number;
+  rounding: 'truncate' | 'nearest' | string;
+}
+
+export interface DisplayDataFormatSelectorDocument {
+  /** 稳定的 sdo_info.parameter_id，不使用菜单数组下标。 */
+  parameter_ref: string;
+  value_map: Record<string, string>;
+  fallback: string;
 }
 
 /** 发布导出相关的路径与文件名配置。 */
@@ -831,6 +882,8 @@ export interface SdoNodeDocument {
   handle?: number;
   handle_name?: string;
   handle_param?: string;
+  /** 稳定设置参数引用键，供 display_data.format_selector.parameter_ref 使用。 */
+  parameter_id?: string;
   fid?: number;
   mid?: number;
   sid?: number;

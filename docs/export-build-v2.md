@@ -116,6 +116,28 @@ language_addr
 language_code
 ```
 
+### display_data 清单段
+
+如果项目声明了 jc002 根级 `display_data`，导出器会在 `ConfigUpdate.json` 顶层原样
+写入该段。它是显示数据的规范化元数据，不会伪装成现有 `pdo_sdo_data.bin` 的固定
+40 字节 SDO v2 记录，也不会改变二进制段地址。
+
+小时计的运行时语义由以下链路组成：
+
+```text
+0x40 23 20 0F 00 00 00 00
+          │
+          ├─ 0x4B：Byte4~5，小端 U16，整数小时
+          └─ 0x43：Byte4~7，小端 U32，0.1小时/bit
+                         │
+                         └─ parameter_ref -> 0:整数 / 1:一位小数
+```
+
+导出校验会检查响应命令字和原始类型匹配（`0x4B`/`u16`、`0x43`/`u32`）、取值范围、
+字节偏移、非零 `scale_den`、格式引用以及 `format_selector.parameter_ref` 是否能在
+控制器 Profile 的 `sdo_info.parameter_id` 中找到。选择参数的 SDO 对象仍由普通 SDO
+菜单和二进制记录描述；`display_data` 只负责把同一个显示值的多个响应来源统一起来。
+
 ### battery v2 的清单边界
 
 `.jcpro` 中 `battery_profiles[].protocol.battery_monitor` 是上位机编辑模型，包含完整的

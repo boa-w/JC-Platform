@@ -12,6 +12,9 @@ default-run = "jc_custom_platform_tauri"
 name = "jc_custom_platform_tauri_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[lints.rust]
+linker_messages = "allow"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

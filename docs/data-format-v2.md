@@ -54,6 +54,7 @@
 | `protocol_profiles.fault_code_profiles` | 必填数组，可为空 | 故障码目录的持久化来源 |
 | `pdo_simple_send_recv` | 禁止 | 仅作为 CSV/Excel 导入的临时输入，转换后不得写回 jc002 |
 | 根级 PDO/SDO/CANopen/锂电/故障字段 | 禁止 | 不保留编辑镜像，不自动迁移或回退 |
+| `display_data` | 可选 | 逻辑显示值及其多 CAN 响应变体；不改变现有固定 SDO 记录 |
 
 禁止字段：
 
@@ -62,6 +63,75 @@ language_info
 ```
 
 检测到禁止字段时加载、保存和构建均立即失败，不忽略、不迁移、不回落。
+
+### 一个显示值的多 CAN 响应变体
+
+`display_data` 用稳定的 `data_id` 表示同一个业务显示值；`sources[]` 表示来源，
+`response_variants[]` 表示同一查询可能返回的不同命令字和宽度。小时计示例如下：
+
+```json
+{
+  "display_data": {
+    "schema_version": 1,
+    "signals": [
+      {
+        "data_id": "hour_meter",
+        "sources": [
+          {
+            "source_id": "hour_meter_sdo",
+            "kind": "canopen_sdo",
+            "channel_ref": "controller_node_8",
+            "request": {
+              "command": 64,
+              "index": 8227,
+              "subindex": 15,
+              "data": [0, 0, 0, 0]
+            },
+            "response_variants": [
+              {
+                "command": 75,
+                "raw_type": "u16",
+                "raw_offset": 4,
+                "scale_num": 1,
+                "scale_den": 1,
+                "default_format": "integer"
+              },
+              {
+                "command": 67,
+                "raw_type": "u32",
+                "raw_offset": 4,
+                "scale_num": 1,
+                "scale_den": 10,
+                "default_format": "decimal"
+              }
+            ]
+          }
+        ],
+        "format_profiles": {
+          "integer": { "decimals": 0, "rounding": "truncate" },
+          "decimal": { "decimals": 1, "rounding": "nearest" }
+        },
+        "format_selector": {
+          "parameter_ref": "hour_display_mode",
+          "value_map": { "0": "integer", "1": "decimal" },
+          "fallback": "variant_default"
+        }
+      }
+    ]
+  }
+}
+```
+
+数值对应关系为：`command=64` 即 `0x40`，索引 `8227` 即 `0x2023`，
+子索引 `15` 即 `0x0F`；响应 `75` (`0x4B`) 从 Byte4~Byte5 按小端读取 U16，
+单位为整数小时；响应 `67` (`0x43`) 从 Byte4~Byte7 按小端读取 U32，
+`scale_den=10` 表示 0.1 小时/bit。U32 不因类型名称自动获得小数，倍率必须显式声明。
+
+`format_selector.parameter_ref` 必须引用控制器 Profile 的 `sdo_info` 参数
+`parameter_id`，例如 `hour_display_mode` 对应下位机对象 `0x2002:0x7A`，
+取值 `0` 为不带小数点、`1` 为带小数点。该引用使用稳定 ID，不使用菜单数组下标。
+导出时 `display_data` 原样写入 `ConfigUpdate.json`，现有 `pdo_sdo_data.bin` 的
+40 字节 SDO v2 记录保持不变。
 
 ### PDO 导入边界
 
