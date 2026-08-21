@@ -245,6 +245,19 @@ export const v2FaultProjectDocument = {
           sdo_info: richProjectDocument.sdo_info,
         },
       },
+      {
+        profile_id: 'controller.acm',
+        controller_family: 'acm',
+        controller_revision: 'v1',
+        localization_overlay: { locales: {} },
+        protocol: {
+          pdo_global_param: richProjectDocument.pdo_global_param,
+          pdo_condition: richProjectDocument.pdo_condition,
+          pdo_recv: richProjectDocument.pdo_recv,
+          pdo_send: richProjectDocument.pdo_send,
+          sdo_info: richProjectDocument.sdo_info,
+        },
+      },
     ],
     battery_profiles: [],
     fault_code_profiles: [

@@ -1,13 +1,15 @@
 import { ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type Dispatch, type SetStateAction, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ControllerProfileSelector } from '../../components/protocol/ControllerProfileSelector';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { useStableCollectionKeys } from '../../hooks/useStableCollectionKeys';
+import type { LoadedProject } from '../../types/platform';
 import type { JsonPath } from '../../utils/projectDirty';
 import {
   isKnownPdoInnerVariableId,
-  PDO_INNER_VARIABLES,
   PDO_INNER_VARIABLE_UNBOUND_ID,
+  PDO_INNER_VARIABLES,
 } from './pdoInnerVariableAbi';
 import { pdoSignalLayout } from './pdoLayout';
 import { formatFrameId, formatFrameIdPadded, type PdoEditorController } from './usePdoEditor';
@@ -15,6 +17,8 @@ import '../legacy-data.css';
 
 interface RealtimeDataPageProps {
   controller: PdoEditorController;
+  loadedProject: LoadedProject | null;
+  updateProjectSections: (sections: Record<string, unknown>) => void;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
   isModifiedPath: (path: JsonPath) => boolean;
@@ -23,6 +27,8 @@ interface RealtimeDataPageProps {
 
 export function RealtimeDataPage({
   controller,
+  loadedProject,
+  updateProjectSections,
   sidebarCollapsed,
   setSidebarCollapsed,
   isModifiedPath,
@@ -543,11 +549,18 @@ export function RealtimeDataPage({
   }
 
   return (
-    <section
-      className={
-        sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'
-      }
-    >
+    <>
+      {loadedProject ? (
+        <ControllerProfileSelector
+          document={loadedProject.document}
+          onUpdateSections={updateProjectSections}
+        />
+      ) : null}
+      <section
+        className={
+          sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'
+        }
+      >
       <div className="legacy-data-sidebar">
         <div className="legacy-data-sidebar-header">
           <div className="legacy-data-sidebar-title">{t('settingData.menu')}</div>
@@ -1269,7 +1282,8 @@ export function RealtimeDataPage({
           )}
         </div>
       </div>
-    </section>
+      </section>
+    </>
   );
 }
 

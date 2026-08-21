@@ -703,6 +703,7 @@ export function Dashboard({
               sidebarCollapsed={sidebarCollapsed}
               setSidebarCollapsed={setSidebarCollapsed}
               updateProjectDocument={updateProjectDocument}
+              updateProjectSections={updateProjectSections}
               isModifiedPath={isModifiedPath}
               restoreModifiedPath={restoreModifiedPath}
             />
@@ -711,6 +712,8 @@ export function Dashboard({
           {activeModule.key === 'realtime-data' ? (
             <RealtimeDataPage
               controller={pdoEditor}
+              loadedProject={loadedProject}
+              updateProjectSections={updateProjectSections}
               sidebarCollapsed={sidebarCollapsed}
               setSidebarCollapsed={setSidebarCollapsed}
               isModifiedPath={isModifiedPath}
@@ -788,7 +791,6 @@ export function Dashboard({
             <CanopenExportPage
               loadedProject={loadedProject}
               onUpdateDocument={updateProjectDocument}
-              onUpdateSections={updateProjectSections}
             />
           ) : null}
 

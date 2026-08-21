@@ -146,6 +146,34 @@ test('switches controller, battery, and fault profiles without producing root se
   );
 });
 
+test('switching the controller preserves fault Profile data byte-for-byte', () => {
+  const document = withAllProfileKinds() as ReturnType<typeof withAllProfileKinds> & {
+    protocol_profiles: {
+      fault_code_profiles: Array<Record<string, unknown>>;
+    };
+  };
+  const faultProfile = document.protocol_profiles.fault_code_profiles[0];
+  faultProfile.vendor_extension = { source_order: ['acm', 'inmotion'], enabled: true };
+  const protocol = faultProfile.protocol as Record<string, unknown>;
+  const faultCodeInfo = protocol.fault_code_info as Record<string, unknown>;
+  faultCodeInfo.runtime_extension = { retain_order: true, sentinel: 'fault-profile' };
+
+  const cloned = { ...document, ...addProtocolProfileSections(document, 'controller') };
+  const before = structuredClone(cloned.protocol_profiles.fault_code_profiles);
+  const sections = protocolProfileSectionsForSelection(
+    cloned,
+    'controller',
+    'controller.default_2',
+  );
+  const switched = syncProtocolProfileSections(cloned, sections) as typeof cloned;
+
+  assert.equal(
+    switched.protocol_profiles.active_controller_profile_id,
+    'controller.default_2',
+  );
+  assert.deepEqual(switched.protocol_profiles.fault_code_profiles, before);
+});
+
 test('keeps a battery patch in the selected battery Profile when the registry is updated atomically', () => {
   const document = withAllProfileKinds();
   const profiles = readProtocolProfiles(document);

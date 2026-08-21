@@ -150,6 +150,7 @@ export interface SettingDataPageProps {
   sidebarCollapsed: boolean;
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
   updateProjectDocument: (section: string, value: unknown) => void;
+  updateProjectSections: (sections: Record<string, unknown>) => void;
   isModifiedPath: (path: JsonPath) => boolean;
   restoreModifiedPath: (path: JsonPath) => void;
 }

@@ -2,6 +2,7 @@ import { ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { type ChangeEvent, useEffect, useId, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { ControllerProfileSelector } from '../../components/protocol/ControllerProfileSelector';
 import { getStorageItem, setStorageItem } from '../../utils/safeStorage';
 import {
   communicationIndexRadixStorageKey,
@@ -135,6 +136,7 @@ export function SettingDataPage({
   sidebarCollapsed,
   setSidebarCollapsed,
   updateProjectDocument,
+  updateProjectSections,
   isModifiedPath,
   restoreModifiedPath,
 }: SettingDataPageProps) {
@@ -624,6 +626,12 @@ export function SettingDataPage({
 
   return (
     <>
+      {loadedProject ? (
+        <ControllerProfileSelector
+          document={loadedProject.document}
+          onUpdateSections={updateProjectSections}
+        />
+      ) : null}
       <section
         className={
           sidebarCollapsed ? 'legacy-data-page legacy-data-page--collapsed' : 'legacy-data-page'

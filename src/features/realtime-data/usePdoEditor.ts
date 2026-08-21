@@ -53,9 +53,9 @@ export function usePdoEditor({
   const jumpRowRef = useRef<HTMLTableRowElement | null>(null);
 
   const simpleDocument = (source?.pdo_simple_send_recv as PdoSimpleDocument | undefined) ?? null;
-  const controllerProtocol = source
-    ? activeControllerProtocolProfile(source)?.protocol
-    : undefined;
+  const controllerProfile = source ? activeControllerProtocolProfile(source) : null;
+  const controllerProfileId = controllerProfile?.profile_id ?? '';
+  const controllerProtocol = controllerProfile?.protocol;
   const advancedSource = source?.config_version === 'jc002' ? controllerProtocol : source;
   const advancedDocument: PdoAdvancedDocument | null = source
     ? {
@@ -82,11 +82,13 @@ export function usePdoEditor({
   const activeAdvancedFrame =
     activeAdvancedFrameIndex < 0 ? null : advancedFrames(selectedKind)[activeAdvancedFrameIndex];
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Profile identity intentionally resets local PDO selection state.
   useEffect(() => {
+    setSelectedKind('pdo_recv');
     setMode(supportsSimpleMode ? 'simple' : 'advanced');
     setSelectedSimpleFrameId(null);
     setSelectedAdvancedFrameId(null);
-  }, [supportsSimpleMode]);
+  }, [supportsSimpleMode, controllerProfileId]);
 
   useEffect(() => {
     if (isActive && mode === 'simple' && jumpTarget !== null) {

@@ -58,14 +58,22 @@ export function useSettingData({
   const [settingColumnWidths, setSettingColumnWidths] =
     useState<Record<string, number>>(loadSettingColumnWidths);
 
-  const controllerProtocol = loadedDocument
-    ? activeControllerProtocolProfile(loadedDocument)?.protocol
-    : undefined;
+  const controllerProfile = loadedDocument
+    ? activeControllerProtocolProfile(loadedDocument)
+    : null;
+  const controllerProfileId = controllerProfile?.profile_id ?? '';
+  const controllerProtocol = controllerProfile?.protocol;
   const sdoDocument = loadedDocument
     ? ((loadedDocument.config_version === 'jc002'
         ? controllerProtocol?.sdo_info
         : loadedDocument.sdo_info) as SdoNodeDocument | undefined) ?? null
     : null;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Profile identity intentionally resets local SDO selection state.
+  useEffect(() => {
+    setSelectedSettingPath(null);
+    setEditingSettingPath(null);
+  }, [controllerProfileId]);
 
   function updateSdoDocument(next: SdoNodeDocument) {
     updateProjectDocument('sdo_info', next);

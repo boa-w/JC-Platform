@@ -355,8 +355,11 @@ export function protocolProfileSectionsForSelection(
         ? profiles.battery_profiles.some((profile) => profile.profile_id === profileId)
         : profiles.fault_code_profiles.some((profile) => profile.profile_id === profileId);
   if (!selected) return {};
-  const nextProfiles: ProtocolProfilesDocument = {
-    ...profiles,
+
+  const root = isRecord(document) ? document : {};
+  const rawProfiles = isRecord(root.protocol_profiles) ? root.protocol_profiles : profiles;
+  const nextProfiles = {
+    ...rawProfiles,
     ...(scope === 'controller'
       ? { active_controller_profile_id: profileId }
       : scope === 'battery'

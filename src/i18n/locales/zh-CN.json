@@ -765,6 +765,8 @@
     "title": "协议 Profile",
     "controllerTitle": "控制器协议 Profile",
     "controllerDescription": "独立管理控制器的 PDO、SDO 和 CANopen 拓扑。",
+    "controllerContextTitle": "控制器协议",
+    "controllerContextDescription": "选择当前设置数据和实时数据对应的控制器 Profile。",
     "batteryTitle": "锂电监控 Profile",
     "batteryDescription": "独立管理锂电帧、信号、显示项和超时策略。",
     "faultTitle": "故障码 Profile",
@@ -790,7 +792,8 @@
     "clone": "复制 Profile",
     "remove": "删除 Profile",
     "removeConfirm": "确定删除 Profile「{{id}}」吗？",
-    "count": "共 {{count}} 个 Profile"
+    "count": "共 {{count}} 个 Profile",
+    "revisionUnset": "未标注版本"
   },
   "canopenExport": {
     "title": "CANopen V2 构建",

@@ -77,6 +77,27 @@ test('shows the explicit jcpro schema in project management', async ({ page }) =
   await expect(page.getByText('JCPro V1 (jc001)', { exact: true })).toBeVisible();
 });
 
+test('shares the selected controller Profile across setting and realtime data pages', async ({
+  page,
+}) => {
+  await openV2FaultProject(page);
+
+  await page.getByRole('button', { name: '数据', exact: true }).click();
+  const dataNavigation = page.getByRole('navigation', { name: '数据 功能' });
+  await dataNavigation.getByRole('button', { name: '设置数据', exact: true }).click();
+  const settingSelector = page.getByRole('region', { name: '控制器协议' });
+  await expect(settingSelector).toBeVisible();
+  await expect(settingSelector.getByRole('button', { name: '新增空白 Profile' })).toBeVisible();
+  await expect(settingSelector.getByRole('button', { name: '复制 Profile' })).toBeVisible();
+  await expect(settingSelector.getByRole('button', { name: '删除 Profile' })).toBeVisible();
+  await settingSelector.getByLabel('当前控制器协议').selectOption('controller.acm');
+  await expect(settingSelector.getByLabel('当前控制器协议')).toHaveValue('controller.acm');
+
+  await dataNavigation.getByRole('button', { name: '实时数据', exact: true }).click();
+  const realtimeSelector = page.getByRole('region', { name: '控制器协议' });
+  await expect(realtimeSelector.getByLabel('当前控制器协议')).toHaveValue('controller.acm');
+});
+
 test('marks deprecated v1 signal and sidecar features', async ({ page }) => {
   await openRichProject(page);
 
