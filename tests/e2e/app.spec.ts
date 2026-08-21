@@ -354,12 +354,30 @@ test('edits the jc002 normalized fault catalog without flattening shared message
         .__SAVED_PROJECT_DOCUMENT__,
   );
   expect(saved).not.toBeNull();
-  expect(saved).toHaveProperty('fault_code_info');
-  const fault = saved?.fault_code_info as Record<string, unknown>;
+  const profiles = saved?.protocol_profiles as {
+    active_fault_code_profile_id?: string;
+    fault_code_profiles?: Array<{
+      profile_id: string;
+      localization_overlay?: {
+        locales?: Record<string, { translations?: Record<string, string> }>;
+      };
+      protocol?: { fault_code_info?: Record<string, unknown> };
+    }>;
+  };
+  const activeFaultProfile = profiles.fault_code_profiles?.find(
+    (profile) => profile.profile_id === profiles.active_fault_code_profile_id,
+  );
+  const fault = activeFaultProfile?.protocol?.fault_code_info;
+  expect(fault).toBeDefined();
   expect(fault.schema_version).toBe(2);
   expect(fault.codes).toBeUndefined();
   expect((fault.definitions as unknown[]).length).toBe(2);
   expect((fault.bindings as unknown[]).length).toBe(2);
+  expect(
+    activeFaultProfile?.localization_overlay?.locales?.en.translations?.[
+      'fault.message.dc_bus_low'
+    ],
+  ).toBe('DC bus voltage is low');
 });
 
 test('meets the serious accessibility baseline across primary surfaces', async ({ page }) => {

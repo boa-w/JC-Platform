@@ -129,8 +129,8 @@ export function useBatteryMonitorController({
   const documentGuard = useOperationGuard(document);
   const source = (document as Record<string, unknown> | null) ?? {};
   const isBatteryMonitorSupported = source.config_version === 'jc002';
-  const hasBatteryMonitor =
-    typeof source.battery_monitor === 'object' && source.battery_monitor !== null;
+  const activeBatteryProfile = activeBatteryProtocolProfile(source);
+  const hasBatteryMonitor = Boolean(activeBatteryProfile?.protocol.battery_monitor);
   const currentBatteryMonitorDocument = batteryMonitorDocument();
   const batteryValidation: BatteryValidationReport = validateBatteryMonitor(
     currentBatteryMonitorDocument,
